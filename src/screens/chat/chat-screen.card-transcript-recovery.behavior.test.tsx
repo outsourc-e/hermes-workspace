@@ -203,6 +203,7 @@ type ScreenInput = {
   inspectedChildCardId?: string
   sessionCardList: SessionCardListWire
   forcedSessionKey?: string
+  embedded?: boolean
 }
 
 const parentCard: SessionCard = {
@@ -404,7 +405,9 @@ async function mountChatScreen(
   function RouteComponent() {
     const [current, setCurrent] = useState(input)
     setInput = setCurrent
-    return <ChatScreen {...current} compact embedded />
+    return (
+      <ChatScreen {...current} compact embedded={current.embedded ?? true} />
+    )
   }
 
   const rootRoute = createRootRoute()
@@ -861,7 +864,9 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     )
     const mountedChat = await mountChatScreen(defaultInput())
 
-    await waitFor(async () => expect(screen.getByText(completeText)).toBeTruthy())
+    await waitFor(async () =>
+      expect(screen.getByText(completeText)).toBeTruthy(),
+    )
     expect(
       screen.queryByText(
         'Transcript recovery storage is unavailable. This complete transcript is not guaranteed to survive a reload until storage recovers.',
@@ -1223,7 +1228,8 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     await waitFor(async () => {
       expect(screen.getByText('partial answer before error')).toBeTruthy()
       expect(
-        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
+        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))
+          ?.messages,
       ).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1312,7 +1318,8 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     )
     await waitFor(async () =>
       expect(
-        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
+        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))
+          ?.messages,
       ).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1370,9 +1377,10 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     const baselineText = 'accepted baseline survives rejected admission'
     const rejectedText = 'candidate whose recovery readback fails'
     expect(
-      await replaceCardTranscriptRecoveryMessages({ cardId: parentCard.cardId }, [
-        message('user', baselineText, { clientId: 'accepted-baseline' }),
-      ]),
+      await replaceCardTranscriptRecoveryMessages(
+        { cardId: parentCard.cardId },
+        [message('user', baselineText, { clientId: 'accepted-baseline' })],
+      ),
     ).not.toBeNull()
 
     const requests = mockHttp()
@@ -1407,7 +1415,9 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       })
 
     const mountedScreen = await mountChatScreen(defaultInput())
-    await waitFor(async () => expect(screen.getByText(baselineText)).toBeTruthy())
+    await waitFor(async () =>
+      expect(screen.getByText(baselineText)).toBeTruthy(),
+    )
     submitSelection(rejectedText)
     await waitFor(async () => {
       expect(screen.queryByText(rejectedText)).toBeNull()
@@ -1417,6 +1427,11 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
         ),
       ).toBeTruthy()
       expect(requests).not.toContain('/api/send-stream')
+      expect(
+        screen.queryByRole('button', {
+          name: 'Reset Workspace chat recovery cache and retry',
+        }),
+      ).toBeNull()
     })
 
     mountedScreen.unmount()
@@ -1428,9 +1443,233 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     recoveryReadSpy.mockRestore()
 
     await mountChatScreen(defaultInput())
-    await waitFor(async () => expect(screen.getByText(baselineText)).toBeTruthy())
+    await waitFor(async () =>
+      expect(screen.getByText(baselineText)).toBeTruthy(),
+    )
     expect(screen.queryByText(rejectedText)).toBeNull()
     expect(requests).not.toContain('/api/send-stream')
+  })
+
+  it('explicitly discards only Workspace chat recovery storage, retries the exact failed admission, and starts transport only after it succeeds', async () => {
+    const baselineText = 'unsent baseline intentionally discarded by reset'
+    const candidateText = 'retry this exact failed admission after reset'
+    expect(
+      await replaceCardTranscriptRecoveryMessages(
+        { cardId: parentCard.cardId },
+        [message('user', baselineText, { clientId: 'discarded-baseline' })],
+      ),
+    ).not.toBeNull()
+    window.localStorage.setItem(
+      'workspace.card-transcript-recovery.v2:obsolete',
+      'obsolete recovery value',
+    )
+    window.localStorage.setItem('workspace.sidebar.collapsed', 'true')
+    window.sessionStorage.setItem('unrelated.application.key', 'keep me')
+    const clearSpy = vi.spyOn(Storage.prototype, 'clear')
+
+    const requests = mockHttp()
+    const originalPut = IDBObjectStore.prototype.put
+    const originalGet = IDBObjectStore.prototype.get
+    let rejectNextCandidateReadback = false
+    let rejectedOnce = false
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key,
+    ) {
+      if (
+        !rejectedOnce &&
+        this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+        JSON.stringify(value).includes(candidateText)
+      ) {
+        rejectNextCandidateReadback = true
+      }
+      return key === undefined
+        ? originalPut.call(this, value)
+        : originalPut.call(this, value, key)
+    })
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (
+      this: IDBObjectStore,
+      query,
+    ) {
+      if (
+        rejectNextCandidateReadback &&
+        this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+        query === parentCard.cardId
+      ) {
+        rejectNextCandidateReadback = false
+        rejectedOnce = true
+        throw new Error('forced transient Card recovery admission failure')
+      }
+      return originalGet.call(this, query)
+    })
+
+    await mountChatScreen({ ...defaultInput(), embedded: false })
+    submitSelection(candidateText)
+    const resetButton = await screen.findByRole('button', {
+      name: 'Reset Workspace chat recovery cache and retry',
+    })
+    expect(
+      screen.getByText(
+        'Unsent local Workspace chat recovery data will be discarded.',
+      ),
+    ).toBeTruthy()
+    expect(requests).not.toContain('/api/send-stream')
+
+    React.act(() => {
+      fireEvent.click(resetButton)
+      fireEvent.click(resetButton)
+    })
+    await waitFor(async () => {
+      expect(requests.filter((url) => url === '/api/send-stream')).toHaveLength(
+        1,
+      )
+    })
+
+    const recovery = await readCardTranscriptRecovery({
+      cardId: parentCard.cardId,
+    })
+    expect(recovery?.messages.map((entry) => entry.content)).toEqual([
+      [{ type: 'text', text: candidateText }],
+    ])
+    expect(
+      window.localStorage.getItem(
+        'workspace.card-transcript-recovery.v2:obsolete',
+      ),
+    ).toBeNull()
+    expect(window.localStorage.getItem('workspace.sidebar.collapsed')).toBe(
+      'true',
+    )
+    expect(window.sessionStorage.getItem('unrelated.application.key')).toBe(
+      'keep me',
+    )
+    expect(clearSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps a persistent admission failure unsent after scoped reset and exact retry', async () => {
+    const candidateText = 'persistent admission failure stays unsent'
+    const requests = mockHttp()
+    const originalPut = IDBObjectStore.prototype.put
+    const originalGet = IDBObjectStore.prototype.get
+    let rejectNextCandidateReadback = false
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key,
+    ) {
+      if (
+        this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+        JSON.stringify(value).includes(candidateText)
+      ) {
+        rejectNextCandidateReadback = true
+      }
+      return key === undefined
+        ? originalPut.call(this, value)
+        : originalPut.call(this, value, key)
+    })
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (
+      this: IDBObjectStore,
+      query,
+    ) {
+      if (
+        rejectNextCandidateReadback &&
+        this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+        query === parentCard.cardId
+      ) {
+        rejectNextCandidateReadback = false
+        throw new Error('forced persistent Card recovery admission failure')
+      }
+      return originalGet.call(this, query)
+    })
+
+    await mountChatScreen({ ...defaultInput(), embedded: false })
+    submitSelection(candidateText)
+    const resetButton = await screen.findByRole('button', {
+      name: 'Reset Workspace chat recovery cache and retry',
+    })
+    expect(requests).not.toContain('/api/send-stream')
+
+    React.act(() => fireEvent.click(resetButton))
+    await waitFor(async () => {
+      expect(
+        screen.getByText(
+          'The recovery cache was reset, but this message still could not be saved safely. No message was sent.',
+        ),
+      ).toBeTruthy()
+    })
+    expect(requests).not.toContain('/api/send-stream')
+    expect(
+      screen.getByRole('button', {
+        name: 'Reset Workspace chat recovery cache and retry',
+      }),
+    ).toBeTruthy()
+    await expect(
+      readCardTranscriptRecovery({ cardId: parentCard.cardId }),
+    ).resolves.toBeNull()
+  })
+
+  it('reports a scoped reset error without retrying persistence or starting transport', async () => {
+    const candidateText = 'reset failure remains unsent'
+    const requests = mockHttp()
+    const originalPut = IDBObjectStore.prototype.put
+    const originalGet = IDBObjectStore.prototype.get
+    let rejectCandidateReadback = false
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key,
+    ) {
+      if (
+        this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+        JSON.stringify(value).includes(candidateText)
+      ) {
+        rejectCandidateReadback = true
+      }
+      return key === undefined
+        ? originalPut.call(this, value)
+        : originalPut.call(this, value, key)
+    })
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (
+      this: IDBObjectStore,
+      query,
+    ) {
+      if (
+        rejectCandidateReadback &&
+        this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery &&
+        query === parentCard.cardId
+      ) {
+        rejectCandidateReadback = false
+        throw new Error('forced Card recovery admission failure')
+      }
+      return originalGet.call(this, query)
+    })
+
+    await mountChatScreen({ ...defaultInput(), embedded: false })
+    submitSelection(candidateText)
+    const resetButton = await screen.findByRole('button', {
+      name: 'Reset Workspace chat recovery cache and retry',
+    })
+    const deleteDatabaseSpy = vi
+      .spyOn(indexedDB, 'deleteDatabase')
+      .mockImplementationOnce(() => {
+        throw new Error('forced scoped reset failure')
+      })
+
+    React.act(() => fireEvent.click(resetButton))
+    await waitFor(async () => {
+      expect(
+        screen.getByText(
+          'The Workspace chat recovery cache could not be reset. This message was not retried or sent.',
+        ),
+      ).toBeTruthy()
+    })
+    expect(deleteDatabaseSpy).toHaveBeenCalledTimes(1)
+    expect(requests).not.toContain('/api/send-stream')
+    expect(
+      screen.getByRole('button', {
+        name: 'Reset Workspace chat recovery cache and retry',
+      }),
+    ).toBeTruthy()
   })
 
   it('keeps send errors retryable after refetch and a cold Card remount', async () => {
@@ -1468,7 +1707,8 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       expect(sendAttempts).toBe(1)
     })
     expect(
-      (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
+      (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))
+        ?.messages,
     ).toMatchObject([
       expect.objectContaining({
         role: 'user',
@@ -1561,12 +1801,15 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     submitSelection('first repeated terminal run')
     await waitFor(async () =>
       expect(
-        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))?.messages,
+        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))
+          ?.messages,
       ).toHaveLength(2),
     )
     submitSelection('second repeated terminal run')
     await waitFor(async () => {
-      const recovery = await readCardTranscriptRecovery({ cardId: parentCard.cardId })
+      const recovery = await readCardTranscriptRecovery({
+        cardId: parentCard.cardId,
+      })
       expect(recovery?.messages).toHaveLength(4)
       const assistants = recovery?.messages.filter(
         (entry) => entry.role === 'assistant',
@@ -1645,8 +1888,12 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
       cardId: parentCard.cardId,
     })
     expect(recovery).not.toBeNull()
-    expect(JSON.stringify(recovery)).not.toContain(parentCard.canonicalSegmentKey)
-    expect(JSON.stringify(recovery)).not.toContain(successorCard.canonicalSegmentKey)
+    expect(JSON.stringify(recovery)).not.toContain(
+      parentCard.canonicalSegmentKey,
+    )
+    expect(JSON.stringify(recovery)).not.toContain(
+      successorCard.canonicalSegmentKey,
+    )
 
     const mountedScreen = await mountChatScreen(
       defaultInput(successorCard),

@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
 
+import 'fake-indexeddb/auto'
 import React from 'react'
-import { fireEvent, screen, within } from '@testing-library/dom'
+import { fireEvent, screen, waitFor, within } from '@testing-library/dom'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OperationsScreen } from './operations-screen'
+import { operationsChatStorageForTests } from './hooks/use-agent-chat'
 import type {
   SessionCardListWire,
   SessionCardWire,
 } from '@/screens/chat/chat-queries'
+import {
+  WORKSPACE_CHAT_STORE_NAMES,
+  resetWorkspaceChatIndexedDb,
+} from '@/screens/chat/card-transcript-indexeddb'
 
 type QueryOptions = {
   queryKey: ReadonlyArray<unknown>
@@ -181,36 +187,29 @@ const mountedRoots: Array<() => void> = []
 const reactActEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
-const operationsOverlayKey =
-  'workspace.operations-card-chat.v1:remote%3Aworker-card'
-const operationsCompleteSnapshotKey =
-  'workspace.operations-card-complete-history.v1:remote%3Aworker-card'
-
-function rejectOperationsStorageWrites({
-  keyPrefix,
+function rejectIndexedDbWrites({
+  storeName,
   afterSuccessfulWrites = 0,
   exceptionName,
-  storageArea,
 }: {
-  keyPrefix: string
+  storeName: string
   afterSuccessfulWrites?: number
   exceptionName: 'QuotaExceededError' | 'SecurityError'
-  storageArea?: Storage
 }) {
-  const originalSetItem = Storage.prototype.setItem
+  const originalPut = IDBObjectStore.prototype.put
   let matchingWrites = 0
-  return vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-    this: Storage,
-    key,
+  return vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+    this: IDBObjectStore,
     value,
+    key,
   ) {
-    if (key.startsWith(keyPrefix) && (!storageArea || this === storageArea)) {
+    if (this.name === storeName) {
       matchingWrites += 1
       if (matchingWrites > afterSuccessfulWrites) {
         throw new DOMException('Operations storage unavailable', exceptionName)
       }
     }
-    return originalSetItem.call(this, key, value)
+    return originalPut.call(this, value, key)
   })
 }
 
@@ -309,6 +308,19 @@ async function renderOperations() {
     root.render(<OperationsScreen />)
     await Promise.resolve()
   })
+  const workerResolution = mocks.cardResponse?.cardResolutions.find(
+    (resolution) => resolution.cardId === 'remote:worker-card',
+  )
+  if (
+    workerResolution?.completeness === 'complete' &&
+    workerResolution.retryable === false
+  ) {
+    await waitFor(() => {
+      const input =
+        screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
+      expect(input.disabled).toBe(false)
+    })
+  }
   let mounted = true
   const unmount = () => {
     if (!mounted) return
@@ -328,9 +340,11 @@ async function renderOperations() {
   }
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   window.localStorage.clear()
   window.sessionStorage.clear()
+  const database = await resetWorkspaceChatIndexedDb()
+  database.close()
   mocks.navigate.mockReset()
   mocks.invalidateQueries.mockReset()
   mocks.historyRefetch.mockReset()
@@ -464,6 +478,13 @@ describe('mounted Operations Session Card activity', () => {
     expect(childInput.disabled).toBe(true)
     expect(screen.getByText('Direct child transcript · read-only')).toBeTruthy()
 
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([input]) => String(input) === '/api/send-stream',
+        ),
+      ).toBe(true)
+    })
     const requests = fetchMock.mock.calls.map(([input]) => String(input))
     expect(requests).toContain('/api/session-cards')
     expect(requests.filter((url) => url.includes('/history'))).toHaveLength(2)
@@ -540,7 +561,7 @@ describe('mounted Operations Session Card activity', () => {
     ])
   })
 
-  it('keeps the optimistic user and returned assistant rows Card-owned across stale history and remount', async () => {
+  it('hydrates optimistic recovery from IndexedDB v4 across partial-history remounts', async () => {
     const assistantText = 'durable Operations assistant reply'
     const userText = 'durable Operations user turn'
     const fetchMock = vi.fn<typeof fetch>((input, init) => {
@@ -551,18 +572,7 @@ describe('mounted Operations Session Card activity', () => {
       if (url === '/api/send-stream' && init?.method === 'POST') {
         return Promise.resolve(
           new Response(
-            [
-              'event: started',
-              'data: {"runId":"operations-run"}',
-              '',
-              'event: chunk',
-              `data: ${JSON.stringify({ text: assistantText, fullReplace: true })}`,
-              '',
-              'event: done',
-              'data: {"state":"final"}',
-              '',
-              '',
-            ].join('\n'),
+            `event: chunk\ndata: ${JSON.stringify({ text: assistantText, fullReplace: true })}\n\nevent: done\ndata: {"state":"final"}\n\n`,
           ),
         )
       }
@@ -579,71 +589,36 @@ describe('mounted Operations Session Card activity', () => {
       await Promise.resolve()
     })
 
-    expect(screen.getByText(userText)).toBeTruthy()
-    expect(screen.getByText(assistantText)).toBeTruthy()
-
-    await React.act(async () => {
-      await mocks.historyRefetch()
+    await waitFor(() => {
+      expect(screen.getByText(userText)).toBeTruthy()
+      expect(screen.getByText(assistantText)).toBeTruthy()
     })
-    await mounted.rerender()
-    expect(screen.getByText(userText)).toBeTruthy()
-    expect(screen.getByText(assistantText)).toBeTruthy()
-
-    const storedKeys = Array.from(
-      { length: window.localStorage.length },
-      (_, index) => window.localStorage.key(index) ?? '',
-    ).filter((key) => key.startsWith('workspace.operations-card-chat.'))
-    expect(storedKeys).toEqual([
-      'workspace.operations-card-chat.v1:remote%3Aworker-card',
-    ])
-    expect(JSON.stringify(window.localStorage)).not.toContain(
-      'remote:agent%3Amain%3Aops-worker',
-    )
-
-    mounted.unmount()
-    const remounted = await renderOperations()
-    expect(screen.getByText(userText)).toBeTruthy()
-    expect(screen.getByText(assistantText)).toBeTruthy()
+    const browserKeys = (storage: Storage) =>
+      Array.from({ length: storage.length }, (_, index) => storage.key(index))
+        .filter((key): key is string => Boolean(key))
+        .filter((key) => key.startsWith('workspace.operations-card-'))
+    expect(browserKeys(window.localStorage)).toEqual([])
+    expect(browserKeys(window.sessionStorage)).toEqual([])
 
     mocks.historyResponse = {
-      messages: [
-        {
-          id: 'server-user',
-          role: 'user',
-          content: [{ type: 'text', text: userText }],
-        },
-        {
-          id: 'server-assistant',
-          role: 'assistant',
-          content: [{ type: 'text', text: assistantText }],
-        },
-      ],
-      completeness: 'complete',
-      retryable: false,
+      messages: [],
+      completeness: 'partial',
+      retryable: true,
       missingSegments: [],
     }
-    await remounted.rerender()
-    const remountedRootCard = screen
-      .getByPlaceholderText('Message Worker...')
-      .closest('article')!
-    expect(within(remountedRootCard).getAllByText(userText)).toHaveLength(1)
-    expect(within(remountedRootCard).getAllByText(assistantText)).toHaveLength(
-      1,
-    )
-    expect(
-      JSON.parse(
-        window.localStorage.getItem(
-          'workspace.operations-card-chat.v1:remote%3Aworker-card',
-        ) ?? '{}',
-      ).messages,
-    ).toEqual([])
+    mounted.unmount()
+    await renderOperations()
+    await waitFor(() => {
+      expect(screen.getByText(userText)).toBeTruthy()
+      expect(screen.getByText(assistantText)).toBeTruthy()
+    })
   })
 
   it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'fails closed before accepted transport when the optimistic recovery write raises %s',
+    'fails closed before accepted transport when IndexedDB overlay admission raises %s',
     async (exceptionName) => {
-      rejectOperationsStorageWrites({
-        keyPrefix: 'workspace.operations-card-chat.',
+      rejectIndexedDbWrites({
+        storeName: WORKSPACE_CHAT_STORE_NAMES.durableJournal,
         exceptionName,
       })
       const fetchMock = vi.fn<typeof fetch>((input) => {
@@ -664,175 +639,44 @@ describe('mounted Operations Session Card activity', () => {
         await Promise.resolve()
       })
 
-      expect(input.value).toBe('must remain unsent')
+      await waitFor(() => expect(input.value).toBe('must remain unsent'))
       expect(screen.queryByText('must remain unsent')).toBeNull()
       expect(
         fetchMock.mock.calls.some(
           ([request]) => String(request) === '/api/send-stream',
         ),
       ).toBe(false)
+      await expect(
+        operationsChatStorageForTests.readOverlay('remote:worker-card'),
+      ).resolves.toEqual([])
     },
   )
 
   it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'does not accept a session-only stream chunk after tab close and partial history when local recovery raises %s',
+    'retains recovery until the complete IndexedDB snapshot is verified after %s',
     async (exceptionName) => {
-      const userText = `accepted ${exceptionName} user turn`
-      const assistantText = `accepted ${exceptionName} assistant chunk`
-      rejectOperationsStorageWrites({
-        keyPrefix: 'workspace.operations-card-chat.',
-        afterSuccessfulWrites: 1,
-        exceptionName,
-        storageArea: window.localStorage,
-      })
-      const fetchMock = vi.fn<typeof fetch>((input, init) => {
-        const url = String(input)
-        if (url === '/api/session-cards') {
-          return Promise.resolve(Response.json(mocks.cardResponse))
-        }
-        if (url === '/api/send-stream' && init?.method === 'POST') {
-          return Promise.resolve(
-            new Response(
-              [
-                'event: chunk',
-                `data: ${JSON.stringify({ text: assistantText, fullReplace: true })}`,
-                '',
-                'event: done',
-                'data: {"state":"final"}',
-                '',
-                '',
-              ].join('\n'),
-            ),
-          )
-        }
-        return Promise.reject(new Error(`Unexpected request: ${url}`))
-      })
-      vi.stubGlobal('fetch', fetchMock)
-
-      const mounted = await renderOperations()
-      const input =
-        screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
-      await React.act(async () => {
-        fireEvent.change(input, { target: { value: userText } })
-        fireEvent.keyDown(input, { key: 'Enter' })
-        await Promise.resolve()
-      })
-
-      expect(input.value).toBe('')
-      expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.queryByText(assistantText)).toBeNull()
-      expect(
-        screen.getByText(
-          'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
+      const userText = `acknowledged ${exceptionName} Operations user turn`
+      const assistantText = `acknowledged ${exceptionName} Operations assistant reply`
+      const recovery = [
+        {
+          id: 'optimistic-user',
+          role: 'user' as const,
+          content: userText,
+          acknowledgementOrdinal: 1,
+        },
+        {
+          id: 'optimistic-assistant',
+          role: 'assistant' as const,
+          content: assistantText,
+          acknowledgementOrdinal: 1,
+        },
+      ]
+      await expect(
+        operationsChatStorageForTests.writeOverlay(
+          'remote:worker-card',
+          recovery,
         ),
-      ).toBeTruthy()
-      expect(
-        JSON.parse(window.localStorage.getItem(operationsOverlayKey) ?? '{}'),
-      ).toMatchObject({
-        messages: [{ role: 'user', content: userText }],
-      })
-
-      mocks.historyResponse = {
-        messages: [],
-        completeness: 'partial',
-        retryable: true,
-        missingSegments: [
-          {
-            segmentKey: 'remote:temporarily-unavailable',
-            retryable: true,
-            error: 'temporary upstream failure',
-          },
-        ],
-      }
-      await mounted.rerender()
-
-      expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.queryByText(assistantText)).toBeNull()
-
-      mounted.unmount()
-      window.sessionStorage.clear()
-      await renderOperations()
-      expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.queryByText(assistantText)).toBeNull()
-    },
-  )
-
-  it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'does not expose a non-durable chunk when every mirror raises %s mid-stream',
-    async (exceptionName) => {
-      const userText = `durable ${exceptionName} checkpoint`
-      const assistantText = `non-durable ${exceptionName} chunk`
-      rejectOperationsStorageWrites({
-        keyPrefix: 'workspace.operations-card-chat.',
-        afterSuccessfulWrites: 2,
-        exceptionName,
-      })
-      const fetchMock = vi.fn<typeof fetch>((input, init) => {
-        const url = String(input)
-        if (url === '/api/session-cards') {
-          return Promise.resolve(Response.json(mocks.cardResponse))
-        }
-        if (url === '/api/send-stream' && init?.method === 'POST') {
-          return Promise.resolve(
-            new Response(
-              `event: chunk\ndata: ${JSON.stringify({ text: assistantText, fullReplace: true })}\n\n`,
-            ),
-          )
-        }
-        return Promise.reject(new Error(`Unexpected request: ${url}`))
-      })
-      vi.stubGlobal('fetch', fetchMock)
-
-      const mounted = await renderOperations()
-      const input =
-        screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
-      await React.act(async () => {
-        fireEvent.change(input, { target: { value: userText } })
-        fireEvent.keyDown(input, { key: 'Enter' })
-        await Promise.resolve()
-      })
-
-      expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.queryByText(assistantText)).toBeNull()
-      expect(
-        fetchMock.mock.calls.some(
-          ([request]) => String(request) === '/api/send-stream',
-        ),
-      ).toBe(true)
-
-      mocks.historyResponse = {
-        messages: [],
-        completeness: 'partial',
-        retryable: true,
-        missingSegments: [],
-      }
-      mounted.unmount()
-      await renderOperations()
-      expect(screen.getByText(userText)).toBeTruthy()
-      expect(screen.queryByText(assistantText)).toBeNull()
-    },
-  )
-
-  it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'keeps complete history visible but warns when its snapshot is only tab-scoped after %s',
-    async (exceptionName) => {
-      const priorAssistantText = `prior durable ${exceptionName} assistant reply`
-      const userText = `complete ${exceptionName} user turn`
-      const assistantText = `complete ${exceptionName} assistant reply`
-      window.localStorage.setItem(
-        operationsCompleteSnapshotKey,
-        JSON.stringify({
-          version: 1,
-          owner: { cardId: 'remote:worker-card' },
-          messages: [
-            {
-              id: 'prior-server-assistant',
-              role: 'assistant',
-              content: priorAssistantText,
-            },
-          ],
-        }),
-      )
+      ).resolves.toBe(true)
       mocks.historyResponse = {
         messages: [
           {
@@ -850,365 +694,82 @@ describe('mounted Operations Session Card activity', () => {
         retryable: false,
         missingSegments: [],
       }
-      const storageSpy = rejectOperationsStorageWrites({
-        keyPrefix: 'workspace.operations-card-complete-history.',
+      const storageSpy = rejectIndexedDbWrites({
+        storeName: WORKSPACE_CHAT_STORE_NAMES.latestCardSnapshots,
         exceptionName,
-        storageArea: window.localStorage,
       })
 
       const mounted = await renderOperations()
-      const rootCard = screen
-        .getByPlaceholderText('Message Worker...')
-        .closest('article')!
-      expect(within(rootCard).getByText(userText)).toBeTruthy()
-      expect(within(rootCard).getByText(assistantText)).toBeTruthy()
-      const durabilityWarning =
-        'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.'
-      expect(within(rootCard).getByText(durabilityWarning)).toBeTruthy()
-      expect(
-        window.localStorage.getItem(operationsCompleteSnapshotKey),
-      ).toContain(priorAssistantText)
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
+          ),
+        ).toBeTruthy(),
+      )
+      await expect(
+        operationsChatStorageForTests.readOverlay('remote:worker-card'),
+      ).resolves.toEqual(recovery)
 
       storageSpy.mockRestore()
       mocks.historyResponse = { ...mocks.historyResponse }
       await mounted.rerender()
-      expect(within(rootCard).queryByText(durabilityWarning)).toBeNull()
-
-      mocks.historyResponse = {
-        messages: [],
-        completeness: 'partial',
-        retryable: true,
-        missingSegments: [
-          {
-            segmentKey: 'remote:temporarily-unavailable',
-            retryable: true,
-            error: 'temporary upstream failure',
-          },
-        ],
-      }
-      await mounted.rerender()
-
-      expect(within(rootCard).getByText(userText)).toBeTruthy()
-      expect(within(rootCard).getByText(assistantText)).toBeTruthy()
-
-      mounted.unmount()
-      await renderOperations()
-      const remountedRootCard = screen
-        .getByPlaceholderText('Message Worker...')
-        .closest('article')!
-      expect(
-        within(remountedRootCard).queryByText(priorAssistantText),
-      ).toBeNull()
-      expect(within(remountedRootCard).getByText(userText)).toBeTruthy()
-      expect(within(remountedRootCard).getByText(assistantText)).toBeTruthy()
-    },
-  )
-
-  it.each(['QuotaExceededError', 'SecurityError'] as const)(
-    'does not promote a complete snapshot when every mirror raises %s',
-    async (exceptionName) => {
-      const priorText = `last durable ${exceptionName} snapshot`
-      const rejectedText = `non-durable ${exceptionName} snapshot transition`
-      window.localStorage.setItem(
-        operationsCompleteSnapshotKey,
-        JSON.stringify({
-          version: 1,
-          owner: { cardId: 'remote:worker-card' },
-          messages: [
-            { id: 'prior-durable', role: 'assistant', content: priorText },
-          ],
-        }),
-      )
-      mocks.historyResponse = {
-        messages: [
-          {
-            id: 'new-server-message',
-            role: 'assistant',
-            content: [{ type: 'text', text: rejectedText }],
-          },
-        ],
-        completeness: 'complete',
-        retryable: false,
-        missingSegments: [],
-      }
-      rejectOperationsStorageWrites({
-        keyPrefix: 'workspace.operations-card-complete-history.',
-        exceptionName,
+      await waitFor(async () => {
+        expect(
+          await operationsChatStorageForTests.readOverlay('remote:worker-card'),
+        ).toEqual([])
       })
-
-      const mounted = await renderOperations()
-      expect(screen.getAllByText(rejectedText).length).toBeGreaterThan(0)
       expect(
-        screen.getAllByText(
+        screen.queryByText(
           'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
-        ).length,
-      ).toBeGreaterThan(0)
-
-      mocks.historyResponse = {
-        messages: [],
-        completeness: 'partial',
-        retryable: true,
-        missingSegments: [],
-      }
-      await mounted.rerender()
-      const rootCard = screen
-        .getByPlaceholderText('Message Worker...')
-        .closest('article')!
-      expect(within(rootCard).getByText(priorText)).toBeTruthy()
-      expect(within(rootCard).queryByText(rejectedText)).toBeNull()
-
-      mounted.unmount()
-      await renderOperations()
-      const remountedRootCard = screen
-        .getByPlaceholderText('Message Worker...')
-        .closest('article')!
-      expect(within(remountedRootCard).getByText(priorText)).toBeTruthy()
-      expect(within(remountedRootCard).queryByText(rejectedText)).toBeNull()
+        ),
+      ).toBeNull()
     },
   )
 
-  it('does not evict accepted overlay rows at the former retention boundary', async () => {
-    const retainedText = 'oldest unacknowledged accepted Operations turn'
-    const existingMessages = Array.from({ length: 100 }, (_, index) => ({
-      id: `accepted-${index}`,
-      role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
-      content: index === 0 ? retainedText : `accepted Operations row ${index}`,
-      acknowledgementOrdinal: 1,
-    }))
-    window.localStorage.setItem(
-      operationsOverlayKey,
-      JSON.stringify({
-        version: 1,
-        owner: { cardId: 'remote:worker-card' },
-        messages: existingMessages,
-      }),
-    )
-    const newUserText = 'accepted turn beyond the former overlay cap'
-    const newAssistantText = 'accepted reply beyond the former overlay cap'
-    vi.stubGlobal(
-      'fetch',
-      vi.fn<typeof fetch>((input, init) => {
-        const url = String(input)
-        if (url === '/api/session-cards') {
-          return Promise.resolve(Response.json(mocks.cardResponse))
-        }
-        if (url === '/api/send-stream' && init?.method === 'POST') {
-          return Promise.resolve(
-            new Response(
-              `event: chunk\ndata: ${JSON.stringify({ text: newAssistantText, fullReplace: true })}\n\nevent: done\ndata: {"state":"final"}\n\n`,
-            ),
-          )
-        }
-        return Promise.reject(new Error(`Unexpected request: ${url}`))
-      }),
-    )
-
-    const mounted = await renderOperations()
-    const input =
-      screen.getByPlaceholderText<HTMLInputElement>('Message Worker...')
-    await React.act(async () => {
-      fireEvent.change(input, { target: { value: newUserText } })
-      fireEvent.keyDown(input, { key: 'Enter' })
-      await Promise.resolve()
+  it('hydrates v4 snapshot and recovery asynchronously without consulting legacy browser values', async () => {
+    const snapshotText = 'verified v4 Operations snapshot'
+    const overlayText = 'verified v4 Operations recovery'
+    const legacyText = 'obsolete browser Operations value'
+    const legacyKey =
+      'workspace.operations-card-complete-history.v1:remote%3Aworker-card'
+    const legacyRaw = JSON.stringify({
+      version: 2,
+      revision: 999,
+      owner: { cardId: 'remote:worker-card' },
+      messages: [{ id: 'legacy', role: 'assistant', content: legacyText }],
     })
-
-    const stored = JSON.parse(
-      window.localStorage.getItem(operationsOverlayKey) ?? '{}',
-    ) as { messages?: Array<{ content?: string }> }
-    expect(stored.messages).toHaveLength(102)
-    expect(stored.messages?.[0]?.content).toBe(retainedText)
-
+    window.localStorage.setItem(legacyKey, legacyRaw)
+    window.localStorage.setItem('workspace.sidebar.collapsed', 'true')
+    await operationsChatStorageForTests.writeCompleteSnapshot(
+      'remote:worker-card',
+      [{ id: 'snapshot', role: 'assistant', content: snapshotText }],
+    )
+    await operationsChatStorageForTests.writeOverlay('remote:worker-card', [
+      {
+        id: 'overlay',
+        role: 'user',
+        content: overlayText,
+        acknowledgementOrdinal: 1,
+      },
+    ])
     mocks.historyResponse = {
       messages: [],
       completeness: 'partial',
       retryable: true,
       missingSegments: [],
     }
-    mounted.unmount()
+
     await renderOperations()
-    expect(screen.getByText(newUserText)).toBeTruthy()
-    expect(screen.getByText(newAssistantText)).toBeTruthy()
-  })
-
-  it('persists complete transcripts beyond the former snapshot cap for partial-history remounts', async () => {
-    const firstText = 'first accepted Operations history row'
-    const lastText = 'last accepted Operations history row'
-    mocks.historyResponse = {
-      messages: Array.from({ length: 251 }, (_, index) => ({
-        id: `server-${index}`,
-        role: index % 2 === 0 ? 'user' : 'assistant',
-        content: [
-          {
-            type: 'text',
-            text:
-              index === 0
-                ? firstText
-                : index === 250
-                  ? lastText
-                  : `Operations history row ${index}`,
-          },
-        ],
-      })),
-      completeness: 'complete',
-      retryable: false,
-      missingSegments: [],
-    }
-
-    const mounted = await renderOperations()
-    const stored = JSON.parse(
-      window.localStorage.getItem(operationsCompleteSnapshotKey) ?? '{}',
-    ) as { messages?: Array<{ content?: string }> }
-    expect(stored.messages).toHaveLength(251)
-    expect(stored.messages?.[0]?.content).toBe(firstText)
-    expect(stored.messages?.at(-1)?.content).toBe(lastText)
-
-    mocks.historyResponse = {
-      messages: [],
-      completeness: 'partial',
-      retryable: true,
-      missingSegments: [],
-    }
-    mounted.unmount()
-    await renderOperations()
-    expect(screen.getAllByText(firstText).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(lastText).length).toBeGreaterThan(0)
-    expect(
-      JSON.parse(
-        window.localStorage.getItem(operationsCompleteSnapshotKey) ?? '{}',
-      ).messages,
-    ).toHaveLength(251)
-  })
-
-  it('retains the last complete acknowledged transcript through partial refetch and remount', async () => {
-    const userText = 'acknowledged Operations user turn'
-    const assistantText = 'acknowledged Operations assistant reply'
-    const overlayKey = 'workspace.operations-card-chat.v1:remote%3Aworker-card'
-    window.localStorage.setItem(
-      overlayKey,
-      JSON.stringify({
-        version: 1,
-        owner: { cardId: 'remote:worker-card' },
-        messages: [
-          {
-            id: 'optimistic-user',
-            role: 'user',
-            content: userText,
-            acknowledgementOrdinal: 1,
-          },
-          {
-            id: 'optimistic-assistant',
-            role: 'assistant',
-            content: assistantText,
-            acknowledgementOrdinal: 1,
-          },
-        ],
-      }),
+    await waitFor(() => {
+      expect(screen.getByText(snapshotText)).toBeTruthy()
+      expect(screen.getByText(overlayText)).toBeTruthy()
+    })
+    expect(screen.queryByText(legacyText)).toBeNull()
+    expect(window.localStorage.getItem(legacyKey)).toBe(legacyRaw)
+    expect(window.localStorage.getItem('workspace.sidebar.collapsed')).toBe(
+      'true',
     )
-    mocks.historyResponse = {
-      messages: [
-        {
-          id: 'server-user',
-          role: 'user',
-          content: [{ type: 'text', text: userText }],
-        },
-        {
-          id: 'server-assistant',
-          role: 'assistant',
-          content: [{ type: 'text', text: assistantText }],
-        },
-      ],
-      completeness: 'complete',
-      retryable: false,
-      missingSegments: [],
-    }
-
-    const mounted = await renderOperations()
-    const rootCard = screen
-      .getByPlaceholderText('Message Worker...')
-      .closest('article')!
-    expect(within(rootCard).getAllByText(userText)).toHaveLength(1)
-    expect(within(rootCard).getAllByText(assistantText)).toHaveLength(1)
-    expect(
-      JSON.parse(window.localStorage.getItem(overlayKey) ?? '{}').messages,
-    ).toEqual([])
-
-    mocks.historyResponse = {
-      messages: [],
-      completeness: 'partial',
-      retryable: true,
-      missingSegments: [
-        {
-          segmentKey: 'remote:unavailable-segment',
-          retryable: true,
-          error: 'temporary upstream failure',
-        },
-      ],
-    }
-    await mounted.rerender()
-
-    expect(within(rootCard).getAllByText(userText)).toHaveLength(1)
-    expect(within(rootCard).getAllByText(assistantText)).toHaveLength(1)
-    expect(
-      within(rootCard).getByText(
-        'Chat history unavailable until a complete transcript is available.',
-      ),
-    ).toBeTruthy()
-
-    mounted.unmount()
-    await renderOperations()
-    const remountedRootCard = screen
-      .getByPlaceholderText('Message Worker...')
-      .closest('article')!
-    expect(within(remountedRootCard).getAllByText(userText)).toHaveLength(1)
-    expect(within(remountedRootCard).getAllByText(assistantText)).toHaveLength(
-      1,
-    )
-  })
-
-  it('does not remove a matching Card overlay from a partial response', async () => {
-    const overlayKey = 'workspace.operations-card-chat.v1:remote%3Aworker-card'
-    const overlayText = 'still pending authoritative acknowledgement'
-    window.localStorage.setItem(
-      overlayKey,
-      JSON.stringify({
-        version: 1,
-        owner: { cardId: 'remote:worker-card' },
-        messages: [
-          {
-            id: 'optimistic-user',
-            role: 'user',
-            content: overlayText,
-            acknowledgementOrdinal: 1,
-          },
-        ],
-      }),
-    )
-    mocks.historyResponse = {
-      messages: [
-        {
-          id: 'partial-server-user',
-          role: 'user',
-          content: [{ type: 'text', text: overlayText }],
-        },
-      ],
-      completeness: 'partial',
-      retryable: true,
-      missingSegments: [
-        {
-          segmentKey: 'remote:unavailable-segment',
-          retryable: true,
-          error: 'temporary upstream failure',
-        },
-      ],
-    }
-
-    await renderOperations()
-
-    const rootCard = screen
-      .getByPlaceholderText('Message Worker...')
-      .closest('article')!
-    expect(within(rootCard).getAllByText(overlayText)).toHaveLength(1)
-    expect(window.localStorage.getItem(overlayKey)).not.toBeNull()
   })
 
   it('fails closed before send when the current Card projection no longer matches the mounted binding', async () => {

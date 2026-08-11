@@ -19,7 +19,10 @@ import {
   replaceCardTranscriptRecoveryMessages,
 } from './card-transcript-recovery'
 import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
-import { resetWorkspaceChatIndexedDb } from './card-transcript-indexeddb'
+import {
+  resetWorkspaceChatIndexedDb,
+  WORKSPACE_CHAT_STORE_NAMES,
+} from './card-transcript-indexeddb'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'
 import {
@@ -540,9 +543,8 @@ vi.mock('./hooks/use-chat-history', () => ({
         (queryContext.newRouteResolvesLegacyMain && activeFriendlyId === 'new'
           ? 'main'
           : activeSessionKey))
-    const [pending, setPending] = React.useState<
-      Awaited<ReturnType<typeof readPendingMessage>>
-    >(null)
+    const [pending, setPending] =
+      React.useState<Awaited<ReturnType<typeof readPendingMessage>>>(null)
     React.useEffect(() => {
       let cancelled = false
       const refreshPending = () => {
@@ -2657,8 +2659,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       'remote:successor-card',
       'backend-a',
     )
-    const targetCardHistoryKey =
-      sessionCardQueryKeys.history('remote:successor-card')
+    const targetCardHistoryKey = sessionCardQueryKeys.history(
+      'remote:successor-card',
+    )
     const stream = createReaderHarness([
       {
         fromSessionKey: 'new',
@@ -2745,8 +2748,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(queryClient.getQueryData(intermediateHistoryKey)).toBeUndefined()
     await waitForAssertion(() =>
       expectAcknowledgedUserMessage(
-        queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
-          ?.messages,
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          targetCardHistoryKey,
+        )?.messages,
         optimisticMessage,
         'run-chain',
       ),
@@ -2943,8 +2947,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
     await waitForAssertion(() =>
       expectAcknowledgedUserMessage(
-        queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
-          ?.messages,
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          targetCardHistoryKey,
+        )?.messages,
         optimisticMessage,
         'run-bootstrap-card',
       ),
@@ -3043,8 +3048,9 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
     expect(queryClient.getQueryData(sourceHistoryKey)).toBeUndefined()
     await waitForAssertion(() =>
       expectAcknowledgedUserMessage(
-        queryClient.getQueryData<SessionCardHistoryResponse>(targetCardHistoryKey)
-          ?.messages,
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          targetCardHistoryKey,
+        )?.messages,
         optimisticMessage,
         'run-portable-bootstrap-card',
       ),
@@ -3194,6 +3200,114 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       'continue',
     )
     expect(window.localStorage.getItem('claude_pending_msg_new')).toBeNull()
+
+    React.act(() => root.unmount())
+    document.body.removeChild(container)
+    queryClient.clear()
+  })
+
+  it('resets and retries the exact /chat/new pending admission before transport starts', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryContext.client = queryClient
+    const sendRequests = vi.fn()
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      if (String(input) === '/api/send-stream') {
+        sendRequests()
+        return Promise.resolve(
+          new Response('bootstrap unavailable after admission', {
+            status: 503,
+          }),
+        )
+      }
+      return Promise.resolve(new Response('{}', { status: 200 }))
+    })
+
+    const originalPut = IDBObjectStore.prototype.put
+    const originalGet = IDBObjectStore.prototype.get
+    const attemptedClientIds: Array<string> = []
+    let rejectNextReadback = false
+    let rejectedOnce = false
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key,
+    ) {
+      const clientId = (
+        value as {
+          payload?: { optimisticMessage?: { clientId?: unknown } }
+        }
+      ).payload?.optimisticMessage?.clientId
+      if (
+        this.name === WORKSPACE_CHAT_STORE_NAMES.pendingSends &&
+        typeof clientId === 'string'
+      ) {
+        attemptedClientIds.push(clientId)
+        if (!rejectedOnce) rejectNextReadback = true
+      }
+      return key === undefined
+        ? originalPut.call(this, value)
+        : originalPut.call(this, value, key)
+    })
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (
+      this: IDBObjectStore,
+      query,
+    ) {
+      if (
+        rejectNextReadback &&
+        this.name === WORKSPACE_CHAT_STORE_NAMES.pendingSends
+      ) {
+        rejectNextReadback = false
+        rejectedOnce = true
+        throw new Error('forced transient pending admission failure')
+      }
+      return originalGet.call(this, query)
+    })
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    React.act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <ChatScreen
+            activeFriendlyId="new"
+            forcedSessionKey="new"
+            isNewChat
+            compact
+          />
+        </QueryClientProvider>,
+      )
+    })
+    React.act(() => {
+      container
+        .querySelector<HTMLElement>('[data-testid="send-message"]')!
+        .click()
+    })
+
+    await waitForAssertion(() => {
+      expect(
+        getByRole(container, 'button', {
+          name: 'Reset Workspace chat recovery cache and retry',
+        }),
+      ).toBeTruthy()
+    })
+    expect(sendRequests).not.toHaveBeenCalled()
+
+    React.act(() => {
+      getByRole(container, 'button', {
+        name: 'Reset Workspace chat recovery cache and retry',
+      }).click()
+    })
+    await waitForAssertion(() => {
+      expect(sendRequests).toHaveBeenCalledTimes(1)
+    })
+    expect(attemptedClientIds).toHaveLength(2)
+    expect(new Set(attemptedClientIds).size).toBe(1)
+    expect(JSON.stringify(await readPendingMessage('new', 'new'))).toContain(
+      'continue',
+    )
 
     React.act(() => root.unmount())
     document.body.removeChild(container)
@@ -3489,7 +3603,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       ),
     ).toBe(false)
     expect(
-      (await readCardTranscriptRecovery({ cardId: activeCard.cardId }))?.messages,
+      (await readCardTranscriptRecovery({ cardId: activeCard.cardId }))
+        ?.messages,
     ).toEqual([baseline])
 
     React.act(() => root.unmount())
@@ -3818,7 +3933,8 @@ describe('ChatScreen authoritative session handoff route lifecycle', () => {
       })
     })
     expect(
-      (await readCardTranscriptRecovery({ cardId: activeCard.cardId }))?.messages,
+      (await readCardTranscriptRecovery({ cardId: activeCard.cardId }))
+        ?.messages,
     ).toMatchObject([
       {
         role: 'user',

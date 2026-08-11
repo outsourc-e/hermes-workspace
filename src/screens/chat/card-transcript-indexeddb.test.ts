@@ -523,9 +523,9 @@ describe('Workspace chat IndexedDB v4 authority', () => {
       }),
     ).rejects.toThrow(/merge output/i)
     await expect(readPendingSend(source.ownerKey)).resolves.toEqual(source)
-    await expect(readPendingSend(existingDestination.ownerKey)).resolves.toEqual(
-      existingDestination,
-    )
+    await expect(
+      readPendingSend(existingDestination.ownerKey),
+    ).resolves.toEqual(existingDestination)
 
     await handoffPendingSendAtomically({
       sourceOwnerKey: source.ownerKey,
@@ -537,9 +537,9 @@ describe('Workspace chat IndexedDB v4 authority', () => {
       },
     })
     await expect(readPendingSend(source.ownerKey)).resolves.toBeNull()
-    await expect(readPendingSend(existingDestination.ownerKey)).resolves.toEqual(
-      mergedDestination,
-    )
+    await expect(
+      readPendingSend(existingDestination.ownerKey),
+    ).resolves.toEqual(mergedDestination)
   })
 
   it('atomically mutates pending records by writeId', async () => {
@@ -566,7 +566,9 @@ describe('Workspace chat IndexedDB v4 authority', () => {
         mutation: { type: 'delete' },
       }),
     ).rejects.toThrow(/compare-and-swap|writeId/i)
-    await expect(readPendingSend(initial.ownerKey)).resolves.toEqual(replacement)
+    await expect(readPendingSend(initial.ownerKey)).resolves.toEqual(
+      replacement,
+    )
   })
 
   it('retains pending source when pending to recovery destination verification fails', async () => {
@@ -803,6 +805,25 @@ describe('Workspace chat IndexedDB v4 authority', () => {
     })
 
     const health = await getWorkspaceChatStorageHealth()
+    expect(Object.keys(health).sort()).toEqual([
+      'databaseAvailable',
+      'persistGranted',
+      'storageEstimate',
+      'stores',
+    ])
+    expect(Object.keys(health.storageEstimate ?? {}).sort()).toEqual([
+      'quota',
+      'usage',
+    ])
+    expect(Object.keys(health.stores).sort()).toEqual(
+      Object.keys(WORKSPACE_CHAT_STORE_NAMES).sort(),
+    )
+    for (const storeHealth of Object.values(health.stores)) {
+      expect(Object.keys(storeHealth).sort()).toEqual([
+        'recordCount',
+        'serializedBytes',
+      ])
+    }
     expect(health).toMatchObject({
       databaseAvailable: true,
       storageEstimate: { usage: 1234, quota: 5678 },

@@ -1,134 +1,109 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
+import 'fake-indexeddb/auto'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  WORKSPACE_CHAT_STORE_NAMES,
+  resetWorkspaceChatIndexedDb,
+} from './card-transcript-indexeddb'
 import {
   readMessageJournal,
+  removeMessageJournalValues,
   writeMessageJournal,
 } from './durable-message-journal'
 
-describe('durable message journal commit protocol', () => {
-  beforeEach(() => window.localStorage.clear())
-  afterEach(() => vi.restoreAllMocks())
+type JournalValue = { id: string; text: string }
 
-  it('rejects a promotion that cannot be read back as the exact committed bytes', () => {
-    const baseKey = 'journal-commit-readback'
-    const originalSetItem = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key,
-      value,
-    ) {
-      const parsed = JSON.parse(value) as { state?: string }
-      if (
-        this === window.localStorage &&
-        key.startsWith(`${baseKey}:entry:`) &&
-        parsed.state === 'committed'
-      ) {
-        // Simulate a storage implementation that reports success while retaining
-        // the prepared bytes instead of the requested commit promotion.
-        return
-      }
-      return originalSetItem.call(this, key, value)
-    })
+function validateJournalValue(value: unknown): JournalValue | null {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    typeof (value as Record<string, unknown>).id !== 'string' ||
+    typeof (value as Record<string, unknown>).text !== 'string'
+  ) {
+    return null
+  }
+  return value as JournalValue
+}
 
-    expect(
-      writeMessageJournal(
-        baseKey,
-        [{ id: 'candidate', text: 'must remain uncommitted' }],
-        [window.localStorage],
-        (value) => value.id,
-      ),
-    ).toEqual({ anyVerified: false, persistentVerified: false })
+async function resetDatabase(): Promise<void> {
+  const database = await resetWorkspaceChatIndexedDb()
+  database.close()
+}
 
-    vi.mocked(Storage.prototype.setItem).mockRestore()
-    expect(
-      readMessageJournal<{ id: string; text: string }>(
-        baseKey,
-        [window.localStorage],
-        (value) => value.id,
-        (value) =>
-          typeof value === 'object' &&
-          value !== null &&
-          'id' in value &&
-          'text' in value &&
-          typeof value.id === 'string' &&
-          typeof value.text === 'string'
-            ? { id: value.id, text: value.text }
-            : null,
-      ),
-    ).toEqual([])
-    expect(
-      Array.from(
-        { length: window.localStorage.length },
-        (_, index) => window.localStorage.key(index) ?? '',
-      ).filter((key) => key.startsWith(`${baseKey}:entry:`)),
-    ).toEqual([])
+describe('durable message journal IndexedDB v4 adapter', () => {
+  beforeEach(async () => {
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+    vi.restoreAllMocks()
+    await resetDatabase()
   })
 
-  it('restores the previous committed checkpoint when a replacement promotion fails', () => {
-    const baseKey = 'journal-checkpoint-preservation'
+  it('writes, orders, reads, and removes v4 journal rows without browser Storage', async () => {
+    window.localStorage.setItem('unrelated.preference', 'keep')
+    const getSpy = vi.spyOn(Storage.prototype, 'getItem')
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem')
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem')
+    const ownerKey = 'operations-overlay:card-a'
+    const first = { id: 'first', text: 'accepted user turn' }
+    const second = { id: 'second', text: 'accepted assistant checkpoint' }
+
+    await writeMessageJournal(ownerKey, [first, second], (value) => value.id)
+    await expect(
+      readMessageJournal(ownerKey, validateJournalValue),
+    ).resolves.toEqual([first, second])
+
+    await removeMessageJournalValues(ownerKey, [first], (value) => value.id)
+    await expect(
+      readMessageJournal(ownerKey, validateJournalValue),
+    ).resolves.toEqual([second])
+
+    expect(getSpy).not.toHaveBeenCalled()
+    expect(setSpy).not.toHaveBeenCalled()
+    expect(removeSpy).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem('unrelated.preference')).toBe('keep')
+  })
+
+  it('retains the previous committed rows when a replacement transaction fails', async () => {
+    const ownerKey = 'operations-overlay:card-b'
     const acceptedUser = { id: 'user-1', text: 'accepted user turn' }
     const priorCheckpoint = {
       id: 'assistant-run-1',
       text: 'durable assistant prefix',
     }
-    expect(
-      writeMessageJournal(
-        baseKey,
-        [acceptedUser, priorCheckpoint],
-        [window.localStorage],
-        (value) => value.id,
-      ),
-    ).toEqual({ anyVerified: true, persistentVerified: true })
+    await writeMessageJournal(
+      ownerKey,
+      [acceptedUser, priorCheckpoint],
+      (value) => value.id,
+    )
 
-    const originalSetItem = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key,
+    const originalPut = IDBObjectStore.prototype.put
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
       value,
+      key,
     ) {
-      const parsed = JSON.parse(value) as {
-        revision?: number
-        state?: string
-      }
       if (
-        this === window.localStorage &&
-        key.endsWith(encodeURIComponent(priorCheckpoint.id)) &&
-        parsed.revision === 2 &&
-        parsed.state === 'committed'
+        this.name === WORKSPACE_CHAT_STORE_NAMES.durableJournal &&
+        (value as { entryKey?: string }).entryKey === priorCheckpoint.id
       ) {
-        // Promotion reports success but leaves the prepared replacement behind.
-        return
+        throw new DOMException('journal write denied', 'QuotaExceededError')
       }
-      return originalSetItem.call(this, key, value)
+      return originalPut.call(this, value, key)
     })
 
-    expect(
+    await expect(
       writeMessageJournal(
-        baseKey,
+        ownerKey,
         [{ ...priorCheckpoint, text: 'unverified replacement' }],
-        [window.localStorage],
         (value) => value.id,
       ),
-    ).toEqual({ anyVerified: false, persistentVerified: false })
+    ).rejects.toThrow()
 
-    vi.mocked(Storage.prototype.setItem).mockRestore()
-    expect(
-      readMessageJournal<{ id: string; text: string }>(
-        baseKey,
-        [window.localStorage],
-        (value) => value.id,
-        (value) =>
-          typeof value === 'object' &&
-          value !== null &&
-          'id' in value &&
-          'text' in value &&
-          typeof value.id === 'string' &&
-          typeof value.text === 'string'
-            ? { id: value.id, text: value.text }
-            : null,
-      ),
-    ).toEqual(expect.arrayContaining([acceptedUser, priorCheckpoint]))
+    vi.mocked(IDBObjectStore.prototype.put).mockRestore()
+    await expect(
+      readMessageJournal(ownerKey, validateJournalValue),
+    ).resolves.toEqual([acceptedUser, priorCheckpoint])
   })
 })

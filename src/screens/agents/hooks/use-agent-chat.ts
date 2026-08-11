@@ -3,11 +3,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { resolveOperationsChatCardId } from './use-operations'
 import type { OperationsChatTarget } from './use-operations'
 import type { ChatMessage, SessionCard } from '@/screens/chat/types'
+import type {
+  PortableValue,
+  V4LatestCardSnapshotRecord,
+} from '@/screens/chat/card-transcript-indexeddb'
 import {
   readMessageJournal,
   removeMessageJournalValues,
   writeMessageJournal,
 } from '@/screens/chat/durable-message-journal'
+import {
+  encodeWorkspaceChatV4Record,
+  readLatestCardSnapshot,
+  writeLatestCardSnapshot,
+} from '@/screens/chat/card-transcript-indexeddb'
 import {
   fetchCompleteSessionCardHistory,
   fetchSessionCards,
@@ -28,28 +37,13 @@ type OperationsChatOverlayMessage = OperationsChatMessage & {
   acknowledgementOrdinal: number
 }
 
-type OperationsChatOverlayEnvelope = {
-  version: 2
-  revision: number
-  owner: { cardId: string }
-  messages: Array<OperationsChatOverlayMessage>
-}
-
-type OperationsChatCompleteSnapshot = {
-  version: 2
-  revision: number
-  owner: { cardId: string }
+type OperationsChatSnapshotPayload = {
+  ownerCardId: string
   messages: Array<OperationsChatMessage>
 }
 
-type StoredMessages<T> = {
-  revision: number
-  messages: Array<T>
-}
-
-const OPERATIONS_CHAT_OVERLAY_PREFIX = 'workspace.operations-card-chat.v1:'
-const OPERATIONS_CHAT_COMPLETE_PREFIX =
-  'workspace.operations-card-complete-history.v1:'
+const OPERATIONS_CHAT_SNAPSHOT_OWNER_PREFIX = 'operations-snapshot:'
+const OPERATIONS_CHAT_OVERLAY_OWNER_PREFIX = 'operations-overlay:'
 
 function normalizeMessage(
   message: ChatMessage,
@@ -82,129 +76,12 @@ function childForTarget(target: OperationsChatTarget) {
   )
 }
 
-function overlayStorageKey(cardId: string) {
-  return `${OPERATIONS_CHAT_OVERLAY_PREFIX}${encodeURIComponent(cardId)}`
+function snapshotOwnerKey(cardId: string): string {
+  return `${OPERATIONS_CHAT_SNAPSHOT_OWNER_PREFIX}${cardId}`
 }
 
-function completeSnapshotStorageKey(cardId: string) {
-  return `${OPERATIONS_CHAT_COMPLETE_PREFIX}${encodeURIComponent(cardId)}`
-}
-
-function storageMirrors() {
-  if (typeof window === 'undefined') return []
-  const mirrors: Array<Storage> = []
-  try {
-    mirrors.push(window.localStorage)
-  } catch {}
-  try {
-    if (!mirrors.includes(window.sessionStorage)) {
-      mirrors.push(window.sessionStorage)
-    }
-  } catch {}
-  return mirrors
-}
-
-function persistentStorageMirrors() {
-  if (typeof window === 'undefined') return []
-  try {
-    return [window.localStorage]
-  } catch {
-    return []
-  }
-}
-
-function removeInvalidStoredValue(storage: Storage, key: string) {
-  try {
-    storage.removeItem(key)
-  } catch {}
-}
-
-function parseEnvelope(
-  raw: string,
-  cardId: string,
-): { parsed: Record<string, unknown>; revision: number } | undefined {
-  const parsedValue = JSON.parse(raw) as unknown
-  if (!parsedValue || typeof parsedValue !== 'object') return undefined
-  const parsed = parsedValue as Record<string, unknown>
-  const owner =
-    parsed.owner && typeof parsed.owner === 'object'
-      ? (parsed.owner as Record<string, unknown>)
-      : undefined
-  const revision =
-    parsed.version === 1
-      ? 0
-      : parsed.version === 2 &&
-          typeof parsed.revision === 'number' &&
-          Number.isSafeInteger(parsed.revision) &&
-          parsed.revision > 0
-        ? parsed.revision
-        : undefined
-  if (
-    revision === undefined ||
-    owner?.cardId !== cardId ||
-    !Array.isArray(parsed.messages)
-  ) {
-    return undefined
-  }
-  return { parsed, revision }
-}
-
-function readMirroredMessages<T>(
-  key: string,
-  parse: (raw: string) => StoredMessages<T> | undefined,
-  mirrors = storageMirrors(),
-): StoredMessages<T> | undefined {
-  let newest: StoredMessages<T> | undefined
-  for (const storage of mirrors) {
-    try {
-      const raw = storage.getItem(key)
-      if (!raw) continue
-      const candidate = parse(raw)
-      if (!candidate) {
-        removeInvalidStoredValue(storage, key)
-        continue
-      }
-      if (!newest || candidate.revision > newest.revision) newest = candidate
-    } catch {}
-  }
-  return newest
-}
-
-function writeMirroredEnvelope(
-  key: string,
-  previousRevision: number,
-  envelope: OperationsChatOverlayEnvelope | OperationsChatCompleteSnapshot,
-) {
-  const serialized = JSON.stringify(envelope)
-  const writtenStorages: Array<Storage> = []
-  const verifiedStorages: Array<Storage> = []
-  for (const storage of storageMirrors()) {
-    try {
-      storage.setItem(key, serialized)
-      writtenStorages.push(storage)
-      if (storage.getItem(key) === serialized) verifiedStorages.push(storage)
-    } catch {}
-  }
-  if (envelope.revision !== previousRevision + 1) {
-    return {
-      anyVerified: false,
-      persistentVerified: false,
-      writtenStorages: [],
-      verifiedStorages: [],
-    }
-  }
-  return {
-    anyVerified: verifiedStorages.length > 0,
-    persistentVerified: verifiedStorages.some((storage) => {
-      try {
-        return storage === window.localStorage
-      } catch {
-        return false
-      }
-    }),
-    writtenStorages,
-    verifiedStorages,
-  }
+function overlayOwnerKey(cardId: string): string {
+  return `${OPERATIONS_CHAT_OVERLAY_OWNER_PREFIX}${cardId}`
 }
 
 function parseCompleteMessage(value: unknown): OperationsChatMessage | null {
@@ -252,220 +129,117 @@ function parseOverlayMessage(
   }
 }
 
-function mergeOperationsMessages<T extends { id: string }>(
-  base: Array<T>,
-  journal: Array<T>,
-): Array<T> {
-  const merged = new Map(base.map((message) => [message.id, message]))
-  for (const message of journal) merged.set(message.id, message)
-  return [...merged.values()]
-}
-
-function parseCompleteSnapshot(
-  raw: string,
+function parseSnapshotPayload(
+  value: unknown,
   cardId: string,
-): StoredMessages<OperationsChatMessage> | undefined {
-  try {
-    const envelope = parseEnvelope(raw, cardId)
-    if (!envelope) return undefined
-    const { parsed, revision } = envelope
-    const messages: Array<OperationsChatMessage> = []
-    for (const candidateValue of parsed.messages as Array<unknown>) {
-      if (
-        !candidateValue ||
-        typeof candidateValue !== 'object' ||
-        Array.isArray(candidateValue)
-      ) {
-        return undefined
-      }
-      const candidate = candidateValue as Record<string, unknown>
-      if (
-        (candidate.role !== 'user' &&
-          candidate.role !== 'assistant' &&
-          candidate.role !== 'system') ||
-        typeof candidate.id !== 'string' ||
-        !candidate.id ||
-        typeof candidate.content !== 'string' ||
-        !candidate.content.trim()
-      ) {
-        return undefined
-      }
-      messages.push({
-        id: candidate.id,
-        role: candidate.role,
-        content: candidate.content,
-        ...(typeof candidate.timestamp === 'number' &&
-        Number.isFinite(candidate.timestamp)
-          ? { timestamp: candidate.timestamp }
-          : {}),
-      })
-    }
-    return { revision, messages }
-  } catch {
-    return undefined
+): OperationsChatSnapshotPayload {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Operations snapshot payload is invalid')
+  }
+  const payload = value as Record<string, unknown>
+  if (payload.ownerCardId !== cardId || !Array.isArray(payload.messages)) {
+    throw new Error('Operations snapshot owner or messages are invalid')
+  }
+  const messages = payload.messages.map(parseCompleteMessage)
+  if (messages.some((message) => message === null)) {
+    throw new Error('Operations snapshot contains an invalid message')
+  }
+  return {
+    ownerCardId: cardId,
+    messages: messages as Array<OperationsChatMessage>,
   }
 }
 
-function readCompleteSnapshot(cardId: string): Array<OperationsChatMessage> {
-  if (!cardId) return []
-  const key = completeSnapshotStorageKey(cardId)
-  const mirrors = storageMirrors()
-  const base =
-    readMirroredMessages(key, (raw) => parseCompleteSnapshot(raw, cardId))
-      ?.messages ?? []
-  const journal = readMessageJournal(
-    key,
-    mirrors,
-    (message: OperationsChatMessage) => message.id,
-    parseCompleteMessage,
-  )
-  return mergeOperationsMessages(base, journal)
+async function readCompleteSnapshotRecord(
+  cardId: string,
+): Promise<V4LatestCardSnapshotRecord<PortableValue> | null> {
+  if (!cardId) return null
+  const ownerKey = snapshotOwnerKey(cardId)
+  const stored = await readLatestCardSnapshot<PortableValue>(ownerKey)
+  if (stored === null) return null
+  const record = encodeWorkspaceChatV4Record(
+    stored,
+  ) as V4LatestCardSnapshotRecord<PortableValue>
+  if (record.cardId !== ownerKey) {
+    throw new Error('Operations snapshot IndexedDB owner is invalid')
+  }
+  parseSnapshotPayload(record.payload, cardId)
+  return record
 }
 
-function writeCompleteSnapshot(
+async function readCompleteSnapshot(
+  cardId: string,
+): Promise<Array<OperationsChatMessage>> {
+  const record = await readCompleteSnapshotRecord(cardId)
+  return record === null
+    ? []
+    : parseSnapshotPayload(record.payload, cardId).messages
+}
+
+async function writeCompleteSnapshot(
   cardId: string,
   messages: Array<OperationsChatMessage>,
-) {
-  if (!cardId) return { anyVerified: false, persistentVerified: false }
-  const key = completeSnapshotStorageKey(cardId)
-  const previous = readMirroredMessages(key, (raw) =>
-    parseCompleteSnapshot(raw, cardId),
-  )
-  const previousRevision = previous?.revision ?? 0
-  const revision = previousRevision + 1
-  if (!Number.isSafeInteger(revision) || revision <= 0) {
-    return { anyVerified: false, persistentVerified: false }
+): Promise<boolean> {
+  if (
+    !cardId ||
+    messages.some((message) => parseCompleteMessage(message) === null)
+  ) {
+    return false
   }
-  const envelope: OperationsChatCompleteSnapshot = {
-    version: 2,
-    revision,
-    owner: { cardId },
-    messages,
-  }
-  const envelopeWrite = writeMirroredEnvelope(key, previousRevision, envelope)
-  if (!envelopeWrite.anyVerified) {
-    return { anyVerified: false, persistentVerified: false }
-  }
-  const journalWrite = writeMessageJournal(
-    key,
-    messages,
-    envelopeWrite.writtenStorages,
-    (message) => message.id,
-  )
-  return {
-    // The compact envelope remains a safe compatibility fallback if a mirror
-    // cannot allocate the additional union-journal rows.
-    anyVerified: envelopeWrite.anyVerified,
-    persistentVerified:
-      envelopeWrite.persistentVerified || journalWrite.persistentVerified,
-  }
-}
-
-function parseOverlay(
-  raw: string,
-  cardId: string,
-): StoredMessages<OperationsChatOverlayMessage> | undefined {
   try {
-    const envelope = parseEnvelope(raw, cardId)
-    if (!envelope) return undefined
-    const { parsed, revision } = envelope
-    const messages: Array<OperationsChatOverlayMessage> = []
-    for (const candidateValue of parsed.messages as Array<unknown>) {
-      if (
-        !candidateValue ||
-        typeof candidateValue !== 'object' ||
-        Array.isArray(candidateValue)
-      ) {
-        return undefined
-      }
-      const candidate = candidateValue as Record<string, unknown>
-      if (
-        (candidate.role !== 'user' && candidate.role !== 'assistant') ||
-        typeof candidate.id !== 'string' ||
-        !candidate.id ||
-        typeof candidate.content !== 'string' ||
-        !candidate.content.trim() ||
-        typeof candidate.acknowledgementOrdinal !== 'number' ||
-        !Number.isSafeInteger(candidate.acknowledgementOrdinal) ||
-        candidate.acknowledgementOrdinal < 1
-      ) {
-        return undefined
-      }
-      messages.push({
-        id: candidate.id,
-        role: candidate.role,
-        content: candidate.content,
-        acknowledgementOrdinal: candidate.acknowledgementOrdinal,
-        ...(typeof candidate.timestamp === 'number' &&
-        Number.isFinite(candidate.timestamp)
-          ? { timestamp: candidate.timestamp }
-          : {}),
-      })
-    }
-    return { revision, messages }
+    const previous = await readCompleteSnapshotRecord(cardId)
+    const revision = (previous?.revision ?? 0) + 1
+    if (!Number.isSafeInteger(revision)) return false
+    const record = encodeWorkspaceChatV4Record({
+      cardId: snapshotOwnerKey(cardId),
+      schema: 4 as const,
+      revision,
+      writeId: crypto.randomUUID(),
+      updatedAt: Date.now(),
+      payload: { ownerCardId: cardId, messages },
+    }) as V4LatestCardSnapshotRecord<PortableValue>
+    await writeLatestCardSnapshot(record)
+    return true
   } catch {
-    return undefined
+    return false
   }
 }
 
-function readOverlay(cardId: string): Array<OperationsChatOverlayMessage> {
+async function readOverlay(
+  cardId: string,
+): Promise<Array<OperationsChatOverlayMessage>> {
   if (!cardId) return []
-  const key = overlayStorageKey(cardId)
-  // Operations renders overlay rows only from the shared durable mirror.
-  // sessionStorage is a write fallback for the current tab, not proof that an
-  // accepted assistant chunk survives a full tab close.
-  const mirrors = persistentStorageMirrors()
-  const base =
-    readMirroredMessages(key, (raw) => parseOverlay(raw, cardId), mirrors)
-      ?.messages ?? []
-  const journal = readMessageJournal(
-    key,
-    mirrors,
-    (message: OperationsChatOverlayMessage) => message.id,
-    parseOverlayMessage,
-  )
-  return mergeOperationsMessages(base, journal)
+  return readMessageJournal(overlayOwnerKey(cardId), parseOverlayMessage)
 }
 
-function writeOverlay(
+async function writeOverlay(
   cardId: string,
   messages: Array<OperationsChatOverlayMessage>,
-  requirePersistent = true,
   acknowledged: Array<OperationsChatOverlayMessage> = [],
-) {
-  if (!cardId) return false
-  const key = overlayStorageKey(cardId)
-  const mirrors = storageMirrors()
-  const previous = readMirroredMessages(key, (raw) => parseOverlay(raw, cardId))
-  const previousRevision = previous?.revision ?? 0
-  const revision = previousRevision + 1
-  if (!Number.isSafeInteger(revision) || revision <= 0) return false
-  const envelope: OperationsChatOverlayEnvelope = {
-    version: 2,
-    revision,
-    owner: { cardId },
-    messages,
+): Promise<boolean> {
+  if (
+    !cardId ||
+    messages.some((message) => parseOverlayMessage(message) === null)
+  ) {
+    return false
   }
-  const envelopeWrite = writeMirroredEnvelope(key, previousRevision, envelope)
-  if (!envelopeWrite.anyVerified) return false
-  const journalWrite = writeMessageJournal(
-    key,
-    messages,
-    envelopeWrite.writtenStorages,
-    (message) => message.id,
-  )
-  const persistentVerified =
-    envelopeWrite.persistentVerified || journalWrite.persistentVerified
-  if (requirePersistent && !persistentVerified) return false
-  if (acknowledged.length > 0) {
-    removeMessageJournalValues(
-      key,
-      acknowledged,
-      envelopeWrite.verifiedStorages,
+  try {
+    await writeMessageJournal(
+      overlayOwnerKey(cardId),
+      messages,
       (message) => message.id,
     )
+    if (acknowledged.length > 0) {
+      await removeMessageJournalValues(
+        overlayOwnerKey(cardId),
+        acknowledged,
+        (message) => message.id,
+      )
+    }
+    return true
+  } catch {
+    return false
   }
-  return true
 }
 
 function messageSignature(
@@ -600,7 +374,7 @@ function processSseBlock(
 
 async function consumeAssistantStream(
   response: Response,
-  onText: (text: string) => void,
+  onText: (text: string) => Promise<void>,
 ) {
   const reader = response.body?.getReader()
   if (!reader) throw new Error('Operations chat stream is unavailable')
@@ -608,7 +382,7 @@ async function consumeAssistantStream(
   let buffer = ''
   let assistantText = ''
 
-  const processBufferedEvents = (flush: boolean) => {
+  const processBufferedEvents = async (flush: boolean) => {
     const blocks = buffer.split('\n\n')
     buffer = flush ? '' : (blocks.pop() ?? '')
     for (const block of blocks) {
@@ -616,7 +390,7 @@ async function consumeAssistantStream(
       const result = processSseBlock(block, assistantText)
       if (result.error) throw new Error(result.error)
       assistantText = result.text
-      if (result.changed) onText(assistantText)
+      if (result.changed) await onText(assistantText)
     }
   }
 
@@ -628,11 +402,11 @@ async function consumeAssistantStream(
     buffer += decoder
       .decode(result.value, { stream: true })
       .replaceAll('\r\n', '\n')
-    processBufferedEvents(false)
+    await processBufferedEvents(false)
   }
   buffer += decoder.decode().replaceAll('\r\n', '\n')
   if (buffer.trim()) buffer += '\n\n'
-  processBufferedEvents(true)
+  await processBufferedEvents(true)
 }
 
 function sameBinding(left: SessionCard, right: SessionCard) {
@@ -647,10 +421,7 @@ function sameBinding(left: SessionCard, right: SessionCard) {
 
 export const operationsChatStorageForTests = {
   readCompleteSnapshot,
-  writeCompleteSnapshot: (
-    cardId: string,
-    messages: Array<OperationsChatMessage>,
-  ) => writeCompleteSnapshot(cardId, messages).anyVerified,
+  writeCompleteSnapshot,
   readOverlay,
   writeOverlay,
 }
@@ -703,80 +474,183 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     ownerCardId: string
     messages: Array<OperationsChatMessage>
     persistentVerified: boolean
-  }>(() => ({
+    hydrated: boolean
+  }>({
     ownerCardId: cardId,
-    messages: readCompleteSnapshot(cardId),
+    messages: [],
     persistentVerified: false,
-  }))
-  const [overlayMessages, setOverlayMessages] = useState<
-    Array<OperationsChatOverlayMessage>
-  >(() => readOverlay(ownerCardId))
+    hydrated: false,
+  })
+  const [overlayState, setOverlayState] = useState<{
+    ownerCardId: string
+    messages: Array<OperationsChatOverlayMessage>
+    hydrated: boolean
+  }>({ ownerCardId, messages: [], hydrated: false })
   const [snapshotDurabilityError, setSnapshotDurabilityError] = useState<
     string | null
   >(null)
   const [overlayDurabilityError, setOverlayDurabilityError] = useState<
     string | null
   >(null)
-  const overlayRef = useRef(overlayMessages)
+  const overlayMessages =
+    overlayState.ownerCardId === ownerCardId ? overlayState.messages : []
+  const overlayRef = useRef<Array<OperationsChatOverlayMessage>>([])
   const overlayOwnerRef = useRef(ownerCardId)
+  const overlayHydratedRef = useRef(false)
+  const snapshotOperationRef = useRef(0)
 
-  const commitOverlay = (
+  const commitOverlay = async (
     nextMessages: Array<OperationsChatOverlayMessage>,
     expectedOwner = ownerCardId,
-    requirePersistent = true,
   ) => {
-    if (!expectedOwner) return false
-    if (!writeOverlay(expectedOwner, nextMessages, requirePersistent))
+    if (
+      !expectedOwner ||
+      overlayOwnerRef.current !== expectedOwner ||
+      !overlayHydratedRef.current
+    ) {
       return false
-    if (overlayOwnerRef.current === expectedOwner) {
-      overlayRef.current = nextMessages
-      setOverlayMessages(nextMessages)
     }
+    if (!(await writeOverlay(expectedOwner, nextMessages))) return false
+    if (overlayOwnerRef.current !== expectedOwner) return false
+    overlayRef.current = nextMessages
+    setOverlayState({
+      ownerCardId: expectedOwner,
+      messages: nextMessages,
+      hydrated: true,
+    })
     return true
   }
 
   useEffect(() => {
+    const operation = snapshotOperationRef.current + 1
+    snapshotOperationRef.current = operation
+    const lifecycle = { cancelled: false }
     setSnapshotDurabilityError(null)
-    setOverlayDurabilityError(null)
-    setCompleteSnapshot({
-      ownerCardId: cardId,
-      messages: readCompleteSnapshot(cardId),
-      persistentVerified: false,
-    })
-  }, [cardId])
-
-  useEffect(() => {
-    if (!completeHistory || !cardId) return
-    const snapshotWrite = writeCompleteSnapshot(
-      cardId,
-      currentAuthoritativeMessages,
+    setCompleteSnapshot((current) =>
+      current.ownerCardId === cardId
+        ? { ...current, persistentVerified: false, hydrated: false }
+        : {
+            ownerCardId: cardId,
+            messages: [],
+            persistentVerified: false,
+            hydrated: false,
+          },
     )
-    if (snapshotWrite.persistentVerified) {
-      setSnapshotDurabilityError(null)
-    } else {
-      setSnapshotDurabilityError(
-        'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
-      )
-    }
-    if (snapshotWrite.anyVerified) {
-      setCompleteSnapshot({
-        ownerCardId: cardId,
-        messages: currentAuthoritativeMessages,
-        persistentVerified: snapshotWrite.persistentVerified,
-      })
+
+    void (async () => {
+      if (!cardId) {
+        if (
+          !lifecycle.cancelled &&
+          snapshotOperationRef.current === operation
+        ) {
+          setCompleteSnapshot({
+            ownerCardId: cardId,
+            messages: [],
+            persistentVerified: false,
+            hydrated: true,
+          })
+        }
+        return
+      }
+
+      if (completeHistory) {
+        const verified = await writeCompleteSnapshot(
+          cardId,
+          currentAuthoritativeMessages,
+        )
+        if (lifecycle.cancelled || snapshotOperationRef.current !== operation)
+          return
+        if (!verified) {
+          setSnapshotDurabilityError(
+            'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
+          )
+          setCompleteSnapshot((current) => ({
+            ...current,
+            ownerCardId: cardId,
+            persistentVerified: false,
+            hydrated: true,
+          }))
+          return
+        }
+        setSnapshotDurabilityError(null)
+        setCompleteSnapshot({
+          ownerCardId: cardId,
+          messages: currentAuthoritativeMessages,
+          persistentVerified: true,
+          hydrated: true,
+        })
+        return
+      }
+
+      try {
+        const messages = await readCompleteSnapshot(cardId)
+        if (lifecycle.cancelled || snapshotOperationRef.current !== operation)
+          return
+        setCompleteSnapshot({
+          ownerCardId: cardId,
+          messages,
+          persistentVerified: false,
+          hydrated: true,
+        })
+      } catch {
+        if (lifecycle.cancelled || snapshotOperationRef.current !== operation)
+          return
+        setSnapshotDurabilityError(
+          'Operations chat recovery storage is unavailable. This complete transcript is not available after reload until storage recovers.',
+        )
+        setCompleteSnapshot({
+          ownerCardId: cardId,
+          messages: [],
+          persistentVerified: false,
+          hydrated: true,
+        })
+      }
+    })()
+
+    return () => {
+      lifecycle.cancelled = true
     }
   }, [cardId, completeHistory, currentAuthoritativeMessages])
 
   useEffect(() => {
+    const lifecycle = { cancelled: false }
     overlayOwnerRef.current = ownerCardId
-    const recovered = readOverlay(ownerCardId)
-    overlayRef.current = recovered
-    setOverlayMessages(recovered)
+    overlayHydratedRef.current = false
+    overlayRef.current = []
+    setOverlayDurabilityError(null)
+    setOverlayState({ ownerCardId, messages: [], hydrated: false })
+
+    void (async () => {
+      try {
+        const recovered = await readOverlay(ownerCardId)
+        if (lifecycle.cancelled || overlayOwnerRef.current !== ownerCardId)
+          return
+        overlayRef.current = recovered
+        overlayHydratedRef.current = true
+        setOverlayState({
+          ownerCardId,
+          messages: recovered,
+          hydrated: true,
+        })
+      } catch {
+        if (lifecycle.cancelled || overlayOwnerRef.current !== ownerCardId)
+          return
+        overlayHydratedRef.current = false
+        setOverlayDurabilityError(
+          'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
+        )
+        setOverlayState({ ownerCardId, messages: [], hydrated: true })
+      }
+    })()
+
+    return () => {
+      lifecycle.cancelled = true
+    }
   }, [ownerCardId])
 
   const authoritativeMessages = completeHistory
     ? currentAuthoritativeMessages
-    : completeSnapshot.ownerCardId === cardId
+    : completeSnapshot.ownerCardId === cardId && completeSnapshot.hydrated
       ? completeSnapshot.messages
       : []
 
@@ -801,8 +675,10 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     if (
       !completeHistory ||
       !ownerCardId ||
+      !overlayState.hydrated ||
       completeSnapshot.ownerCardId !== cardId ||
       completeSnapshot.messages !== currentAuthoritativeMessages ||
+      !completeSnapshot.persistentVerified ||
       unacknowledgedOverlay.length === overlayMessages.length
     ) {
       return
@@ -813,13 +689,29 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     const acknowledged = overlayMessages.filter(
       (message) => !remainingIds.has(message.id),
     )
-    if (!completeSnapshot.persistentVerified) return
-    if (!writeOverlay(ownerCardId, unacknowledgedOverlay, true, acknowledged)) {
-      return
-    }
-    if (overlayOwnerRef.current === ownerCardId) {
+    const lifecycle = { cancelled: false }
+    void (async () => {
+      const verified = await writeOverlay(
+        ownerCardId,
+        unacknowledgedOverlay,
+        acknowledged,
+      )
+      if (lifecycle.cancelled || overlayOwnerRef.current !== ownerCardId) return
+      if (!verified) {
+        setOverlayDurabilityError(
+          'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
+        )
+        return
+      }
       overlayRef.current = unacknowledgedOverlay
-      setOverlayMessages(unacknowledgedOverlay)
+      setOverlayState({
+        ownerCardId,
+        messages: unacknowledgedOverlay,
+        hydrated: true,
+      })
+    })()
+    return () => {
+      lifecycle.cancelled = true
     }
   }, [
     cardId,
@@ -828,6 +720,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
     currentAuthoritativeMessages,
     ownerCardId,
     overlayMessages,
+    overlayState.hydrated,
     unacknowledgedOverlay,
   ])
 
@@ -883,17 +776,13 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
           overlayRef.current,
         ),
       }
-      let activeSendOverlay = [...overlayRef.current, optimisticUser]
-      const overlayBeforeSend = overlayRef.current
-      if (!commitOverlay(activeSendOverlay, ownerCardId)) {
-        if (overlayOwnerRef.current === ownerCardId) {
-          overlayRef.current = overlayBeforeSend
-          setOverlayMessages(overlayBeforeSend)
-        }
+      const admittedOverlay = [...overlayRef.current, optimisticUser]
+      if (!(await commitOverlay(admittedOverlay, ownerCardId))) {
         throw new Error(
           'Operations chat recovery storage is unavailable. Message was not sent.',
         )
       }
+      let activeSendOverlay = admittedOverlay
 
       const response = await fetch('/api/send-stream', {
         method: 'POST',
@@ -911,7 +800,7 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
       }
 
       const assistantId = `operations-assistant-${idempotencyKey}`
-      await consumeAssistantStream(response, (content) => {
+      await consumeAssistantStream(response, async (content) => {
         const existing = activeSendOverlay.find(
           (entry) => entry.id === assistantId,
         )
@@ -928,17 +817,18 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
                   authoritativeMessages,
                   withoutAssistant,
                 )
-          activeSendOverlay = activeSendOverlay.map((entry) =>
+          const nextOverlay = activeSendOverlay.map((entry) =>
             entry.id === assistantId
               ? { ...entry, content, acknowledgementOrdinal }
               : entry,
           )
-          if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+          if (!(await commitOverlay(nextOverlay, ownerCardId))) {
             setOverlayDurabilityError(
               'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
             )
             return
           }
+          activeSendOverlay = nextOverlay
           setOverlayDurabilityError(null)
           return
         }
@@ -953,13 +843,14 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
             activeSendOverlay,
           ),
         }
-        activeSendOverlay = [...activeSendOverlay, assistant]
-        if (!commitOverlay(activeSendOverlay, ownerCardId)) {
+        const nextOverlay = [...activeSendOverlay, assistant]
+        if (!(await commitOverlay(nextOverlay, ownerCardId))) {
           setOverlayDurabilityError(
             'Operations chat recovery storage became unavailable. The last durable stream checkpoint is still shown.',
           )
           return
         }
+        activeSendOverlay = nextOverlay
         setOverlayDurabilityError(null)
       })
     },
@@ -987,12 +878,16 @@ export function useAgentChat(target: OperationsChatTarget | undefined) {
           (sendMutation.error instanceof Error && sendMutation.error.message) ||
           null
   const durabilityWarning = overlayDurabilityError || snapshotDurabilityError
+  const storageHydrating =
+    !overlayState.hydrated ||
+    (!completeHistory &&
+      (completeSnapshot.ownerCardId !== cardId || !completeSnapshot.hydrated))
 
   return {
     messages,
     sendMessage: sendMutation.mutateAsync,
-    canSend: Boolean(target && !child),
-    isLoading: historyQuery.isPending,
+    canSend: Boolean(target && !child && ownerCardId && overlayState.hydrated),
+    isLoading: historyQuery.isPending || storageHydrating,
     isRefreshing: historyQuery.isFetching,
     isSending: sendMutation.isPending,
     error,

@@ -83,6 +83,7 @@ import {
   mergeCardTranscriptRecoveryMessages,
   removeRejectedCardTranscriptRecoveryMessage,
 } from './card-transcript-recovery'
+import { resetWorkspaceChatIndexedDb } from './card-transcript-indexeddb'
 import { parsePortableAttachmentDataUrl } from './attachment-envelope'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
@@ -201,6 +202,13 @@ type ChatScreenProps = {
    * user out to /chat/<uuid> on mount, refresh, or after send.
    */
   embedded?: boolean
+}
+
+type WorkspaceChatAdmissionRetry = {
+  ownerKey: string
+  safeMessage: string
+  retryPersistence: () => Promise<boolean>
+  continueAfterAdmission: () => Promise<void>
 }
 
 type PortableHistoryMessage = {
@@ -594,6 +602,15 @@ export function ChatScreen({
   const activeCardIdRef = useRef(activeCard?.cardId)
   activeCardIdRef.current = activeCard?.cardId
   const [error, setError] = useState<string | null>(null)
+  const [workspaceChatAdmissionRetry, setWorkspaceChatAdmissionRetry] =
+    useState<WorkspaceChatAdmissionRetry | null>(null)
+  const [workspaceChatAdmissionRetryBusy, setWorkspaceChatAdmissionRetryBusy] =
+    useState(false)
+  const workspaceChatAdmissionRetryBusyRef = useRef(false)
+  const [
+    workspaceChatAdmissionRetryError,
+    setWorkspaceChatAdmissionRetryError,
+  ] = useState<string | null>(null)
   const [renamingCardTitle, setRenamingCardTitle] = useState(false)
   const [pendingCardIds, setPendingCardIds] = useState<Set<string>>(
     () => new Set(),
@@ -909,8 +926,7 @@ export function ChatScreen({
     : ''
   const bootstrapPendingQuery = useQuery({
     queryKey: ['chat', 'pending-send-v4', bootstrapPendingOwnerId],
-    queryFn: () =>
-      readPendingMessage('new', 'new', bootstrapPendingOwnerId),
+    queryFn: () => readPendingMessage('new', 'new', bootstrapPendingOwnerId),
     enabled: isNewChat && Boolean(bootstrapPendingOwnerId),
   })
   const bootstrapPending = bootstrapPendingQuery.data ?? null
@@ -3283,51 +3299,85 @@ export function ChatScreen({
 
       const provisionalOwnerId = isNewChat ? getNewChatProvisionalOwnerId() : ''
 
-      let persisted = false
-      try {
-        if (activeCard) {
-          persisted = Boolean(
-            await appendCardTranscriptRecoveryMessage(
-              { cardId: activeCard.cardId },
-              durableOptimisticMessage,
-            ),
-          )
-          if (persisted) {
-            await appendSessionCardTransientMessage(
-              queryClient,
-              activeCard.cardId,
-              sessionKeyForSend,
-              durableOptimisticMessage,
-              { persistRecovery: false },
+      const retryOwnerKey = activeCard?.cardId
+        ? `${activeCard.canonicalSource}:${activeCard.cardId}`
+        : isNewChat
+          ? 'new'
+          : `${sessionKeyForSend}:${transportFriendlyId}`
+      const persistExactAdmission = async (): Promise<boolean> => {
+        let persisted = false
+        try {
+          if (activeCard) {
+            persisted = Boolean(
+              await appendCardTranscriptRecoveryMessage(
+                { cardId: activeCard.cardId },
+                durableOptimisticMessage,
+              ),
             )
+            if (!persisted) {
+              await removeRejectedCardTranscriptRecoveryMessage(
+                { cardId: activeCard.cardId },
+                durableClientId,
+              )
+            }
           } else {
-            await removeRejectedCardTranscriptRecoveryMessage(
-              { cardId: activeCard.cardId },
-              durableClientId,
-            )
+            persisted = await persistPendingMessage({
+              sessionKey: sessionKeyForSend,
+              friendlyId: isNewChat ? 'new' : transportFriendlyId,
+              ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
+              message: trimmedBody,
+              attachments: attachmentPayload,
+              optimisticMessage: durableOptimisticMessage,
+            })
           }
-        } else {
-          persisted = await persistPendingMessage({
-            sessionKey: sessionKeyForSend,
-            friendlyId: isNewChat ? 'new' : transportFriendlyId,
-            ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
-            message: trimmedBody,
-            attachments: attachmentPayload,
-            optimisticMessage: durableOptimisticMessage,
-          })
-          if (persisted) {
-            appendHistoryMessage(
-              queryClient,
-              isNewChat ? 'new' : transportFriendlyId,
-              sessionKeyForSend,
-              durableOptimisticMessage,
-            )
-          }
+        } catch {
+          persisted = false
         }
-      } catch {
-        persisted = false
+        return persisted
       }
 
+      const continueAfterAdmission = async (): Promise<void> => {
+        if (activeCard) {
+          await appendSessionCardTransientMessage(
+            queryClient,
+            activeCard.cardId,
+            sessionKeyForSend,
+            durableOptimisticMessage,
+            { persistRecovery: false },
+          )
+        } else {
+          appendHistoryMessage(
+            queryClient,
+            isNewChat ? 'new' : transportFriendlyId,
+            sessionKeyForSend,
+            durableOptimisticMessage,
+          )
+        }
+        updateSessionLastMessage(
+          queryClient,
+          sessionKeyForSend,
+          isNewChat ? 'new' : transportFriendlyId,
+          durableOptimisticMessage,
+        )
+
+        helpers.reset()
+        // Haptic feedback on mobile only after the durable overlay is accepted.
+        if (isMobile) hapticTap()
+        requestAnimationFrame(() => scrollChatToBottom('smooth'))
+
+        await sendMessage(
+          sessionKeyForSend,
+          isNewChat ? 'new' : transportFriendlyId,
+          trimmedBody,
+          attachmentPayload,
+          fastMode,
+          true,
+          durableClientId,
+          provisionalOwnerId,
+        )
+      }
+
+      const persisted = await persistExactAdmission()
       if (!persisted) {
         const safeMessage =
           attachmentPayload.length > 0
@@ -3335,37 +3385,25 @@ export function ChatScreen({
             : activeCard
               ? 'This message was not sent because it could not be saved safely. Free browser storage and try again.'
               : 'This first message was not sent because it could not be saved safely. Free browser storage and try again.'
+        if (!embedded && retryOwnerKey) {
+          workspaceChatAdmissionRetryBusyRef.current = false
+          setWorkspaceChatAdmissionRetry({
+            ownerKey: retryOwnerKey,
+            safeMessage,
+            retryPersistence: persistExactAdmission,
+            continueAfterAdmission,
+          })
+          setWorkspaceChatAdmissionRetryError(null)
+        }
         setError(safeMessage)
         toast(safeMessage, { type: 'error' })
         showErrorToast(safeMessage)
         return
       }
-      updateSessionLastMessage(
-        queryClient,
-        sessionKeyForSend,
-        isNewChat ? 'new' : transportFriendlyId,
-        durableOptimisticMessage,
-      )
-
-      helpers.reset()
-      // Haptic feedback on mobile only after the durable overlay is accepted.
-      if (isMobile) hapticTap()
-      requestAnimationFrame(() => scrollChatToBottom('smooth'))
-
-      await sendMessage(
-        sessionKeyForSend,
-        isNewChat ? 'new' : transportFriendlyId,
-        trimmedBody,
-        attachmentPayload,
-        fastMode,
-        true,
-        durableClientId,
-        provisionalOwnerId,
-      )
-      // New Chat stays on the bootstrap route until the stream provides the
-      // authoritative Card handoff; its provisional localStorage owner is moved
-      // only after the destination record has landed.
-      if (isNewChat) return
+      setWorkspaceChatAdmissionRetry(null)
+      setWorkspaceChatAdmissionRetryError(null)
+      workspaceChatAdmissionRetryBusyRef.current = false
+      await continueAfterAdmission()
     },
     [
       activeCard,
@@ -3374,6 +3412,7 @@ export function ChatScreen({
       activeSessionKey,
       cardSourceError,
       cardTransportReady,
+      embedded,
       forcedSessionKey,
       isNewChat,
       isPortableMode,
@@ -3385,6 +3424,71 @@ export function ChatScreen({
       handleUiSlashCommand,
     ],
   )
+
+  const workspaceChatAdmissionOwnerKey = activeCard?.cardId
+    ? `${activeCard.canonicalSource}:${activeCard.cardId}`
+    : isNewChat
+      ? 'new'
+      : `${
+          isPortableMode
+            ? 'main'
+            : forcedSessionKey ||
+              resolvedSessionKey ||
+              activeSessionKey ||
+              'main'
+        }:${transportFriendlyId}`
+  useEffect(() => {
+    workspaceChatAdmissionRetryBusyRef.current = false
+    setWorkspaceChatAdmissionRetry(null)
+    setWorkspaceChatAdmissionRetryError(null)
+    setWorkspaceChatAdmissionRetryBusy(false)
+  }, [workspaceChatAdmissionOwnerKey])
+
+  const handleResetWorkspaceChatRecoveryAndRetry = useCallback(async () => {
+    const pending = workspaceChatAdmissionRetry
+    if (!pending || workspaceChatAdmissionRetryBusyRef.current) return
+    if (pending.ownerKey !== workspaceChatAdmissionOwnerKey) {
+      setWorkspaceChatAdmissionRetry(null)
+      setWorkspaceChatAdmissionRetryError(null)
+      return
+    }
+
+    workspaceChatAdmissionRetryBusyRef.current = true
+    setWorkspaceChatAdmissionRetryBusy(true)
+    setWorkspaceChatAdmissionRetryError(null)
+    try {
+      const database = await resetWorkspaceChatIndexedDb()
+      database.close()
+    } catch {
+      workspaceChatAdmissionRetryBusyRef.current = false
+      setWorkspaceChatAdmissionRetryError(
+        'The Workspace chat recovery cache could not be reset. This message was not retried or sent.',
+      )
+      setWorkspaceChatAdmissionRetryBusy(false)
+      return
+    }
+
+    let persisted = false
+    try {
+      persisted = await pending.retryPersistence()
+    } catch {
+      persisted = false
+    }
+    if (!persisted) {
+      workspaceChatAdmissionRetryBusyRef.current = false
+      setWorkspaceChatAdmissionRetryError(
+        'The recovery cache was reset, but this message still could not be saved safely. No message was sent.',
+      )
+      setWorkspaceChatAdmissionRetryBusy(false)
+      return
+    }
+
+    setWorkspaceChatAdmissionRetry(null)
+    setWorkspaceChatAdmissionRetryError(null)
+    setError(null)
+    setWorkspaceChatAdmissionRetryBusy(false)
+    await pending.continueAfterAdmission()
+  }, [workspaceChatAdmissionOwnerKey, workspaceChatAdmissionRetry])
 
   const handleAbortStreaming = useCallback(async () => {
     const activeSend = activeSendRef.current
@@ -3836,6 +3940,32 @@ export function ChatScreen({
           )}
           {snapshotDurabilityNotice}
           {incompleteHistoryNotice}
+          {!embedded && workspaceChatAdmissionRetry ? (
+            <div
+              className="mx-4 mt-2 rounded-lg border border-red-300 bg-red-50 px-3 py-3 text-sm text-red-950 dark:border-red-700/60 dark:bg-red-950/30 dark:text-red-100"
+              role="alert"
+              aria-live="assertive"
+            >
+              <p>{workspaceChatAdmissionRetry.safeMessage}</p>
+              <p className="mt-1 font-semibold">
+                Unsent local Workspace chat recovery data will be discarded.
+              </p>
+              {workspaceChatAdmissionRetryError ? (
+                <p className="mt-1">{workspaceChatAdmissionRetryError}</p>
+              ) : null}
+              <button
+                type="button"
+                className="mt-2 rounded-md border border-red-400 px-2.5 py-1 text-xs font-semibold hover:bg-red-100 disabled:cursor-wait disabled:opacity-70 dark:border-red-600 dark:hover:bg-red-900/40"
+                aria-busy={workspaceChatAdmissionRetryBusy}
+                disabled={workspaceChatAdmissionRetryBusy}
+                onClick={() => void handleResetWorkspaceChatRecoveryAndRetry()}
+              >
+                {workspaceChatAdmissionRetryBusy
+                  ? 'Resetting Workspace chat recovery cache…'
+                  : 'Reset Workspace chat recovery cache and retry'}
+              </button>
+            </div>
+          ) : null}
           {pendingApprovals.length > 0 && (
             <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
               <div className="space-y-2">

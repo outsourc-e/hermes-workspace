@@ -33,6 +33,7 @@ import {
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
+import { initializeWorkspaceChatIndexedDb } from '@/screens/chat/card-transcript-indexeddb'
 
 // Content Security Policy used to be emitted here as a `<meta http-equiv>`
 // tag. That made the workspace unusable when the Cloudflare JS Challenge
@@ -236,6 +237,25 @@ type CachesLike = {
   delete: (name: string) => Promise<boolean> | boolean
 }
 
+type WorkspaceChatStorageInitializer = () => Promise<Pick<IDBDatabase, 'close'>>
+
+let workspaceChatStorageInitialization: Promise<void> | undefined
+
+export function initializeWorkspaceChatStorageOnStartup(
+  initialize: WorkspaceChatStorageInitializer = initializeWorkspaceChatIndexedDb,
+): void {
+  if (workspaceChatStorageInitialization) return
+
+  workspaceChatStorageInitialization = initialize()
+    .then((database) => database.close())
+    .catch((error: unknown) => {
+      console.warn(
+        'Workspace chat browser storage initialization failed',
+        error,
+      )
+    })
+}
+
 export async function registerAppServiceWorker({
   serviceWorker,
   cachesApi,
@@ -286,6 +306,7 @@ function RootLayout() {
       return undefined
     }
 
+    initializeWorkspaceChatStorageOnStartup()
     syncOnboardingCompletion()
 
     void fetch('/api/connection-status')
