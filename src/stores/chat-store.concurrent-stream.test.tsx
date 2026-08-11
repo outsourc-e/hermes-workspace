@@ -42,6 +42,58 @@ afterEach(() => {
 })
 
 describe('mounted same-Card concurrent stream projection', () => {
+  it('replaces a completed run without publishing a duplicate stream snapshot', () => {
+    const cardId = 'remote:card'
+    const runId = 'run-terminal-order'
+    useChatStore.getState().processCardEvent(cardId, {
+      type: 'chunk',
+      text: 'terminal ordering response',
+      runId,
+      sessionKey: 'remote:segment',
+      transport: 'send-stream',
+    })
+
+    const publishedSnapshots: Array<{
+      hasCompletedMessage: boolean
+      hasStreamingRun: boolean
+    }> = []
+    const unsubscribe = useChatStore.subscribe((state) => {
+      publishedSnapshots.push({
+        hasCompletedMessage: (state.realtimeMessages.get(cardId) ?? []).some(
+          (message) =>
+            message.role === 'assistant' &&
+            message.__streamingStatus === 'complete' &&
+            message.runId === runId,
+        ),
+        hasStreamingRun:
+          state.cardStreamingRuns.get(cardId)?.has(runId) ?? false,
+      })
+    })
+
+    useChatStore.getState().processCardEvent(cardId, {
+      type: 'done',
+      state: 'complete',
+      runId,
+      sessionKey: 'remote:segment',
+      transport: 'send-stream',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'terminal ordering response' }],
+        runId,
+      },
+    })
+    unsubscribe()
+
+    expect(publishedSnapshots).not.toContainEqual({
+      hasCompletedMessage: true,
+      hasStreamingRun: true,
+    })
+    expect(publishedSnapshots.at(-1)).toEqual({
+      hasCompletedMessage: true,
+      hasStreamingRun: false,
+    })
+  })
+
   it('renders independent rows and removes only the completed immutable run', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)

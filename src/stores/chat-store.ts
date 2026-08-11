@@ -1396,6 +1396,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           completeMessage = withoutTransportOwnership(completeMessage)
         }
 
+        let nextRealtimeMessages: Map<string, Array<ChatMessage>> | undefined
         if (completeMessage) {
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
@@ -1429,7 +1430,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               sessionKey,
               sortMessagesChronologically(sessionMessages),
             )
-            set({ realtimeMessages: messages })
+            nextRealtimeMessages = messages
           } else {
             // If there IS a duplicate (e.g. a tagged pre-final message was stored),
             // replace it with the clean final version so the UI shows clean text.
@@ -1459,13 +1460,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 sessionKey,
                 sortMessagesChronologically(sessionMessages),
               )
-              set({ realtimeMessages: messages })
+              nextRealtimeMessages = messages
             }
           }
         }
 
-        // Clear only the immutable run named by this terminal event. A sibling
-        // stream on the same Card remains independently visible and recoverable.
+        // Publish the terminal message and remove its streaming projection in a
+        // single store update. Subscribers must never observe both rows for the
+        // same run, even when terminal persistence is still in flight.
         if (ownerCardId && cardRuns && cardRunId) {
           cardRuns.delete(cardRunId)
           const nextCardRuns = new Map(state.cardStreamingRuns)
@@ -1475,6 +1477,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (remaining) streamingMap.set(sessionKey, remaining)
           else streamingMap.delete(sessionKey)
           set({
+            ...(nextRealtimeMessages
+              ? { realtimeMessages: nextRealtimeMessages }
+              : {}),
             streamingState: streamingMap,
             cardStreamingRuns: nextCardRuns,
             lastEventAt: now,
@@ -1487,7 +1492,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           } else removePersistedCardStreamingState(ownerCardId)
         } else {
           streamingMap.delete(sessionKey)
-          set({ streamingState: streamingMap, lastEventAt: now })
+          set({
+            ...(nextRealtimeMessages
+              ? { realtimeMessages: nextRealtimeMessages }
+              : {}),
+            streamingState: streamingMap,
+            lastEventAt: now,
+          })
           if (ownerCardId) removePersistedCardStreamingState(ownerCardId)
         }
         break

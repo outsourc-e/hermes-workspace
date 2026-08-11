@@ -1173,6 +1173,140 @@ describe('mounted Session Card transcript recovery lifecycle', () => {
     expectCardOnlyTranscriptBoundary(requests)
   })
 
+  it('renders live chunks without IndexedDB checkpoints and persists only the terminal assistant', async () => {
+    const requests: Array<string> = []
+    const responseText = 'live response without per-chunk IndexedDB writes'
+    const encoder = new TextEncoder()
+    let resolveTerminalRead:
+      | ((result: ReadableStreamReadResult<Uint8Array>) => void)
+      | undefined
+    const terminalRead = new Promise<ReadableStreamReadResult<Uint8Array>>(
+      (resolve) => {
+        resolveTerminalRead = resolve
+      },
+    )
+    const recoveryWrites: Array<unknown> = []
+    const originalPut = IDBObjectStore.prototype.put
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      value,
+      key,
+    ) {
+      if (this.name === WORKSPACE_CHAT_STORE_NAMES.cardRecovery) {
+        recoveryWrites.push(value)
+      }
+      return key === undefined
+        ? originalPut.call(this, value)
+        : originalPut.call(this, value, key)
+    })
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.startsWith('/api/session-cards/')) {
+        return Promise.resolve(
+          jsonResponse(recentHistory(parentCard, completeHistory(parentCard))),
+        )
+      }
+      if (url === '/api/send-stream') {
+        const reader = {
+          read: vi
+            .fn()
+            .mockResolvedValueOnce({
+              done: false,
+              value: encoder.encode(
+                [
+                  'event: started',
+                  'data: {"runId":"run-no-chunk-persistence"}',
+                  '',
+                  'event: chunk',
+                  `data: ${JSON.stringify({ delta: responseText })}`,
+                  '',
+                  '',
+                ].join('\n'),
+              ),
+            })
+            .mockReturnValueOnce(terminalRead)
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+          cancel: vi.fn().mockResolvedValue(undefined),
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          body: { getReader: () => reader },
+          text: () => Promise.resolve(''),
+          json: () => Promise.resolve({}),
+        } as unknown as Response)
+      }
+      if (url === '/api/status')
+        return Promise.resolve(jsonResponse({ ok: true, status: 200 }))
+      if (url === '/api/models')
+        return Promise.resolve(jsonResponse({ models: [] }))
+      return Promise.resolve(jsonResponse({ ok: true }))
+    })
+
+    await mountChatScreen(defaultInput())
+    submitSelection('stream without checkpointing every chunk')
+    await waitFor(async () =>
+      expect(screen.getByText(responseText)).toBeTruthy(),
+    )
+    expect(
+      recoveryWrites.some(
+        (value) =>
+          JSON.stringify(value).includes(responseText) &&
+          JSON.stringify(value).includes('"__streamingStatus":"streaming"'),
+      ),
+    ).toBe(false)
+
+    await React.act(async () => {
+      resolveTerminalRead?.({
+        done: false,
+        value: encoder.encode(
+          [
+            'event: done',
+            `data: ${JSON.stringify({
+              state: 'complete',
+              runId: 'run-no-chunk-persistence',
+              message: {
+                role: 'assistant',
+                content: [{ type: 'text', text: responseText }],
+              },
+            })}`,
+            '',
+            '',
+          ].join('\n'),
+        ),
+      })
+    })
+
+    await waitFor(async () => {
+      expect(screen.getAllByText(responseText)).toHaveLength(1)
+      expect(
+        useChatStore.getState().getCardStreamingStates(parentCard.cardId),
+      ).toEqual([])
+      expect(
+        (await readCardTranscriptRecovery({ cardId: parentCard.cardId }))
+          ?.messages,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            runId: 'run-no-chunk-persistence',
+            __streamingStatus: 'complete',
+          }),
+        ]),
+      )
+    })
+    expect(
+      recoveryWrites.some(
+        (value) =>
+          JSON.stringify(value).includes(responseText) &&
+          JSON.stringify(value).includes('"__streamingStatus":"complete"'),
+      ),
+    ).toBe(true)
+    expectCardOnlyTranscriptBoundary(requests)
+  })
+
   it('seals a chunk before a stream error and restores the interrupted assistant after remount', async () => {
     const requests: Array<string> = []
     const encoder = new TextEncoder()

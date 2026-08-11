@@ -265,8 +265,6 @@ type UseStreamingMessageOptions = {
   pinMainSession?: boolean
   onStarted?: (payload: { runId: string | null }) => void | Promise<void>
   onChunk?: (text: string, fullText: string) => void
-  /** Must durably checkpoint the full assistant prefix before it is displayed. */
-  onCheckpoint?: (message: ChatMessage) => boolean | Promise<boolean>
   onComplete?: (message: ChatMessage) => void | Promise<void>
   onInterrupted?: (message: ChatMessage) => void | Promise<void>
   onError?: (error: string) => void | Promise<void>
@@ -301,7 +299,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     pinMainSession = false,
     onStarted,
     onChunk,
-    onCheckpoint,
     onComplete,
     onInterrupted,
     onError,
@@ -365,23 +362,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   // should be promoted to the route identity. Prevents concrete sessions
   // from being overridden by api-* derivations (#297).
   const requestedSessionKeyRef = useRef<string>('')
-  const checkpointQueueRef = useRef<Promise<void>>(Promise.resolve())
-
-  const enqueueCheckpoint = useCallback(
-    (message: ChatMessage): Promise<boolean> => {
-      let accepted = true
-      const task = checkpointQueueRef.current.then(async () => {
-        accepted = (await onCheckpoint?.(message)) ?? true
-      })
-      checkpointQueueRef.current = task.catch(() => {})
-      return task.then(() => accepted)
-    },
-    [onCheckpoint],
-  )
-
-  const drainCheckpointQueue = useCallback(async (): Promise<void> => {
-    await checkpointQueueRef.current
-  }, [])
 
   const registerSendStreamRun = useChatStore((s) => s.registerSendStreamRun)
   const unregisterSendStreamRun = useChatStore((s) => s.unregisterSendStreamRun)
@@ -486,45 +466,46 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     lifecyclePhaseRef.current = 'accepted'
   }, [])
 
-  const sealInterruptedStream = useCallback(async (): Promise<ChatMessage | null> => {
-    await drainCheckpointQueue()
-    const partialText = fullTextRef.current
-    if (!partialText || finishedRef.current) return null
-    const runId = activeRunIdRef.current
-    const interruptedMessage: ChatMessage = {
-      role: 'assistant',
-      content: [
-        ...(thinkingRef.current
-          ? [
-              {
-                type: 'thinking' as const,
-                thinking: thinkingRef.current,
-              },
-            ]
-          : []),
-        { type: 'text' as const, text: partialText },
-      ],
-      timestamp: Date.now(),
-      __streamingStatus: 'interrupted',
-      recoveryId: recoveryIdRef.current,
-      ...stepUsageRef.current,
-      ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
-    }
+  const sealInterruptedStream =
+    useCallback(async (): Promise<ChatMessage | null> => {
+      const partialText = fullTextRef.current
+      if (!partialText || finishedRef.current) return null
+      const runId = activeRunIdRef.current
+      const interruptedMessage: ChatMessage = {
+        role: 'assistant',
+        content: [
+          ...(thinkingRef.current
+            ? [
+                {
+                  type: 'thinking' as const,
+                  thinking: thinkingRef.current,
+                },
+              ]
+            : []),
+          { type: 'text' as const, text: partialText },
+        ],
+        timestamp: Date.now(),
+        __streamingStatus: 'interrupted',
+        recoveryId: recoveryIdRef.current,
+        ...stepUsageRef.current,
+        ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
+      }
 
-    // Recovery persistence must land before the store consumes `done` and
-    // clears active streaming persistence. Otherwise a reload in that narrow
-    // terminal window can lose the accumulated assistant partial.
-    await onInterrupted?.(interruptedMessage)
-    processBrowserEvent({
-      type: 'done',
-      state: 'interrupted',
-      message: interruptedMessage as Record<string, unknown>,
-      runId: runId ?? undefined,
-      sessionKey: activeSessionKeyRef.current,
-      transport: 'send-stream',
-    })
-    return interruptedMessage
-  }, [drainCheckpointQueue, onInterrupted, processBrowserEvent])
+      // Replace the live stream synchronously so persistence latency cannot keep
+      // a duplicate streaming row visible beside the interrupted response.
+      processBrowserEvent({
+        type: 'done',
+        state: 'interrupted',
+        message: interruptedMessage as Record<string, unknown>,
+        runId: runId ?? undefined,
+        sessionKey: activeSessionKeyRef.current,
+        transport: 'send-stream',
+      })
+      // Interrupted output is persisted once, at the lifecycle boundary. Healthy
+      // streams never checkpoint growing prefixes to IndexedDB.
+      await onInterrupted?.(interruptedMessage)
+      return interruptedMessage
+    }, [onInterrupted, processBrowserEvent])
 
   const markFailed = useCallback(
     async (message: string) => {
@@ -703,7 +684,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const finishStream = useCallback(
     async (payload?: unknown) => {
       if (finishedRef.current) return
-      await drainCheckpointQueue()
       finishedRef.current = true
       eventSourceRef.current = null
       stopFrame()
@@ -754,6 +734,32 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           : {}),
       }
 
+      // Atomically replace the live stream in the synchronous store before any
+      // terminal IndexedDB work. The completed message can render immediately,
+      // and the streaming placeholder cannot lag behind it.
+      processBrowserEvent({
+        type: 'done',
+        state:
+          typeof (payload as Record<string, unknown> | undefined)?.state ===
+          'string'
+            ? ((payload as Record<string, unknown>).state as string)
+            : 'complete',
+        message:
+          finalText || thinking
+            ? (message as Record<string, unknown>)
+            : ((payload as Record<string, unknown> | undefined)?.message as
+                | Record<string, unknown>
+                | undefined),
+        runId:
+          completedRunId ??
+          (typeof (payload as Record<string, unknown> | undefined)?.runId ===
+          'string'
+            ? ((payload as Record<string, unknown>).runId as string)
+            : undefined),
+        sessionKey: activeSessionKeyRef.current,
+        transport: 'send-stream',
+      })
+
       try {
         await onComplete?.(message)
       } catch {
@@ -766,8 +772,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     },
     [
       clearHandoffTimer,
-      drainCheckpointQueue,
       onComplete,
+      processBrowserEvent,
       stopFrame,
       unregisterSendStreamRun,
     ],
@@ -819,7 +825,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       }
       activeSessionKeyRef.current = resolvedSessionKey
     },
-    [claimSessionStateForCard, handoffSession, onSessionResolved, pinMainSession],
+    [
+      claimSessionStateForCard,
+      handoffSession,
+      onSessionResolved,
+      pinMainSession,
+    ],
   )
 
   const processEvent = useCallback(
@@ -946,26 +957,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         case 'assistant': {
           const text = (payload as { text?: string }).text ?? ''
           if (text) {
-            if (
-              !(await enqueueCheckpoint({
-                role: 'assistant',
-                content: [{ type: 'text', text }],
-                timestamp: Date.now(),
-                __streamingStatus: 'streaming',
-                recoveryId: recoveryIdRef.current,
-                ...(activeRunIdRef.current
-                  ? {
-                      runId: activeRunIdRef.current,
-                      stableId: `stream-run:${activeRunIdRef.current}`,
-                    }
-                  : {}),
-              }))
-            ) {
-              await markFailed(
-                'Response stopped because recovery storage is unavailable',
-              )
-              break
-            }
             markActivity()
             processBrowserEvent({
               type: 'chunk',
@@ -988,26 +979,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             const accumulated = fullReplace
               ? newText
               : fullTextRef.current + newText
-            if (
-              !(await enqueueCheckpoint({
-                role: 'assistant',
-                content: [{ type: 'text', text: accumulated }],
-                timestamp: Date.now(),
-                __streamingStatus: 'streaming',
-                recoveryId: recoveryIdRef.current,
-                ...(activeRunIdRef.current
-                  ? {
-                      runId: activeRunIdRef.current,
-                      stableId: `stream-run:${activeRunIdRef.current}`,
-                    }
-                  : {}),
-              }))
-            ) {
-              await markFailed(
-                'Response stopped because recovery storage is unavailable',
-              )
-              break
-            }
             markActivity()
             pushTargetText(accumulated)
             processBrowserEvent({
@@ -1183,18 +1154,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             break
           }
           await finishStream(payload)
-          processBrowserEvent({
-            type: 'done',
-            state: doneState ?? 'final',
-            errorMessage,
-            message: payload.message as Record<string, unknown> | undefined,
-            runId:
-              typeof payload.runId === 'string'
-                ? payload.runId
-                : (activeRunIdRef.current ?? undefined),
-            sessionKey: activeSessionKeyRef.current,
-            transport: 'send-stream',
-          })
           break
         }
         case 'complete': {
@@ -1254,7 +1213,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     [
       activeCard,
       applySessionHandoff,
-      enqueueCheckpoint,
       finishStream,
       markFailed,
       onCardHandoff,

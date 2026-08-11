@@ -1865,24 +1865,6 @@ export function ChatScreen({
       },
       [queryClient],
     ),
-    onCheckpoint: useCallback(async (checkpointMessage: ChatMessage) => {
-      const activeSend = activeSendRef.current
-      if (!activeSend) return false
-      if (activeSend.cardId) {
-        return Boolean(
-          await checkpointCardTranscriptRecoveryMessage(
-            { cardId: activeSend.cardId },
-            checkpointMessage,
-          ),
-        )
-      }
-      return checkpointPendingRecoveryMessage(
-        activeSend.sessionKey,
-        activeSend.friendlyId,
-        checkpointMessage,
-        activeSend.provisionalOwnerId,
-      )
-    }, []),
     onComplete: useCallback(
       async (completedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
@@ -1933,7 +1915,7 @@ export function ChatScreen({
           }
           if (!terminalPersisted) {
             setError(
-              'The response completed, but its terminal recovery update could not be saved. The last durable assistant prefix remains available after reload.',
+              'The response completed, but it could not be saved for recovery after reload.',
             )
           }
         }
@@ -1979,7 +1961,7 @@ export function ChatScreen({
         }
         if (!persisted) {
           setError(
-            'The stream was interrupted after recovery storage became unavailable. The last durable assistant prefix remains available after reload.',
+            'The stream was interrupted, but its partial response could not be saved for recovery after reload.',
           )
         }
       },
