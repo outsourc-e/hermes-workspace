@@ -152,3 +152,6 @@ skills-bundle/
 .hermes/
 .env.bak-*
 pr-triage-20260505-*/
+
+# Local Treehouse pool configuration
+treehouse.toml
