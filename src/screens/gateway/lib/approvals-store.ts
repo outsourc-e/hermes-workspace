@@ -15,11 +15,11 @@ export type ApprovalRequest = {
 
 const APPROVALS_KEY = 'clawsuite:approvals'
 
-export function loadApprovals(): ApprovalRequest[] {
+export function loadApprovals(): Array<ApprovalRequest> {
   try {
     const raw = localStorage.getItem(APPROVALS_KEY)
     if (!raw) return []
-    const all = JSON.parse(raw) as ApprovalRequest[]
+    const all = JSON.parse(raw) as Array<ApprovalRequest>
     // Auto-archive resolved items older than 24h
     const cutoff = Date.now() - 24 * 60 * 60 * 1000
     return all.filter(
@@ -30,7 +30,7 @@ export function loadApprovals(): ApprovalRequest[] {
   }
 }
 
-export function saveApprovals(approvals: ApprovalRequest[]): void {
+export function saveApprovals(approvals: Array<ApprovalRequest>): void {
   try {
     localStorage.setItem(APPROVALS_KEY, JSON.stringify(approvals))
   } catch {

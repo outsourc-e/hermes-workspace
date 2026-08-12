@@ -5,7 +5,6 @@ import {
   ArrowRight01Icon,
   BrainIcon,
   Building01Icon,
-  Castle02Icon,
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
@@ -26,17 +25,31 @@ import {
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useRouterState } from '@tanstack/react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
+import {
+  archiveSessionCard,
+  branchSessionCard,
+  fetchSessionCard,
+  mergeSessionCardDetail,
+  sessionCardQueryKeys,
+  updateSessionCardMetadata,
+} from '../chat-queries'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
-import { useDeleteSession } from '../hooks/use-delete-session'
-import { useRenameSession } from '../hooks/use-rename-session'
+import { isWholeCardBranchAvailable } from '../types'
 import { ProvidersDialog } from './providers-dialog'
 import { SessionRenameDialog } from './sidebar/session-rename-dialog'
 import { SessionDeleteDialog } from './sidebar/session-delete-dialog'
 import { SidebarSessions } from './sidebar/sidebar-sessions'
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react'
+import type { SessionCardListWire } from '../chat-queries'
 import type { ChatOpenSettingsDetail } from '../chat-events'
-import type { SessionMeta } from '../types'
+import type { SessionCard, SessionMeta } from '../types'
+
 import { t } from '@/lib/i18n'
 import { SettingsDialog } from '@/components/settings-dialog'
 import {
@@ -47,11 +60,15 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { UserAvatar } from '@/components/avatars'
+import { AgentIdentityAvatar, UserAvatar } from '@/components/avatars'
 import { SEARCH_MODAL_EVENTS, useSearchModal } from '@/hooks/use-search-modal'
 import {
+  MAX_DESKTOP_SIDEBAR_WIDTH,
+  MIN_DESKTOP_SIDEBAR_WIDTH,
+  normalizeDesktopSidebarWidth,
   selectChatProfileAvatarDataUrl,
   selectChatProfileDisplayName,
+  selectDesktopSidebarWidth,
   selectSidebarHoverExpand,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
@@ -63,8 +80,195 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { useFeatureAvailable } from '@/hooks/use-feature-available'
+import { useChatSessionCardInventory } from '@/screens/chat/hooks/use-chat-session-card-inventory'
+import { useSessionCardAttention } from '@/screens/chat/hooks/use-session-card-attention'
 
 type WorkspaceStats = Record<string, unknown>
+
+const EMPTY_SESSION_CARDS: ReadonlyArray<SessionCard> = []
+
+type DesktopCardAction = 'rename' | 'pin' | 'branch' | 'archive'
+
+type DesktopCardActionFailure = {
+  action: DesktopCardAction
+  actionLabel: string
+  cardId: string
+  cardTitle: string
+  message: string
+  retry: () => void
+}
+
+type DesktopSessionCardActionsOptions = {
+  activeCardId: string
+  onActiveSessionDelete?: () => void
+  invalidateCards: (cardId: string) => Promise<unknown> | unknown
+  navigateToCard: (cardId: string) => Promise<unknown> | unknown
+}
+
+function mutationErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message
+  return 'The Card service did not complete this action.'
+}
+
+export function useDesktopSessionCardActions({
+  activeCardId,
+  onActiveSessionDelete,
+  invalidateCards,
+  navigateToCard,
+}: DesktopSessionCardActionsOptions) {
+  const pendingCardIdsRef = useRef<Set<string>>(new Set())
+  const activeCardIdRef = useRef(activeCardId)
+  const navigateToCardRef = useRef(navigateToCard)
+  const onActiveSessionDeleteRef = useRef(onActiveSessionDelete)
+  activeCardIdRef.current = activeCardId
+  navigateToCardRef.current = navigateToCard
+  onActiveSessionDeleteRef.current = onActiveSessionDelete
+  const [pendingCardIds, setPendingCardIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [failure, setFailure] = useState<DesktopCardActionFailure | null>(null)
+
+  function setCardPending(cardId: string, pending: boolean) {
+    const next = new Set(pendingCardIdsRef.current)
+    if (pending) next.add(cardId)
+    else next.delete(cardId)
+    pendingCardIdsRef.current = next
+    setPendingCardIds(next)
+  }
+
+  async function runCardAction(
+    card: SessionCard,
+    action: DesktopCardAction,
+    actionLabel: string,
+    mutation: () => Promise<unknown>,
+    onSuccess?: () => Promise<unknown> | unknown,
+  ): Promise<void> {
+    if (pendingCardIdsRef.current.has(card.cardId)) return
+    setFailure((current) => (current?.cardId === card.cardId ? null : current))
+    setCardPending(card.cardId, true)
+    try {
+      await mutation()
+      await onSuccess?.()
+      setFailure((current) =>
+        current?.cardId === card.cardId && current.action === action
+          ? null
+          : current,
+      )
+    } catch (error) {
+      setFailure({
+        action,
+        actionLabel,
+        cardId: card.cardId,
+        cardTitle: card.title,
+        message: mutationErrorMessage(error),
+        retry: () => {
+          void runCardAction(card, action, actionLabel, mutation, onSuccess)
+        },
+      })
+    } finally {
+      setCardPending(card.cardId, false)
+      try {
+        await invalidateCards(card.cardId)
+      } catch {
+        // The mutation outcome is already known. A later poll can reconcile the list.
+      }
+    }
+  }
+
+  return {
+    pendingCardIds,
+    failure,
+    dismissFailure: () => setFailure(null),
+    rename(card: SessionCard, newTitle: string) {
+      void runCardAction(card, 'rename', 'Rename', () =>
+        updateSessionCardMetadata(card.cardId, { manualTitle: newTitle }),
+      )
+    },
+    togglePin(card: SessionCard) {
+      void runCardAction(card, 'pin', card.pinned ? 'Unpin' : 'Pin', () =>
+        updateSessionCardMetadata(card.cardId, { pinned: !card.pinned }),
+      )
+    },
+    branch(card: SessionCard) {
+      const idempotencyKey = crypto.randomUUID()
+      void runCardAction(
+        card,
+        'branch',
+        'Branch',
+        () =>
+          branchSessionCard(card.cardId, card.canonicalSegmentKey, {
+            idempotencyKey,
+          }),
+        () => {
+          if (activeCardIdRef.current !== card.cardId) return
+          return navigateToCardRef.current(card.cardId)
+        },
+      )
+    },
+    archive(card: SessionCard) {
+      void runCardAction(
+        card,
+        'archive',
+        'Archive',
+        () => archiveSessionCard(card.cardId),
+        () => {
+          if (activeCardIdRef.current !== card.cardId) return
+          return onActiveSessionDeleteRef.current?.()
+        },
+      )
+    },
+  }
+}
+
+export function DesktopCardActionFailureNotice({
+  failure,
+  pending,
+  onDismiss,
+}: {
+  failure: DesktopCardActionFailure
+  pending: boolean
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      role="alert"
+      className="mx-3 mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
+      data-card-action-error={failure.cardId}
+    >
+      <div className="font-medium">
+        {failure.actionLabel} unavailable for “{failure.cardTitle}”.
+      </div>
+      <details className="mt-1">
+        <summary className="cursor-pointer select-none text-[11px]">
+          Details
+        </summary>
+        <div className="mt-1 text-[11px] opacity-80">{failure.message}</div>
+      </details>
+      <div className="mt-2 flex gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          aria-label={`Retry ${failure.action} for ${failure.cardTitle}`}
+          onClick={failure.retry}
+        >
+          Retry
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={onDismiss}
+        >
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function ThemeToggleMini() {
   const _theme = useSettingsStore((state) => state.settings.theme)
@@ -125,7 +329,7 @@ type ChatSidebarProps = {
   sessions: Array<SessionMeta>
   activeFriendlyId: string
   creatingSession: boolean
-  onCreateSession: () => void
+  onCreateSession: () => void | Promise<void>
   isCollapsed: boolean
   onToggleCollapse: () => void
   onSelectSession?: () => void
@@ -141,7 +345,6 @@ type ChatSidebarProps = {
 type NavItemDef = {
   kind: 'link' | 'button'
   to?: string
-  search?: Record<string, unknown>
   hash?: string
   icon: unknown
   label: string
@@ -255,7 +458,6 @@ function NavItem({
               render={
                 <Link
                   to={item.to}
-                  search={item.search as any}
                   hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
@@ -273,7 +475,6 @@ function NavItem({
     return (
       <Link
         to={item.to}
-        search={item.search as any}
         hash={item.hash}
         onClick={handleSelect}
         className={cls}
@@ -515,19 +716,424 @@ function usePersistedBool(key: string, defaultValue: boolean) {
   return [value, toggle] as const
 }
 
+const DESKTOP_SIDEBAR_KEYBOARD_STEP = 16
+
+type DesktopSidebarResizeHandleProps = {
+  enabled: boolean
+  width: number
+  onWidthChange: (width: number) => void
+  onResizingChange: (resizing: boolean) => void
+}
+
+export function DesktopSidebarResizeHandle({
+  enabled,
+  width,
+  onWidthChange,
+  onResizingChange,
+}: DesktopSidebarResizeHandleProps) {
+  const cleanupRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    return () => cleanupRef.current?.()
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) cleanupRef.current?.()
+  }, [enabled])
+
+  if (!enabled) return null
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.preventDefault()
+    event.currentTarget.focus()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Window listeners below keep the drag active when capture is unavailable.
+    }
+
+    cleanupRef.current?.()
+    const sidebarLeft =
+      event.currentTarget.parentElement?.getBoundingClientRect().left ?? 0
+    const previousUserSelect = document.body.style.userSelect
+    const previousCursor = document.body.style.cursor
+    const pointerId = event.pointerId
+    let active = true
+
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    onResizingChange(true)
+
+    function cleanup() {
+      if (!active) return
+      active = false
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerEnd)
+      window.removeEventListener('pointercancel', handlePointerEnd)
+      window.removeEventListener('blur', handleWindowBlur)
+      document.body.style.userSelect = previousUserSelect
+      document.body.style.cursor = previousCursor
+      cleanupRef.current = null
+    }
+
+    function handlePointerMove(pointerEvent: PointerEvent) {
+      if (pointerEvent.pointerId !== pointerId) return
+      pointerEvent.preventDefault()
+      onWidthChange(
+        normalizeDesktopSidebarWidth(pointerEvent.clientX - sidebarLeft),
+      )
+    }
+
+    function handlePointerEnd(pointerEvent: PointerEvent) {
+      if (pointerEvent.pointerId !== pointerId) return
+      cleanup()
+      onResizingChange(false)
+    }
+
+    function handleWindowBlur() {
+      cleanup()
+      onResizingChange(false)
+    }
+
+    cleanupRef.current = () => {
+      cleanup()
+      onResizingChange(false)
+    }
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerEnd)
+    window.addEventListener('pointercancel', handlePointerEnd)
+    window.addEventListener('blur', handleWindowBlur)
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    let nextWidth: number | null = null
+    if (event.key === 'ArrowLeft') {
+      nextWidth = width - DESKTOP_SIDEBAR_KEYBOARD_STEP
+    } else if (event.key === 'ArrowRight') {
+      nextWidth = width + DESKTOP_SIDEBAR_KEYBOARD_STEP
+    } else if (event.key === 'Home') {
+      nextWidth = MIN_DESKTOP_SIDEBAR_WIDTH
+    } else if (event.key === 'End') {
+      nextWidth = MAX_DESKTOP_SIDEBAR_WIDTH
+    }
+    if (nextWidth === null) return
+    event.preventDefault()
+    onWidthChange(normalizeDesktopSidebarWidth(nextWidth))
+  }
+
+  return (
+    <div
+      role="separator"
+      aria-label="Resize sessions sidebar"
+      aria-orientation="vertical"
+      aria-valuemin={MIN_DESKTOP_SIDEBAR_WIDTH}
+      aria-valuemax={MAX_DESKTOP_SIDEBAR_WIDTH}
+      aria-valuenow={width}
+      tabIndex={0}
+      onPointerDown={handlePointerDown}
+      onKeyDown={handleKeyDown}
+      className="absolute inset-y-0 right-0 z-10 w-1 touch-none cursor-col-resize select-none bg-transparent transition-colors hover:bg-accent-500/20 focus-visible:bg-accent-500/30 focus-visible:outline-none"
+    />
+  )
+}
+
+type DesktopSidebarContentProps = {
+  activeCardId: string
+  inspectedChildCardId?: string
+  isVisuallyCollapsed: boolean
+  transition: Record<string, unknown>
+  searchItem: NavItemDef
+  mainItems: Array<NavItemDef>
+  knowledgeItems: Array<NavItemDef>
+  onSelectSession?: () => void
+  onCreateSession: () => void | Promise<void>
+  creatingSession: boolean
+  onToggleCollapse: () => void
+  profileDisplayName: string
+  profileAvatarDataUrl: string | null
+  handleOpenSettings: (section?: 'appearance' | 'claude') => void
+  /** Whether the desktop Session Card panel should be visible. */
+  showSessions: boolean
+  sessionCards: Array<SessionCard>
+  cardResolutions: SessionCardListWire['cardResolutions']
+  completeness: SessionCardListWire['completeness']
+  attentionCardIds: ReadonlySet<string>
+  onViewCard: (cardId: string) => void
+  sessionForkAvailable: boolean
+  onTogglePin: (card: SessionCard) => void
+  onRename: (card: SessionCard) => void
+  onArchive: (card: SessionCard) => void
+  onBranch: (card: SessionCard) => void
+  pendingCardIds: ReadonlySet<string>
+  cardActionFailure: DesktopCardActionFailure | null
+  onDismissCardActionFailure: () => void
+  loading: boolean
+  fetching: boolean
+  error: string | null
+  onRetry: () => void
+  hasMoreOlderSessions: boolean
+  loadingOlderSessions: boolean
+  olderSessionsError: string | null
+  onLoadOlderSessions: () => void
+}
+
+function DesktopSidebarContent({
+  activeCardId,
+  inspectedChildCardId,
+  isVisuallyCollapsed,
+  transition,
+  searchItem,
+  mainItems,
+  knowledgeItems,
+  onSelectSession,
+  onCreateSession,
+  creatingSession,
+  onToggleCollapse,
+  profileDisplayName,
+  profileAvatarDataUrl,
+  handleOpenSettings,
+  showSessions,
+  sessionCards,
+  cardResolutions,
+  completeness,
+  attentionCardIds,
+  onViewCard,
+  sessionForkAvailable,
+  onTogglePin,
+  onRename,
+  onArchive,
+  onBranch,
+  pendingCardIds,
+  cardActionFailure,
+  onDismissCardActionFailure,
+  loading,
+  fetching,
+  error,
+  onRetry,
+  hasMoreOlderSessions,
+  loadingOlderSessions,
+  olderSessionsError,
+  onLoadOlderSessions,
+}: DesktopSidebarContentProps) {
+  return (
+    <div className="flex h-full min-w-0 flex-1">
+      <nav
+        aria-label="Workspace navigation"
+        className="flex w-12 shrink-0 flex-col border-r theme-border"
+      >
+        <div className="flex h-12 shrink-0 items-center justify-center">
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                render={
+                  <Link
+                    to="/chat"
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'icon-sm' }),
+                      'size-8',
+                    )}
+                    aria-label="Hermes Workspace"
+                  >
+                    <AgentIdentityAvatar alt="" className="size-6 rounded-lg" />
+                  </Link>
+                }
+              />
+              <TooltipContent side="right">Hermes Workspace</TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-2">
+          <NavItem
+            item={searchItem}
+            isCollapsed
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={creatingSession}
+                    onClick={() => void onCreateSession()}
+                    className={cn(
+                      'mt-0.5 flex min-h-11 w-full items-center justify-center px-0 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
+                    )}
+                    aria-label="New Session"
+                    data-tour="new-session"
+                  >
+                    <HugeiconsIcon
+                      icon={PencilEdit02Icon}
+                      size={20}
+                      strokeWidth={1.5}
+                      className="size-5 shrink-0"
+                    />
+                  </Button>
+                }
+              />
+              <TooltipContent side="right">New Session</TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+
+          <div className="my-1.5 border-t theme-border" />
+          <div aria-label="Main navigation" className="space-y-0.5">
+            <CollapsibleSection
+              expanded
+              items={mainItems}
+              isCollapsed
+              transition={transition}
+              onSelectSession={onSelectSession}
+            />
+          </div>
+          <div className="my-1.5 border-t theme-border" />
+          <div aria-label="Knowledge navigation" className="space-y-0.5">
+            <CollapsibleSection
+              expanded
+              items={knowledgeItems}
+              isCollapsed
+              transition={transition}
+              onSelectSession={onSelectSession}
+            />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-center gap-1 border-t py-2 theme-border">
+          <MenuRoot>
+            <MenuTrigger
+              data-tour="settings"
+              className="flex size-8 items-center justify-center rounded-lg transition-colors hover:bg-primary-200 dark:hover:bg-neutral-800"
+              aria-label={`${profileDisplayName} settings`}
+            >
+              <UserAvatar size={28} src={profileAvatarDataUrl} alt="" />
+            </MenuTrigger>
+            <MenuContent side="right" align="end" className="min-w-[200px]">
+              <MenuItem
+                onClick={function onOpenSettings() {
+                  handleOpenSettings('claude')
+                }}
+                className="justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <HugeiconsIcon
+                    icon={Settings01Icon}
+                    size={20}
+                    strokeWidth={1.5}
+                  />
+                  Settings
+                </span>
+              </MenuItem>
+            </MenuContent>
+          </MenuRoot>
+          <ThemeToggleMini />
+          {showSessions ? (
+            <TooltipProvider>
+              <TooltipRoot>
+                <TooltipTrigger
+                  onClick={onToggleCollapse}
+                  render={
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={
+                        isVisuallyCollapsed
+                          ? 'Open sessions sidebar'
+                          : 'Close sessions sidebar'
+                      }
+                      data-tour="sidebar-collapse-toggle"
+                    >
+                      <HugeiconsIcon
+                        icon={
+                          isVisuallyCollapsed
+                            ? ArrowRight01Icon
+                            : ArrowLeft01Icon
+                        }
+                        size={18}
+                        strokeWidth={1.75}
+                      />
+                    </Button>
+                  }
+                />
+                <TooltipContent side="right">
+                  {isVisuallyCollapsed
+                    ? 'Open sessions sidebar'
+                    : 'Close sessions sidebar'}
+                </TooltipContent>
+              </TooltipRoot>
+            </TooltipProvider>
+          ) : null}
+        </div>
+      </nav>
+
+      {showSessions ? (
+        <AnimatePresence initial={false}>
+          {!isVisuallyCollapsed ? (
+            <motion.section
+              key="sessions-panel"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={transition}
+              aria-label="Session history"
+              className="flex min-w-0 flex-1 flex-col"
+            >
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                {cardActionFailure ? (
+                  <DesktopCardActionFailureNotice
+                    failure={cardActionFailure}
+                    pending={pendingCardIds.has(cardActionFailure.cardId)}
+                    onDismiss={onDismissCardActionFailure}
+                  />
+                ) : null}
+                <div className="flex min-h-0 min-w-0 flex-1">
+                  <SidebarSessions
+                    sessionCards={sessionCards}
+                    cardResolutions={cardResolutions}
+                    completeness={completeness}
+                    sessionForkAvailable={sessionForkAvailable}
+                    activeCardId={activeCardId}
+                    inspectedChildCardId={inspectedChildCardId}
+                    attentionCardIds={attentionCardIds}
+                    onViewCard={onViewCard}
+                    onSelect={onSelectSession}
+                    onTogglePin={onTogglePin}
+                    onRename={onRename}
+                    onArchive={onArchive}
+                    onBranch={onBranch}
+                    pendingCardIds={pendingCardIds}
+                    loading={loading}
+                    fetching={fetching}
+                    error={error}
+                    onRetry={onRetry}
+                    hasMoreOlderSessions={hasMoreOlderSessions}
+                    loadingOlderSessions={loadingOlderSessions}
+                    olderSessionsError={olderSessionsError}
+                    onLoadOlderSessions={onLoadOlderSessions}
+                  />
+                </div>
+              </div>
+            </motion.section>
+          ) : null}
+        </AnimatePresence>
+      ) : null}
+    </div>
+  )
+}
+
 // ── Main component ──────────────────────────────────────────────────────
 
 function ChatSidebarComponent({
-  sessions,
   activeFriendlyId,
+  creatingSession,
+  onCreateSession,
   isCollapsed,
   onToggleCollapse,
   onSelectSession,
   onActiveSessionDelete,
-  sessionsLoading,
-  sessionsFetching,
-  sessionsError,
-  onRetrySessions,
 }: ChatSidebarProps) {
   const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
     useSidebarSettings()
@@ -535,8 +1141,8 @@ function ChatSidebarComponent({
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
   )
-  const { deleteSession } = useDeleteSession()
-  const { renameSession } = useRenameSession()
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const openSearchModal = useSearchModal((state) => state.openModal)
   const isSearchModalOpen = useSearchModal((state) => state.isOpen)
   const pathname = useRouterState({
@@ -544,6 +1150,34 @@ function ChatSidebarComponent({
       return state.location.pathname
     },
   })
+  const isChatActive =
+    pathname === '/' || pathname === '/new' || pathname.startsWith('/chat')
+  const inspectedChildCardId = useRouterState({
+    select: function selectInspectedChild(state) {
+      const search = state.location.search as Record<string, unknown>
+      return typeof search.inspect === 'string' ? search.inspect : undefined
+    },
+  })
+  const sessionCardInventory = useChatSessionCardInventory({
+    enabled: isChatActive,
+  })
+  const sessionCardDetailQuery = useQuery({
+    queryKey: sessionCardQueryKeys.detail(activeFriendlyId),
+    queryFn: () => fetchSessionCard(activeFriendlyId),
+    enabled: activeFriendlyId !== 'new' && isChatActive,
+    retry: 1,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
+  const sessionCardList = mergeSessionCardDetail(
+    sessionCardInventory.sessionCardList,
+    sessionCardDetailQuery.data,
+  )
+  const sessionCardAttention = useSessionCardAttention({
+    cards: sessionCardList?.cards ?? EMPTY_SESSION_CARDS,
+    activeCardId: activeFriendlyId,
+  })
+  const sessionForkAvailable = useFeatureAvailable('sessionFork')
 
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
@@ -573,15 +1207,13 @@ function ChatSidebarComponent({
   )
 
   // Route active states
-  const isChatActive =
-    pathname === '/' || pathname === '/new' || pathname.startsWith('/chat')
   const isNewSessionActive =
     pathname === '/new' || pathname.startsWith('/chat/new')
   const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
   const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
-  const isPlaygroundActive = pathname === '/playground'
+
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
@@ -627,62 +1259,79 @@ function ChatSidebarComponent({
   )
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
-  const [renameSessionKey, setRenameSessionKey] = useState<string | null>(null)
-  const [renameFriendlyId, setRenameFriendlyId] = useState<string | null>(null)
+  const [renameCard, setRenameCard] = useState<SessionCard | null>(null)
   const [renameSessionTitle, setRenameSessionTitle] = useState('')
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deleteSessionKey, setDeleteSessionKey] = useState<string | null>(null)
-  const [deleteFriendlyId, setDeleteFriendlyId] = useState<string | null>(null)
+  const [archiveCard, setArchiveCard] = useState<SessionCard | null>(null)
   const [deleteSessionTitle, setDeleteSessionTitle] = useState('')
   const [providersOpen, setProvidersOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isHoverExpanded, setIsHoverExpanded] = useState(false)
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false)
   const sidebarHoverExpand = useChatSettingsStore(selectSidebarHoverExpand)
+  const desktopSidebarWidth = useChatSettingsStore(selectDesktopSidebarWidth)
+  const updateChatSettings = useChatSettingsStore(
+    (state) => state.updateSettings,
+  )
   const sidebarRef = useRef<HTMLElement | null>(null)
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
 
-  function handleOpenRename(session: SessionMeta) {
-    setRenameSessionKey(session.key)
-    setRenameFriendlyId(session.friendlyId)
-    setRenameSessionTitle(
-      session.label || session.title || session.derivedTitle || '',
-    )
+  const cardActions = useDesktopSessionCardActions({
+    activeCardId: activeFriendlyId,
+    onActiveSessionDelete,
+    invalidateCards: (cardId) =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.lists,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.detail(cardId),
+        }),
+      ]),
+    navigateToCard: (cardId) =>
+      navigate({
+        to: '/chat/$sessionKey',
+        params: { sessionKey: cardId },
+        search: {},
+      }),
+  })
+
+  function handleOpenRename(card: SessionCard) {
+    setRenameCard(card)
+    setRenameSessionTitle(card.title)
     setRenameDialogOpen(true)
   }
 
   function handleSaveRename(newTitle: string) {
-    if (renameSessionKey) {
-      void renameSession(renameSessionKey, renameFriendlyId, newTitle)
-    }
+    const card = renameCard
     setRenameDialogOpen(false)
-    setRenameSessionKey(null)
-    setRenameFriendlyId(null)
+    setRenameCard(null)
+    if (!card) return
+    cardActions.rename(card, newTitle)
   }
 
-  function handleOpenDelete(session: SessionMeta) {
-    setDeleteSessionKey(session.key)
-    setDeleteFriendlyId(session.friendlyId)
-    setDeleteSessionTitle(
-      session.label ||
-        session.title ||
-        session.derivedTitle ||
-        session.friendlyId,
-    )
+  function handleOpenArchive(card: SessionCard) {
+    setArchiveCard(card)
+    setDeleteSessionTitle(card.title)
     setDeleteDialogOpen(true)
   }
 
-  function handleConfirmDelete() {
-    if (deleteSessionKey && deleteFriendlyId) {
-      const isActive = deleteFriendlyId === activeFriendlyId
-      if (isActive && onActiveSessionDelete) {
-        onActiveSessionDelete()
-      }
-      void deleteSession(deleteSessionKey, deleteFriendlyId, isActive)
-    }
+  function handleConfirmArchive() {
+    const card = archiveCard
     setDeleteDialogOpen(false)
-    setDeleteSessionKey(null)
-    setDeleteFriendlyId(null)
+    setArchiveCard(null)
+    if (!card) return
+    cardActions.archive(card)
+  }
+
+  function handleTogglePin(card: SessionCard) {
+    cardActions.togglePin(card)
+  }
+
+  function handleBranch(card: SessionCard) {
+    if (!isWholeCardBranchAvailable(card, sessionForkAvailable)) return
+    cardActions.branch(card)
   }
 
   useEffect(() => {
@@ -702,6 +1351,8 @@ function ChatSidebarComponent({
   const isHoverPreviewExpanded =
     sidebarHoverExpand && !isMobile && isCollapsed && isHoverExpanded
   const isVisuallyCollapsed = isCollapsed && !isHoverPreviewExpanded
+  const isDesktopNavigationOnly = !isMobile && !isChatActive
+  const isDesktopSidebarCompact = isVisuallyCollapsed || isDesktopNavigationOnly
 
   function handleSidebarToggle() {
     // In hover-preview mode, a click should dismiss the preview first;
@@ -715,7 +1366,7 @@ function ChatSidebarComponent({
 
   const asideProps = {
     className: cn(
-      'border-r h-full overflow-hidden flex flex-col theme-sidebar theme-border',
+      'relative shrink-0 border-r h-full overflow-hidden flex flex-col theme-sidebar theme-border',
       isMobile && 'fixed inset-y-0 left-0 z-50 shadow-2xl',
       isMobile && isCollapsed && 'pointer-events-none',
     ),
@@ -732,6 +1383,7 @@ function ChatSidebarComponent({
     function handleTouchStart(event: TouchEvent) {
       if (event.touches.length !== 1) return
       const touch = event.touches[0]
+      if (!touch) return
       swipeStartRef.current = { x: touch.clientX, y: touch.clientY }
     }
 
@@ -740,6 +1392,7 @@ function ChatSidebarComponent({
       swipeStartRef.current = null
       if (!start || event.changedTouches.length !== 1) return
       const touch = event.changedTouches[0]
+      if (!touch) return
       const dx = touch.clientX - start.x
       const dy = touch.clientY - start.y
       if (Math.abs(dy) > MAX_VERTICAL_DRIFT_PX) return
@@ -905,18 +1558,23 @@ function ChatSidebarComponent({
       }}
       initial={false}
       animate={{
-        width: isVisuallyCollapsed
+        width: isDesktopSidebarCompact
           ? isMobile
             ? 0
             : 48
           : isMobile
             ? '85vw'
-            : 300,
+            : desktopSidebarWidth,
       }}
-      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      transition={
+        isSidebarResizing
+          ? { duration: 0 }
+          : { type: 'spring', stiffness: 400, damping: 30 }
+      }
       className={cn(
         asideProps.className,
         isMobile && isCollapsed && 'pointer-events-none overflow-hidden',
+        isSidebarResizing && 'select-none',
       )}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
@@ -931,322 +1589,374 @@ function ChatSidebarComponent({
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: true } : {})}
     >
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <motion.div
-        layout
-        transition={{ layout: transition }}
-        className="relative flex h-12 items-center px-2"
-      >
-        <AnimatePresence initial={false}>
-          {!isVisuallyCollapsed ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={transition}
-            >
-              <Link
-                to="/chat"
-                className={cn(
-                  buttonVariants({ variant: 'ghost', size: 'sm' }),
-                  'w-full pl-1.5 justify-start gap-2',
-                )}
-              >
-                <img
-                  src="/claude-avatar.webp"
-                  alt="Hermes Agent"
-                  className="size-6 rounded-lg"
-                />
-                <span
-                  className="text-sm font-semibold tracking-tight"
-                  style={{ color: 'var(--theme-text)' }}
-                >
-                  Hermes Workspace
-                </span>
-              </Link>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger
-              onClick={handleSidebarToggle}
-              render={
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={
-                    isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'
-                  }
-                  className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
-                  data-tour="sidebar-collapse-toggle"
-                >
-                  {isVisuallyCollapsed ? (
-                    <HugeiconsIcon
-                      icon={ArrowRight01Icon}
-                      size={18}
-                      strokeWidth={1.75}
-                    />
-                  ) : (
-                    <HugeiconsIcon
-                      icon={ArrowLeft01Icon}
-                      size={18}
-                      strokeWidth={1.75}
-                    />
-                  )}
-                </Button>
-              }
-            />
-            <TooltipContent side="right">
-              {isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
-            </TooltipContent>
-          </TooltipRoot>
-        </TooltipProvider>
-      </motion.div>
-
-      {/* ── Search (ChatGPT-style, above sections) ─────────────────── */}
-      <div className="px-2 pb-1">
-        <motion.div
-          layout
-          transition={{ layout: transition }}
-          className="w-full"
-        >
-          <NavItem
-            item={searchItem}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-        </motion.div>
-      </div>
-
-      {/* ── New Session button ──────────────────────────────────────── */}
-      {!isVisuallyCollapsed && (
-        <div className="px-2 pb-1">
-          <Link
-            to="/chat/$sessionKey"
-            params={{ sessionKey: 'new' }}
-            onClick={() => {
-              onSelectSession?.()
-            }}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
-              isNewSessionActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
-            )}
-            data-tour="new-session"
+      {!isMobile ? (
+        <DesktopSidebarContent
+          activeCardId={activeFriendlyId}
+          inspectedChildCardId={inspectedChildCardId}
+          isVisuallyCollapsed={isDesktopSidebarCompact}
+          transition={transition}
+          searchItem={searchItem}
+          mainItems={mainItems}
+          knowledgeItems={knowledgeItems}
+          onSelectSession={onSelectSession}
+          onCreateSession={onCreateSession}
+          creatingSession={creatingSession}
+          onToggleCollapse={handleSidebarToggle}
+          profileDisplayName={profileDisplayName}
+          profileAvatarDataUrl={profileAvatarDataUrl}
+          handleOpenSettings={handleOpenSettings}
+          showSessions={isChatActive}
+          sessionCards={sessionCardList?.cards ?? []}
+          cardResolutions={sessionCardList?.cardResolutions ?? []}
+          completeness={sessionCardList?.completeness ?? 'complete'}
+          attentionCardIds={sessionCardAttention.attentionCardIds}
+          onViewCard={sessionCardAttention.markCardForViewing}
+          sessionForkAvailable={sessionForkAvailable}
+          onTogglePin={handleTogglePin}
+          onRename={handleOpenRename}
+          onArchive={handleOpenArchive}
+          onBranch={handleBranch}
+          pendingCardIds={cardActions.pendingCardIds}
+          cardActionFailure={cardActions.failure}
+          onDismissCardActionFailure={cardActions.dismissFailure}
+          loading={sessionCardInventory.isLoading}
+          fetching={sessionCardInventory.isFetching}
+          error={
+            !sessionCardInventory.sessionCardList &&
+            sessionCardInventory.error instanceof Error
+              ? sessionCardInventory.error.message
+              : null
+          }
+          onRetry={() => void sessionCardInventory.refetch()}
+          hasMoreOlderSessions={sessionCardInventory.hasNextPage}
+          loadingOlderSessions={sessionCardInventory.isFetchingNextPage}
+          olderSessionsError={sessionCardInventory.olderSessionsError}
+          onLoadOlderSessions={() =>
+            void sessionCardInventory.loadOlderSessions()
+          }
+        />
+      ) : (
+        <>
+          {/* ── Header ──────────────────────────────────────────────────── */}
+          <motion.div
+            layout
+            transition={{ layout: transition }}
+            className="relative flex h-12 items-center px-2"
           >
-            <HugeiconsIcon
-              icon={PencilEdit02Icon}
-              size={20}
-              strokeWidth={1.5}
-              className="size-5 shrink-0"
-            />
-            <span>New Session</span>
-          </Link>
-        </div>
-      )}
-
-      {/* ── HermesWorld featured link (gold castle, NEW badge) ────── */}
-      {/* Hide when VITE_HERMESWORLD_ENABLED is explicitly '0' */}
-      {!isVisuallyCollapsed &&
-        (import.meta as any).env?.VITE_HERMESWORLD_ENABLED !== '0' && (
-          <div className="px-2 pb-2">
-            <Link
-              to="/playground"
-              onClick={() => onSelectSession?.()}
-              className={cn(
-                buttonVariants({ variant: 'ghost', size: 'sm' }),
-                'group w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
-                isPlaygroundActive &&
-                  'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
-              )}
-              data-tour="hermesworld"
-            >
-              <HugeiconsIcon
-                icon={Castle02Icon}
-                size={20}
-                strokeWidth={1.5}
-                className="size-5 shrink-0"
-                style={{ color: '#facc15' }}
-              />
-              <span>HermesWorld</span>
-              <span
-                className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
-                style={{
-                  background:
-                    'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
-                  color: '#0b1320',
-                  boxShadow: '0 0 8px rgba(250,204,21,0.4)',
-                  letterSpacing: '0.08em',
-                }}
-              >
-                NEW
-              </span>
-            </Link>
-          </div>
-        )}
-
-      {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
-        {/* Navigation sections */}
-        <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
-          <SectionLabel
-            label="Main"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={mainExpanded}
-            onToggle={toggleMain}
-            navigateTo={mainNav}
-          />
-          <CollapsibleSection
-            expanded={mainExpanded || isCollapsed}
-            items={mainItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-
-          <SectionLabel
-            label="Knowledge"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={knowledgeExpanded}
-            onToggle={toggleKnowledge}
-            navigateTo={knowledgeNav}
-          />
-          <CollapsibleSection
-            expanded={knowledgeExpanded || isCollapsed}
-            items={knowledgeItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-
-          {/* System */}
-          <CollapsibleSection
-            expanded={true}
-            items={systemItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-        </div>
-
-        {/* Sessions list */}
-        <div className={cn('shrink-0 mt-1', isMobile && 'order-1')}>
-          <AnimatePresence initial={false}>
-            {!isVisuallyCollapsed && (
-              <motion.div
-                key="content"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={transition}
-                className="flex flex-col w-full min-h-0 h-full"
-              >
-                <div className="flex-1 min-h-0">
-                  <SidebarSessions
-                    sessions={sessions}
-                    activeFriendlyId={activeFriendlyId}
-                    onSelect={onSelectSession}
-                    onRename={handleOpenRename}
-                    onDelete={handleOpenDelete}
-                    loading={sessionsLoading}
-                    fetching={sessionsFetching}
-                    error={sessionsError}
-                    onRetry={onRetrySessions}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-      {/* end scrollable body */}
-
-      {/* ── Footer with User Menu ─────────────────────────────────── */}
-      <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
-        {/* User card + actions */}
-        <div
-          className={cn(
-            'flex items-center rounded-lg transition-colors',
-            isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
-          )}
-        >
-          {/* User menu trigger */}
-          <MenuRoot>
-            <MenuTrigger
-              data-tour="settings"
-              className={cn(
-                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200 dark:hover:bg-neutral-800 flex-1 min-w-0',
-                isVisuallyCollapsed ? 'justify-center px-0' : 'px-1.5',
-              )}
-            >
-              <UserAvatar
-                size={28}
-                src={profileAvatarDataUrl}
-                alt={profileDisplayName}
-              />
-              <AnimatePresence initial={false} mode="wait">
-                {!isVisuallyCollapsed && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={transition}
-                    className="flex-1 min-w-0 flex items-center gap-1.5"
+            <AnimatePresence initial={false}>
+              {!isVisuallyCollapsed ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                >
+                  <Link
+                    to="/chat"
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'sm' }),
+                      'w-full pl-1.5 justify-start gap-2',
+                    )}
                   >
-                    <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
-                      {profileDisplayName}
+                    <AgentIdentityAvatar className="size-6 rounded-lg" />
+                    <span
+                      className="text-sm font-semibold tracking-tight"
+                      style={{ color: 'var(--theme-text)' }}
+                    >
+                      Hermes Workspace
                     </span>
-                    <StatusDot />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </MenuTrigger>
-            <MenuContent side="top" align="start" className="min-w-[200px]">
-              <MenuItem
-                onClick={function onOpenSettings() {
-                  handleOpenSettings('claude')
-                }}
-                className="justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <HugeiconsIcon
-                    icon={Settings01Icon}
-                    size={20}
-                    strokeWidth={1.5}
-                  />
-                  Settings
-                </span>
-              </MenuItem>
-            </MenuContent>
-          </MenuRoot>
+                  </Link>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+            <TooltipProvider>
+              <TooltipRoot>
+                <TooltipTrigger
+                  onClick={handleSidebarToggle}
+                  render={
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={
+                        isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'
+                      }
+                      className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
+                      data-tour="sidebar-collapse-toggle"
+                    >
+                      {isVisuallyCollapsed ? (
+                        <HugeiconsIcon
+                          icon={ArrowRight01Icon}
+                          size={18}
+                          strokeWidth={1.75}
+                        />
+                      ) : (
+                        <HugeiconsIcon
+                          icon={ArrowLeft01Icon}
+                          size={18}
+                          strokeWidth={1.75}
+                        />
+                      )}
+                    </Button>
+                  }
+                />
+                <TooltipContent side="right">
+                  {isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                </TooltipContent>
+              </TooltipRoot>
+            </TooltipProvider>
+          </motion.div>
 
-          {/* Settings + Theme toggle */}
+          {/* ── Search (ChatGPT-style, above sections) ─────────────────── */}
+          <div className="px-2 pb-1">
+            <motion.div
+              layout
+              transition={{ layout: transition }}
+              className="w-full"
+            >
+              <NavItem
+                item={searchItem}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </motion.div>
+          </div>
+
+          {/* ── New Session button ──────────────────────────────────────── */}
           {!isVisuallyCollapsed && (
-            <div className="flex items-center gap-0.5">
-              <button
+            <div className="px-2 pb-1">
+              <Button
                 type="button"
-                onClick={() => handleOpenSettings('claude')}
-                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
-                aria-label="Settings"
+                variant="ghost"
+                size="sm"
+                disabled={creatingSession}
+                onClick={() => void onCreateSession()}
+                className={cn(
+                  'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
+                  isNewSessionActive &&
+                    'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
+                )}
+                data-tour="new-session"
               >
                 <HugeiconsIcon
-                  icon={Settings01Icon}
-                  size={16}
+                  icon={PencilEdit02Icon}
+                  size={20}
                   strokeWidth={1.5}
+                  className="size-5 shrink-0"
                 />
-              </button>
-              <ThemeToggleMini />
+                <span>
+                  {creatingSession ? 'Creating Session…' : 'New Session'}
+                </span>
+              </Button>
             </div>
           )}
-        </div>
-      </div>
+
+          {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
+            {/* Navigation sections */}
+            <div className="shrink-0 space-y-0.5 px-2 order-2">
+              <SectionLabel
+                label="Main"
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                collapsible
+                expanded={mainExpanded}
+                onToggle={toggleMain}
+                navigateTo={mainNav}
+              />
+              <CollapsibleSection
+                expanded={mainExpanded || isCollapsed}
+                items={mainItems}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+
+              <SectionLabel
+                label="Knowledge"
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                collapsible
+                expanded={knowledgeExpanded}
+                onToggle={toggleKnowledge}
+                navigateTo={knowledgeNav}
+              />
+              <CollapsibleSection
+                expanded={knowledgeExpanded || isCollapsed}
+                items={knowledgeItems}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+
+              {/* System */}
+              <CollapsibleSection
+                expanded={true}
+                items={systemItems}
+                isCollapsed={isVisuallyCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </div>
+
+            {/* Sessions list */}
+            {isChatActive ? (
+              <div className="shrink-0 mt-1 order-1">
+                <AnimatePresence initial={false}>
+                  {!isVisuallyCollapsed && (
+                    <motion.div
+                      key="content"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={transition}
+                      className="flex flex-col w-full min-h-0 h-full"
+                    >
+                      <div className="flex-1 min-h-0">
+                        <SidebarSessions
+                          sessionCards={sessionCardList?.cards ?? []}
+                          cardResolutions={
+                            sessionCardList?.cardResolutions ?? []
+                          }
+                          completeness={
+                            sessionCardList?.completeness ?? 'complete'
+                          }
+                          sessionForkAvailable={sessionForkAvailable}
+                          activeCardId={activeFriendlyId}
+                          inspectedChildCardId={inspectedChildCardId}
+                          attentionCardIds={
+                            sessionCardAttention.attentionCardIds
+                          }
+                          onViewCard={sessionCardAttention.markCardForViewing}
+                          onSelect={onSelectSession}
+                          onTogglePin={handleTogglePin}
+                          onRename={handleOpenRename}
+                          onArchive={handleOpenArchive}
+                          onBranch={handleBranch}
+                          pendingCardIds={cardActions.pendingCardIds}
+                          loading={sessionCardInventory.isLoading}
+                          fetching={sessionCardInventory.isFetching}
+                          error={
+                            !sessionCardInventory.sessionCardList &&
+                            sessionCardInventory.error instanceof Error
+                              ? sessionCardInventory.error.message
+                              : null
+                          }
+                          onRetry={() => void sessionCardInventory.refetch()}
+                          hasMoreOlderSessions={
+                            sessionCardInventory.hasNextPage
+                          }
+                          loadingOlderSessions={
+                            sessionCardInventory.isFetchingNextPage
+                          }
+                          olderSessionsError={
+                            sessionCardInventory.olderSessionsError
+                          }
+                          onLoadOlderSessions={() =>
+                            void sessionCardInventory.loadOlderSessions()
+                          }
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : null}
+          </div>
+          {/* end scrollable body */}
+
+          {/* ── Footer with User Menu ─────────────────────────────────── */}
+          <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
+            {/* User card + actions */}
+            <div
+              className={cn(
+                'flex items-center rounded-lg transition-colors',
+                isVisuallyCollapsed
+                  ? 'flex-col gap-2 py-2'
+                  : 'gap-2.5 px-2 py-1.5',
+              )}
+            >
+              {/* User menu trigger */}
+              <MenuRoot>
+                <MenuTrigger
+                  data-tour="settings"
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200 dark:hover:bg-neutral-800 flex-1 min-w-0',
+                    isVisuallyCollapsed ? 'justify-center px-0' : 'px-1.5',
+                  )}
+                >
+                  <UserAvatar
+                    size={28}
+                    src={profileAvatarDataUrl}
+                    alt={profileDisplayName}
+                  />
+                  <AnimatePresence initial={false} mode="wait">
+                    {!isVisuallyCollapsed && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={transition}
+                        className="flex-1 min-w-0 flex items-center gap-1.5"
+                      >
+                        <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
+                          {profileDisplayName}
+                        </span>
+                        <StatusDot />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </MenuTrigger>
+                <MenuContent side="top" align="start" className="min-w-[200px]">
+                  <MenuItem
+                    onClick={function onOpenSettings() {
+                      handleOpenSettings('claude')
+                    }}
+                    className="justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <HugeiconsIcon
+                        icon={Settings01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                      Settings
+                    </span>
+                  </MenuItem>
+                </MenuContent>
+              </MenuRoot>
+
+              {/* Settings + Theme toggle */}
+              {!isVisuallyCollapsed && (
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenSettings('claude')}
+                    className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
+                    aria-label="Settings"
+                  >
+                    <HugeiconsIcon
+                      icon={Settings01Icon}
+                      size={16}
+                      strokeWidth={1.5}
+                    />
+                  </button>
+                  <ThemeToggleMini />
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      <DesktopSidebarResizeHandle
+        enabled={!isMobile && isChatActive && !isCollapsed}
+        width={desktopSidebarWidth}
+        onWidthChange={(nextDesktopSidebarWidth) =>
+          updateChatSettings({ desktopSidebarWidth: nextDesktopSidebarWidth })
+        }
+        onResizingChange={setIsSidebarResizing}
+      />
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
       <SettingsDialog
@@ -1262,8 +1972,7 @@ function ChatSidebarComponent({
         onOpenChange={(open) => {
           setRenameDialogOpen(open)
           if (!open) {
-            setRenameSessionKey(null)
-            setRenameFriendlyId(null)
+            setRenameCard(null)
             setRenameSessionTitle('')
           }
         }}
@@ -1271,8 +1980,7 @@ function ChatSidebarComponent({
         onSave={handleSaveRename}
         onCancel={() => {
           setRenameDialogOpen(false)
-          setRenameSessionKey(null)
-          setRenameFriendlyId(null)
+          setRenameCard(null)
           setRenameSessionTitle('')
         }}
       />
@@ -1281,33 +1989,12 @@ function ChatSidebarComponent({
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         sessionTitle={deleteSessionTitle}
-        onConfirm={handleConfirmDelete}
+        mode="archive"
+        onConfirm={handleConfirmArchive}
         onCancel={() => setDeleteDialogOpen(false)}
       />
     </motion.aside>
   )
-}
-
-function areSessionsEqual(
-  prevSessions: Array<SessionMeta>,
-  nextSessions: Array<SessionMeta>,
-): boolean {
-  if (prevSessions === nextSessions) return true
-  if (prevSessions.length !== nextSessions.length) return false
-  for (let i = 0; i < prevSessions.length; i += 1) {
-    const prev = prevSessions[i]
-    const next = nextSessions[i]
-    if (prev.key !== next.key) return false
-    if (prev.friendlyId !== next.friendlyId) return false
-    if (prev.label !== next.label) return false
-    if (prev.title !== next.title) return false
-    if (prev.derivedTitle !== next.derivedTitle) return false
-    if (prev.updatedAt !== next.updatedAt) return false
-    if (prev.titleStatus !== next.titleStatus) return false
-    if (prev.titleSource !== next.titleSource) return false
-    if (prev.titleError !== next.titleError) return false
-  }
-  return true
 }
 
 function areSidebarPropsEqual(
@@ -1317,11 +2004,6 @@ function areSidebarPropsEqual(
   if (prevProps.activeFriendlyId !== nextProps.activeFriendlyId) return false
   if (prevProps.creatingSession !== nextProps.creatingSession) return false
   if (prevProps.isCollapsed !== nextProps.isCollapsed) return false
-  if (prevProps.sessionsLoading !== nextProps.sessionsLoading) return false
-  if (prevProps.sessionsFetching !== nextProps.sessionsFetching) return false
-  if (prevProps.sessionsError !== nextProps.sessionsError) return false
-  if (prevProps.onRetrySessions !== nextProps.onRetrySessions) return false
-  if (!areSessionsEqual(prevProps.sessions, nextProps.sessions)) return false
   return true
 }
 

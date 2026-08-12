@@ -41,7 +41,7 @@ export function formatModelName(raw: string): string {
       /gemini[- _]?(\d+(?:[._]\d+)*)(?:[- _]?(flash|pro|ultra|exp))?/i,
     )
     if (match) {
-      const version = match[1].replace(/[_]/g, '.')
+      const version = (match[1] ?? '').replace(/[_]/g, '.')
       const variant = match[2]
         ? ` ${match[2].charAt(0).toUpperCase()}${match[2].slice(1)}`
         : ''
@@ -94,7 +94,7 @@ export function formatSkillName(raw: string): string {
   if (!raw) return '—'
   const trimmed = raw.trim()
   if (!trimmed.includes(':') && !trimmed.includes('/')) return trimmed
-  const segments = trimmed.split(/[:\/]/)
+  const segments = trimmed.split(/[:/]/)
   return segments[segments.length - 1] || trimmed
 }
 

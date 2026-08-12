@@ -3,11 +3,15 @@ import {
   ensureBusStarted,
   subscribeToChatEvents,
 } from '../../server/chat-event-bus'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
 
 export const Route = createFileRoute('/api/events')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return Response.json({ error: 'Unauthorized' }, { status: 401 })
+        }
         await ensureBusStarted()
 
         const encoder = new TextEncoder()

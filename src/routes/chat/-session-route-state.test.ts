@@ -1,0 +1,437 @@
+import { describe, expect, it } from 'vitest'
+
+import { SessionCardLookupError } from '../../screens/chat/chat-queries'
+import {
+  buildSessionReplaceNavigation,
+  resolveSessionCardDetailRouteState,
+  resolveSessionCardProducerNavigation,
+  resolveSessionCardRoute,
+  resolveSessionCardRouteState,
+  validatedInspectedChildCardId,
+} from './-session-route-state'
+import type { SessionCardListWire } from '../../screens/chat/chat-queries'
+
+const rootCard = {
+  cardId: 'remote:root',
+  canonicalSource: 'remote' as const,
+  title: 'Root card',
+  titleSource: 'manual' as const,
+  canonicalSegmentKey: 'remote:tip',
+  continuationSegmentKeys: ['remote:root', 'remote:tip'],
+  continuationCount: 2,
+  relationshipKind: 'root' as const,
+  childNodes: [
+    {
+      cardId: 'remote:child-root',
+      sessionKey: 'remote:child-tip',
+      continuationSegmentKeys: [
+        'remote:child-root',
+        'remote:child-middle',
+        'remote:child-tip',
+      ],
+      relationshipKind: 'child' as const,
+      title: 'Delegate',
+      status: 'running' as const,
+      updatedAt: 2,
+      continuationCount: 3,
+    },
+  ],
+  updatedAt: 2,
+  archived: false,
+  pinned: false,
+}
+
+const localCard = {
+  ...rootCard,
+  cardId: 'local:root',
+  canonicalSource: 'local' as const,
+  canonicalSegmentKey: 'local:root',
+  continuationSegmentKeys: ['local:root'],
+  continuationCount: 1,
+  childNodes: [],
+}
+
+function cardResolutions(
+  cards: Array<{ cardId: string }>,
+  completeness: 'complete' | 'incomplete' = 'complete',
+) {
+  return cards.map((card) => ({
+    cardId: card.cardId,
+    completeness,
+    retryable: completeness === 'incomplete',
+  }))
+}
+
+describe('chat canonical replace navigation', () => {
+  it('preserves search, hash, and route state', () => {
+    expect(buildSessionReplaceNavigation('canonical-friendly')).toEqual({
+      to: '/chat/$sessionKey',
+      params: { sessionKey: 'canonical-friendly' },
+      search: true,
+      hash: true,
+      state: true,
+      replace: true,
+    })
+  })
+})
+
+describe('Session Card route resolution', () => {
+  it('maps raw producer identities, including every child continuation alias', () => {
+    const response = {
+      cards: [rootCard],
+      cardResolutions: cardResolutions([rootCard]),
+      completeness: 'complete' as const,
+      retryable: false,
+      sources: [],
+    }
+    expect(
+      resolveSessionCardProducerNavigation(response, ['remote:tip']),
+    ).toEqual({ cardId: 'remote:root' })
+    for (const childIdentity of [
+      'remote:child-root',
+      'remote:child-middle',
+      'remote:child-tip',
+    ]) {
+      expect(
+        resolveSessionCardProducerNavigation(response, [childIdentity]),
+      ).toEqual({
+        cardId: 'remote:root',
+        inspectedChildCardId: 'remote:child-root',
+      })
+    }
+    expect(
+      resolveSessionCardProducerNavigation(
+        {
+          ...response,
+          cards: [
+            {
+              ...rootCard,
+              cardId: 'remote:other',
+              canonicalSegmentKey: 'remote:other-tip',
+              continuationSegmentKeys: ['remote:other', 'remote:other-tip'],
+              childNodes: [],
+            },
+            rootCard,
+          ],
+          cardResolutions: cardResolutions([
+            { cardId: 'remote:other' },
+            rootCard,
+          ]),
+        },
+        ['remote:tip', 'remote:friendly-alias'],
+      ),
+    ).toEqual({ cardId: 'remote:root' })
+    expect(
+      resolveSessionCardProducerNavigation(response, ['remote:missing']),
+    ).toBeUndefined()
+    expect(
+      resolveSessionCardProducerNavigation(
+        {
+          ...response,
+          cardResolutions: cardResolutions([rootCard], 'incomplete'),
+          completeness: 'incomplete',
+          retryable: true,
+        },
+        ['remote:child-middle'],
+      ),
+    ).toBeUndefined()
+  })
+
+  it('accepts inspection only for a child Card of the selected parent', () => {
+    expect(validatedInspectedChildCardId(rootCard, 'remote:child-root')).toBe(
+      'remote:child-root',
+    )
+    expect(
+      validatedInspectedChildCardId(rootCard, 'remote:child-tip'),
+    ).toBeUndefined()
+    expect(
+      validatedInspectedChildCardId(rootCard, 'remote:missing'),
+    ).toBeUndefined()
+    expect(
+      validatedInspectedChildCardId(undefined, 'remote:child-root'),
+    ).toBeUndefined()
+  })
+
+  it('selects a root by stable cardId without exposing its canonical segment', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'remote:root',
+        response: {
+          cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'selected', card: rootCard })
+  })
+
+  it('resolves arbitrary targeted roots and keeps incomplete/error states fail-closed', () => {
+    expect(
+      resolveSessionCardDetailRouteState({
+        routeKey: 'old-alias',
+        queryStatus: 'success',
+        response: {
+          card: rootCard,
+          resolution: cardResolutions([rootCard])[0]!,
+          completeness: 'incomplete',
+          retryable: true,
+          sources: [
+            {
+              source: 'gateway',
+              status: 'unavailable',
+              fetched: 0,
+              retryable: true,
+            },
+          ],
+        },
+      }),
+    ).toEqual({ status: 'selected', card: rootCard })
+    expect(
+      resolveSessionCardDetailRouteState({
+        routeKey: 'missing',
+        queryStatus: 'error',
+        error: new SessionCardLookupError('missing', 404, false),
+      }),
+    ).toEqual({ status: 'rejected', reason: 'missing' })
+    expect(
+      resolveSessionCardDetailRouteState({
+        routeKey: 'missing',
+        queryStatus: 'error',
+        error: new SessionCardLookupError('retry', 503, true),
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'query' })
+  })
+
+  it('rejects direct navigation to a continuation segment', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'remote:tip',
+        response: {
+          cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'rejected', reason: 'continuation' })
+  })
+
+  it.each(['remote:child-root', 'remote:child-middle', 'remote:child-tip'])(
+    'rejects child/branch identity %s as a parent route',
+    (routeKey) => {
+      expect(
+        resolveSessionCardRoute({
+          routeKey,
+          response: {
+            cards: [rootCard],
+            cardResolutions: cardResolutions([rootCard]),
+            completeness: 'complete',
+            retryable: false,
+            sources: [],
+          },
+        }),
+      ).toEqual({ status: 'rejected', reason: 'child' })
+    },
+  )
+
+  it('rejects an unknown route after a complete validated list', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'remote:missing',
+        response: {
+          cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'rejected', reason: 'missing' })
+  })
+
+  it('preserves new as the only explicit bootstrap route', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'new',
+        response: {
+          cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'bootstrap' })
+  })
+
+  it('does not infer the former bare main alias from an authoritative Card', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'main',
+        response: {
+          cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard]),
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'rejected', reason: 'missing' })
+  })
+
+  it('fails closed when the Card projection is incomplete', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'remote:root',
+        response: {
+          cards: [rootCard],
+          cardResolutions: cardResolutions([rootCard], 'incomplete'),
+          completeness: 'incomplete',
+          retryable: true,
+          sources: [
+            {
+              source: 'gateway',
+              status: 'unavailable',
+              fetched: 0,
+              retryable: true,
+              error: 'temporarily unavailable',
+            },
+          ],
+        },
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'projection' })
+  })
+
+  it('keeps a source-complete local Card navigable when remote collection fails', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'local:root',
+        response: {
+          cards: [localCard],
+          cardResolutions: [
+            {
+              cardId: 'local:root',
+              completeness: 'complete',
+              retryable: false,
+            },
+          ],
+          completeness: 'incomplete',
+          retryable: true,
+          sources: [
+            {
+              source: 'gateway',
+              status: 'unavailable',
+              fetched: 0,
+              retryable: true,
+              error: 'temporarily unavailable',
+            },
+            {
+              source: 'local',
+              status: 'complete',
+              fetched: 1,
+              retryable: false,
+            },
+          ],
+        },
+      }),
+    ).toEqual({ status: 'selected', card: localCard })
+  })
+
+  it('keeps a Card unavailable when its own continuation projection is incomplete', () => {
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'remote:root',
+        response: {
+          cards: [{ ...rootCard, canonicalSource: 'remote' }],
+          cardResolutions: [
+            {
+              cardId: 'remote:root',
+              completeness: 'incomplete',
+              retryable: true,
+            },
+          ],
+          completeness: 'complete',
+          retryable: false,
+          sources: [],
+        },
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'projection' })
+  })
+
+  it('fails closed for missing or ambiguous per-Card resolution metadata', () => {
+    const response = {
+      cards: [localCard],
+      completeness: 'incomplete' as const,
+      retryable: true,
+      sources: [],
+    }
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'local:root',
+        response: response as unknown as SessionCardListWire,
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'projection' })
+    expect(
+      resolveSessionCardRoute({
+        routeKey: 'local:root',
+        response: {
+          ...response,
+          cardResolutions: [
+            {
+              cardId: 'local:root',
+              completeness: 'complete',
+              retryable: false,
+            },
+            {
+              cardId: 'local:root',
+              completeness: 'complete',
+              retryable: false,
+            },
+          ],
+        },
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'projection' })
+  })
+
+  it('fails closed when the Card query fails instead of choosing a raw session', () => {
+    expect(
+      resolveSessionCardRouteState({
+        routeKey: 'remote:root',
+        queryStatus: 'error',
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'query' })
+  })
+
+  it('keeps only new available while the Card query is disabled', () => {
+    expect(
+      resolveSessionCardRouteState({
+        routeKey: 'new',
+        queryStatus: 'pending',
+      }),
+    ).toEqual({ status: 'bootstrap' })
+    expect(
+      resolveSessionCardRouteState({
+        routeKey: 'main',
+        queryStatus: 'pending',
+      }),
+    ).toBeNull()
+    expect(
+      resolveSessionCardRouteState({
+        routeKey: 'main',
+        queryStatus: 'error',
+      }),
+    ).toEqual({ status: 'unavailable', reason: 'query' })
+  })
+
+  it('waits for a pending Card query without selecting a raw session', () => {
+    expect(
+      resolveSessionCardRouteState({
+        routeKey: 'remote:root',
+        queryStatus: 'pending',
+      }),
+    ).toBeNull()
+  })
+})

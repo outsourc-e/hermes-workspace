@@ -11,6 +11,7 @@ import {
   RefreshIcon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
+import { fetchExactSwarmWorkerCardBindings } from '@/lib/swarm-card-bindings'
 
 type WorkerHealth = {
   workerId: string
@@ -41,7 +42,7 @@ type HealthResponse = {
   workspaceModel: string | null
   agentApiUrl?: string | null
   claudeApiUrl?: string | null
-  workers: WorkerHealth[]
+  workers: Array<WorkerHealth>
   summary: {
     totalWorkers: number
     wrappersConfigured: number
@@ -50,9 +51,9 @@ type HealthResponse = {
     workersUsingFallback: number
     workersPrimaryAuthFailed: number
     degraded: boolean
-    warnings: string[]
-    distinctModels: string[]
-    distinctProviders: string[]
+    warnings: Array<string>
+    distinctModels: Array<string>
+    distinctProviders: Array<string>
   }
 }
 
@@ -106,12 +107,21 @@ export function SwarmHealthStrip({
     setPingError(null)
     setPingResult(null)
     try {
+      const cardBinding = (
+        await fetchExactSwarmWorkerCardBindings([workerId])
+      ).get(workerId)
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workerIds: [workerId],
-          prompt: `Reply with exactly: ${workerId.toUpperCase()}_PING_OK`,
+          assignments: [
+            {
+              workerId,
+              task: `Reply with exactly: ${workerId.toUpperCase()}_PING_OK`,
+              rationale: 'Card-bound health probe.',
+              cardBinding,
+            },
+          ],
           timeoutSeconds: 60,
         }),
       })
@@ -119,8 +129,13 @@ export function SwarmHealthStrip({
         const text = await res.text()
         throw new Error(text || `HTTP ${res.status}`)
       }
-      const data = (await res.json()) as { results?: Array<DispatchPingResult> }
-      const first = data.results && data.results[0] ? data.results[0] : null
+      const responseData = (await res.json()) as {
+        results?: Array<DispatchPingResult>
+      }
+      const first =
+        responseData.results && responseData.results[0]
+          ? responseData.results[0]
+          : null
       setPingResult(first)
     } catch (err) {
       setPingError(err instanceof Error ? err.message : 'Ping failed')

@@ -1,10 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
 import {
   getSwarmProfilePath,
   patchSwarmRuntimeFile,
@@ -19,6 +23,7 @@ import {
 
 type StopRequest = {
   workerId?: unknown
+  cardBinding?: unknown
 }
 
 const TMUX_BIN_CANDIDATES = [
@@ -60,7 +65,7 @@ function killSession(
         if (error) {
           resolve({
             ok: false,
-            error: stderr?.toString().trim() || error.message,
+            error: stderr.toString().trim() || error.message,
           })
           return
         }
@@ -94,6 +99,23 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
         if (!workerId || !validateWorkerId(workerId)) {
           return json({ error: 'workerId required' }, { status: 400 })
         }
+        const cardBinding = parseSessionCardOperationBinding(body.cardBinding, {
+          source: 'local',
+          transport: 'tmux',
+          canonicalSegmentKey: `local:${workerId}`,
+        })
+        if (!cardBinding) {
+          return json(
+            { error: 'Invalid Session Card stop binding' },
+            { status: 400 },
+          )
+        }
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card stop binding is unavailable' },
+            { status: 409 },
+          )
+        }
 
         const tmuxBin = resolveTmuxBin()
         if (!tmuxBin) {
@@ -114,6 +136,14 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
           })
         }
 
+        // has-session is an awaitable TOCTOU window. Re-resolve the exact Card
+        // at the final destructive edge before targeting this mutable alias.
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card stop binding is unavailable' },
+            { status: 409 },
+          )
+        }
         const result = await killSession(tmuxBin, sessionName)
         if (!result.ok) {
           return json(
@@ -122,10 +152,22 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
           )
         }
 
-        // Reconcile runtime.json so the Swarm UI doesn't show a 'stuck'
-        // worker (tmux gone, lifecycle still says running/blocked). Best
-        // effort — the kill already succeeded, so a write failure here
-        // should NOT fail the stop request. Reported in #235.
+        // Reconcile runtime.json only if the killed alias still belongs to the
+        // same Card. kill-session is awaitable and cannot authorize this file
+        // mutation on its own.
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            {
+              error: 'Session Card stop binding changed after tmux termination',
+              workerId,
+              sessionName,
+              wasRunning: true,
+              killed: true,
+              runtimePatched: false,
+            },
+            { status: 409 },
+          )
+        }
         const profilePath = getSwarmProfilePath(workerId)
         const stoppedAt = Date.now()
         const patchResult = patchSwarmRuntimeFile(profilePath, workerId, {

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   __resetHubCacheForTests,
@@ -72,8 +72,8 @@ describe('getCache / setCache', () => {
   it('isolates different source keys', () => {
     setCache('mcp-get', { payload: 'a' })
     setCache('local', { payload: 'b' })
-    expect((getCache('mcp-get') as { payload: unknown })?.payload).toBe('a')
-    expect((getCache('local') as { payload: unknown })?.payload).toBe('b')
+    expect(getCache('mcp-get')!.payload).toBe('a')
+    expect(getCache('local')!.payload).toBe('b')
   })
 
   it('persists to disk (survives memory clear)', () => {
@@ -82,7 +82,7 @@ describe('getCache / setCache', () => {
     const result = getCache('mcp-get')
     expect(result).not.toBeNull()
     expect(result?.etag).toBe('"v1"')
-    expect((result?.payload as Record<string, unknown>)?.data).toBe('persisted')
+    expect((result!.payload as Record<string, unknown>).data).toBe('persisted')
   })
 })
 

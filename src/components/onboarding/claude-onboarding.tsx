@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { ProviderLogo } from '@/components/provider-logo'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 const KNOWN_PROVIDER_PREFIXES = [
   'openrouter',
@@ -522,9 +523,7 @@ export function ClaudeOnboarding() {
         >
           {step === 'welcome' && (
             <div className="space-y-4 text-center">
-              <img
-                src="/claude-avatar.webp"
-                alt="Hermes Agent"
+              <AgentIdentityAvatar
                 className="mx-auto size-20 rounded-2xl"
                 style={{
                   filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.3))',

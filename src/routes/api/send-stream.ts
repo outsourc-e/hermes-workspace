@@ -4,7 +4,11 @@ import { buildWorkspaceScopedTextMessage } from '../../lib/workspace-message-sco
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-import { publishChatEvent } from '../../server/chat-event-bus'
+import {
+  publishCardActivityEvent,
+  publishChatEvent,
+} from '../../server/chat-event-bus'
+import { isSafeRunId } from '../../server/run-id'
 import {
   registerActiveSendRun,
   unregisterActiveSendRun,
@@ -12,21 +16,33 @@ import {
 import {
   appendRunText,
   createPersistedRun,
+  createRunTextPersistenceBuffer,
   markRunStatus,
+  migratePersistedRun,
+  persistedRunMatchesOwner,
   setRunThinking,
   upsertRunToolCall,
 } from '../../server/run-store'
 import { getChatMode } from '../../server/gateway-capabilities'
+import { sessionCardService } from '../../server/session-card-service'
+import { resolveExactSessionCardOperationBinding } from '../../server/session-card-operation-binding'
 import {
   appendLocalMessage,
   ensureLocalSession,
   getLocalMessages,
+  getLocalSession,
   touchLocalSession,
 } from '../../server/local-session-store'
 import {
   getDiscoveredModels,
   getLocalProviderDef,
 } from '../../server/local-provider-discovery'
+import {
+  isConfiguredDefaultModelRequest,
+  rememberConfiguredSessionModel,
+  resolveCurrentGatewayModel,
+  resolveSessionGatewayModel,
+} from '../../server/configured-primary-model'
 import { openaiChat } from '../../server/openai-compat-api'
 import { streamResponses } from '../../server/responses-api'
 import { selectPortableConversationHistory } from '../../server/portable-history'
@@ -35,6 +51,8 @@ import {
   createSession,
   ensureGatewayProbed,
   getGatewayCapabilities,
+  getLatestDescendant,
+  getSession,
   getMessages as getSessionMessagesFromAgent,
   listSessions,
   streamChat,
@@ -44,68 +62,253 @@ import {
   collectSyntheticLiveToolEvents,
   createSyntheticLiveToolTracker,
 } from './-send-stream-live-tools'
+import { createSseHeartbeatLifecycle } from './-send-stream-heartbeat'
+import { isExplicitSendStreamBootstrap } from './-send-stream-authority'
+import {
+  createRunTerminalTransitionCoordinator,
+  finalizeRunTerminalStream,
+} from './-send-stream-terminal'
+import {
+  cardActivityStateForEvent,
+  childLifecycleStatusForEvent,
+  classifyStreamTerminalEvent,
+  createStreamEventProvenanceTracker,
+  hasNonParentStreamFacts,
+  resolveAuthoritativeBootstrapHandoff,
+  resolveAuthoritativeCardStreamHandoff,
+  resolveAuthoritativeSessionSource,
+  resolveAuthoritativeStreamHandoff,
+} from './-send-stream-session-handoff'
 import type {
   OpenAICompatContentPart,
   OpenAICompatMessage,
 } from '../../server/openai-compat-api'
+import type { SessionCardOperationBinding } from '../../server/session-card-operation-binding'
 // Claude agent runs can take 5+ minutes with complex tool chains
 const SEND_STREAM_RUN_TIMEOUT_MS = 600_000
+export const SEND_STREAM_MAX_REQUEST_BYTES = 4 * 1024 * 1024
+export const SEND_STREAM_MAX_ATTACHMENT_COUNT = 8
+export const SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS = 2 * 1024 * 1024
+export const SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES =
+  (SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS / 4) * 3
+export const SEND_STREAM_MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES =
+  2 * 1024 * 1024
 const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  return undefined
+function decodedBase64ByteLength(value: string): number {
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
+  return Math.floor((value.length * 3) / 4) - padding
 }
 
-function stripDataUrlPrefix(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) return ''
-  const commaIndex = trimmed.indexOf(',')
-  if (trimmed.toLowerCase().startsWith('data:') && commaIndex >= 0) {
-    return trimmed.slice(commaIndex + 1).trim()
+function encodedAttachmentPayloadLength(value: string): number {
+  const firstNonWhitespace = value.search(/\S/u)
+  if (
+    firstNonWhitespace >= 0 &&
+    value.slice(firstNonWhitespace, firstNonWhitespace + 5).toLowerCase() ===
+      'data:'
+  ) {
+    const comma = value.indexOf(',', firstNonWhitespace + 5)
+    if (comma >= 0) return value.length - comma - 1
   }
-  return trimmed
+  return value.length
 }
 
-function normalizeAttachments(
-  attachments: unknown,
-): Array<Record<string, unknown>> | undefined {
-  if (!Array.isArray(attachments) || attachments.length === 0) {
-    return undefined
+async function readBoundedRequestText(
+  request: Request,
+  signal: AbortSignal,
+): Promise<{ ok: true; text: string } | { ok: false }> {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength && /^\d+$/u.test(contentLength)) {
+    const declaredBytes = Number(contentLength)
+    if (
+      !Number.isSafeInteger(declaredBytes) ||
+      declaredBytes > SEND_STREAM_MAX_REQUEST_BYTES
+    ) {
+      return { ok: false }
+    }
+  }
+  if (!request.body) return { ok: true, text: '' }
+
+  const reader = request.body.getReader()
+  const cancelReader = () => {
+    void reader.cancel()
+  }
+  signal.addEventListener('abort', cancelReader, { once: true })
+  const decoder = new TextDecoder()
+  let receivedBytes = 0
+  let text = ''
+  try {
+    let result = await reader.read()
+    while (!result.done) {
+      const { value } = result
+      receivedBytes += value.byteLength
+      if (receivedBytes > SEND_STREAM_MAX_REQUEST_BYTES) {
+        void reader.cancel()
+        return { ok: false }
+      }
+      text += decoder.decode(value, { stream: true })
+      result = await reader.read()
+    }
+    text += decoder.decode()
+    return { ok: true, text }
+  } finally {
+    signal.removeEventListener('abort', cancelReader)
+  }
+}
+
+function isValidBase64Payload(value: string): boolean {
+  if (
+    !value ||
+    value.length % 4 === 1 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/u.test(value)
+  ) {
+    return false
+  }
+  const paddingIndex = value.indexOf('=')
+  return paddingIndex < 0 || value.length % 4 === 0
+}
+
+function parseAttachmentDataUrl(
+  value: unknown,
+): { mimeType: string; content: string; dataUrl: string } | null {
+  if (typeof value !== 'string') return null
+  const dataUrl = value.trim()
+  const match = /^data:([^,;\s]+);base64,([^\s]+)$/iu.exec(dataUrl)
+  if (!match || !isValidBase64Payload(match[2]!)) return null
+  return { mimeType: match[1]!, content: match[2]!, dataUrl }
+}
+
+type AttachmentNormalization =
+  | { ok: true; attachments: Array<Record<string, unknown>> | undefined }
+  | { ok: false; reason: 'invalid' | 'too_large' }
+
+function normalizeAttachments(attachments: unknown): AttachmentNormalization {
+  if (attachments === undefined || attachments === null) {
+    return { ok: true, attachments: undefined }
+  }
+  if (!Array.isArray(attachments)) return { ok: false, reason: 'invalid' }
+  if (attachments.length === 0) {
+    return { ok: true, attachments: undefined }
+  }
+  if (attachments.length > SEND_STREAM_MAX_ATTACHMENT_COUNT) {
+    return { ok: false, reason: 'too_large' }
   }
 
   const normalized: Array<Record<string, unknown>> = []
+  let aggregateDecodedBytes = 0
   for (const attachment of attachments) {
-    if (!attachment || typeof attachment !== 'object') continue
+    if (!attachment || typeof attachment !== 'object') {
+      return { ok: false, reason: 'invalid' }
+    }
     const source = attachment as Record<string, unknown>
+
+    // Reject raw envelope strings before regex parsing, normalization, or
+    // retaining the same payload under compatibility aliases.
+    for (const key of ['dataUrl', 'content', 'data', 'base64'] as const) {
+      const value = source[key]
+      if (
+        typeof value === 'string' &&
+        encodedAttachmentPayloadLength(value) >
+          SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS
+      ) {
+        return { ok: false, reason: 'too_large' }
+      }
+    }
 
     const id = readString(source.id)
     const name = readString(source.name) || readString(source.fileName)
-    const mimeType =
+    let mimeType =
       readString(source.contentType) ||
       readString(source.mimeType) ||
       readString(source.mediaType)
-    const size = readNumber(source.size)
+    const hasDeclaredSize = Object.prototype.hasOwnProperty.call(source, 'size')
+    const size =
+      typeof source.size === 'number' &&
+      Number.isSafeInteger(source.size) &&
+      source.size >= 0
+        ? source.size
+        : undefined
+    if (hasDeclaredSize && size === undefined) {
+      return { ok: false, reason: 'invalid' }
+    }
+    if (size !== undefined && size > SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES) {
+      return { ok: false, reason: 'too_large' }
+    }
+    const hasDataUrl = Object.prototype.hasOwnProperty.call(source, 'dataUrl')
 
-    const base64Raw =
-      readString(source.content) ||
-      readString(source.data) ||
-      readString(source.base64) ||
-      readString(source.dataUrl)
-    const content = stripDataUrlPrefix(base64Raw)
-    if (!content) continue
+    let content: string
+    let dataUrl: string
+    if (hasDataUrl) {
+      const parsed = parseAttachmentDataUrl(source.dataUrl)
+      if (
+        !parsed ||
+        (mimeType && mimeType.toLowerCase() !== parsed.mimeType.toLowerCase())
+      ) {
+        return { ok: false, reason: 'invalid' }
+      }
+      mimeType ||= parsed.mimeType
+      content = parsed.content
+      dataUrl = parsed.dataUrl
+    } else {
+      const rawContent =
+        readString(source.content) ||
+        readString(source.data) ||
+        readString(source.base64)
+      const embeddedDataUrl = rawContent.toLowerCase().startsWith('data:')
+        ? parseAttachmentDataUrl(rawContent)
+        : null
+      if (rawContent.toLowerCase().startsWith('data:') && !embeddedDataUrl) {
+        return { ok: false, reason: 'invalid' }
+      }
+      if (embeddedDataUrl) {
+        if (
+          mimeType &&
+          mimeType.toLowerCase() !== embeddedDataUrl.mimeType.toLowerCase()
+        ) {
+          return { ok: false, reason: 'invalid' }
+        }
+        mimeType ||= embeddedDataUrl.mimeType
+        content = embeddedDataUrl.content
+        dataUrl = embeddedDataUrl.dataUrl
+      } else {
+        content = rawContent
+        if (!isValidBase64Payload(content)) {
+          return { ok: false, reason: 'invalid' }
+        }
+        dataUrl = mimeType ? `data:${mimeType};base64,${content}` : ''
+      }
+    }
+
+    if (content.length > SEND_STREAM_MAX_ATTACHMENT_ENCODED_CHARS) {
+      return { ok: false, reason: 'too_large' }
+    }
+    const decodedBytes = decodedBase64ByteLength(content)
+    if (
+      decodedBytes > SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES ||
+      (size !== undefined && size !== decodedBytes)
+    ) {
+      return {
+        ok: false,
+        reason:
+          decodedBytes > SEND_STREAM_MAX_ATTACHMENT_DECODED_BYTES
+            ? 'too_large'
+            : 'invalid',
+      }
+    }
+    aggregateDecodedBytes += decodedBytes
+    if (
+      aggregateDecodedBytes > SEND_STREAM_MAX_AGGREGATE_ATTACHMENT_DECODED_BYTES
+    ) {
+      return { ok: false, reason: 'too_large' }
+    }
 
     const type =
       readString(source.type) ||
       (mimeType.toLowerCase().startsWith('image/') ? 'image' : 'file')
-
-    const dataUrl =
-      readString(source.dataUrl) ||
-      (mimeType ? `data:${mimeType};base64,${content}` : '')
 
     normalized.push({
       id: id || undefined,
@@ -123,7 +326,7 @@ function normalizeAttachments(
     })
   }
 
-  return normalized.length > 0 ? normalized : undefined
+  return { ok: true, attachments: normalized }
 }
 
 function getChatMessage(
@@ -160,7 +363,7 @@ function buildMultimodalContent(
       if (!b64) {
         const dataUrl = (att.dataUrl || '') as string
         if (dataUrl.startsWith('data:') && dataUrl.includes(',')) {
-          b64 = dataUrl.split(',')[1]
+          b64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
         }
       }
       if (!b64) continue
@@ -292,6 +495,89 @@ export const Route = createFileRoute('/api/send-stream')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Establish the route lifetime before any await. Request aborts during
+        // gateway probing, body parsing, or session/workspace resolution must
+        // prevent the SSE stream (and all of its timers/work) from starting.
+        let streamClosed = false
+        let activeRunId: string | null = null
+        let persistedRunId: string | null = null
+        let activeRunSessionKey: string | null = null
+        let persistedRunReady: Promise<unknown> | null = null
+        let runTextBuffer: ReturnType<
+          typeof createRunTextPersistenceBuffer
+        > | null = null
+        let unregisterTimer: ReturnType<typeof setTimeout> | null = null
+        let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+        let stopLivePolling: () => void = () => undefined
+        const abortController = new AbortController()
+        const streamTimeoutError = new Error('Stream timeout')
+        const streamAbortError = new Error('Stream aborted')
+        let rejectStreamLifetime: ((reason: Error) => void) | null = null
+        let streamLifetimeSettled = false
+        const streamLifetime = new Promise<never>((_resolve, reject) => {
+          rejectStreamLifetime = reject
+        })
+        // The lifetime signal is also rejected on ordinary terminal closure, when
+        // no route-owned await may still be racing it.
+        void streamLifetime.catch(() => undefined)
+        const settleStreamLifetime = (reason: Error) => {
+          if (streamLifetimeSettled) return
+          streamLifetimeSettled = true
+          rejectStreamLifetime?.(reason)
+          rejectStreamLifetime = null
+        }
+        const streamTransportUnavailable = () =>
+          streamClosed || abortController.signal.aborted
+        const ensureStreamTransportAvailable = () => {
+          if (streamTransportUnavailable()) throw streamAbortError
+        }
+        const waitWithinStreamLifetime = <T>(pending: Promise<T>): Promise<T> =>
+          Promise.race([pending, streamLifetime])
+        const streamTimeoutResponse = () =>
+          new Response(
+            JSON.stringify({ ok: false, error: streamTimeoutError.message }),
+            {
+              status: 504,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
+        // Close out the SSE stream — stop enqueueing, clear timers, and
+        // abort the upstream Hermes gateway request so the agent stops
+        // processing. Does not touch persisted run status.
+        let closeStream = () => {
+          if (streamClosed) return
+          streamClosed = true
+          stopLivePolling()
+          if (unregisterTimer) {
+            clearTimeout(unregisterTimer)
+            unregisterTimer = null
+          }
+          if (streamTimeoutTimer) {
+            clearTimeout(streamTimeoutTimer)
+            streamTimeoutTimer = null
+          }
+          settleStreamLifetime(streamAbortError)
+          abortController.abort()
+        }
+        let handleStreamDeadline = () => {
+          settleStreamLifetime(streamTimeoutError)
+          closeStream()
+        }
+        const finishPreStreamResponse = (response: Response) => {
+          closeStream()
+          return response
+        }
+        let handleObservedRequestAbort = () => closeStream()
+        const observeRequestAbort = () => handleObservedRequestAbort()
+        request.signal.addEventListener('abort', observeRequestAbort, {
+          once: true,
+        })
+        const abortedResponse = () => new Response(null, { status: 499 })
+        if (request.signal.aborted) {
+          observeRequestAbort()
+          return abortedResponse()
+        }
+
         // Auth check
         if (!isAuthenticated(request)) {
           return new Response(
@@ -301,15 +587,54 @@ export const Route = createFileRoute('/api/send-stream')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
-        await ensureGatewayProbed()
+        // One absolute deadline owns the complete route lifetime. Start it
+        // before the first preflight await so gateway/body/session/workspace
+        // stalls consume the same budget as production and terminal writes.
+        streamTimeoutTimer = setTimeout(
+          () => handleStreamDeadline(),
+          SEND_STREAM_RUN_TIMEOUT_MS,
+        )
+        try {
+          await waitWithinStreamLifetime(ensureGatewayProbed())
+          ensureStreamTransportAvailable()
+        } catch (error) {
+          if (error === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (error === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
+          closeStream()
+          throw error
+        }
 
-        // Read body manually to handle large payloads (image attachments
-        // can push the JSON body above the default ~1MB parse limit).
+        // Read and decode the body incrementally so the manual parser remains
+        // bounded even when framework JSON limits are bypassed for attachments.
         let body: Record<string, unknown> = {}
         try {
-          const rawBody = await request.text()
-          body = JSON.parse(rawBody) as Record<string, unknown>
-        } catch {
+          const boundedBody = await waitWithinStreamLifetime(
+            readBoundedRequestText(request, abortController.signal),
+          )
+          ensureStreamTransportAvailable()
+          if (!boundedBody.ok) {
+            return finishPreStreamResponse(
+              new Response(
+                JSON.stringify({ ok: false, error: 'request body too large' }),
+                {
+                  status: 413,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+            )
+          }
+          body = JSON.parse(boundedBody.text) as Record<string, unknown>
+        } catch (error) {
+          if (error === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (error === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
           // Fall through — body stays empty, will hit 'message required' below
         }
 
@@ -317,53 +642,230 @@ export const Route = createFileRoute('/api/send-stream')({
           typeof body.sessionKey === 'string' ? body.sessionKey.trim() : ''
         const requestedFriendlyId =
           typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
+        const hasRequestedCardId = Object.prototype.hasOwnProperty.call(
+          body,
+          'cardId',
+        )
+        const requestedCardId =
+          typeof body.cardId === 'string' ? body.cardId.trim() : ''
         const message = String(body.message ?? '')
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
-        const attachments = normalizeAttachments(body.attachments)
+        const normalizedAttachments = normalizeAttachments(body.attachments)
+        if (!normalizedAttachments.ok) {
+          const tooLarge = normalizedAttachments.reason === 'too_large'
+          return finishPreStreamResponse(
+            new Response(
+              JSON.stringify({
+                error: tooLarge
+                  ? 'attachment payload too large'
+                  : 'invalid attachment data',
+              }),
+              {
+                status: tooLarge ? 413 : 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+        }
+        const attachments = normalizedAttachments.attachments
         const history = normalizePortableHistory(body.history)
+        if (
+          hasRequestedCardId &&
+          (typeof body.cardId !== 'string' ||
+            !requestedCardId ||
+            body.cardId !== requestedCardId)
+        ) {
+          return finishPreStreamResponse(
+            new Response(
+              JSON.stringify({ ok: false, error: 'invalid card id' }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+        }
+        const isExplicitBootstrapSend =
+          !hasRequestedCardId &&
+          isExplicitSendStreamBootstrap(rawSessionKey, body.sessionKey)
+        if (!requestedCardId && !isExplicitBootstrapSend) {
+          return finishPreStreamResponse(
+            new Response(
+              JSON.stringify({
+                error: 'Session Card authority required for existing session',
+              }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+        }
         if (!message.trim() && (!attachments || attachments.length === 0)) {
-          return new Response(
-            JSON.stringify({ ok: false, error: 'message required' }),
-            {
-              status: 400,
-              headers: { 'Content-Type': 'application/json' },
-            },
+          return finishPreStreamResponse(
+            new Response(
+              JSON.stringify({ ok: false, error: 'message required' }),
+              {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
           )
         }
 
-        // Resolve session key
+        // Resolve the stable Card identifier to a fresh canonical projection, then
+        // translate that source-qualified segment key to the backend session key.
+        // Legacy callers without a cardId retain the existing alias resolver.
         let sessionKey: string
         let resolvedFriendlyId: string
+        let activeCardResolution: Awaited<
+          ReturnType<typeof sessionCardService.resolveCard>
+        > | null = null
+        let activeCardId: string | null = null
+        let activeCardCanonicalSegmentKey: string | null = null
+        let activeCardCanonicalSource: string | null = null
+        let requestedCardMutationBinding: SessionCardOperationBinding | null =
+          null
         try {
-          const resolved = await resolveSessionKey({
-            rawSessionKey,
-            friendlyId: requestedFriendlyId,
-            defaultKey: 'main',
-          })
-          sessionKey = resolved.sessionKey
-          resolvedFriendlyId = resolved.sessionKey
+          if (requestedCardId) {
+            const resolved = await waitWithinStreamLifetime(
+              sessionCardService.resolveCard(requestedCardId),
+            )
+            ensureStreamTransportAvailable()
+            const canonicalSegmentKey = resolved.card.canonicalSegmentKey
+            const canonicalSource =
+              resolved.sourceBySegmentKey.get(canonicalSegmentKey)?.trim() ?? ''
+            const upstreamKey =
+              resolved.upstreamKeyBySegmentKey
+                .get(canonicalSegmentKey)
+                ?.trim() ?? ''
+            const requestedSegmentBelongsToCard =
+              !rawSessionKey ||
+              resolved.card.continuationSegmentKeys.includes(rawSessionKey)
+            const isCompleteParentCard =
+              resolved.collection.completeness === 'complete' &&
+              (resolved.card.relationshipKind === 'root' ||
+                resolved.card.relationshipKind === 'orphan') &&
+              resolved.card.parentCardId === undefined
+            if (
+              resolved.card.cardId !== requestedCardId ||
+              !requestedSegmentBelongsToCard ||
+              !isCompleteParentCard ||
+              !canonicalSource ||
+              !upstreamKey
+            ) {
+              throw new Error('session not found')
+            }
+            activeCardResolution = resolved
+            activeCardId = requestedCardId
+            activeCardCanonicalSegmentKey = canonicalSegmentKey
+            activeCardCanonicalSource = canonicalSource
+            const canonicalOperationSource =
+              canonicalSource === 'local' ? 'local' : 'remote'
+            const mutationBinding: SessionCardOperationBinding = {
+              kind: 'session-card-owner',
+              cardId: requestedCardId,
+              parentCardId: null,
+              canonicalSource: canonicalOperationSource,
+              canonicalSegmentKey,
+              canonicalTransport:
+                canonicalOperationSource === 'local'
+                  ? 'tmux'
+                  : resolved.card.canonicalTransport === 'dashboard'
+                    ? 'dashboard'
+                    : 'gateway',
+            }
+            const preflightOwner = await waitWithinStreamLifetime(
+              resolveExactSessionCardOperationBinding(mutationBinding),
+            )
+            ensureStreamTransportAvailable()
+            if (
+              !preflightOwner ||
+              preflightOwner.cardId !== requestedCardId ||
+              preflightOwner.parentCardId !== null
+            ) {
+              throw new Error('Session Card ownership changed before send')
+            }
+            requestedCardMutationBinding = mutationBinding
+            sessionKey = upstreamKey
+            resolvedFriendlyId = requestedCardId
+          } else {
+            const resolved = await waitWithinStreamLifetime(
+              resolveSessionKey({
+                rawSessionKey,
+                friendlyId: requestedFriendlyId,
+                defaultKey: 'main',
+              }),
+            )
+            ensureStreamTransportAvailable()
+            sessionKey = resolved.sessionKey
+            resolvedFriendlyId = resolved.sessionKey
+          }
         } catch (err) {
+          if (err === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (err === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
           const errorMsg = normalizeClaudeErrorMessage(err)
-          if (errorMsg === 'session not found') {
-            return new Response(
-              JSON.stringify({ ok: false, error: 'session not found' }),
-              {
-                status: 404,
+          if (errorMsg === 'Session Card ownership changed before send') {
+            return finishPreStreamResponse(
+              new Response(JSON.stringify({ error: errorMsg }), {
+                status: 409,
                 headers: { 'Content-Type': 'application/json' },
-              },
+              }),
             )
           }
-          return new Response(JSON.stringify({ ok: false, error: errorMsg }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-          })
+          if (errorMsg === 'session not found') {
+            return finishPreStreamResponse(
+              new Response(
+                JSON.stringify({ ok: false, error: 'session not found' }),
+                {
+                  status: 404,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+            )
+          }
+          return finishPreStreamResponse(
+            new Response(JSON.stringify({ ok: false, error: errorMsg }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
         }
 
-        // Check if the selected model is a local provider model — force portable + direct routing
-        let chatMode = getChatMode()
+        // A freshly resolved Card owns its transport: local segments are portable,
+        // while every remote segment stays on the gateway regardless of global mode
+        // or whether the requested model also appears in local discovery.
+        let chatMode = activeCardCanonicalSource
+          ? activeCardCanonicalSource === 'local'
+            ? 'portable'
+            : 'enhanced'
+          : getChatMode()
         let localBaseUrl: string | undefined
-        const requestModel = typeof body.model === 'string' ? body.model : ''
+        // Gateway advertises `hermes-agent` as a compatibility alias, but Codex
+        // cannot accept that alias as a provider model. A browser-created Card
+        // already has Card authority before its first message, so it is not the
+        // legacy `new` bootstrap route. Resolve an omitted/default/virtual model
+        // from the active Hermes configuration when that Card has no remembered
+        // concrete model yet, then retain it for subsequent turns. Explicit picker
+        // values always stay exact.
+        const isDefaultModelRequest = isConfiguredDefaultModelRequest(
+          body.model,
+        )
+        const sessionModel = resolveSessionGatewayModel(sessionKey, body.model)
+        const configuredModel =
+          isDefaultModelRequest && (isExplicitBootstrapSend || !sessionModel)
+            ? resolveCurrentGatewayModel(body.model)
+            : undefined
+        const requestedModel = configuredModel ?? sessionModel
+        if (configuredModel && !isExplicitBootstrapSend) {
+          rememberConfiguredSessionModel(sessionKey, configuredModel)
+        }
+        const requestModel = requestedModel ?? ''
         const bareModel = requestModel.includes('/')
           ? requestModel.split('/').slice(1).join('/')
           : requestModel
@@ -374,141 +876,768 @@ export const Route = createFileRoute('/api/send-stream')({
           )
           if (localMatch) {
             const providerDef = getLocalProviderDef(localMatch.provider)
-            if (providerDef) {
+            if (
+              providerDef &&
+              (!activeCardCanonicalSource ||
+                activeCardCanonicalSource === 'local')
+            ) {
               chatMode = 'portable'
               localBaseUrl = providerDef.baseUrl
             }
           }
         }
-        if (chatMode === 'portable' && sessionKey === 'new') {
+        const portableBootstrapSessionKey =
+          chatMode === 'portable' &&
+          !activeCardId &&
+          SESSION_BOOTSTRAP_KEYS.has(sessionKey)
+            ? sessionKey
+            : null
+        if (portableBootstrapSessionKey === 'new') {
+          // This is an internal local-store/upstream identity only. It must not
+          // escape through routing, SSE, headers, or run persistence until a
+          // fresh complete local Card projection maps it authoritatively.
           sessionKey = crypto.randomUUID()
-          resolvedFriendlyId = sessionKey
+          rememberConfiguredSessionModel(sessionKey, requestedModel)
+        }
+        const resolvePortableBootstrapCard = async (
+          upstreamSessionKey: string,
+        ): Promise<string> => {
+          const resolvedBootstrapCard = await waitWithinStreamLifetime(
+            sessionCardService.resolveLocalCardByUpstreamSession(
+              upstreamSessionKey,
+            ),
+          )
+          ensureStreamTransportAvailable()
+          const canonicalSegmentKey =
+            resolvedBootstrapCard.card.canonicalSegmentKey
+          const canonicalSource =
+            resolvedBootstrapCard.sourceBySegmentKey
+              .get(canonicalSegmentKey)
+              ?.trim() ?? ''
+          const canonicalUpstreamKey =
+            resolvedBootstrapCard.upstreamKeyBySegmentKey
+              .get(canonicalSegmentKey)
+              ?.trim() ?? ''
+          const mappedBootstrapSegments =
+            resolvedBootstrapCard.card.continuationSegmentKeys.filter(
+              (segmentKey) =>
+                resolvedBootstrapCard.upstreamKeyBySegmentKey.get(
+                  segmentKey,
+                ) === upstreamSessionKey,
+            )
+          const isCompleteLocalParentCard =
+            resolvedBootstrapCard.collection.completeness === 'complete' &&
+            resolvedBootstrapCard.card.canonicalSource === 'local' &&
+            (resolvedBootstrapCard.card.relationshipKind === 'root' ||
+              resolvedBootstrapCard.card.relationshipKind === 'orphan') &&
+            resolvedBootstrapCard.card.parentCardId === undefined
+          if (
+            !isCompleteLocalParentCard ||
+            canonicalSource !== 'local' ||
+            !canonicalUpstreamKey ||
+            mappedBootstrapSegments.length !== 1
+          ) {
+            throw new Error('authoritative local bootstrap Card unavailable')
+          }
+
+          activeCardResolution = resolvedBootstrapCard
+          activeCardId = resolvedBootstrapCard.card.cardId
+          activeCardCanonicalSegmentKey = canonicalSegmentKey
+          activeCardCanonicalSource = canonicalSource
+          resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+          requestedCardMutationBinding = {
+            kind: 'session-card-owner',
+            cardId: resolvedBootstrapCard.card.cardId,
+            parentCardId: null,
+            canonicalSource: 'local',
+            canonicalSegmentKey,
+            canonicalTransport: 'tmux',
+          }
+          return canonicalUpstreamKey
+        }
+        let portableBootstrapProjectionAttemptedBeforeStream = false
+        if (portableBootstrapSessionKey === 'main' && !activeCardId) {
+          // Cardless `main` is allowed only when the local store proves that this
+          // request will create a new session. An existing main must resolve to an
+          // exact Card before any local-store or provider mutation.
+          if (getLocalSession(sessionKey)) {
+            portableBootstrapProjectionAttemptedBeforeStream = true
+            try {
+              sessionKey = await resolvePortableBootstrapCard(sessionKey)
+              if (!activeCardId) {
+                throw new Error('Existing main has no exact Session Card owner')
+              }
+            } catch (error) {
+              if (error === streamTimeoutError) {
+                return finishPreStreamResponse(streamTimeoutResponse())
+              }
+              if (error === streamAbortError || streamTransportUnavailable()) {
+                return finishPreStreamResponse(abortedResponse())
+              }
+              return finishPreStreamResponse(
+                new Response(
+                  JSON.stringify({
+                    ok: false,
+                    error:
+                      'Existing main Session Card ownership is unavailable',
+                  }),
+                  {
+                    status: 409,
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              )
+            }
+          }
+        }
+        let enhancedMainBootstrapSessionKey: string | null = null
+        if (
+          chatMode === 'enhanced' &&
+          rawSessionKey === 'main' &&
+          !activeCardId
+        ) {
+          enhancedMainBootstrapSessionKey = 'main'
+          let existingMain:
+            | Awaited<ReturnType<typeof listSessions>>[number]
+            | undefined
+          try {
+            const allSessions = await waitWithinStreamLifetime(
+              listSessions(30, 0),
+            )
+            ensureStreamTransportAvailable()
+            const isInternal = (id: string) =>
+              id.startsWith('cron_') ||
+              id.startsWith('cron:') ||
+              id.startsWith('agent:main:ops-')
+            const hasRealTitle = (session: {
+              id: string
+              title?: string | null
+            }) => {
+              const title = (session.title ?? '').trim()
+              return title.length > 0 && title !== session.id
+            }
+            const nonInternal = allSessions.filter(
+              (session) => !isInternal(session.id),
+            )
+            const titled = nonInternal.find(hasRealTitle)
+            existingMain =
+              titled ??
+              nonInternal.find(
+                (session) =>
+                  typeof session.message_count === 'number' &&
+                  session.message_count > 0,
+              ) ??
+              nonInternal[0]
+          } catch (error) {
+            if (error === streamTimeoutError) {
+              return finishPreStreamResponse(streamTimeoutResponse())
+            }
+            if (error === streamAbortError || streamTransportUnavailable()) {
+              return finishPreStreamResponse(abortedResponse())
+            }
+            return finishPreStreamResponse(
+              new Response(
+                JSON.stringify({
+                  ok: false,
+                  error:
+                    'Unable to verify existing main Session Card ownership',
+                }),
+                {
+                  status: 503,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+            )
+          }
+
+          if (existingMain) {
+            try {
+              const resolution = await waitWithinStreamLifetime(
+                sessionCardService.resolveRemoteCardByUpstreamSession(
+                  existingMain.id,
+                ),
+              )
+              ensureStreamTransportAvailable()
+              const canonicalSegmentKey = resolution.card.canonicalSegmentKey
+              const canonicalSource =
+                resolution.sourceBySegmentKey
+                  .get(canonicalSegmentKey)
+                  ?.trim() ?? ''
+              const canonicalUpstreamKey =
+                resolution.upstreamKeyBySegmentKey
+                  .get(canonicalSegmentKey)
+                  ?.trim() ?? ''
+              const continuations = resolution.card.continuationSegmentKeys
+              const isCompleteParentCard =
+                resolution.collection.completeness === 'complete' &&
+                !resolution.collection.retryable &&
+                resolution.card.canonicalSource === 'remote' &&
+                (resolution.card.canonicalTransport === 'gateway' ||
+                  resolution.card.canonicalTransport === 'dashboard') &&
+                (resolution.card.relationshipKind === 'root' ||
+                  resolution.card.relationshipKind === 'orphan') &&
+                resolution.card.parentCardId === undefined
+              if (
+                !isCompleteParentCard ||
+                canonicalSource !== 'remote' ||
+                !canonicalSegmentKey.startsWith('remote:') ||
+                !canonicalUpstreamKey ||
+                !resolution.card.cardId.startsWith('remote:') ||
+                continuations.length === 0 ||
+                continuations.length !== resolution.card.continuationCount ||
+                continuations[0] !== resolution.card.cardId ||
+                continuations.at(-1) !== canonicalSegmentKey ||
+                new Set(continuations).size !== continuations.length ||
+                !continuations.some(
+                  (segmentKey) =>
+                    resolution.upstreamKeyBySegmentKey.get(segmentKey) ===
+                    existingMain.id,
+                )
+              ) {
+                throw new Error('Existing main has no exact Session Card owner')
+              }
+              const mutationBinding: SessionCardOperationBinding = {
+                kind: 'session-card-owner',
+                cardId: resolution.card.cardId,
+                parentCardId: null,
+                canonicalSource: 'remote',
+                canonicalSegmentKey,
+                canonicalTransport:
+                  resolution.card.canonicalTransport === 'dashboard'
+                    ? 'dashboard'
+                    : 'gateway',
+              }
+              const preflightOwner = await waitWithinStreamLifetime(
+                resolveExactSessionCardOperationBinding(mutationBinding),
+              )
+              ensureStreamTransportAvailable()
+              if (
+                !preflightOwner ||
+                preflightOwner.cardId !== mutationBinding.cardId ||
+                preflightOwner.parentCardId !== null
+              ) {
+                throw new Error('Existing main has no exact Session Card owner')
+              }
+              activeCardResolution = resolution
+              activeCardId = resolution.card.cardId
+              activeCardCanonicalSegmentKey = canonicalSegmentKey
+              activeCardCanonicalSource = canonicalSource
+              sessionKey = canonicalUpstreamKey
+              resolvedFriendlyId = resolution.card.cardId
+              requestedCardMutationBinding = mutationBinding
+            } catch (error) {
+              if (error === streamTimeoutError) {
+                return finishPreStreamResponse(streamTimeoutResponse())
+              }
+              if (error === streamAbortError || streamTransportUnavailable()) {
+                return finishPreStreamResponse(abortedResponse())
+              }
+              return finishPreStreamResponse(
+                new Response(
+                  JSON.stringify({
+                    ok: false,
+                    error:
+                      'Existing main Session Card ownership is unavailable',
+                  }),
+                  {
+                    status: 409,
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              )
+            }
+          } else {
+            try {
+              const created = await waitWithinStreamLifetime(
+                createSession(
+                  requestedModel ? { model: requestedModel } : undefined,
+                ),
+              )
+              ensureStreamTransportAvailable()
+              if (!created.id) {
+                throw new Error('Gateway did not create a main session')
+              }
+              sessionKey = created.id
+              rememberConfiguredSessionModel(sessionKey, requestedModel)
+            } catch (error) {
+              if (error === streamTimeoutError) {
+                return finishPreStreamResponse(streamTimeoutResponse())
+              }
+              if (error === streamAbortError || streamTransportUnavailable()) {
+                return finishPreStreamResponse(abortedResponse())
+              }
+              return finishPreStreamResponse(
+                new Response(
+                  JSON.stringify({
+                    ok: false,
+                    error: normalizeClaudeErrorMessage(error),
+                  }),
+                  {
+                    status: 502,
+                    headers: { 'Content-Type': 'application/json' },
+                  },
+                ),
+              )
+            }
+          }
+        }
+        // Once a request has a validated Card projection, every public identity
+        // uses its source-qualified canonical segment. The upstream key remains
+        // private to provider calls below. Unresolved bootstrap/legacy requests
+        // keep their existing safe public identity.
+        const getPublicSessionKey = () =>
+          activeCardCanonicalSegmentKey ??
+          portableBootstrapSessionKey ??
+          enhancedMainBootstrapSessionKey ??
+          sessionKey
+        const publicFriendlyId =
+          activeCardId ??
+          portableBootstrapSessionKey ??
+          enhancedMainBootstrapSessionKey ??
+          resolvedFriendlyId
+        const getVerifiedBootstrapCardAuthority = () => {
+          const card = activeCardResolution?.card
+          if (
+            !card ||
+            !activeCardId ||
+            !activeCardCanonicalSegmentKey ||
+            card.cardId !== activeCardId ||
+            card.canonicalSegmentKey !== activeCardCanonicalSegmentKey ||
+            card.relationshipKind !== 'root' ||
+            card.parentCardId !== undefined ||
+            (card.canonicalSource !== 'local' &&
+              card.canonicalSource !== 'remote') ||
+            card.continuationSegmentKeys.length === 0 ||
+            new Set(card.continuationSegmentKeys).size !==
+              card.continuationSegmentKeys.length ||
+            card.continuationSegmentKeys.at(-1) !==
+              activeCardCanonicalSegmentKey
+          ) {
+            return null
+          }
+          return {
+            cardId: activeCardId,
+            canonicalSource: card.canonicalSource,
+            canonicalSegmentKey: activeCardCanonicalSegmentKey,
+            continuationSegmentKeys: [...card.continuationSegmentKeys],
+            relationshipKind: 'root' as const,
+          }
         }
 
-        const workspaceScope = await loadWorkspaceCatalog().catch(() => null)
+        let cardMutationAuthorityStale = false
+        let emitCardActivityToStream = (
+          _payload: Record<string, unknown>,
+        ): void => undefined
+        const observeAndPublishCardActivity = async (
+          activity: string,
+          activityRunId: string | undefined = activeRunId ?? undefined,
+          upstreamSessionKey: string = sessionKey,
+        ): Promise<void> => {
+          const state = cardActivityStateForEvent(activity)
+          if (
+            cardMutationAuthorityStale ||
+            !state ||
+            !activeCardId ||
+            !activityRunId
+          ) {
+            return
+          }
+          const observed = await sessionCardService
+            .observeCardActivity({
+              cardId: activeCardId,
+              upstreamSessionKey,
+              runId: activityRunId,
+              state,
+            })
+            .catch(() => null)
+          if (!observed) return
+          const payload = { ...observed, activity }
+          emitCardActivityToStream(payload)
+          publishCardActivityEvent(payload)
+        }
+        const withRouteOwnedCardError = (
+          terminalPersistence: Promise<void>,
+          endingRunId: string | undefined = activeRunId ?? undefined,
+          endingUpstreamSessionKey: string = sessionKey,
+        ): Promise<void> =>
+          Promise.all([
+            terminalPersistence,
+            observeAndPublishCardActivity(
+              'error',
+              endingRunId,
+              endingUpstreamSessionKey,
+            ),
+          ]).then(() => undefined)
+
+        let workspaceScope: Awaited<
+          ReturnType<typeof loadWorkspaceCatalog>
+        > | null = null
+        try {
+          workspaceScope = await waitWithinStreamLifetime(
+            loadWorkspaceCatalog(),
+          )
+          ensureStreamTransportAvailable()
+        } catch (error) {
+          if (error === streamTimeoutError) {
+            return finishPreStreamResponse(streamTimeoutResponse())
+          }
+          if (error === streamAbortError || streamTransportUnavailable()) {
+            return finishPreStreamResponse(abortedResponse())
+          }
+        }
         const scopedMessage = buildWorkspaceScopedTextMessage(
           getChatMessage(message, attachments),
           workspaceScope,
         )
 
+        const staleCardMutationError = new Error(
+          'Session Card ownership changed before send',
+        )
+        const staleCardMutationResponse = () =>
+          finishPreStreamResponse(
+            new Response(
+              JSON.stringify({
+                ok: false,
+                error: staleCardMutationError.message,
+              }),
+              {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+
+        type CardMutationEdgeStatus = 'authorized' | 'stale' | 'not-reached'
+        let settleCardMutationEdge: (
+          status: CardMutationEdgeStatus,
+        ) => void = () => undefined
+        let cardMutationEdgeSettled = !requestedCardMutationBinding
+        const cardMutationEdgeStatus = requestedCardMutationBinding
+          ? new Promise<CardMutationEdgeStatus>((resolve) => {
+              settleCardMutationEdge = (status) => {
+                if (cardMutationEdgeSettled) return
+                cardMutationEdgeSettled = true
+                resolve(status)
+              }
+            })
+          : null
+        const revalidateCardMutationAuthority = async (): Promise<void> => {
+          const binding = requestedCardMutationBinding
+          if (!binding) return
+
+          let owner: Awaited<
+            ReturnType<typeof resolveExactSessionCardOperationBinding>
+          >
+          try {
+            owner = await waitWithinStreamLifetime(
+              resolveExactSessionCardOperationBinding(binding),
+            )
+            ensureStreamTransportAvailable()
+          } catch (error) {
+            if (
+              error === streamTimeoutError ||
+              error === streamAbortError ||
+              streamTransportUnavailable()
+            ) {
+              throw error
+            }
+            cardMutationAuthorityStale = true
+            throw staleCardMutationError
+          }
+          if (
+            !owner ||
+            owner.cardId !== binding.cardId ||
+            owner.parentCardId !== binding.parentCardId
+          ) {
+            cardMutationAuthorityStale = true
+            throw staleCardMutationError
+          }
+        }
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()
-        let streamClosed = false
-        let activeRunId: string | null = null
-        let activeRunSessionKey: string | null = null
-        let persistedRunReady: Promise<unknown> | null = null
-        let unregisterTimer: ReturnType<typeof setTimeout> | null = null
-        let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
-        let heartbeatTimer: ReturnType<typeof setInterval> | null = null
-        const abortController = new AbortController()
-        // Close out the SSE stream — stop enqueueing, clear timers, and
-        // abort the upstream Hermes gateway request so the agent stops
-        // processing.  Does NOT touch run status (persistActiveRun etc.).
-        // The abort path (request.signal / handleAbort) owns run cleanup.
-        let closeStream = () => {
-          if (streamClosed) return
-          streamClosed = true
-          if (heartbeatTimer) {
-            clearInterval(heartbeatTimer)
-            heartbeatTimer = null
-          }
-          if (unregisterTimer) {
-            clearTimeout(unregisterTimer)
-            unregisterTimer = null
-          }
-          if (streamTimeoutTimer) {
-            clearTimeout(streamTimeoutTimer)
-            streamTimeoutTimer = null
-          }
-          abortController.abort()
-        }
+
+        const terminalRunTransition = createRunTerminalTransitionCoordinator({
+          sealTranscript: async () => {
+            await runTextBuffer?.seal()
+          },
+          persist: async (status, errorMessage) => {
+            await (persistedRunReady ?? Promise.resolve())
+            const runId = persistedRunId
+            const runSessionKey = activeRunSessionKey
+            if (!runId || !runSessionKey) return
+            await markRunStatus(runSessionKey, runId, status, errorMessage)
+          },
+        })
 
         // When the client hits Stop / navigates away / closes the tab, the
-        // request.signal fires abort.  Stop the upstream agent (closeStream)
-        // and clean up run tracking so we don't burn API credits on an orphan.
+        // request.signal fires abort. Stop the upstream agent immediately, then
+        // observe terminal persistence without allowing seal rejection to leak.
         function handleAbort() {
-          if (activeRunId && !streamClosed) {
-            persistActiveRun((runSessionKey, activeId) =>
-              markRunStatus(runSessionKey, activeId, 'handoff'),
+          if (!streamClosed) {
+            const endingRunId = activeRunId ?? undefined
+            const terminalPersistence = withRouteOwnedCardError(
+              persistedRunId
+                ? persistTerminalRun('handoff')
+                : Promise.resolve(),
+              endingRunId,
+              sessionKey,
             )
-            unregisterActiveSendRun(activeRunId)
-            activeRunId = null
+            if (activeRunId) {
+              unregisterActiveSendRun(activeRunId)
+              activeRunId = null
+            }
+            void finalizeTerminalPersistence(
+              terminalPersistence,
+              undefined,
+              true,
+            )
           }
-          closeStream()
         }
-        request.signal.addEventListener('abort', () => handleAbort(), {
-          once: true,
-        })
+        handleObservedRequestAbort = handleAbort
 
         const persistRunStarted = (
           runId: string | undefined,
           runSessionKey: string,
           friendlyId: string,
+          cardIdentity?: { cardId: string; canonicalSegmentKey: string },
         ) => {
-          if (!runId || persistedRunReady) return
+          if (!isSafeRunId(runId) || persistedRunReady) return
+          persistedRunId = runId
           activeRunSessionKey = runSessionKey
           persistedRunReady = createPersistedRun({
             runId,
             sessionKey: runSessionKey,
             friendlyId,
-          }).catch(() => null)
+            ...cardIdentity,
+          }).catch(async (error: unknown) => {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return null
+            const durableRunId = `persisted-${crypto.randomUUID()}`
+            persistedRunId = durableRunId
+            return createPersistedRun({
+              runId: durableRunId,
+              providerRunId: runId,
+              sessionKey: runSessionKey,
+              friendlyId,
+              ...cardIdentity,
+            })
+          })
+          runTextBuffer = createRunTextPersistenceBuffer(
+            async (text, options) => {
+              await (persistedRunReady ?? Promise.resolve())
+              const targetRunSessionKey = activeRunSessionKey
+              const targetRunId = persistedRunId
+              if (!targetRunSessionKey || !targetRunId) return null
+              return appendRunText(
+                targetRunSessionKey,
+                targetRunId,
+                text,
+                options,
+              )
+            },
+          )
+        }
+
+        const migrateActivePersistedRun = async (
+          fromSessionKey: string,
+          toSessionKey: string,
+          friendlyId: string,
+          cardIdentity?: { cardId: string; canonicalSegmentKey: string },
+        ) => {
+          if (
+            !persistedRunReady ||
+            fromSessionKey === toSessionKey ||
+            streamTransportUnavailable()
+          ) {
+            return
+          }
+
+          try {
+            await waitWithinStreamLifetime(
+              runTextBuffer?.flush() ?? Promise.resolve(),
+            )
+            if (streamTransportUnavailable()) return
+
+            const priorRunReady = persistedRunReady
+            const migrationReady = (async () => {
+              await waitWithinStreamLifetime(priorRunReady)
+              if (streamTransportUnavailable()) return
+              const runId = persistedRunId
+              if (!runId) return
+
+              const migration = cardIdentity
+                ? migratePersistedRun(
+                    fromSessionKey,
+                    toSessionKey,
+                    runId,
+                    friendlyId,
+                    cardIdentity,
+                  )
+                : migratePersistedRun(
+                    fromSessionKey,
+                    toSessionKey,
+                    runId,
+                    friendlyId,
+                  )
+              // The underlying file operation is not cancellable. Observe a late
+              // rejection, while the shared lifetime race prevents it from keeping
+              // this route or a successor run alive after transport closure.
+              void migration.catch(() => undefined)
+              const migratedRun = await waitWithinStreamLifetime(migration)
+              if (streamTransportUnavailable()) return
+              if (
+                persistedRunMatchesOwner(migratedRun, {
+                  runId,
+                  sessionKey: toSessionKey,
+                  friendlyId,
+                  ...cardIdentity,
+                })
+              ) {
+                activeRunSessionKey = toSessionKey
+              }
+            })().catch(() => undefined)
+            // Publish the serialization barrier synchronously so polling writes
+            // cannot slip between the prior queue and the migration.
+            persistedRunReady = migrationReady
+            await waitWithinStreamLifetime(migrationReady)
+            if (streamTransportUnavailable()) return
+          } catch (error) {
+            if (
+              error === streamTimeoutError ||
+              error === streamAbortError ||
+              streamTransportUnavailable()
+            ) {
+              return
+            }
+            // Persisted-run migration is best effort. Keep subsequent writes on
+            // the last authoritative durable owner when migration fails.
+          }
+        }
+
+        const queueActiveRunPersistence = (
+          write: (sessionKey: string, runId: string) => Promise<unknown>,
+          allowAfterTerminalClaim = false,
+        ): Promise<void> => {
+          if (terminalRunTransition.isSealed() && !allowAfterTerminalClaim) {
+            return Promise.resolve()
+          }
+          if (!persistedRunId || !activeRunSessionKey) return Promise.resolve()
+          const nextReady = (persistedRunReady ?? Promise.resolve())
+            .then(() => {
+              const runId = persistedRunId
+              const runSessionKey = activeRunSessionKey
+              if (!runId || !runSessionKey) return null
+              return write(runSessionKey, runId)
+            })
+            .then(() => null)
+            .catch(() => null)
+          persistedRunReady = nextReady
+          return nextReady.then(() => undefined)
         }
 
         const persistActiveRun = (
           write: (sessionKey: string, runId: string) => Promise<unknown>,
         ) => {
-          if (!activeRunId || !activeRunSessionKey) return
-          const runId = activeRunId
-          const runSessionKey = activeRunSessionKey
-          void (persistedRunReady ?? Promise.resolve())
-            .then(() => write(runSessionKey, runId))
-            .catch(() => null)
+          void queueActiveRunPersistence(write)
+        }
+
+        const persistSyntheticToolActivity = (
+          synthetic: ReturnType<typeof collectSyntheticLiveToolEvents>[number],
+          allowAfterTerminalClaim = false,
+        ) =>
+          queueActiveRunPersistence(
+            (runSessionKey, activeId) =>
+              upsertRunToolCall(runSessionKey, activeId, {
+                id: synthetic.toolCallId,
+                name: synthetic.name,
+                phase: synthetic.phase,
+                args: synthetic.args,
+                result: synthetic.result,
+              }),
+            allowAfterTerminalClaim,
+          )
+
+        const persistRunText = (text: string, replace = false) => {
+          if (terminalRunTransition.isSealed()) return
+          if (replace) runTextBuffer?.replace(text)
+          else runTextBuffer?.append(text)
+        }
+
+        async function persistTerminalRun(
+          status: 'handoff' | 'complete' | 'error',
+          errorMessage?: string,
+          beforeSeal?: () => Promise<void>,
+        ): Promise<void> {
+          await terminalRunTransition.transition(
+            status,
+            errorMessage,
+            beforeSeal,
+          )
+        }
+
+        async function finalizeTerminalPersistence(
+          terminalPersistence: Promise<void>,
+          onPersisted?: () => void,
+          closeBeforePersistence = false,
+        ): Promise<void> {
+          await finalizeRunTerminalStream({
+            terminalPersistence,
+            onPersisted,
+            closeStream,
+            closeBeforePersistence,
+          })
         }
 
         const stream = new ReadableStream({
           async start(controller) {
-            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
-            let lastClientEventAt = Date.now()
             // Track the last human-readable activity so the heartbeat can
             // forward it to the UI. Without this the ThinkingBubble shows a
             // static "Thinking…" for minutes when the agent is reasoning
             // without tool calls, making it look hung.
             let lastActivity: string | null = null
+            let heartbeatLifecycle: ReturnType<
+              typeof createSseHeartbeatLifecycle
+            > | null = null
             const enqueueRaw = (payload: string) => {
               if (streamClosed) return
               controller.enqueue(encoder.encode(payload))
             }
             const sendEvent = (event: string, data: unknown) => {
               if (streamClosed) return
-              lastClientEventAt = Date.now()
+              heartbeatLifecycle?.noteClientEvent()
               const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
               enqueueRaw(payload)
             }
+            emitCardActivityToStream = (payload) =>
+              sendEvent('card_activity', payload)
+
+            heartbeatLifecycle = createSseHeartbeatLifecycle({
+              intervalMs: 10_000,
+              getActivity: () => lastActivity,
+              sendActivityHeartbeat: (payload) => {
+                sendEvent('heartbeat', payload)
+              },
+              sendProxyKeepalive: () => {
+                // Use a dedicated hb_signal event (not 'thinking') so it does
+                // not pollute the activity card. The tiny comment is the
+                // actual keepalive byte for Cloudflare Tunnel/Access.
+                sendEvent('hb_signal', { sessionKey: getPublicSessionKey() })
+                enqueueRaw(': keepalive\n\n')
+              },
+            })
 
             // Cloudflare Tunnel/Access can otherwise leave small SSE streams idle
             // long enough that the browser-side fetch is canceled before visible
-            // assistant chunks arrive. Send an initial padding comment and a
-            // lightweight recognized event periodically so public Workspace chats
-            // do not sit at "Thinking…" until the frontend reports failure.
+            // assistant chunks arrive. Send initial padding immediately, then use
+            // one timer for both proxy keepalive bytes and meaningful UI activity.
             enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
-            heartbeatTimer = setInterval(() => {
-              if (streamClosed) return
-              if (Date.now() - lastClientEventAt < 10_000) return
-              // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
-              // Use a dedicated hb_signal event (not 'thinking') so it does not
-              // pollute the TUI activity card with fake thinking text. Send a
-              // tiny SSE comment as the actual keepalive byte.
-              sendEvent('hb_signal', { sessionKey })
-              enqueueRaw(': keepalive\n\n')
-            }, 10_000)
+            heartbeatLifecycle.start()
 
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
-              }
+              heartbeatLifecycle?.stop()
+              heartbeatLifecycle = null
+              stopLivePolling()
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
                 unregisterTimer = null
@@ -521,6 +1650,7 @@ export const Route = createFileRoute('/api/send-stream')({
                 unregisterActiveSendRun(activeRunId)
                 activeRunId = null
               }
+              settleStreamLifetime(streamAbortError)
               abortController.abort()
               try {
                 controller.close()
@@ -529,38 +1659,109 @@ export const Route = createFileRoute('/api/send-stream')({
               }
             }
 
-            // Keep the SSE stream alive during long agent processing (tool calls,
-            // slow LLM responses on large contexts). Without this the client-side
-            // no-activity timer fires after 2-3 min and aborts the stream.
-            // Every 10s we also forward the last known activity so the UI can
-            // show meaningful progress instead of a static "Thinking…".
-            heartbeatTimer = setInterval(() => {
-              sendEvent('heartbeat', {
-                timestamp: Date.now(),
-                activity: lastActivity,
+            handleStreamDeadline = () => {
+              if (streamClosed) return
+              const terminalPersistence = withRouteOwnedCardError(
+                persistedRunId
+                  ? persistTerminalRun('error', streamTimeoutError.message)
+                  : Promise.resolve(),
+                activeRunId ?? undefined,
+                sessionKey,
+              )
+              void terminalPersistence.catch(() => undefined)
+              sendEvent('error', {
+                message: streamTimeoutError.message,
+                sessionKey: getPublicSessionKey(),
               })
-            }, 10_000)
+              settleStreamLifetime(streamTimeoutError)
+              closeStream()
+            }
 
             try {
               if (chatMode === 'portable') {
                 const runId = crypto.randomUUID()
-                const portableSessionKey = sessionKey
+                let portableSessionKey = sessionKey
 
-                // Ensure session exists (user message appended after building history)
-                ensureLocalSession(
-                  portableSessionKey,
-                  typeof body.model === 'string' ? body.model : undefined,
-                )
-                const portableFriendlyId =
-                  resolvedFriendlyId ||
-                  requestedFriendlyId ||
-                  rawSessionKey ||
+                // Every selected-Card side effect gets its own just-in-time
+                // authority check. Bootstrap sends have no binding yet and keep
+                // their local-session creation path until projection succeeds.
+                await revalidateCardMutationAuthority()
+                ensureLocalSession(portableSessionKey, requestedModel)
+
+                if (
+                  portableBootstrapSessionKey &&
+                  !activeCardId &&
+                  !portableBootstrapProjectionAttemptedBeforeStream
+                ) {
+                  try {
+                    portableSessionKey =
+                      await resolvePortableBootstrapCard(portableSessionKey)
+                  } catch (error) {
+                    if (
+                      error === streamTimeoutError ||
+                      error === streamAbortError ||
+                      streamTransportUnavailable()
+                    ) {
+                      throw error
+                    }
+                    // Projection may lag the synchronous local-store write. Keep
+                    // every public identity on the bootstrap key and skip durable
+                    // run persistence rather than exposing the internal UUID.
+                  }
+                }
+
+                const portableClientSessionKey =
+                  activeCardCanonicalSegmentKey ??
+                  portableBootstrapSessionKey ??
                   portableSessionKey
+                const portableClientFriendlyId =
+                  (activeCardId ??
+                    portableBootstrapSessionKey ??
+                    resolvedFriendlyId) ||
+                  portableClientSessionKey
+                const portableRunSessionKey =
+                  activeCardCanonicalSegmentKey ??
+                  (portableBootstrapSessionKey === 'new'
+                    ? null
+                    : portableSessionKey)
+                const portableRunFriendlyId =
+                  activeCardId ?? portableClientFriendlyId
                 let accumulated = ''
+
+                const bootstrapHandoff =
+                  portableBootstrapSessionKey === 'new' && activeCardId
+                    ? resolveAuthoritativeBootstrapHandoff(
+                        portableBootstrapSessionKey,
+                        portableClientSessionKey,
+                      )
+                    : null
+                const verifiedCardAuthority =
+                  getVerifiedBootstrapCardAuthority()
+                if (bootstrapHandoff && verifiedCardAuthority) {
+                  sendEvent('session_handoff', {
+                    ...bootstrapHandoff,
+                    friendlyId: portableClientFriendlyId,
+                    runId,
+                    verifiedCardAuthority,
+                  })
+                }
 
                 activeRunId = runId
                 registerActiveSendRun(runId)
-                persistRunStarted(runId, portableSessionKey, portableFriendlyId)
+                if (portableRunSessionKey) {
+                  await revalidateCardMutationAuthority()
+                  persistRunStarted(
+                    runId,
+                    portableRunSessionKey,
+                    portableRunFriendlyId,
+                    activeCardId && activeCardCanonicalSegmentKey
+                      ? {
+                          cardId: activeCardId,
+                          canonicalSegmentKey: activeCardCanonicalSegmentKey,
+                        }
+                      : undefined,
+                  )
+                }
                 unregisterTimer = setTimeout(() => {
                   if (activeRunId) {
                     unregisterActiveSendRun(activeRunId)
@@ -570,8 +1771,8 @@ export const Route = createFileRoute('/api/send-stream')({
 
                 sendEvent('started', {
                   runId,
-                  sessionKey: portableSessionKey,
-                  friendlyId: portableFriendlyId,
+                  sessionKey: portableClientSessionKey,
+                  friendlyId: portableClientFriendlyId,
                 })
                 lastActivity = 'Processing your message...'
 
@@ -602,7 +1803,11 @@ export const Route = createFileRoute('/api/send-stream')({
                     role: m.role as 'user' | 'assistant' | 'system',
                     content: m.content,
                   }))
-                  // Persist user message AFTER reading history to avoid duplication
+                  // Persist the admitted user turn after reading history to avoid
+                  // duplication, then publish running activity. Each durable
+                  // mutation gets a fresh exact-owner check; accepted earlier data
+                  // is retained if a later check observes rollover.
+                  await revalidateCardMutationAuthority()
                   appendLocalMessage(portableSessionKey, {
                     id: crypto.randomUUID(),
                     role: 'user',
@@ -610,6 +1815,12 @@ export const Route = createFileRoute('/api/send-stream')({
                       typeof body.message === 'string' ? body.message : '',
                     timestamp: Date.now(),
                   })
+                  await revalidateCardMutationAuthority()
+                  await observeAndPublishCardActivity(
+                    'run.started',
+                    runId,
+                    portableSessionKey,
+                  )
                   const effectiveHistory = selectPortableConversationHistory(
                     persistedHistory,
                     history,
@@ -637,7 +1848,6 @@ export const Route = createFileRoute('/api/send-stream')({
                   const useResponsesApi =
                     process.env.HERMES_USE_RESPONSES === '1' && !localBaseUrl
                   if (useResponsesApi) {
-                    const thinking = ''
                     // Track tool calls by callId so a `tool.completed`
                     // followed by `tool.output` can carry the full
                     // arguments forward without losing them.
@@ -649,31 +1859,23 @@ export const Route = createFileRoute('/api/send-stream')({
                       }
                     >()
                     try {
+                      await revalidateCardMutationAuthority()
                       const responsesStream = streamResponses({
                         input: scopedMessage,
                         conversationHistory: effectiveHistory,
-                        model:
-                          typeof body.model === 'string'
-                            ? body.model
-                            : undefined,
+                        model: requestedModel,
                         sessionId: portableSessionKey,
                         signal: abortController.signal,
                       })
+                      settleCardMutationEdge('authorized')
                       for await (const ev of responsesStream) {
                         if (ev.kind === 'text.delta') {
                           accumulated += ev.delta
-                          persistActiveRun((runSessionKey, activeId) =>
-                            appendRunText(
-                              runSessionKey,
-                              activeId,
-                              accumulated,
-                              { replace: true },
-                            ),
-                          )
+                          persistRunText(accumulated, true)
                           sendEvent('chunk', {
                             text: accumulated,
                             fullReplace: true,
-                            sessionKey: portableSessionKey,
+                            sessionKey: portableClientSessionKey,
                             runId,
                           })
                           continue
@@ -700,7 +1902,7 @@ export const Route = createFileRoute('/api/send-stream')({
                             name: ev.name,
                             toolCallId: ev.callId,
                             args: argsForCard,
-                            sessionKey: portableSessionKey,
+                            sessionKey: portableClientSessionKey,
                             runId,
                           })
                           lastActivity = `Running: ${ev.name.replace(/_/g, ' ')}`
@@ -738,7 +1940,7 @@ export const Route = createFileRoute('/api/send-stream')({
                             toolCallId: ev.callId,
                             args: argsForCard,
                             result: ev.output,
-                            sessionKey: portableSessionKey,
+                            sessionKey: portableClientSessionKey,
                             runId,
                           })
                           lastActivity = `Completed: ${name.replace(/_/g, ' ')}`
@@ -749,37 +1951,42 @@ export const Route = createFileRoute('/api/send-stream')({
                           // shared 'done' emit below.
                           break
                         }
-                        if (ev.kind === 'failed') {
-                          throw new Error(ev.error)
-                        }
+                        throw new Error(ev.error)
                       }
+                      await revalidateCardMutationAuthority()
                       appendLocalMessage(portableSessionKey, {
                         id: crypto.randomUUID(),
                         role: 'assistant',
                         content: accumulated,
                         timestamp: Date.now(),
                       })
+                      await revalidateCardMutationAuthority()
                       touchLocalSession(portableSessionKey)
-                      persistActiveRun((runSessionKey, activeId) =>
-                        markRunStatus(runSessionKey, activeId, 'complete'),
-                      )
-                      sendEvent('done', {
-                        state: 'complete',
-                        sessionKey: portableSessionKey,
+                      await revalidateCardMutationAuthority()
+                      await observeAndPublishCardActivity(
+                        'run.completed',
                         runId,
-                        message: {
-                          role: 'assistant',
-                          content: [
-                            ...(thinking
-                              ? [{ type: 'thinking', thinking }]
-                              : []),
-                            { type: 'text', text: accumulated },
-                          ],
+                        portableSessionKey,
+                      )
+                      await finalizeTerminalPersistence(
+                        persistTerminalRun('complete'),
+                        () => {
+                          sendEvent('done', {
+                            state: 'complete',
+                            sessionKey: portableClientSessionKey,
+                            runId,
+                            message: {
+                              role: 'assistant',
+                              content: [{ type: 'text', text: accumulated }],
+                            },
+                          })
                         },
-                      })
-                      closeStream()
+                      )
                       return
                     } catch (err) {
+                      // A Card-bound retry would cross a second mutation edge
+                      // after its HTTP status is committed. Fail closed instead.
+                      if (requestedCardMutationBinding) throw err
                       // Log and fall through to the openaiChat path so a
                       // misconfigured /v1/responses surface (older agent,
                       // CORS issue, network blip) doesn't break the chat.
@@ -792,12 +1999,9 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  const stream = await openaiChat(portableMessages, {
-                    model: localBaseUrl
-                      ? bareModel
-                      : typeof body.model === 'string'
-                        ? body.model
-                        : undefined,
+                  await revalidateCardMutationAuthority()
+                  const streamPending = openaiChat(portableMessages, {
+                    model: localBaseUrl ? bareModel : requestedModel,
                     temperature:
                       typeof body.temperature === 'number'
                         ? body.temperature
@@ -807,6 +2011,8 @@ export const Route = createFileRoute('/api/send-stream')({
                     sessionId: portableSessionKey,
                     baseUrl: localBaseUrl,
                   })
+                  settleCardMutationEdge('authorized')
+                  const stream = await streamPending
 
                   let thinking = ''
                   let toolEventCount = 0
@@ -818,7 +2024,7 @@ export const Route = createFileRoute('/api/send-stream')({
                       )
                       sendEvent('thinking', {
                         text: thinking,
-                        sessionKey: portableSessionKey,
+                        sessionKey: portableClientSessionKey,
                         runId,
                       })
                     } else if (chunk.type === 'tool') {
@@ -853,68 +2059,86 @@ export const Route = createFileRoute('/api/send-stream')({
                         name: chunk.name,
                         toolCallId,
                         preview: chunk.label,
-                        sessionKey: portableSessionKey,
+                        sessionKey: portableClientSessionKey,
                         runId,
                       })
                     } else {
                       accumulated += chunk.text
-                      persistActiveRun((runSessionKey, activeId) =>
-                        appendRunText(runSessionKey, activeId, accumulated, {
-                          replace: true,
-                        }),
-                      )
+                      persistRunText(accumulated, true)
                       sendEvent('chunk', {
                         text: accumulated,
                         fullReplace: true,
-                        sessionKey: portableSessionKey,
+                        sessionKey: portableClientSessionKey,
                         runId,
                       })
                     }
                   }
 
-                  // Persist assistant response to local session store
+                  // Persist assistant response to the accepted local session.
+                  // A rollover after provider acceptance keeps the durable user
+                  // turn and exact run cleanup, but blocks all later Card writes.
+                  await revalidateCardMutationAuthority()
                   appendLocalMessage(portableSessionKey, {
                     id: crypto.randomUUID(),
                     role: 'assistant',
                     content: accumulated,
                     timestamp: Date.now(),
                   })
+                  await revalidateCardMutationAuthority()
                   touchLocalSession(portableSessionKey)
 
-                  persistActiveRun((runSessionKey, activeId) =>
-                    markRunStatus(runSessionKey, activeId, 'complete'),
-                  )
-                  sendEvent('done', {
-                    state: 'complete',
-                    sessionKey: portableSessionKey,
+                  await revalidateCardMutationAuthority()
+                  await observeAndPublishCardActivity(
+                    'run.completed',
                     runId,
-                    message: {
-                      role: 'assistant',
-                      content: [
-                        ...(thinking ? [{ type: 'thinking', thinking }] : []),
-                        { type: 'text', text: accumulated },
-                      ],
+                    portableSessionKey,
+                  )
+                  await finalizeTerminalPersistence(
+                    persistTerminalRun('complete'),
+                    () => {
+                      sendEvent('done', {
+                        state: 'complete',
+                        sessionKey: portableClientSessionKey,
+                        runId,
+                        message: {
+                          role: 'assistant',
+                          content: [
+                            ...(thinking
+                              ? [{ type: 'thinking', thinking }]
+                              : []),
+                            { type: 'text', text: accumulated },
+                          ],
+                        },
+                      })
                     },
-                  })
-                  closeStream()
+                  )
                 } catch (err) {
                   if (!streamClosed) {
                     const errorMessage = normalizeClaudeErrorMessage(err)
-                    persistActiveRun((runSessionKey, activeId) =>
-                      markRunStatus(
-                        runSessionKey,
-                        activeId,
-                        'error',
-                        errorMessage,
-                      ),
+                    const terminalRunCleanup = persistTerminalRun(
+                      'error',
+                      errorMessage,
                     )
-                    sendEvent('error', {
-                      message: errorMessage,
-                      sessionKey: portableSessionKey,
-                      runId,
-                    })
-                    closeStream()
+                    await finalizeTerminalPersistence(
+                      cardMutationAuthorityStale
+                        ? terminalRunCleanup
+                        : withRouteOwnedCardError(
+                            terminalRunCleanup,
+                            runId,
+                            portableSessionKey,
+                          ),
+                      () => {
+                        sendEvent('error', {
+                          message: errorMessage,
+                          sessionKey: portableClientSessionKey,
+                          runId,
+                        })
+                      },
+                    )
                   }
+                  settleCardMutationEdge(
+                    cardMutationAuthorityStale ? 'stale' : 'not-reached',
+                  )
                 }
                 return
               }
@@ -923,6 +2147,8 @@ export const Route = createFileRoute('/api/send-stream')({
                 throw new Error(SESSIONS_API_UNAVAILABLE_MESSAGE)
               }
 
+              const requestedPreStreamSessionKey =
+                enhancedMainBootstrapSessionKey ?? sessionKey
               if (SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
                 // 'main' should land in the user's existing main chat,
                 // not spin up a brand new session every time. Skip cron
@@ -931,7 +2157,10 @@ export const Route = createFileRoute('/api/send-stream')({
                 let reused: string | null = null
                 if (sessionKey === 'main') {
                   try {
-                    const recent = await listSessions(30, 0)
+                    const recent = await waitWithinStreamLifetime(
+                      listSessions(30, 0),
+                    )
+                    ensureStreamTransportAvailable()
                     const isInternal = (id: string) =>
                       id.startsWith('cron_') ||
                       id.startsWith('cron:') ||
@@ -956,7 +2185,14 @@ export const Route = createFileRoute('/api/send-stream')({
                         )
                     const candidate = titled ?? fallback
                     if (candidate) reused = candidate.id
-                  } catch {
+                  } catch (error) {
+                    if (
+                      error === streamTimeoutError ||
+                      error === streamAbortError ||
+                      streamTransportUnavailable()
+                    ) {
+                      throw error
+                    }
                     // fall through to createSession()
                   }
                 }
@@ -964,17 +2200,133 @@ export const Route = createFileRoute('/api/send-stream')({
                   sessionKey = reused
                   resolvedFriendlyId = reused
                 } else {
-                  const session = await createSession()
+                  const session = await waitWithinStreamLifetime(
+                    createSession(
+                      requestedModel ? { model: requestedModel } : undefined,
+                    ),
+                  )
+                  ensureStreamTransportAvailable()
                   sessionKey = session.id
                   resolvedFriendlyId = session.id
+                  rememberConfiguredSessionModel(sessionKey, requestedModel)
                 }
+              }
+
+              ensureStreamTransportAvailable()
+
+              const enhancedBootstrapSessionKey =
+                SESSION_BOOTSTRAP_KEYS.has(requestedPreStreamSessionKey) &&
+                requestedPreStreamSessionKey &&
+                sessionKey !== requestedPreStreamSessionKey
+                  ? requestedPreStreamSessionKey
+                  : null
+              let bootstrapHandoff: ReturnType<
+                typeof resolveAuthoritativeBootstrapHandoff
+              > = null
+              if (
+                enhancedBootstrapSessionKey &&
+                activeCardId &&
+                activeCardCanonicalSegmentKey
+              ) {
+                bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
+                  requestedPreStreamSessionKey,
+                  activeCardCanonicalSegmentKey,
+                )
+              } else if (enhancedBootstrapSessionKey) {
+                try {
+                  const resolvedBootstrapCard = await waitWithinStreamLifetime(
+                    sessionCardService.resolveRemoteCardByUpstreamSession(
+                      sessionKey,
+                    ),
+                  )
+                  ensureStreamTransportAvailable()
+                  const canonicalSegmentKey =
+                    resolvedBootstrapCard.card.canonicalSegmentKey
+                  const canonicalSource =
+                    resolvedBootstrapCard.sourceBySegmentKey
+                      .get(canonicalSegmentKey)
+                      ?.trim() ?? ''
+                  const canonicalUpstreamKey =
+                    resolvedBootstrapCard.upstreamKeyBySegmentKey
+                      .get(canonicalSegmentKey)
+                      ?.trim() ?? ''
+                  const isCompleteParentCard =
+                    resolvedBootstrapCard.collection.completeness ===
+                      'complete' &&
+                    (resolvedBootstrapCard.card.relationshipKind === 'root' ||
+                      resolvedBootstrapCard.card.relationshipKind ===
+                        'orphan') &&
+                    resolvedBootstrapCard.card.parentCardId === undefined
+                  if (
+                    !isCompleteParentCard ||
+                    !canonicalSource ||
+                    canonicalSource === 'local' ||
+                    !canonicalUpstreamKey ||
+                    !resolvedBootstrapCard.card.continuationSegmentKeys.some(
+                      (segmentKey) =>
+                        resolvedBootstrapCard.upstreamKeyBySegmentKey.get(
+                          segmentKey,
+                        ) === sessionKey,
+                    )
+                  ) {
+                    throw new Error('authoritative bootstrap Card unavailable')
+                  }
+
+                  activeCardResolution = resolvedBootstrapCard
+                  activeCardId = resolvedBootstrapCard.card.cardId
+                  activeCardCanonicalSegmentKey = canonicalSegmentKey
+                  activeCardCanonicalSource = canonicalSource
+                  resolvedFriendlyId = resolvedBootstrapCard.card.cardId
+                  requestedCardMutationBinding = {
+                    kind: 'session-card-owner',
+                    cardId: resolvedBootstrapCard.card.cardId,
+                    parentCardId: null,
+                    canonicalSource: 'remote',
+                    canonicalSegmentKey,
+                    canonicalTransport: 'gateway',
+                  }
+                  bootstrapHandoff = resolveAuthoritativeBootstrapHandoff(
+                    requestedPreStreamSessionKey,
+                    canonicalSegmentKey,
+                  )
+                } catch (error) {
+                  if (
+                    error === streamTimeoutError ||
+                    error === streamAbortError ||
+                    streamTransportUnavailable()
+                  ) {
+                    throw error
+                  }
+                  // Card projection can lag creation. Stay on the accepted
+                  // bootstrap route rather than exposing the raw backend key.
+                }
+              }
+              const getEnhancedClientSessionKey = () =>
+                activeCardCanonicalSegmentKey ??
+                enhancedBootstrapSessionKey ??
+                sessionKey
+              const getEnhancedClientFriendlyId = () =>
+                activeCardId ??
+                enhancedBootstrapSessionKey ??
+                resolvedFriendlyId
+              const getEnhancedRunSessionKey = () =>
+                enhancedBootstrapSessionKey
+                  ? activeCardCanonicalSegmentKey
+                  : getEnhancedClientSessionKey()
+              const verifiedCardAuthority = getVerifiedBootstrapCardAuthority()
+              if (bootstrapHandoff && verifiedCardAuthority) {
+                sendEvent('session_handoff', {
+                  ...bootstrapHandoff,
+                  friendlyId: getEnhancedClientFriendlyId(),
+                  runId: activeRunId,
+                  verifiedCardAuthority,
+                })
               }
 
               let startedSent = false
               // In enhanced mode, the HTTP stream response delivers all events
-              // directly to useStreamingMessage. Skip publishChatEvent to prevent
-              // useRealtimeChatHistory from creating duplicate message bubbles.
-              const skipPublish = true
+              // directly to useStreamingMessage. Do not call publishChatEvent here,
+              // because useRealtimeChatHistory would create duplicate bubbles.
 
               // Mid-run tool polling: vanilla Hermes Agent currently does not
               // emit tool.* SSE events live (callback signature drift). Until
@@ -985,7 +2337,44 @@ export const Route = createFileRoute('/api/send-stream')({
               // chat-store dedupes by tool_call_id so this is safe alongside
               // any real live events that might arrive.
               const syntheticLiveToolTracker = createSyntheticLiveToolTracker()
-              let liveRunActive = true
+              const liveRunState: { active: boolean } = { active: true }
+              let livePollDelayTimer: ReturnType<typeof setTimeout> | null =
+                null
+              let finishLivePollDelay: (() => void) | null = null
+              const waitForLivePoll = (delayMs: number): Promise<void> =>
+                new Promise((resolve) => {
+                  if (!liveRunState.active) {
+                    resolve()
+                    return
+                  }
+                  finishLivePollDelay = () => {
+                    if (livePollDelayTimer) clearTimeout(livePollDelayTimer)
+                    livePollDelayTimer = null
+                    finishLivePollDelay = null
+                    resolve()
+                  }
+                  livePollDelayTimer = setTimeout(
+                    () => finishLivePollDelay?.(),
+                    delayMs,
+                  )
+                })
+              stopLivePolling = () => {
+                liveRunState.active = false
+                finishLivePollDelay?.()
+              }
+              const livePollingStopped = () => !liveRunState.active
+              const streamEventProvenance = createStreamEventProvenanceTracker()
+              const activeParentSource = await waitWithinStreamLifetime(
+                getSession(sessionKey)
+                  .then((parentSession) =>
+                    resolveAuthoritativeSessionSource(
+                      sessionKey,
+                      parentSession,
+                    ),
+                  )
+                  .catch(() => null),
+              )
+              ensureStreamTransportAvailable()
               const livePollIntervalMs = 800
               // Snapshot the session message count at run-start so the poller
               // and the post-run backfill only consider messages persisted by
@@ -993,91 +2382,400 @@ export const Route = createFileRoute('/api/send-stream')({
               // tool_calls" can resolve to the previous turn, surfacing stale
               // tool cards (off-by-one-turn bug).
               let liveBaselineCount = 0
+              let liveBaselineSessionKey = sessionKey
               try {
-                const baseline = (await getSessionMessagesFromAgent(
-                  sessionKey,
+                const baseline = (await waitWithinStreamLifetime(
+                  getSessionMessagesFromAgent(sessionKey),
                 )) as unknown as Array<Record<string, unknown>>
+                ensureStreamTransportAvailable()
                 if (Array.isArray(baseline)) liveBaselineCount = baseline.length
-              } catch {
+              } catch (error) {
+                if (
+                  error === streamTimeoutError ||
+                  error === streamAbortError ||
+                  streamTransportUnavailable()
+                ) {
+                  throw error
+                }
                 liveBaselineCount = 0
               }
               const livePollerPromise = (async () => {
                 // Initial small delay so the agent has time to ingest the
                 // user message before we start asking for session state.
-                await new Promise((r) => setTimeout(r, 600))
-                while (liveRunActive) {
-                  if (!liveRunActive || streamClosed) break
+                await waitForLivePoll(600)
+                if (streamTransportUnavailable()) return
+                while (liveRunState.active) {
+                  if (streamClosed) break
                   try {
-                    const allMsgs = (await getSessionMessagesFromAgent(
-                      sessionKey,
+                    const polledSessionKey = sessionKey
+                    const polledBaselineCount =
+                      polledSessionKey === liveBaselineSessionKey
+                        ? liveBaselineCount
+                        : 0
+                    const allMsgs = (await waitWithinStreamLifetime(
+                      getSessionMessagesFromAgent(polledSessionKey),
                     )) as unknown as Array<Record<string, unknown>>
+                    if (livePollingStopped() || streamTransportUnavailable()) {
+                      break
+                    }
+                    if (polledSessionKey !== sessionKey) continue
                     if (!Array.isArray(allMsgs) || allMsgs.length === 0) {
-                      await new Promise((r) =>
-                        setTimeout(r, livePollIntervalMs),
-                      )
+                      await waitForLivePoll(livePollIntervalMs)
                       continue
                     }
                     // Only inspect messages added on or after this run started.
-                    const msgs = allMsgs.slice(liveBaselineCount)
+                    const msgs = allMsgs.slice(polledBaselineCount)
                     if (msgs.length === 0) {
-                      await new Promise((r) =>
-                        setTimeout(r, livePollIntervalMs),
-                      )
+                      await waitForLivePoll(livePollIntervalMs)
                       continue
                     }
                     const syntheticEvents = collectSyntheticLiveToolEvents({
                       messages: msgs,
                       tracker: syntheticLiveToolTracker,
-                      sessionKey,
+                      sessionKey: getEnhancedClientSessionKey(),
                       runId: activeRunId ?? undefined,
                     })
                     if (syntheticEvents.length === 0) {
-                      await new Promise((r) =>
-                        setTimeout(r, livePollIntervalMs),
-                      )
+                      await waitForLivePoll(livePollIntervalMs)
                       continue
                     }
                     for (const synthetic of syntheticEvents) {
+                      void persistSyntheticToolActivity(synthetic)
                       sendEvent('tool', synthetic)
                     }
                   } catch {
+                    if (streamTransportUnavailable()) break
                     // Best-effort polling; ignore transient errors.
                   }
-                  await new Promise((r) => setTimeout(r, livePollIntervalMs))
+                  await waitForLivePoll(livePollIntervalMs)
                 }
               })()
 
               try {
-                await streamChat(
+                await revalidateCardMutationAuthority()
+                const upstreamStream = streamChat(
                   sessionKey,
                   {
                     message: scopedMessage,
-                    model:
-                      typeof body.model === 'string' ? body.model : undefined,
+                    model: requestedModel,
                     system_message: thinking,
                     attachments: attachments || undefined,
                   },
                   {
                     signal: abortController.signal,
                     async onEvent({ event, data }) {
-                      const sessionKeyFromEvent =
-                        typeof data.session_id === 'string' &&
-                        data.session_id.trim()
+                      if (streamTransportUnavailable()) return
+                      const hasUpstreamRunId =
+                        Object.prototype.hasOwnProperty.call(data, 'run_id')
+                      const rawUpstreamRunId =
+                        typeof data.run_id === 'string' ? data.run_id : ''
+                      const upstreamRunId = isSafeRunId(rawUpstreamRunId)
+                        ? rawUpstreamRunId
+                        : undefined
+                      const upstreamSessionKey = readString(data.session_id)
+                      const rawChildSessionKey =
+                        typeof data.session_id === 'string'
                           ? data.session_id
-                          : sessionKey
-                      const runId =
-                        typeof data.run_id === 'string' && data.run_id.trim()
-                          ? data.run_id
-                          : (activeRunId ?? undefined)
+                          : ''
+                      const rawChildRunId =
+                        typeof data.run_id === 'string' ? data.run_id : ''
+                      if (
+                        activeCardId &&
+                        rawChildSessionKey.length > 0 &&
+                        rawChildSessionKey.trim() === rawChildSessionKey &&
+                        rawChildSessionKey !== sessionKey &&
+                        isSafeRunId(rawChildRunId)
+                      ) {
+                        const childObservation = await waitWithinStreamLifetime(
+                          sessionCardService
+                            .observeChildLifecycle({
+                              parentCardId: activeCardId,
+                              childUpstreamSessionKey: rawChildSessionKey,
+                              runId: rawChildRunId,
+                              status: childLifecycleStatusForEvent(event),
+                            })
+                            .catch(() => null),
+                        )
+                        if (streamTransportUnavailable()) return
+                        if (childObservation) {
+                          streamEventProvenance.quarantine({
+                            sessionKey: rawChildSessionKey,
+                            runId: rawChildRunId,
+                            sourceIsExplicitlyNonParent: true,
+                          })
+                          const childActivity = {
+                            ...childObservation,
+                            activity: event,
+                          }
+                          sendEvent('card_child_activity', childActivity)
+                          publishChatEvent('card_child_activity', childActivity)
+                          // The Card inventory is the root Card's public
+                          // activity projection. A child lifecycle mutation can
+                          // make that root busy (or clear the final busy child),
+                          // so wake every mounted inventory immediately rather
+                          // than waiting for its polling fallback.
+                          const cardActivityInvalidation = {
+                            ...childObservation,
+                            activity: event,
+                            source: 'child_lifecycle',
+                          }
+                          emitCardActivityToStream(cardActivityInvalidation)
+                          publishCardActivityEvent(cardActivityInvalidation)
+                          return
+                        }
+                      }
+                      if (hasUpstreamRunId && !upstreamRunId) {
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
+                        })
+                        return
+                      }
+                      if (
+                        activeRunId &&
+                        upstreamRunId &&
+                        upstreamRunId !== activeRunId
+                      ) {
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          runId: upstreamRunId,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
+                        })
+                        return
+                      }
+                      if (!activeRunId && !upstreamRunId) {
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
+                        })
+                        return
+                      }
+                      // Once one safe parent run is accepted, every parent event
+                      // is translated, emitted, persisted, and terminalized only
+                      // under that immutable run identity. Identifier-less tails
+                      // remain compatible by inheriting the active parent run.
+                      const runId = activeRunId ?? upstreamRunId
+                      const hasExplicitNonParentFacts = hasNonParentStreamFacts(
+                        data,
+                        activeParentSource,
+                      )
+                      let parentLifecycleEligible = false
+
+                      if (hasExplicitNonParentFacts) {
+                        // Every explicit conflict is sticky for metadata-poor
+                        // tails. The active parent ID itself is never globally
+                        // rejected, so later explicit parent events still work.
+                        streamEventProvenance.quarantine({
+                          sessionKey: upstreamSessionKey,
+                          runId: upstreamRunId,
+                          sourceIsExplicitlyNonParent:
+                            upstreamSessionKey !== sessionKey,
+                        })
+                      } else if (upstreamSessionKey === sessionKey) {
+                        // Explicit current-parent ownership applies to this event
+                        // even when another source aliases the same run ID.
+                        parentLifecycleEligible = true
+                      } else if (upstreamSessionKey) {
+                        const mayVerifyContinuation =
+                          !SESSION_BOOTSTRAP_KEYS.has(upstreamSessionKey) &&
+                          !streamEventProvenance.isExplicitlyRejectedSession(
+                            upstreamSessionKey,
+                          )
+                        const [
+                          continuationVerification,
+                          targetSessionSource,
+                          currentCardResolution,
+                          successorCardResolution,
+                        ] = mayVerifyContinuation
+                          ? await waitWithinStreamLifetime(
+                              Promise.all([
+                                activeCardId
+                                  ? Promise.resolve(null)
+                                  : getLatestDescendant(sessionKey),
+                                activeCardId
+                                  ? Promise.resolve(null)
+                                  : getSession(upstreamSessionKey)
+                                      .then((targetSession) =>
+                                        resolveAuthoritativeSessionSource(
+                                          upstreamSessionKey,
+                                          targetSession,
+                                        ),
+                                      )
+                                      .catch(() => null),
+                                Promise.resolve(activeCardResolution),
+                                activeCardId
+                                  ? sessionCardService
+                                      .resolveCard(activeCardId)
+                                      .catch(() => null)
+                                  : Promise.resolve(null),
+                              ]),
+                            )
+                          : [null, null, null, null]
+                        if (streamTransportUnavailable()) return
+                        const toVerifiedCard = (
+                          resolved: Awaited<
+                            ReturnType<typeof sessionCardService.resolveCard>
+                          > | null,
+                        ) =>
+                          resolved
+                            ? {
+                                cardId: resolved.card.cardId,
+                                canonicalSegmentKey:
+                                  resolved.card.canonicalSegmentKey,
+                                continuationSegmentKeys:
+                                  resolved.card.continuationSegmentKeys,
+                                upstreamKeyBySegmentKey:
+                                  resolved.upstreamKeyBySegmentKey,
+                                relationshipKind:
+                                  resolved.card.relationshipKind,
+                                ...(resolved.card.parentCardId
+                                  ? {
+                                      parentCardId: resolved.card.parentCardId,
+                                    }
+                                  : {}),
+                                collectionCompleteness:
+                                  resolved.collection.completeness,
+                              }
+                            : null
+                        const cardHandoff =
+                          resolveAuthoritativeCardStreamHandoff(
+                            sessionKey,
+                            data,
+                            toVerifiedCard(currentCardResolution),
+                            toVerifiedCard(successorCardResolution),
+                          )
+                        const sessionHandoff = activeCardId
+                          ? null
+                          : resolveAuthoritativeStreamHandoff(
+                              sessionKey,
+                              data,
+                              continuationVerification,
+                              activeParentSource,
+                              targetSessionSource,
+                            )
+                        if (
+                          enhancedBootstrapSessionKey &&
+                          sessionHandoff &&
+                          !cardHandoff
+                        ) {
+                          // A legacy continuation may still be needed to follow the
+                          // upstream run to completion, but it cannot establish a
+                          // public or durable identity for an unresolved bootstrap.
+                          sessionKey = sessionHandoff.sessionKey
+                          rememberConfiguredSessionModel(
+                            sessionKey,
+                            requestedModel,
+                          )
+                          liveBaselineSessionKey = sessionHandoff.sessionKey
+                          liveBaselineCount = 0
+                          parentLifecycleEligible = true
+                        } else if (cardHandoff || sessionHandoff) {
+                          const fromRunSessionKey = cardHandoff
+                            ? cardHandoff.fromSegmentKey
+                            : sessionHandoff!.fromSessionKey
+                          const successorRunSessionKey = cardHandoff
+                            ? cardHandoff.canonicalSegmentKey
+                            : sessionHandoff!.sessionKey
+                          const successorUpstreamSessionKey = cardHandoff
+                            ? upstreamSessionKey
+                            : sessionHandoff!.sessionKey
+                          const successorFriendlyId = cardHandoff
+                            ? cardHandoff.cardId
+                            : sessionHandoff!.sessionKey
+                          await migrateActivePersistedRun(
+                            fromRunSessionKey,
+                            successorRunSessionKey,
+                            successorFriendlyId,
+                            cardHandoff
+                              ? {
+                                  cardId: cardHandoff.cardId,
+                                  canonicalSegmentKey:
+                                    cardHandoff.canonicalSegmentKey,
+                                }
+                              : undefined,
+                          )
+                          if (streamTransportUnavailable()) {
+                            return
+                          }
+                          sessionKey = successorUpstreamSessionKey
+                          rememberConfiguredSessionModel(
+                            sessionKey,
+                            requestedModel,
+                          )
+                          liveBaselineSessionKey = successorUpstreamSessionKey
+                          liveBaselineCount = 0
+                          resolvedFriendlyId = successorFriendlyId
+                          if (cardHandoff) {
+                            activeCardResolution = successorCardResolution
+                            activeCardCanonicalSegmentKey =
+                              cardHandoff.canonicalSegmentKey
+                            sendEvent('card_handoff', {
+                              ...cardHandoff,
+                              runId,
+                            })
+                          } else {
+                            sendEvent('session_handoff', {
+                              ...sessionHandoff,
+                              friendlyId: successorFriendlyId,
+                              runId,
+                            })
+                          }
+                          parentLifecycleEligible = true
+                        } else {
+                          streamEventProvenance.quarantine({
+                            sessionKey: upstreamSessionKey,
+                            runId: upstreamRunId,
+                            sourceIsExplicitlyNonParent: false,
+                          })
+                        }
+                      } else {
+                        parentLifecycleEligible =
+                          streamEventProvenance.isImplicitParentEligible(
+                            upstreamRunId,
+                            activeRunId,
+                          )
+                        if (!parentLifecycleEligible) {
+                          streamEventProvenance.quarantine({
+                            runId: upstreamRunId,
+                            sourceIsExplicitlyNonParent: false,
+                          })
+                        }
+                      }
+
+                      // Rejected provenance is server-local. It must never emit
+                      // an event carrying the parent session key or mutate any
+                      // parent lifecycle/activity/persistence state.
+                      if (!parentLifecycleEligible) return
+                      streamEventProvenance.recordParentRun(upstreamRunId)
+                      const sessionKeyFromEvent = getEnhancedClientSessionKey()
+                      const terminalEventKind =
+                        classifyStreamTerminalEvent(event)
 
                       if (runId && !activeRunId) {
                         activeRunId = runId
                         registerActiveSendRun(runId)
-                        persistRunStarted(
-                          runId,
-                          sessionKeyFromEvent,
-                          sessionKeyFromEvent,
-                        )
+                        const runSessionKey = getEnhancedRunSessionKey()
+                        if (runSessionKey) {
+                          // The provider callback may arrive long after streamChat
+                          // was admitted. Re-resolve the exact Card immediately
+                          // before publishing this run's durable owner.
+                          await revalidateCardMutationAuthority()
+                          persistRunStarted(
+                            runId,
+                            runSessionKey,
+                            getEnhancedClientFriendlyId(),
+                            activeCardId && activeCardCanonicalSegmentKey
+                              ? {
+                                  cardId: activeCardId,
+                                  canonicalSegmentKey:
+                                    activeCardCanonicalSegmentKey,
+                                }
+                              : undefined,
+                          )
+                        }
                         unregisterTimer = setTimeout(() => {
                           if (activeRunId) {
                             unregisterActiveSendRun(activeRunId)
@@ -1091,38 +2789,18 @@ export const Route = createFileRoute('/api/send-stream')({
                         sendEvent('started', {
                           runId,
                           sessionKey: sessionKeyFromEvent,
-                          friendlyId: sessionKeyFromEvent,
+                          friendlyId: getEnhancedClientFriendlyId(),
                         })
                         lastActivity = 'Processing your message...'
                       }
 
+                      await observeAndPublishCardActivity(
+                        event,
+                        runId,
+                        sessionKey,
+                      )
+
                       if (event === 'run.started') {
-                        const userMessage =
-                          data.user_message &&
-                          typeof data.user_message === 'object'
-                            ? (data.user_message as Record<string, unknown>)
-                            : null
-                        if (userMessage) {
-                          skipPublish ||
-                            publishChatEvent('user_message', {
-                              message: {
-                                id: userMessage.id,
-                                role: userMessage.role ?? 'user',
-                                content: [
-                                  {
-                                    type: 'text',
-                                    text:
-                                      typeof userMessage.content === 'string'
-                                        ? userMessage.content
-                                        : '',
-                                  },
-                                ],
-                              },
-                              sessionKey: sessionKeyFromEvent,
-                              source: 'claude',
-                              runId,
-                            })
-                        }
                         return
                       }
 
@@ -1141,7 +2819,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           runId,
                         }
                         sendEvent('message', translated)
-                        skipPublish || publishChatEvent('message', translated)
                         return
                       }
 
@@ -1151,11 +2828,7 @@ export const Route = createFileRoute('/api/send-stream')({
                         const content =
                           typeof data.content === 'string' ? data.content : ''
                         if (content) {
-                          persistActiveRun((runSessionKey, activeId) =>
-                            appendRunText(runSessionKey, activeId, content, {
-                              replace: true,
-                            }),
-                          )
+                          persistRunText(content, true)
                           const translated = {
                             text: content,
                             fullReplace: true,
@@ -1163,7 +2836,6 @@ export const Route = createFileRoute('/api/send-stream')({
                             runId,
                           }
                           sendEvent('chunk', translated)
-                          skipPublish || publishChatEvent('chunk', translated)
                         }
                         return
                       }
@@ -1172,16 +2844,13 @@ export const Route = createFileRoute('/api/send-stream')({
                         const delta =
                           typeof data.delta === 'string' ? data.delta : ''
                         if (!delta) return
-                        persistActiveRun((runSessionKey, activeId) =>
-                          appendRunText(runSessionKey, activeId, delta),
-                        )
+                        persistRunText(delta)
                         const translated = {
                           text: delta,
                           sessionKey: sessionKeyFromEvent,
                           runId,
                         }
                         sendEvent('chunk', translated)
-                        skipPublish || publishChatEvent('chunk', translated)
                         return
                       }
 
@@ -1218,7 +2887,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           }),
                         )
                         sendEvent('tool', translated)
-                        skipPublish || publishChatEvent('tool', translated)
                         lastActivity = `Running: ${toolName.replace(/_/g, ' ')}`
                         return
                       }
@@ -1237,8 +2905,6 @@ export const Route = createFileRoute('/api/send-stream')({
                             runId,
                           }
                           sendEvent('thinking', translated)
-                          skipPublish ||
-                            publishChatEvent('thinking', translated)
                           lastActivity =
                             delta.length > 60
                               ? delta.slice(0, 60) + '...'
@@ -1264,7 +2930,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           }),
                         )
                         sendEvent('tool', translated)
-                        skipPublish || publishChatEvent('tool', translated)
                         return
                       }
 
@@ -1290,7 +2955,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           }),
                         )
                         sendEvent('tool', translated)
-                        skipPublish || publishChatEvent('tool', translated)
                         lastActivity = `Completed: ${toolName.replace(/_/g, ' ')}`
                         return
                       }
@@ -1318,7 +2982,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           runId,
                         }
                         sendEvent('artifact', translated)
-                        skipPublish || publishChatEvent('artifact', translated)
                         return
                       }
 
@@ -1345,7 +3008,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           }),
                         )
                         sendEvent('tool', translated)
-                        skipPublish || publishChatEvent('tool', translated)
                         return
                       }
 
@@ -1377,7 +3039,6 @@ export const Route = createFileRoute('/api/send-stream')({
                           }),
                         )
                         sendEvent('tool', translated)
-                        skipPublish || publishChatEvent('tool', translated)
                         return
                       }
 
@@ -1405,11 +3066,10 @@ export const Route = createFileRoute('/api/send-stream')({
                           }),
                         )
                         sendEvent('tool', translated)
-                        skipPublish || publishChatEvent('tool', translated)
                         return
                       }
 
-                      if (event === 'error') {
+                      if (terminalEventKind === 'error') {
                         const errorMessage =
                           readString(
                             (data.error as Record<string, unknown> | undefined)
@@ -1417,183 +3077,219 @@ export const Route = createFileRoute('/api/send-stream')({
                           ) ||
                           readString(data.message) ||
                           'Hermes stream error'
-                        persistActiveRun((runSessionKey, activeId) =>
-                          markRunStatus(
-                            runSessionKey,
-                            activeId,
-                            'error',
-                            errorMessage,
-                          ),
+                        stopLivePolling()
+                        await finalizeTerminalPersistence(
+                          persistTerminalRun('error', errorMessage),
+                          () => {
+                            sendEvent('error', {
+                              message: errorMessage,
+                              sessionKey: sessionKeyFromEvent,
+                              runId,
+                            })
+                          },
                         )
-                        sendEvent('error', {
-                          message: errorMessage,
-                          sessionKey: sessionKeyFromEvent,
-                          runId,
-                        })
-                        closeStream()
                         return
                       }
 
-                      if (event === 'run.completed') {
-                        // Backfill tool calls from session history.
-                        // Hermes Agent currently does not stream tool.* events
-                        // reliably, but it persists tool calls on the assistant
-                        // message. Fetch the latest assistant message and emit
-                        // synthetic 'tool' events for each tool call so the
-                        // Workspace UI can render the Activity card.
-                        try {
-                          const sid =
-                            readString(data.session_id) ||
-                            sessionKeyFromEvent ||
-                            ''
-                          if (sid) {
-                            let persistedMessages: Array<
-                              Record<string, unknown>
-                            > = []
-                            try {
-                              persistedMessages =
-                                (await getSessionMessagesFromAgent(
-                                  sid,
-                                )) as unknown as Array<Record<string, unknown>>
-                            } catch {
-                              persistedMessages = []
-                            }
-                            // Walk back to the most recent assistant message in
-                            // this run; tool_calls are siblings on it. Also
-                            // collect tool_result entries that immediately
-                            // follow it so we can pair input/output.
-                            // Use the per-run baseline so we never read tool
-                            // calls from a previous turn.
-                            const sliceFrom = Math.max(
-                              0,
-                              Math.min(
-                                liveBaselineCount,
-                                Math.max(0, persistedMessages.length - 1),
-                              ),
-                            )
-                            const recent = persistedMessages.slice(sliceFrom)
-                            let lastAssistantIndex = -1
-                            for (let i = recent.length - 1; i >= 0; i--) {
-                              const m = recent[i]
-                              if (m && m.role === 'assistant') {
-                                lastAssistantIndex = i
-                                break
-                              }
-                            }
-                            if (lastAssistantIndex >= 0) {
-                              const lastAssistant = recent[lastAssistantIndex]
-                              const rawToolCalls = (lastAssistant.tool_calls ??
-                                (lastAssistant as any).toolCalls) as
-                                | Array<Record<string, unknown>>
-                                | undefined
-                              const toolCalls =
-                                Array.isArray(rawToolCalls) &&
-                                rawToolCalls.length
-                                  ? rawToolCalls
-                                  : []
+                      if (terminalEventKind === 'cancelled') {
+                        stopLivePolling()
+                        await finalizeTerminalPersistence(
+                          persistTerminalRun('handoff'),
+                          () => {
+                            sendEvent('done', {
+                              state: 'interrupted',
+                              sessionKey: sessionKeyFromEvent,
+                              runId,
+                            })
+                          },
+                        )
+                        return
+                      }
 
-                              const syntheticEvents =
-                                collectSyntheticLiveToolEvents({
-                                  messages: recent,
-                                  tracker: syntheticLiveToolTracker,
-                                  sessionKey: sessionKeyFromEvent,
-                                  runId,
-                                })
-                              for (const synthetic of syntheticEvents) {
-                                persistActiveRun((runSessionKey, activeId) =>
-                                  upsertRunToolCall(runSessionKey, activeId, {
-                                    id: synthetic.toolCallId,
-                                    name: synthetic.name,
-                                    phase: synthetic.phase,
-                                    args: synthetic.args,
-                                    result: synthetic.result,
-                                  }),
+                      if (terminalEventKind === 'success') {
+                        // The terminal history read below is the authoritative
+                        // final tool refresh. Stop scheduling live polls before
+                        // it starts; an origin poll already in flight is still
+                        // discarded by the session-key check above.
+                        stopLivePolling()
+                        // Claim completion before any asynchronous backfill so
+                        // a later abort cannot overwrite the observed winner.
+                        // The coordinator delays transcript sealing until the
+                        // authoritative final activity refresh has joined the
+                        // durable write queue.
+                        const terminalPersistence = persistTerminalRun(
+                          'complete',
+                          undefined,
+                          async () => {
+                            // Backfill tool calls from session history.
+                            // Hermes Agent currently does not stream tool.* events
+                            // reliably, but it persists tool calls on the assistant
+                            // message. Fetch the latest assistant message and emit
+                            // synthetic 'tool' events for each tool call so the
+                            // Workspace UI can render the Activity card.
+                            try {
+                              const sid =
+                                readString(data.session_id) ||
+                                sessionKeyFromEvent ||
+                                ''
+                              if (sid) {
+                                let persistedMessages: Array<
+                                  Record<string, unknown>
+                                > = []
+                                try {
+                                  persistedMessages =
+                                    (await waitWithinStreamLifetime(
+                                      getSessionMessagesFromAgent(sid),
+                                    )) as unknown as Array<
+                                      Record<string, unknown>
+                                    >
+                                  if (streamTransportUnavailable()) return
+                                } catch (error) {
+                                  if (
+                                    error === streamTimeoutError ||
+                                    error === streamAbortError ||
+                                    streamTransportUnavailable()
+                                  ) {
+                                    return
+                                  }
+                                  persistedMessages = []
+                                }
+                                // Use the rebased per-run baseline so we never
+                                // read tool calls from a previous turn. A session
+                                // handoff resets this count before successor events.
+                                const sliceFrom = Math.max(
+                                  0,
+                                  Math.min(
+                                    liveBaselineCount,
+                                    Math.max(0, persistedMessages.length - 1),
+                                  ),
                                 )
-                                sendEvent('tool', synthetic)
-                                skipPublish ||
-                                  publishChatEvent('tool', synthetic)
+                                const recent =
+                                  persistedMessages.slice(sliceFrom)
+                                const syntheticEvents =
+                                  collectSyntheticLiveToolEvents({
+                                    messages: recent,
+                                    tracker: syntheticLiveToolTracker,
+                                    sessionKey: sessionKeyFromEvent,
+                                    runId,
+                                  })
+                                for (const synthetic of syntheticEvents) {
+                                  await persistSyntheticToolActivity(
+                                    synthetic,
+                                    true,
+                                  )
+                                  sendEvent('tool', synthetic)
+                                }
                               }
+                            } catch (err) {
+                              // Backfill is best-effort; don't fail the run.
+                              console.warn(
+                                '[send-stream] tool backfill failed:',
+                                err,
+                              )
                             }
-                          }
-                        } catch (err) {
-                          // Backfill is best-effort; don't fail the run.
-                          console.warn(
-                            '[send-stream] tool backfill failed:',
-                            err,
-                          )
-                        }
+                          },
+                        )
+                        // Backfill can outlive bounded sealing retries; attach a
+                        // handler now, then re-observe any failure below.
+                        void terminalPersistence.catch(() => undefined)
 
                         const translated = {
                           state: 'complete',
                           sessionKey: sessionKeyFromEvent,
                           runId,
                         }
-                        persistActiveRun((runSessionKey, activeId) =>
-                          markRunStatus(runSessionKey, activeId, 'complete'),
+                        await finalizeTerminalPersistence(
+                          terminalPersistence,
+                          () => sendEvent('done', translated),
                         )
-                        sendEvent('done', translated)
-                        skipPublish || publishChatEvent('done', translated)
-                        closeStream()
                       }
                     },
                   },
                 )
+                settleCardMutationEdge('authorized')
+                // A producer may ignore abort and remain pending forever. Keep
+                // its eventual rejection observed, but let the bounded race own
+                // this HTTP stream's lifetime.
+                void upstreamStream.catch(() => undefined)
+                await waitWithinStreamLifetime(upstreamStream)
+                // A producer that resolves without a terminal event still owns
+                // no authority to leave this SSE response open indefinitely.
+                if (!streamTransportUnavailable()) await streamLifetime
               } finally {
-                // Stop the mid-run tool poller and let it drain.
-                liveRunActive = false
-                try {
-                  await livePollerPromise
-                } catch {
-                  // ignore
-                }
+                stopLivePolling()
+                // Do not clear the shared deadline here: a producer rejection still
+                // has to finish terminal persistence in the outer catch. closeStream
+                // clears it after persistence or when the absolute deadline wins.
+                // History providers may ignore route closure. The detached poller
+                // still exits through the shared lifetime race and closed guards.
+                void livePollerPromise.catch(() => undefined)
               }
-
-              // Set a timeout to close the stream if no completion event
-              streamTimeoutTimer = setTimeout(() => {
-                if (!streamClosed) {
-                  sendEvent('error', { message: 'Stream timeout' })
-                  closeStream()
-                }
-              }, SEND_STREAM_RUN_TIMEOUT_MS)
             } catch (err) {
-              // Only send error if stream hasn't already completed successfully
+              // Only send error if stream hasn't already completed successfully.
+              // Finalization consumes a sealing failure so this catch cannot loop
+              // by requesting the already-rejected terminal transition again.
               if (!streamClosed) {
                 const errorMsg = normalizeClaudeErrorMessage(err)
-                sendEvent('error', {
-                  message: errorMsg,
-                  sessionKey,
-                })
-                closeStream()
+                await finalizeTerminalPersistence(
+                  withRouteOwnedCardError(
+                    persistTerminalRun('error', errorMsg),
+                    activeRunId ?? undefined,
+                    sessionKey,
+                  ),
+                  () => {
+                    sendEvent('error', {
+                      message: errorMsg,
+                      sessionKey: getPublicSessionKey(),
+                    })
+                  },
+                )
               }
-            }
-          },
-          cancel() {
-            // User clicked Stop, navigated away, or browser closed the tab.
-            // Mark the stream complete, persist the run as 'handoff' so
-            // session history reflects the interruption, then delegate to
-            // closeStream() for timer/controller cleanup.  Delegate instead
-            // of duplicating cleanup logic to keep the two paths in sync.
-            if (activeRunId && !streamClosed) {
-              persistActiveRun((runSessionKey, activeId) =>
-                markRunStatus(runSessionKey, activeId, 'handoff'),
+              settleCardMutationEdge(
+                cardMutationAuthorityStale ? 'stale' : 'not-reached',
               )
             }
-            closeStream()
+          },
+          async cancel() {
+            // User clicked Stop, navigated away, or browser closed the tab.
+            // Stop transport work immediately, then observe bounded sealing
+            // without allowing exhaustion to reject stream cancellation.
+            const terminalPersistence = !streamClosed
+              ? withRouteOwnedCardError(
+                  persistedRunId
+                    ? persistTerminalRun('handoff')
+                    : Promise.resolve(),
+                  activeRunId ?? undefined,
+                  sessionKey,
+                )
+              : Promise.resolve()
+            await finalizeTerminalPersistence(
+              terminalPersistence,
+              undefined,
+              true,
+            )
           },
         })
 
-        return new Response(stream, {
+        const response = new Response(stream, {
           headers: {
             'Content-Type': 'text/event-stream; charset=utf-8',
             'Cache-Control': 'no-cache, no-transform',
             Connection: 'keep-alive',
             'X-Accel-Buffering': 'no',
             ...buildResolvedSessionHeaders({
-              sessionKey,
-              friendlyId: resolvedFriendlyId,
+              sessionKey: getPublicSessionKey(),
+              friendlyId: publicFriendlyId,
             }),
           },
         })
+        if (cardMutationEdgeStatus) {
+          const mutationEdgeStatus = await cardMutationEdgeStatus
+          if (mutationEdgeStatus === 'stale') {
+            return staleCardMutationResponse()
+          }
+        }
+        return response
       },
     },
   },

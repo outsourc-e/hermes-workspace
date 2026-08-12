@@ -4,7 +4,6 @@ import {
   BrainIcon,
   Building01Icon,
   Cancel01Icon,
-  Castle02Icon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
@@ -23,17 +22,23 @@ import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
 import {
+  selectAgentDisplayName,
   selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { useSettingsStore } from '@/hooks/use-settings'
+import { AgentIdentityAvatar } from '@/components/avatars'
+import {
+  buildChatCardNavigation,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 
 export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
-    to: '/chat/main',
+    to: '/chat/new',
     match: (p: string) => p.startsWith('/chat') || p === '/new' || p === '/',
   },
   {
@@ -43,13 +48,7 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     to: '/dashboard',
     match: (p: string) => p.startsWith('/dashboard'),
   },
-  {
-    id: 'playground',
-    label: 'HermesWorld',
-    icon: Castle02Icon,
-    to: '/playground',
-    match: (p: string) => p.startsWith('/playground'),
-  },
+
   {
     id: 'terminal',
     label: 'Terminal',
@@ -165,8 +164,10 @@ export function MobileHamburgerMenu() {
   }, [open])
 
   const navigate = useNavigate()
+  const activeChatCardId = useWorkspaceStore((state) => state.activeChatCardId)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
+  const agentDisplayName = useChatSettingsStore(selectAgentDisplayName)
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
@@ -176,9 +177,13 @@ export function MobileHamburgerMenu() {
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
-  function handleNav(to: string) {
+  function handleNav(to: string, cardAwareChat = false) {
     hapticTap()
-    void navigate({ to })
+    if (cardAwareChat) {
+      void navigate(buildChatCardNavigation(activeChatCardId))
+    } else {
+      void navigate({ to })
+    }
     setOpen(false)
   }
 
@@ -227,17 +232,13 @@ export function MobileHamburgerMenu() {
           style={{ borderBottom: '1px solid var(--color-border, #e5e7eb)' }}
         >
           <div className="flex items-center gap-2.5">
-            <img
-              src="/claude-avatar.webp"
-              alt="Hermes Agent"
-              className="size-8 rounded-xl shrink-0"
-            />
+            <AgentIdentityAvatar className="size-8 rounded-xl shrink-0" />
             <div className="flex flex-col leading-tight">
               <span
                 className="font-bold text-[15px] tracking-tight"
                 style={{ color: 'var(--color-ink, #111)' }}
               >
-                Hermes Agent
+                {agentDisplayName}
               </span>
               <span
                 className="text-[11px]"
@@ -266,7 +267,7 @@ export function MobileHamburgerMenu() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => handleNav(item.to)}
+                onClick={() => handleNav(item.to, item.id === 'chat')}
                 className={cn(
                   'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full',
                   'transition-all duration-150 active:scale-[0.98]',

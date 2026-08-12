@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Delete01Icon,
+  GitForkIcon,
   MoreHorizontalIcon,
   Pen01Icon,
   PinIcon,
@@ -21,12 +22,22 @@ import {
 
 type SessionItemProps = {
   session: SessionMeta
+  routeKey?: string
+  inspectChildCardId?: string
   active: boolean
   isPinned: boolean
+  contextLabel?: string
+  showActions?: boolean
+  inspected?: boolean
+  busy?: boolean
+  attention?: boolean
   onSelect?: () => void
-  onTogglePin: (session: SessionMeta) => void
-  onRename: (session: SessionMeta) => void
-  onDelete: (session: SessionMeta) => void
+  onTogglePin?: () => void
+  canBranch: boolean
+  pending: boolean
+  onBranch?: () => void
+  onRename?: () => void
+  onArchive?: () => void
 }
 
 const dayFormatter = new Intl.DateTimeFormat(undefined, {
@@ -98,12 +109,22 @@ function getFriendlyIdLabel(friendlyId: string): string {
 
 function SessionItemComponent({
   session,
+  routeKey = session.friendlyId,
+  inspectChildCardId,
   active,
   isPinned,
+  contextLabel,
+  showActions = true,
+  inspected = false,
+  busy = false,
+  attention = false,
   onSelect,
   onTogglePin,
+  canBranch,
+  pending,
+  onBranch,
   onRename,
-  onDelete,
+  onArchive,
 }: SessionItemProps) {
   const isGenerating = session.titleStatus === 'generating'
   const isError = session.titleStatus === 'error'
@@ -129,7 +150,11 @@ function SessionItemComponent({
   return (
     <Link
       to="/chat/$sessionKey"
-      params={{ sessionKey: session.friendlyId }}
+      params={{ sessionKey: routeKey }}
+      search={inspectChildCardId ? { inspect: inspectChildCardId } : {}}
+      aria-current={active ? 'page' : undefined}
+      aria-busy={busy ? true : undefined}
+      data-inspected={inspected ? 'true' : undefined}
       onClick={() => {
         try {
           localStorage.setItem('claude-last-session', session.friendlyId)
@@ -142,19 +167,33 @@ function SessionItemComponent({
         'select-none',
         active
           ? 'bg-primary-200 text-primary-950'
-          : 'bg-transparent text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200',
+          : attention
+            ? 'animate-[pulse_3s_ease-in-out_infinite] bg-accent-500/10 text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200'
+            : 'bg-transparent text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200',
       )}
     >
       <div className="flex-1 min-w-0 py-1.5">
-        <div
-          className={cn(
-            'truncate text-sm font-[500]',
-            isGenerating ? 'text-primary-700' : '',
-          )}
-        >
-          <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
-            {baseTitle}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span
+            className={cn(
+              'min-w-0 truncate text-sm font-[500]',
+              isGenerating ? 'text-primary-700' : '',
+            )}
+          >
+            <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
+              {baseTitle}
+            </span>
           </span>
+          {busy ? (
+            <span className="inline-flex shrink-0 items-center">
+              <span
+                aria-hidden="true"
+                data-card-working-indicator="true"
+                className="size-3 animate-spin rounded-full border border-primary-400 border-t-primary-800"
+              />
+              <span className="sr-only">Card is working</span>
+            </span>
+          ) : null}
         </div>
         <div
           className={cn(
@@ -162,84 +201,119 @@ function SessionItemComponent({
             isError ? 'text-red-600' : undefined,
           )}
         >
+          {contextLabel ? <span>{contextLabel}</span> : null}
+          {contextLabel && subtitle ? (
+            <span aria-hidden="true"> • </span>
+          ) : null}
           {subtitle}
         </div>
       </div>
-      <MenuRoot>
-        <MenuTrigger
-          type="button"
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          className={cn(
-            'ml-2 inline-flex size-7 items-center justify-center rounded-md text-primary-700',
-            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200 dark:hover:bg-primary-800',
-            'aria-expanded:opacity-100 aria-expanded:bg-primary-200',
-          )}
-          aria-label="Session options"
-        >
-          <HugeiconsIcon
-            icon={MoreHorizontalIcon}
-            size={20}
-            strokeWidth={1.5}
-          />
-        </MenuTrigger>
-        <MenuContent side="bottom" align="end">
-          <MenuItem
+      {showActions ? (
+        <MenuRoot>
+          <MenuTrigger
+            type="button"
             onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
-              onTogglePin(session)
             }}
-            className="gap-2"
+            className={cn(
+              'ml-2 inline-flex size-7 items-center justify-center rounded-md text-primary-700',
+              'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200 dark:hover:bg-primary-800',
+              'aria-expanded:opacity-100 aria-expanded:bg-primary-200',
+            )}
+            aria-label="Card options"
           >
-            <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
-            {isPinned ? 'Unpin session' : 'Pin session'}
-          </MenuItem>
-          <MenuItem
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onRename(session)
-            }}
-            className="gap-2"
-          >
-            <HugeiconsIcon icon={Pen01Icon} size={20} strokeWidth={1.5} />{' '}
-            Rename
-          </MenuItem>
-          <MenuItem
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onDelete(session)
-            }}
-            className="text-red-700 gap-2 hover:bg-red-50 dark:hover:bg-red-900/30/80 data-highlighted:bg-red-50/80"
-          >
-            <HugeiconsIcon icon={Delete01Icon} size={20} strokeWidth={1.5} />{' '}
-            Delete
-          </MenuItem>
-        </MenuContent>
-      </MenuRoot>
+            <HugeiconsIcon
+              icon={MoreHorizontalIcon}
+              size={20}
+              strokeWidth={1.5}
+            />
+          </MenuTrigger>
+          <MenuContent side="bottom" align="end">
+            <MenuItem
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onTogglePin?.()
+              }}
+              className="gap-2"
+            >
+              <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
+              {isPinned ? 'Unpin card' : 'Pin card'}
+            </MenuItem>
+            {canBranch ? (
+              <MenuItem
+                disabled={pending}
+                aria-busy={pending ? true : undefined}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  if (!pending) onBranch?.()
+                }}
+                className="gap-2"
+              >
+                <HugeiconsIcon icon={GitForkIcon} size={20} strokeWidth={1.5} />{' '}
+                Branch conversation
+              </MenuItem>
+            ) : null}
+            <MenuItem
+              disabled={pending}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onRename?.()
+              }}
+              className="gap-2"
+            >
+              <HugeiconsIcon icon={Pen01Icon} size={20} strokeWidth={1.5} />{' '}
+              Rename
+            </MenuItem>
+            <MenuItem
+              disabled={pending}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onArchive?.()
+              }}
+              className="text-red-700 gap-2 hover:bg-red-50 dark:hover:bg-red-900/30/80 data-highlighted:bg-red-50/80"
+            >
+              <HugeiconsIcon icon={Delete01Icon} size={20} strokeWidth={1.5} />{' '}
+              Archive
+            </MenuItem>
+          </MenuContent>
+        </MenuRoot>
+      ) : null}
     </Link>
   )
 }
 
 function areSessionItemsEqual(prev: SessionItemProps, next: SessionItemProps) {
+  if (prev.routeKey !== next.routeKey) return false
+  if (prev.inspectChildCardId !== next.inspectChildCardId) return false
   if (prev.active !== next.active) return false
   if (prev.isPinned !== next.isPinned) return false
+  if (prev.contextLabel !== next.contextLabel) return false
+  if (prev.showActions !== next.showActions) return false
+  if (prev.inspected !== next.inspected) return false
+  if (prev.busy !== next.busy) return false
+  if (prev.attention !== next.attention) return false
   if (prev.onSelect !== next.onSelect) return false
   if (prev.onTogglePin !== next.onTogglePin) return false
+  if (prev.canBranch !== next.canBranch) return false
+  if (prev.pending !== next.pending) return false
+  if (prev.onBranch !== next.onBranch) return false
   if (prev.onRename !== next.onRename) return false
-  if (prev.onDelete !== next.onDelete) return false
+  if (prev.onArchive !== next.onArchive) return false
   if (prev.session === next.session) return true
   return (
     prev.session.key === next.session.key &&
+    prev.session.backendKey === next.session.backendKey &&
     prev.session.friendlyId === next.session.friendlyId &&
     prev.session.label === next.session.label &&
     prev.session.title === next.session.title &&
     prev.session.derivedTitle === next.session.derivedTitle &&
     prev.session.updatedAt === next.session.updatedAt &&
+    prev.session.lastMessage === next.session.lastMessage &&
     prev.session.titleStatus === next.session.titleStatus &&
     prev.session.titleSource === next.session.titleSource &&
     prev.session.titleError === next.session.titleError

@@ -35,7 +35,7 @@ export type AgentWorkingRow = {
 }
 
 type AgentsWorkingPanelProps = {
-  agents: AgentWorkingRow[]
+  agents: Array<AgentWorkingRow>
   className?: string
   onSelectAgent?: (agentId: string) => void
   onKillAgent?: (agentId: string) => void
@@ -46,8 +46,12 @@ type AgentsWorkingPanelProps = {
 }
 
 // Accent colors per agent index (cycled) — must match AGENT_ACCENT_COLORS in agent-hub-layout
+const DEFAULT_ACCENT_COLOR = {
+  bar: 'bg-orange-500',
+  text: 'text-orange-600',
+}
 const ACCENT_COLORS = [
-  { bar: 'bg-orange-500', text: 'text-orange-600' },
+  DEFAULT_ACCENT_COLOR,
   { bar: 'bg-blue-500', text: 'text-blue-600' },
   { bar: 'bg-violet-500', text: 'text-violet-600' },
   { bar: 'bg-emerald-500', text: 'text-emerald-600' },
@@ -153,7 +157,8 @@ function AgentRow({
   onSteer?: (message: string) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const accent = ACCENT_COLORS[accentIndex % ACCENT_COLORS.length]
+  const accent =
+    ACCENT_COLORS[accentIndex % ACCENT_COLORS.length] ?? DEFAULT_ACCENT_COLOR
   const isActive = agent.status === 'active'
   const isSpawning = agent.status === 'spawning'
   const canSteer =
@@ -336,7 +341,8 @@ function AgentCompactCard({
   isSelected: boolean
   onSelect: () => void
 }) {
-  const accent = ACCENT_COLORS[accentIndex % ACCENT_COLORS.length]
+  const accent =
+    ACCENT_COLORS[accentIndex % ACCENT_COLORS.length] ?? DEFAULT_ACCENT_COLOR
   const isActive = agent.status === 'active'
 
   return (

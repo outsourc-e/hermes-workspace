@@ -1,5 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { randomUUID } from 'node:crypto'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   deleteTask,
@@ -8,8 +8,8 @@ import {
   updateTask,
 } from '../../server/tasks-store'
 import {
-  ensureLocalSession,
   appendLocalMessage,
+  ensureLocalSession,
   getLocalMessages,
 } from '../../server/local-session-store'
 import { getSessionMessages } from '../../server/claude-dashboard-api'
@@ -127,7 +127,7 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             // Try dashboard API first — this has the full conversation history
             try {
               const dashResult = await getSessionMessages(task.session_id)
-              if (dashResult?.messages?.length) {
+              if (dashResult.messages.length) {
                 tail = dashResult.messages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .filter(

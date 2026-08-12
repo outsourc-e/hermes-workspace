@@ -70,7 +70,7 @@ export type MissionStartedEvent = MissionEventBase<
   {
     missionId: string
     goal: string
-    team: string[]
+    team: Array<string>
   }
 >
 
@@ -135,14 +135,14 @@ export type MissionEventInput = Omit<MissionEvent, 'id' | 'timestamp'> &
   Partial<Pick<MissionEvent, 'id' | 'timestamp'>>
 
 export type MissionEventFilter = {
-  type?: MissionEventType | MissionEventType[]
+  type?: MissionEventType | Array<MissionEventType>
   agentId?: string
   fromTimestamp?: number
   toTimestamp?: number
 }
 
 function createEventId(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
+  if (typeof globalThis.crypto.randomUUID === 'function') {
     return globalThis.crypto.randomUUID()
   }
 
@@ -197,9 +197,9 @@ function matchesFilter(
 }
 
 export class MissionEventLog {
-  private events: MissionEvent[]
+  private events: Array<MissionEvent>
 
-  constructor(initialEvents: MissionEventInput[] = []) {
+  constructor(initialEvents: Array<MissionEventInput> = []) {
     this.events = initialEvents.map(normalizeEvent)
   }
 
@@ -209,11 +209,11 @@ export class MissionEventLog {
     return nextEvent
   }
 
-  getEvents(filter?: MissionEventFilter): MissionEvent[] {
+  getEvents(filter?: MissionEventFilter): Array<MissionEvent> {
     return this.events.filter((event) => matchesFilter(event, filter))
   }
 
-  getAgentTimeline(agentId: string): MissionEvent[] {
+  getAgentTimeline(agentId: string): Array<MissionEvent> {
     return this.getEvents({ agentId })
   }
 
@@ -221,7 +221,7 @@ export class MissionEventLog {
     this.events = []
   }
 
-  toJSON(): { events: MissionEvent[] } {
+  toJSON(): { events: Array<MissionEvent> } {
     return {
       events: [...this.events],
     }

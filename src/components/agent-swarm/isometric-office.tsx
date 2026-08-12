@@ -3,18 +3,16 @@
  * Agents walk around, take breaks, chat, celebrate, and show expressions.
  * Inspired by Gather.town / @RoundtableSpace.
  */
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useMemo } from 'react'
 import { PERSONA_COLORS, PixelAvatar } from './pixel-avatar'
 import { DESK_POSITIONS, LOCATIONS } from './agent-behaviors'
-import {
-  useAgentBehaviors,
-  type AgentBehaviorView,
-} from '@/hooks/use-agent-behaviors'
-import { assignPersona } from '@/lib/agent-personas'
-import type { SwarmSession } from '@/stores/agent-swarm-store'
-import { cn } from '@/lib/utils'
 import { getSwarmSessionDisplayName } from './session-display-name'
+import type { SwarmSession } from '@/stores/agent-swarm-store'
+import type { AgentBehaviorView } from '@/hooks/use-agent-behaviors'
+import { useAgentBehaviors } from '@/hooks/use-agent-behaviors'
+import { assignPersona } from '@/lib/agent-personas'
+import { cn } from '@/lib/utils'
 
 type IsometricOfficeProps = {
   sessions: Array<SwarmSession>

@@ -20,7 +20,7 @@ export type TaskRecord = {
   column: TaskColumn
   priority: TaskPriority
   assignee: string | null
-  tags: string[]
+  tags: Array<string>
   due_date: string | null
   position: number
   created_by: string
@@ -29,7 +29,7 @@ export type TaskRecord = {
   session_id?: string | null
 }
 
-type TaskFile = { tasks: TaskRecord[] }
+type TaskFile = { tasks: Array<TaskRecord> }
 
 type TaskFilters = {
   column?: string | null
@@ -88,8 +88,8 @@ function normalizeTask(
     id: task.id,
     title: task.title,
     description: task.description ?? '',
-    column: (task.column as TaskColumn) ?? 'backlog',
-    priority: (task.priority as TaskPriority) ?? 'medium',
+    column: task.column ?? 'backlog',
+    priority: task.priority ?? 'medium',
     assignee: task.assignee ?? null,
     tags: Array.isArray(task.tags)
       ? task.tags.filter((tag): tag is string => typeof tag === 'string')
@@ -103,7 +103,7 @@ function normalizeTask(
   }
 }
 
-export function listTasks(filters: TaskFilters = {}): TaskRecord[] {
+export function listTasks(filters: TaskFilters = {}): Array<TaskRecord> {
   let tasks = readTaskFile().tasks.map(normalizeTask)
   if (!filters.includeDone) {
     tasks = tasks.filter((task) => task.column !== 'done')
@@ -164,7 +164,9 @@ export function updateTask(
   const index = file.tasks.findIndex((task) => task.id === taskId)
   if (index === -1) return null
 
-  const current = normalizeTask(file.tasks[index] as TaskRecord)
+  const storedTask = file.tasks[index]
+  if (!storedTask) return null
+  const current = normalizeTask(storedTask)
   const next = normalizeTask({
     ...current,
     ...updates,
@@ -191,9 +193,7 @@ export function deleteTask(taskId: string): boolean {
   const file = readTaskFile()
   const nextTasks = file.tasks.filter((task) => task.id !== taskId)
   if (nextTasks.length === file.tasks.length) return false
-  writeTaskFile({
-    tasks: nextTasks.map((task) => normalizeTask(task as TaskRecord)),
-  })
+  writeTaskFile({ tasks: nextTasks.map((task) => normalizeTask(task)) })
   return true
 }
 

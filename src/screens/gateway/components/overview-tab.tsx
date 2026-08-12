@@ -2,19 +2,19 @@
 // The Overview content is instead rendered inline via renderOverviewContent().
 // To reduce agent-hub-layout.tsx size, the inline overview rendering could be
 // migrated to use this component instead.
-import { cn } from '@/lib/utils'
-import type { AgentWorkingRow } from './agents-working-panel'
-import type { TeamMember } from './team-panel'
 import {
-  AGENT_ACCENT_COLORS,
   AgentAvatar,
+  getAgentAccentColor,
   resolveAgentAvatarIndex,
 } from './agent-avatar'
 import {
+  OfficeView,
   getAgentStatusMeta,
   getOfficeModelLabel,
-  OfficeView,
 } from './office-view'
+import type { AgentWorkingRow } from './agents-working-panel'
+import type { TeamMember } from './team-panel'
+import { cn } from '@/lib/utils'
 
 export interface OverviewTabProps {
   missionActive: boolean
@@ -27,13 +27,13 @@ export interface OverviewTabProps {
   teamCount: number
   teamLabel: string
   pendingApprovalCount: number
-  agentWorkingRows: AgentWorkingRow[]
+  agentWorkingRows: Array<AgentWorkingRow>
   teamById: Map<string, TeamMember>
   overviewAgentsView: 'cards' | 'live'
   selectedOutputAgentId?: string
   activeTemplateName?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
-  recentActivityItems: string[]
+  recentActivityItems: Array<string>
   truncateMissionGoal: (goal: string, max?: number) => string
   onViewMission: () => void
   onStopMission: () => void
@@ -171,8 +171,7 @@ export function OverviewTab({
               {agentWorkingRows.length > 0 ? (
                 <div className="flex -space-x-2">
                   {agentWorkingRows.slice(0, 5).map((agent, index) => {
-                    const accent =
-                      AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                    const accent = getAgentAccentColor(index)
                     return (
                       <span
                         key={`${agent.id}-header-avatar`}
@@ -256,8 +255,7 @@ export function OverviewTab({
               )}
             >
               {agentWorkingRows.map((agent, index) => {
-                const accent =
-                  AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+                const accent = getAgentAccentColor(index)
                 const isBusy =
                   agent.status === 'active' || agent.status === 'spawning'
                 const isRunning = agent.status === 'active'

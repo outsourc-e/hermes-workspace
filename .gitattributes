@@ -1,0 +1,3 @@
+# esbuild may preserve semantic control characters inside template literals in this generated artifact.
+# They are not source formatting defects, so do not make `git diff --check` reject a fresh bundle.
+electron/server-bundle.cjs whitespace=-trailing-space

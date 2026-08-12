@@ -1,15 +1,13 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { seedAgentPresets } from './agent-presets'
+import { useNavigate } from '@tanstack/react-router'
 import {
   AiBrain03Icon,
-  Settings01Icon,
   PlusSignIcon,
+  Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Button } from '@/components/ui/button'
-import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
+import { seedAgentPresets } from './agent-presets'
 import { OrchestratorCard } from './components/orchestrator-card'
 import { OperationsAgentCard } from './components/operations-agent-card'
 import { OperationsAgentDetail } from './components/operations-agent-detail'
@@ -18,6 +16,11 @@ import { OperationsSettingsModal } from './components/operations-settings-modal'
 import { FullOutputsView } from './components/full-outputs-view'
 import { AgentBusPanel } from './components/agent-bus-panel'
 import { useOperations } from './hooks/use-operations'
+import type { CSSProperties } from 'react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
+import { buildAgentSessionCardRoute } from '@/components/agent-view/agent-session-card-navigation'
 
 export const THEME_STYLE: CSSProperties = {
   ['--theme-bg' as string]: 'var(--color-surface)',
@@ -53,6 +56,7 @@ export const THEME_STYLE: CSSProperties = {
 }
 
 export function OperationsScreen() {
+  const navigate = useNavigate()
   useEffect(() => {
     seedAgentPresets()
   }, [])
@@ -62,9 +66,10 @@ export function OperationsScreen() {
   const [view, setView] = useState<'overview' | 'outputs'>('overview')
   const {
     agents,
+    orchestratorChat,
     recentActivity,
     configQuery,
-    sessionsQuery,
+    sessionCardsQuery,
     cronJobsQuery,
     settings,
     saveSettings,
@@ -78,10 +83,13 @@ export function OperationsScreen() {
   } = useOperations()
 
   const isLoading =
-    configQuery.isPending || sessionsQuery.isPending || cronJobsQuery.isPending
+    configQuery.isPending ||
+    sessionCardsQuery.isPending ||
+    cronJobsQuery.isPending
   const error =
     (configQuery.error instanceof Error && configQuery.error.message) ||
-    (sessionsQuery.error instanceof Error && sessionsQuery.error.message) ||
+    (sessionCardsQuery.error instanceof Error &&
+      sessionCardsQuery.error.message) ||
     (cronJobsQuery.error instanceof Error && cronJobsQuery.error.message) ||
     null
   const settingsAgent =
@@ -173,7 +181,10 @@ export function OperationsScreen() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <OrchestratorCard totalAgents={agents.length} />
+              <OrchestratorCard
+                totalAgents={agents.length}
+                chat={orchestratorChat}
+              />
             </motion.div>
 
             <motion.div
@@ -225,36 +236,43 @@ export function OperationsScreen() {
                     Recent Activity
                   </h2>
                   <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
-                    Latest outputs across the team
+                    Authoritative Session Card activity across the team
                   </p>
                 </div>
               </div>
               <div className="mt-4 space-y-3">
                 {recentActivity.length > 0 ? (
-                  recentActivity.map((activity) => {
-                    const agent = agents.find(
-                      (entry) => entry.id === activity.agentId,
-                    )
-                    return (
-                      <div
-                        key={activity.id}
-                        className="flex flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 md:flex-row md:items-center md:justify-between"
-                      >
-                        <p className="text-sm text-[var(--theme-text)]">
-                          <span className="mr-2">
-                            {agent?.meta.emoji ?? '🤖'}
-                          </span>
-                          <span className="font-medium">
-                            {agent?.name ?? activity.agentId}:
-                          </span>{' '}
-                          {activity.summary}
-                        </p>
-                        <span className="shrink-0 text-sm text-[var(--theme-muted)]">
+                  recentActivity.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="flex flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 md:flex-row md:items-center md:justify-between"
+                    >
+                      <p className="text-sm text-[var(--theme-text)]">
+                        <span className="mr-2">💬</span>
+                        <span className="font-medium">{activity.summary}</span>
+                        <span className="ml-2 text-xs capitalize text-[var(--theme-muted)]">
+                          {activity.relationship}
+                        </span>
+                      </p>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="text-sm text-[var(--theme-muted)]">
                           {formatRelativeTime(activity.timestamp)}
                         </span>
+                        <button
+                          type="button"
+                          aria-label={`Open ${activity.summary}`}
+                          onClick={() =>
+                            void navigate(
+                              buildAgentSessionCardRoute(activity.navigation),
+                            )
+                          }
+                          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+                        >
+                          Open Chat
+                        </button>
                       </div>
-                    )
-                  })
+                    </div>
+                  ))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-6 text-sm text-[var(--theme-muted)]">
                     No recent activity yet.

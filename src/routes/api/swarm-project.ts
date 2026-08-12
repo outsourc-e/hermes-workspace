@@ -1,8 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProfilesDir } from '../../server/claude-paths'
 
@@ -95,7 +95,7 @@ function gitChangedFiles(cwd: string, max = 25): Array<string> {
       .slice(0, max)
       .map((line) => {
         const m = line.match(/^[A-Z?! ]{1,2}\s+(.+)$/)
-        return m ? m[1].replace(/^"|"$/g, '') : line
+        return m?.[1]?.replace(/^"|"$/g, '') ?? line
       })
   } catch {
     return []

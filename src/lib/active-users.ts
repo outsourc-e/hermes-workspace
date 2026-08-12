@@ -22,7 +22,7 @@ function isAlreadyPingedToday(): boolean {
     return false
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toISOString().slice(0, 10)
   return storedDate === today
 }
 
@@ -31,7 +31,7 @@ function markAsPingedToday(): void {
     return
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toISOString().slice(0, 10)
   localStorage.setItem(STORAGE_KEY, today)
 }
 

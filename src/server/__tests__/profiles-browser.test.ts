@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   existsSync,
@@ -139,7 +139,7 @@ describe('profiles-browser', () => {
       const mod = await loadMod()
       mod.setActiveProfile('jarvis')
       expect(warnSpy).toHaveBeenCalledTimes(1)
-      expect(warnSpy.mock.calls[0][0]).toContain(
+      expect(warnSpy.mock.calls[0]?.[0]).toContain(
         'Restart the Hermes Agent gateway',
       )
 

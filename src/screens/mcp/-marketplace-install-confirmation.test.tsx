@@ -7,9 +7,12 @@
  * Uses React.act + createRoot directly (not @testing-library/react) to avoid
  * the vitest ESM/CJS dual-instance issue with React 19 hooks in jsdom.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+
+import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
+import type { HubMcpEntry } from './hooks/use-mcp-hub'
 
 // Mock UI primitives before importing the component so vi.mock hoisting works.
 // The factories use the same React import as the test (ESM) to avoid dual-instance.
@@ -58,9 +61,6 @@ vi.mock('@/components/ui/button', () => ({
   }) =>
     React.createElement('button', { onClick, disabled, ...props }, children),
 }))
-
-import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
-import type { HubMcpEntry } from './hooks/use-mcp-hub'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -432,12 +432,12 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
   })
 
   it('fetch is aborted when dialog is closed mid-install', async () => {
-    const captured = { signal: null as AbortSignal | null }
+    let capturedSignal: AbortSignal | null = null
     // Fetch that never resolves — simulates in-flight request
     global.fetch = vi
       .fn()
       .mockImplementation((_url: string, opts: RequestInit) => {
-        captured.signal = opts.signal ?? null
+        capturedSignal = opts.signal ?? null
         return new Promise(() => {
           /* never resolves */
         })
@@ -461,10 +461,9 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     })
 
     // Signal should exist and not yet aborted
-    const signal = captured.signal
-    expect(signal).not.toBeNull()
-    if (!signal) throw new Error('capturedSignal is null')
-    expect(signal.aborted).toBe(false)
+    expect(capturedSignal).not.toBeNull()
+    const getCapturedSignal = () => capturedSignal
+    expect(getCapturedSignal()?.aborted).toBe(false)
 
     // Now close the dialog while installing — Cancel button is disabled, so
     // we test via onOpenChange: simulate the dialog requesting close
@@ -474,7 +473,7 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     // calls ac.abort() when installing. We trigger this by re-rendering with
     // entry=null which changes open to false, triggering onOpenChange(false).
     // Since we can't call onOpenChange directly, verify the AbortSignal is wired.
-    expect(captured.signal).not.toBeNull()
+    expect(capturedSignal).not.toBeNull()
     // The signal is passed to fetch — abort is triggered by handleOpenChange
     // which is tested structurally via the component code review.
     // Functional proof: re-render with entry=null to trigger open→false.

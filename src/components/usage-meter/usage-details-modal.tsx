@@ -9,30 +9,33 @@ import {
 import { Button } from '@/components/ui/button'
 import { formatModelName } from '@/lib/format-model-name'
 
-type ModelUsage = {
+export type ModelUsage = {
   model: string
   inputTokens: number
   outputTokens: number
   costUsd: number
 }
 
-type SessionUsage = {
-  id: string
+export type CardUsage = {
+  cardId: string
+  title: string
+  canonicalSource: 'local' | 'remote'
+  state: 'idle' | 'running' | 'completed' | 'error' | 'pending_approval'
   model: string
   inputTokens: number
   outputTokens: number
+  contextPercent: number
   costUsd: number
-  startedAt?: number
-  updatedAt?: number
+  updatedAt: number
 }
 
-type UsageSummary = {
+export type UsageSummary = {
   inputTokens: number
   outputTokens: number
   contextPercent: number
   dailyCost: number
   models: Array<ModelUsage>
-  sessions: Array<SessionUsage>
+  cards: Array<CardUsage>
 }
 
 type UsageLine = {
@@ -52,7 +55,7 @@ type ProviderUsage = {
   status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
   message?: string
   plan?: string
-  lines: UsageLine[]
+  lines: Array<UsageLine>
   updatedAt: number
 }
 
@@ -236,7 +239,13 @@ function statusBadge(status: ProviderUsage['status']) {
   }
 }
 
-function buildCsv(usage: UsageSummary): string {
+function csvCell(value: string | number): string {
+  const raw = String(value)
+  const text = /^[\t\r\n ]*[=+\-@]/.test(raw) ? `'${raw}` : raw
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+export function buildUsageCsv(usage: UsageSummary): string {
   const rows: Array<string> = []
   rows.push('Usage Summary')
   rows.push('Metric,Value')
@@ -249,17 +258,37 @@ function buildCsv(usage: UsageSummary): string {
   rows.push('Model,Input Tokens,Output Tokens,Cost (USD)')
   usage.models.forEach((model) => {
     rows.push(
-      `${model.model},${model.inputTokens},${model.outputTokens},${model.costUsd.toFixed(4)}`,
+      [
+        model.model,
+        model.inputTokens,
+        model.outputTokens,
+        model.costUsd.toFixed(4),
+      ]
+        .map(csvCell)
+        .join(','),
     )
   })
   rows.push('')
-  rows.push('Session History')
+  rows.push('Card Usage')
   rows.push(
-    'Session,Model,Input Tokens,Output Tokens,Cost (USD),Start,Last Updated',
+    'Card ID,Card Title,Canonical Source,State,Model,Input Tokens,Output Tokens,Context %,Cost (USD),Last Updated',
   )
-  usage.sessions.forEach((session) => {
+  usage.cards.forEach((card) => {
     rows.push(
-      `${session.id},${session.model},${session.inputTokens},${session.outputTokens},${session.costUsd.toFixed(4)},${formatTimestamp(session.startedAt)},${formatTimestamp(session.updatedAt)}`,
+      [
+        card.cardId,
+        card.title,
+        card.canonicalSource,
+        card.state,
+        card.model,
+        card.inputTokens,
+        card.outputTokens,
+        card.contextPercent,
+        card.costUsd.toFixed(4),
+        formatTimestamp(card.updatedAt),
+      ]
+        .map(csvCell)
+        .join(','),
     )
   })
   return rows.join('\n')
@@ -276,9 +305,7 @@ export function UsageDetailsModal({
   preferredProvider,
   onSetPreferredProvider,
 }: UsageDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState<'session' | 'providers'>(
-    'providers',
-  )
+  const [activeTab, setActiveTab] = useState<'cards' | 'providers'>('providers')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const handleSetDefault = (provider: string) => {
@@ -294,16 +321,16 @@ export function UsageDetailsModal({
         await onRefreshProviders()
       }
       setIsRefreshing(false)
-    } catch (error) {
+    } catch (refreshError) {
       if (import.meta.env.DEV)
-        console.error('Failed to refresh provider data:', error)
+        console.error('Failed to refresh provider data:', refreshError)
     } finally {
       setIsRefreshing(false)
     }
   }
 
   const handleExport = () => {
-    const csv = buildCsv(usage)
+    const csv = buildUsageCsv(usage)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -321,14 +348,15 @@ export function UsageDetailsModal({
         <div>
           <DialogTitle>Usage Overview</DialogTitle>
           <DialogDescription>
-            Live usage from your gateway session and connected providers.
+            Card-scoped usage from validated Session Cards and connected
+            providers.
           </DialogDescription>
         </div>
         <DialogClose className="text-primary-700">Close</DialogClose>
       </div>
 
       <div className="flex w-fit items-center gap-1 rounded-full border border-primary-100 bg-primary-50 p-1 text-xs">
-        {(['session', 'providers'] as const).map((tab) => (
+        {(['cards', 'providers'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -339,13 +367,13 @@ export function UsageDetailsModal({
                 : 'text-primary-600 hover:text-primary-800'
             }`}
           >
-            {tab === 'session' ? 'Session' : 'Providers'}
+            {tab === 'cards' ? 'Cards' : 'Providers'}
           </button>
         ))}
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'session' ? (
+        {activeTab === 'cards' ? (
           <div className="flex flex-col gap-4">
             {error ? (
               <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
@@ -414,38 +442,44 @@ export function UsageDetailsModal({
 
             <div className="rounded-2xl border border-primary-200 bg-primary-50/70 p-4">
               <div className="mb-3 text-sm font-semibold text-primary-900">
-                Session history
+                Card usage
               </div>
               <div className="grid gap-2">
-                {usage.sessions.length === 0 ? (
+                {usage.cards.length === 0 ? (
                   <div className="text-sm text-primary-500">
-                    No sessions reported yet. Start a chat to see session
-                    history here.
+                    No validated Card usage reported yet.
                   </div>
                 ) : (
-                  usage.sessions.map((session) => (
+                  usage.cards.map((card) => (
                     <div
-                      key={session.id}
+                      key={card.cardId}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 text-sm"
                     >
                       <div>
                         <div className="font-medium text-primary-800">
-                          {session.id}
+                          {card.title}
                         </div>
                         <div className="text-xs text-primary-500">
-                          {formatModelName(session.model)}
+                          {card.canonicalSource === 'remote'
+                            ? 'Remote'
+                            : 'Local'}{' '}
+                          ·{' '}
+                          {card.state
+                            .replace('_', ' ')
+                            .replace(/^./, (value) => value.toUpperCase())}
                         </div>
                       </div>
                       <div className="text-primary-600">
-                        {formatTokens(session.inputTokens)} in ·{' '}
-                        {formatTokens(session.outputTokens)} out
+                        {formatTokens(card.inputTokens)} in ·{' '}
+                        {formatTokens(card.outputTokens)} out ·{' '}
+                        {Math.round(card.contextPercent)}% context
                       </div>
                       <div className="text-xs text-primary-500">
-                        {formatTimestamp(session.startedAt)} →{' '}
-                        {formatTimestamp(session.updatedAt)}
+                        {formatModelName(card.model)} · Updated{' '}
+                        {formatTimestamp(card.updatedAt)}
                       </div>
                       <div className="font-semibold text-primary-900">
-                        {formatCurrency(session.costUsd)}
+                        {formatCurrency(card.costUsd)}
                       </div>
                     </div>
                   ))

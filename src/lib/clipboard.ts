@@ -1,7 +1,15 @@
 export async function writeTextToClipboard(text: string): Promise<void> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+  const clipboard = (
+    globalThis as {
+      navigator?: {
+        clipboard?: { writeText?: (value: string) => Promise<void> }
+      }
+    }
+  ).navigator?.clipboard
+
+  if (typeof clipboard?.writeText === 'function') {
     try {
-      await navigator.clipboard.writeText(text)
+      await clipboard.writeText(text)
       return
     } catch {
       // Fall through to execCommand for insecure origins / limited browsers.

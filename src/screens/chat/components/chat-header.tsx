@@ -1,6 +1,9 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Folder01Icon } from '@hugeicons/core-free-icons'
+
+import type { SessionCard } from '../types'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -35,10 +38,11 @@ function formatMobileSessionTitle(rawTitle: string): string {
     .filter(Boolean)
   if (
     parts.length >= 2 &&
-    parts[0].toLowerCase() === 'agent' &&
-    parts[1].length > 0
+    parts[0]?.toLowerCase() === 'agent' &&
+    (parts[1]?.length ?? 0) > 0
   ) {
-    const candidate = parts[parts.length - 1]
+    const candidate = parts.at(-1)
+    if (!candidate) return 'New Chat'
     if (candidate.toLowerCase() === 'main') return 'Main Chat'
     return `${toTitleCase(candidate)} Chat`
   }
@@ -64,6 +68,64 @@ function formatMobileSessionTitle(rawTitle: string): string {
   return title
 }
 
+function cardOwnsSessionKey(card: SessionCard, sessionKey: string): boolean {
+  return (
+    card.cardId === sessionKey ||
+    card.canonicalSegmentKey === sessionKey ||
+    card.continuationSegmentKeys.includes(sessionKey)
+  )
+}
+
+type ActiveLineageContextProps = {
+  parentCard?: Pick<SessionCard, 'cardId' | 'title'>
+  continuationCount: number
+  onOpenParent?: () => void
+  backToParent?: boolean
+}
+
+function ActiveLineageContext({
+  parentCard,
+  continuationCount,
+  onOpenParent,
+  backToParent = false,
+}: ActiveLineageContextProps) {
+  const segmentStatus =
+    continuationCount > 1 ? (
+      <span
+        className="shrink-0 whitespace-nowrap text-[10px] font-medium text-primary-500"
+        aria-label={`Logical conversation with ${continuationCount} segments`}
+      >
+        {continuationCount} segments
+      </span>
+    ) : null
+
+  if (!parentCard) return segmentStatus
+
+  const parentTitle = parentCard.title
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-primary-500">
+      <Link
+        to="/chat/$sessionKey"
+        params={{ sessionKey: parentCard.cardId }}
+        search={{}}
+        onClick={onOpenParent}
+        aria-label={
+          backToParent
+            ? 'Back to parent conversation'
+            : `Open parent session ${parentTitle}`
+        }
+        className="min-w-0 truncate rounded-sm underline decoration-primary-300 underline-offset-2 hover:text-accent-600 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+        title={`Parent: ${parentTitle}`}
+      >
+        {backToParent
+          ? 'Back to parent conversation'
+          : `Parent: ${parentTitle}`}
+      </Link>
+      {segmentStatus}
+    </span>
+  )
+}
+
 type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'adaptive'
 
 type ChatHeaderProps = {
@@ -72,14 +134,10 @@ type ChatHeaderProps = {
   renamingTitle?: boolean
   wrapperRef?: React.Ref<HTMLDivElement>
   onOpenSessions?: () => void
-  sessions?: Array<{
-    key?: string
-    friendlyId?: string
-    label?: string
-    derivedTitle?: string
-    title?: string
-  }>
+  /** Authoritative, server-backed logical conversations. */
+  sessionCards?: Array<SessionCard>
   activeFriendlyId?: string
+  inspectedChildCardId?: string
   onSelectSession?: (key: string) => void
   showFileExplorerButton?: boolean
   fileExplorerCollapsed?: boolean
@@ -112,9 +170,10 @@ function ChatHeaderComponent({
   renamingTitle = false,
   wrapperRef,
   onOpenSessions,
-  sessions = [],
+  sessionCards,
   activeFriendlyId = '',
-  onSelectSession,
+  inspectedChildCardId,
+
   showFileExplorerButton = false,
   fileExplorerCollapsed = true,
   onToggleFileExplorer,
@@ -139,17 +198,39 @@ function ChatHeaderComponent({
   const [sessionPopoverOpen, setSessionPopoverOpen] = useState(false)
   const [sessionSearch, setSessionSearch] = useState('')
   const sessionPopoverRef = useRef<HTMLDivElement | null>(null)
+  const closeSessionPopover = useCallback(() => {
+    setSessionPopoverOpen(false)
+    setSessionSearch('')
+  }, [])
+  const availableCards = sessionCards ?? []
+  const cardContext = useMemo(() => {
+    const card = availableCards.find(
+      (candidate) =>
+        candidate.cardId === activeFriendlyId ||
+        cardOwnsSessionKey(candidate, activeFriendlyId),
+    )
+    if (!card) return undefined
+    const inspectedChild = inspectedChildCardId
+      ? card.childNodes.find((child) => child.cardId === inspectedChildCardId)
+      : undefined
+    return { card, inspectedChild }
+  }, [activeFriendlyId, availableCards, inspectedChildCardId])
+  const displayedTitle = cardContext?.card.title ?? activeTitle
+  const displayedContinuationCount = cardContext?.card.continuationCount ?? 1
+  const displayedParentCard = cardContext?.inspectedChild
+    ? cardContext.card
+    : undefined
+
   useEffect(() => {
     if (!sessionPopoverOpen) return
     const handler = (e: MouseEvent) => {
       if (sessionPopoverRef.current?.contains(e.target as Node)) return
-      setSessionPopoverOpen(false)
-      setSessionSearch('')
+      closeSessionPopover()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [sessionPopoverOpen])
-  const [titleDraft, setTitleDraft] = useState(activeTitle)
+  }, [closeSessionPopover, sessionPopoverOpen])
+  const [titleDraft, setTitleDraft] = useState(displayedTitle)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const isSavingTitleRef = useRef(false)
 
@@ -162,7 +243,7 @@ function ChatHeaderComponent({
   }, [])
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
-  const mobileTitle = formatMobileSessionTitle(activeTitle)
+  const mobileTitle = formatMobileSessionTitle(displayedTitle)
   void _agentModel
   void agentConnected
   void statusMode
@@ -188,8 +269,8 @@ function ChatHeaderComponent({
 
   useEffect(() => {
     if (isEditingTitle) return
-    setTitleDraft(activeTitle)
-  }, [activeTitle, isEditingTitle])
+    setTitleDraft(displayedTitle)
+  }, [displayedTitle, isEditingTitle])
 
   useEffect(() => {
     if (!isEditingTitle) return
@@ -200,21 +281,25 @@ function ChatHeaderComponent({
     return () => window.clearTimeout(id)
   }, [isEditingTitle])
 
-  const canRenameTitle = Boolean(onRenameTitle && !isMobile)
+  const canRenameTitle = Boolean(
+    onRenameTitle &&
+    !isMobile &&
+    (!cardContext || cardContext.card.relationshipKind === 'root'),
+  )
 
   const startTitleEdit = useCallback(() => {
     if (!canRenameTitle || renamingTitle) return
-    setTitleDraft(activeTitle)
+    setTitleDraft(displayedTitle)
     setIsEditingTitle(true)
-  }, [activeTitle, canRenameTitle, renamingTitle])
+  }, [canRenameTitle, displayedTitle, renamingTitle])
 
   const cancelTitleEdit = useCallback(() => {
-    setTitleDraft(activeTitle)
+    setTitleDraft(displayedTitle)
     setIsEditingTitle(false)
-  }, [activeTitle])
+  }, [displayedTitle])
 
   const saveTitleEdit = useCallback(async () => {
-    if (!onRenameTitle || isSavingTitleRef.current) return
+    if (!canRenameTitle || !onRenameTitle || isSavingTitleRef.current) return
 
     const trimmed = titleDraft.trim()
     if (!trimmed) {
@@ -222,7 +307,7 @@ function ChatHeaderComponent({
       return
     }
 
-    if (trimmed === activeTitle.trim()) {
+    if (trimmed === displayedTitle.trim()) {
       setIsEditingTitle(false)
       return
     }
@@ -234,7 +319,13 @@ function ChatHeaderComponent({
     } finally {
       isSavingTitleRef.current = false
     }
-  }, [activeTitle, cancelTitleEdit, onRenameTitle, titleDraft])
+  }, [
+    cancelTitleEdit,
+    canRenameTitle,
+    displayedTitle,
+    onRenameTitle,
+    titleDraft,
+  ])
 
   if (isMobile) {
     return (
@@ -271,32 +362,39 @@ function ChatHeaderComponent({
             </svg>
           </button>
 
-          {/* Session name — centered pill, tappable */}
-          <button
-            type="button"
-            onClick={onOpenSessions}
-            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 dark:bg-neutral-700/80 dark:hover:bg-neutral-600/80 transition-colors"
-            aria-label="Switch session"
-          >
-            <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
-              {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
-            </span>
-            <svg
-              width="8"
-              height="5"
-              viewBox="0 0 8 5"
-              fill="none"
-              className="shrink-0 opacity-40"
+          {/* Session name and compact lineage context */}
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenSessions}
+              className="flex min-w-0 max-w-[55vw] items-center gap-1 rounded-full bg-primary-100/70 px-3 py-1.5 transition-colors hover:bg-primary-200/80 dark:bg-neutral-700/80 dark:hover:bg-neutral-600/80"
+              aria-label="Switch session"
             >
-              <path
-                d="M1 1L4 4L7 1"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+              <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
+                {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
+              </span>
+              <svg
+                width="8"
+                height="5"
+                viewBox="0 0 8 5"
+                fill="none"
+                className="shrink-0 opacity-40"
+              >
+                <path
+                  d="M1 1L4 4L7 1"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <ActiveLineageContext
+              parentCard={displayedParentCard}
+              continuationCount={displayedContinuationCount}
+              backToParent={Boolean(cardContext?.inspectedChild)}
+            />
+          </div>
 
           <div className="flex-1" />
         </div>
@@ -336,7 +434,7 @@ function ChatHeaderComponent({
           </TooltipProvider>
         ) : null}
         <div className="group min-w-0 flex-1">
-          {isEditingTitle ? (
+          {isEditingTitle && canRenameTitle ? (
             <input
               ref={titleInputRef}
               value={titleDraft}
@@ -370,7 +468,7 @@ function ChatHeaderComponent({
                 className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
                 title="Click to switch session"
               >
-                {activeTitle}
+                {displayedTitle}
               </button>
               {canRenameTitle && !renamingTitle && (
                 <button
@@ -382,6 +480,12 @@ function ChatHeaderComponent({
                   ✏️
                 </button>
               )}
+              <ActiveLineageContext
+                parentCard={displayedParentCard}
+                continuationCount={displayedContinuationCount}
+                onOpenParent={closeSessionPopover}
+                backToParent={Boolean(cardContext?.inspectedChild)}
+              />
               {sessionPopoverOpen && (
                 <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-2xl">
                   <div
@@ -423,38 +527,26 @@ function ChatHeaderComponent({
                       opacity: 1,
                     }}
                   >
-                    {sessions
-                      .filter((s) => {
+                    {availableCards
+                      .filter((card) => {
                         if (!sessionSearch.trim()) return true
                         const q = sessionSearch.toLowerCase()
                         return (
-                          (s.label || s.derivedTitle || s.title || '')
-                            .toLowerCase()
-                            .includes(q) ||
-                          s.friendlyId?.toLowerCase().includes(q)
+                          card.title.toLowerCase().includes(q) ||
+                          card.cardId.toLowerCase().includes(q)
                         )
                       })
                       .slice(0, 20)
-                      .map((s) => {
-                        const label =
-                          s.label ||
-                          s.derivedTitle ||
-                          s.title ||
-                          s.friendlyId?.slice(0, 8) ||
-                          'Session'
+                      .map((card) => {
                         const isActive =
-                          Boolean(activeFriendlyId) &&
-                          (s.friendlyId === activeFriendlyId ||
-                            s.key?.endsWith(`:${activeFriendlyId}`))
+                          card.cardId === cardContext?.card.cardId
                         return (
-                          <button
-                            key={s.key || s.friendlyId}
-                            type="button"
-                            onClick={() => {
-                              setSessionPopoverOpen(false)
-                              setSessionSearch('')
-                              onSelectSession?.(s.key || s.friendlyId || '')
-                            }}
+                          <Link
+                            key={card.cardId}
+                            to="/chat/$sessionKey"
+                            params={{ sessionKey: card.cardId }}
+                            search={{}}
+                            onClick={closeSessionPopover}
                             className={cn(
                               'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors',
                               'border-b border-[var(--theme-border)] last:border-0 hover:bg-[var(--theme-card2)]',
@@ -465,15 +557,15 @@ function ChatHeaderComponent({
                               className="flex-1 min-w-0 truncate"
                               style={{ color: 'var(--theme-text)' }}
                             >
-                              {label}
+                              {card.title}
                             </span>
                             {isActive && (
                               <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />
                             )}
-                          </button>
+                          </Link>
                         )
                       })}
-                    {sessions.length === 0 && (
+                    {availableCards.length === 0 && (
                       <p className="px-3 py-4 text-sm text-neutral-400">
                         No sessions
                       </p>

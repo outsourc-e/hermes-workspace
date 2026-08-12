@@ -6,9 +6,9 @@
  */
 import { motion } from 'motion/react'
 import type {
-  AgoraStatus,
   AgoraAvatarId,
   AgoraFacing,
+  AgoraStatus,
 } from '../lib/agora-types'
 
 const STATUS_DOT_COLOR: Record<AgoraStatus, string> = {

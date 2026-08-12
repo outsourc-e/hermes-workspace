@@ -9,15 +9,15 @@
  * Replaced by real WebSocket sync in v0.1.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  DEFAULT_WORLD,
-  type AgoraFacing,
-  type AgoraMessage,
-  type AgoraProfile,
-  type AgoraUser,
-  type AgoraWorld,
-} from '../lib/agora-types'
+import { DEFAULT_WORLD } from '../lib/agora-types'
 import { buildMockAgoraUsers, driftUser } from '../lib/agora-mock'
+import type {
+  AgoraFacing,
+  AgoraMessage,
+  AgoraProfile,
+  AgoraUser,
+  AgoraWorld,
+} from '../lib/agora-types'
 
 const MOVE_SPEED_PX = 6
 const BUBBLE_TTL_MS = 7000
@@ -42,11 +42,11 @@ export function useAgoraRoom({
     isMoving: false,
   }))
 
-  const [others, setOthers] = useState<AgoraUser[]>(() =>
+  const [others, setOthers] = useState<Array<AgoraUser>>(() =>
     buildMockAgoraUsers({ worldWidth: world.width, worldHeight: world.height }),
   )
 
-  const [messages, setMessages] = useState<AgoraMessage[]>([])
+  const [messages, setMessages] = useState<Array<AgoraMessage>>([])
 
   // Sync self.profile when external profile changes (e.g. avatar swap).
   useEffect(() => {
@@ -216,8 +216,9 @@ export function useAgoraRoom({
       if (others.length === 0) return
       const speaker = others[Math.floor(Math.random() * others.length)]
       const line = lines[Math.floor(Math.random() * lines.length)]
+      if (!speaker || !line) return
       setMessages((prev) => {
-        const next: AgoraMessage[] = [
+        const next: Array<AgoraMessage> = [
           ...prev,
           {
             id:
@@ -239,7 +240,7 @@ export function useAgoraRoom({
       window.clearTimeout(initial)
     }
     // intentionally only on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [])
 
   // ── Derived: active speech bubbles per user ────────────────

@@ -17,7 +17,6 @@ export type WidgetId =
   | 'cache_efficiency'
   | 'velocity'
   | 'cost_ledger'
-  | 'sessions_intelligence'
   | 'logs_tail'
   | 'operator_tip'
   | 'skills_usage'
@@ -79,13 +78,7 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     column: 'main',
     hideable: true,
   },
-  {
-    id: 'sessions_intelligence',
-    label: 'Sessions intelligence',
-    description: 'Recent sessions with token / tool / status badges.',
-    column: 'main',
-    hideable: true,
-  },
+
   {
     id: 'logs_tail',
     label: 'Live logs',
@@ -169,9 +162,7 @@ function readLayout(): StoredLayout {
     }
     const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
     const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
-    const filtered = incoming.filter((id): id is WidgetId =>
-      valid.has(id as WidgetId),
-    )
+    const filtered = incoming.filter((id): id is WidgetId => valid.has(id))
     // Schema migration: when we introduce new widgets that should be
     // off-by-default, bump STORAGE_VERSION and union the prior user
     // hides with the new defaults so existing installs don't suddenly

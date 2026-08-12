@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
+import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import { fetchSessionCards } from '@/screens/chat/chat-queries'
 import {
   Collapsible,
   CollapsiblePanel,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
+import { resolveSessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import { resolveMutableSessionCardBinding } from '@/lib/swarm-card-bindings'
 
 type BackgroundRun = {
   runId: string
@@ -23,6 +29,37 @@ type BackgroundRun = {
   lastLifecycleEvent: string | null
   errorMessage: string | null
 }
+
+export function resolveBackgroundRunCardNavigation(
+  response: SessionCardListWire | undefined,
+  run: Pick<BackgroundRun, 'sessionKey' | 'friendlyId'>,
+) {
+  return resolveSessionCardProducerNavigation(response, [
+    run.sessionKey,
+    run.friendlyId,
+  ])
+}
+
+function resolveBackgroundRunCardActivity(
+  response: SessionCardListWire | undefined,
+  run: BackgroundRun,
+) {
+  const navigation = resolveBackgroundRunCardNavigation(response, run)
+  if (!navigation || !response) return null
+  const owner = response.cards.find((card) => card.cardId === navigation.cardId)
+  if (!owner) return null
+  const title = navigation.inspectedChildCardId
+    ? owner.childNodes.find(
+        (child) => child.cardId === navigation.inspectedChildCardId,
+      )?.title
+    : owner.title
+  if (!title?.trim()) return null
+  return { run, navigation, title: title.trim() }
+}
+
+type BackgroundRunActivity = NonNullable<
+  ReturnType<typeof resolveBackgroundRunCardActivity>
+>
 
 const POLL_INTERVAL_MS = 10_000
 const STALE_THRESHOLD_MS = 5 * 60 * 1000
@@ -44,7 +81,11 @@ function statusColor(run: BackgroundRun): string {
   return 'bg-emerald-400 animate-pulse'
 }
 
-export function BackgroundRunsSection() {
+export function BackgroundRunsSection({
+  sessionCardList,
+}: {
+  sessionCardList?: SessionCardListWire
+}) {
   const navigate = useNavigate()
   const [runs, setRuns] = useState<Array<BackgroundRun>>([])
   const [expanded, setExpanded] = useState(false)
@@ -77,15 +118,32 @@ export function BackgroundRunsSection() {
     }
   }, [refresh])
 
-  const handleAbandon = useCallback(async (run: BackgroundRun) => {
-    setBusyRunId(run.runId)
+  const handleAbandon = useCallback(async (activity: BackgroundRunActivity) => {
+    const cardId =
+      activity.navigation.inspectedChildCardId ?? activity.navigation.cardId
+    setBusyRunId(activity.run.runId)
     try {
-      await fetch(
-        `/api/runs/${encodeURIComponent(run.sessionKey)}/${encodeURIComponent(run.runId)}/abandon`,
-        { method: 'POST' },
+      const cardBinding = resolveMutableSessionCardBinding(
+        await fetchSessionCards(),
+        {
+          cardId,
+          parentCardId: activity.navigation.inspectedChildCardId
+            ? activity.navigation.cardId
+            : null,
+        },
       )
+      if (!cardBinding) return
+      const response = await fetch(
+        `/api/session-cards/${encodeURIComponent(cardId)}/active-run/abandon`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ runId: activity.run.runId, cardBinding }),
+        },
+      )
+      if (!response.ok) return
       // Optimistic removal — server poll will catch up.
-      setRuns((prev) => prev.filter((r) => r.runId !== run.runId))
+      setRuns((prev) => prev.filter((run) => run.runId !== activity.run.runId))
     } catch {
       /* surface via reload */
     } finally {
@@ -94,19 +152,31 @@ export function BackgroundRunsSection() {
   }, [])
 
   const handleOpen = useCallback(
-    (run: BackgroundRun) => {
+    (target: SessionCardProducerNavigation) => {
       void navigate({
         to: '/chat/$sessionKey',
-        params: { sessionKey: run.friendlyId || run.sessionKey },
+        params: { sessionKey: target.cardId },
+        search: target.inspectedChildCardId
+          ? { inspect: target.inspectedChildCardId }
+          : {},
       })
     },
     [navigate],
   )
 
-  if (runs.length === 0) return null
+  const resolvedRuns = useMemo(
+    () =>
+      runs.flatMap((run) => {
+        const activity = resolveBackgroundRunCardActivity(sessionCardList, run)
+        return activity ? [activity] : []
+      }),
+    [runs, sessionCardList],
+  )
 
-  const staleCount = runs.filter(
-    (r) => r.stalenessMs >= STALE_THRESHOLD_MS,
+  if (resolvedRuns.length === 0) return null
+
+  const staleCount = resolvedRuns.filter(
+    ({ run }) => run.stalenessMs >= STALE_THRESHOLD_MS,
   ).length
 
   return (
@@ -131,26 +201,27 @@ export function BackgroundRunsSection() {
             title={
               staleCount > 0
                 ? `${staleCount} stale (>5m silent)`
-                : `${runs.length} running`
+                : `${resolvedRuns.length} running`
             }
           >
-            {runs.length}
+            {resolvedRuns.length}
             {staleCount > 0 ? ` · ${staleCount} stale` : ''}
           </span>
         </div>
         <CollapsiblePanel contentClassName="pt-1">
           <div className="space-y-1">
-            {runs.map((run) => {
+            {resolvedRuns.map((activity) => {
+              const { run, navigation, title } = activity
               const isStale = run.stalenessMs >= STALE_THRESHOLD_MS
               const isBusy = busyRunId === run.runId
               const snippet =
-                run.lastAssistantText?.trim() ||
+                run.lastAssistantText.trim() ||
                 run.lastLifecycleEvent ||
                 (run.lastToolName ? `tool: ${run.lastToolName}` : '') ||
                 'no output yet'
               return (
                 <div
-                  key={`${run.sessionKey}:${run.runId}`}
+                  key={`${navigation.cardId}:${run.runId}`}
                   className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
                 >
                   <div className="flex items-center gap-1.5">
@@ -162,9 +233,9 @@ export function BackgroundRunsSection() {
                     />
                     <span
                       className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800"
-                      title={run.sessionKey}
+                      title={title}
                     >
-                      {run.friendlyId || run.sessionKey}
+                      {title}
                     </span>
                     <span
                       className={cn(
@@ -181,15 +252,15 @@ export function BackgroundRunsSection() {
                   <div className="mt-1 flex justify-end gap-1 pl-3">
                     <button
                       type="button"
-                      onClick={() => handleOpen(run)}
-                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-600 hover:bg-accent-100 hover:text-accent-800"
+                      onClick={() => handleOpen(navigation)}
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-600 hover:bg-accent-100 hover:text-accent-800 disabled:cursor-default disabled:opacity-50"
                     >
                       Open
                     </button>
                     <button
                       type="button"
                       disabled={isBusy}
-                      onClick={() => handleAbandon(run)}
+                      onClick={() => handleAbandon(activity)}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium text-red-500 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
                       title="Mark this run as failed and remove it from the active list"
                     >

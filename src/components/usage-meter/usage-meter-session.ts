@@ -1,11 +1,21 @@
-export function resolveUsageMeterSessionKey(pathname: string): string {
-  if (!pathname.startsWith('/chat/')) return 'main'
-  const raw = pathname.slice('/chat/'.length).split('/')[0] || 'main'
+const SOURCE_QUALIFIED_CARD_ID_PATTERN = /^(remote|local):\S+$/
+
+/**
+ * Resolve the active route to the logical Card identity accepted by the
+ * session-status API. Bootstrap aliases and legacy raw session IDs are not
+ * Cards, so polling them would repeatedly receive "Card usage unavailable".
+ */
+export function resolveUsageMeterSessionKey(pathname: string): string | null {
+  if (!pathname.startsWith('/chat/')) return null
+  const raw = pathname.slice('/chat/'.length).split('/')[0]
+  if (!raw) return null
+  let cardId: string
   try {
-    return decodeURIComponent(raw) || 'main'
+    cardId = decodeURIComponent(raw)
   } catch {
-    return raw || 'main'
+    return null
   }
+  return SOURCE_QUALIFIED_CARD_ID_PATTERN.test(cardId) ? cardId : null
 }
 
 export function shouldShowUsageMeterContextAlert({
@@ -15,7 +25,7 @@ export function shouldShowUsageMeterContextAlert({
   pathname: string
   visible: boolean
 }): boolean {
-  return visible && pathname.startsWith('/chat/')
+  return visible && resolveUsageMeterSessionKey(pathname) !== null
 }
 
 export function resolveContextAlertThreshold({

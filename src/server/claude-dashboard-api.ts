@@ -1,4 +1,4 @@
-import { dashboardFetch, CLAUDE_DASHBOARD_URL } from './gateway-capabilities'
+import { CLAUDE_DASHBOARD_URL, dashboardFetch } from './gateway-capabilities'
 
 export type DashboardSession = {
   id: string
@@ -16,6 +16,17 @@ export type DashboardSession = {
   cache_read_tokens?: number
   reasoning_tokens?: number
   parent_session_id?: string | null
+  relationship_type?: string | null
+  parent_title?: string | null
+  parent_source?: string | null
+  session_source?: string | null
+  _lineage_root_id?: string | null
+  _lineage_tip_id?: string | null
+  _compression_segment_count?: number | null
+  _parent_lineage_root_id?: string | null
+  _parent_lineage_tip_id?: string | null
+  _cross_surface_child_session?: boolean | null
+  pre_compression_snapshot?: boolean | null
   last_active?: number | null
   is_active?: boolean
   preview?: string | null
@@ -33,6 +44,11 @@ export type DashboardMessage = {
   token_count?: number | null
   finish_reason?: string | null
   reasoning?: string | null
+}
+
+/** Exact persisted session row plus its messages from the dashboard export API. */
+export type DashboardSessionExport = DashboardSession & {
+  messages: Array<DashboardMessage>
 }
 
 export type SessionSearchResponse = {
@@ -64,7 +80,7 @@ export type EnvVarInfo = {
   url?: string | null
   category?: string
   is_password?: boolean
-  tools?: string[]
+  tools?: Array<string>
   advanced?: boolean
 }
 
@@ -88,7 +104,7 @@ export type ToolsetInfo = {
   description: string
   enabled: boolean
   configured: boolean
-  tools: string[]
+  tools: Array<string>
 }
 
 export type DashboardStatus = {
@@ -116,10 +132,11 @@ export async function listSessions(
   limit = 50,
   offset = 0,
 ): Promise<{
-  sessions: DashboardSession[]
+  sessions: Array<DashboardSession>
   total: number
   limit: number
   offset: number
+  snapshot?: string
 }> {
   return dashboardJson(`/api/sessions?limit=${limit}&offset=${offset}`)
 }
@@ -129,11 +146,22 @@ export async function getSession(id: string): Promise<DashboardSession> {
 }
 
 export async function getSessionMessages(id: string): Promise<{
-  messages: DashboardMessage[]
+  messages: Array<DashboardMessage>
+  session_id?: string
   session_started?: number
   model?: string
 }> {
   return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/messages`)
+}
+
+/**
+ * Read one exact persisted segment without the dashboard's resume-to-tip
+ * behavior used by its interactive message route.
+ */
+export async function getSessionExport(
+  id: string,
+): Promise<DashboardSessionExport> {
+  return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/export`)
 }
 
 export async function searchSessions(
@@ -169,15 +197,22 @@ export async function updateSession(
   })
 }
 
-export async function forkSession(
-  id: string,
-): Promise<{ session: DashboardSession; forked_from: string }> {
-  return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/fork`, {
-    method: 'POST',
-  })
+export type SessionLatestDescendantResponse = {
+  requested_session_id: string
+  session_id: string
+  path: Array<string>
+  changed: boolean
 }
 
-export async function getSkills(): Promise<SkillInfo[]> {
+export async function getLatestDescendant(
+  id: string,
+): Promise<SessionLatestDescendantResponse> {
+  return dashboardJson(
+    `/api/sessions/${encodeURIComponent(id)}/latest-descendant`,
+  )
+}
+
+export async function getSkills(): Promise<Array<SkillInfo>> {
   return dashboardJson('/api/skills')
 }
 
@@ -198,7 +233,7 @@ export async function getConfig(): Promise<Record<string, unknown>> {
 
 export async function getConfigSchema(): Promise<{
   fields: Record<string, unknown>
-  category_order: string[]
+  category_order: Array<string>
 }> {
   return dashboardJson('/api/config/schema')
 }
@@ -258,15 +293,9 @@ export async function saveConfig(
     const current = await getConfig()
     // Dashboards have historically wrapped the config in `{ config: {...} }`.
     // Support both shapes defensively.
-    const base =
-      current && typeof current === 'object' && 'config' in current
-        ? ((current as Record<string, unknown>).config as Record<
-            string,
-            unknown
-          >)
-        : (current as Record<string, unknown>)
-    if (base && typeof base === 'object') {
-      merged = deepMerge(base, config)
+    const base: unknown = 'config' in current ? current.config : current
+    if (base !== null && typeof base === 'object') {
+      merged = deepMerge(base as Record<string, unknown>, config)
     }
   } catch {
     // If we can't read the current config, fall back to sending the raw patch.
@@ -313,7 +342,7 @@ export async function deleteEnvVar(key: string): Promise<{ ok: boolean }> {
   })
 }
 
-export async function getCronJobs(): Promise<CronJob[]> {
+export async function getCronJobs(): Promise<Array<CronJob>> {
   return dashboardJson('/api/cron/jobs')
 }
 
@@ -362,7 +391,7 @@ export async function getModelInfo(): Promise<Record<string, unknown>> {
   return dashboardJson('/api/model/info')
 }
 
-export async function getToolsets(): Promise<ToolsetInfo[]> {
+export async function getToolsets(): Promise<Array<ToolsetInfo>> {
   return dashboardJson('/api/tools/toolsets')
 }
 

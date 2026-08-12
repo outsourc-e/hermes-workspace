@@ -6,6 +6,16 @@ export type CrewPlatformInfo = {
   updatedAt: string
 }
 
+type LegacyCrewSessionActivity =
+  | {
+      lastSessionTitle: string
+      lastSessionAt: number | null
+    }
+  | {
+      lastSessionTitle?: null | undefined
+      lastSessionAt?: number | null
+    }
+
 export type CrewMember = {
   id: string
   displayName: string
@@ -21,16 +31,13 @@ export type CrewMember = {
   platforms: Record<string, CrewPlatformInfo>
   model: string
   provider: string
-  lastSessionTitle: string | null
-  lastSessionAt: number | null
-  sessionCount: number
-  messageCount: number
-  toolCallCount: number
-  totalTokens: number
-  estimatedCostUsd: number | null
   cronJobCount: number
   assignedTaskCount: number
-}
+  // Compatibility-only typing for older non-Crew consumers. The crew-status
+  // endpoint never populates these raw activity fields.
+  sessionCount?: number
+  totalTokens?: number
+} & LegacyCrewSessionActivity
 
 export type CrewStatus = {
   crew: Array<CrewMember>

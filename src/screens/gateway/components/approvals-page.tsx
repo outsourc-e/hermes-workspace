@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  fetchGatewayApprovals,
-  type GatewayApprovalEntry,
-} from '@/lib/gateway-api'
-import { cn } from '@/lib/utils'
 import type { ApprovalRequest } from '../lib/approvals-store'
+import type { GatewayApprovalEntry } from '@/lib/gateway-api'
+import { fetchGatewayApprovals } from '@/lib/gateway-api'
+import { cn } from '@/lib/utils'
 
 type ApprovalsPageProps = {
-  approvals: ApprovalRequest[]
+  approvals: Array<ApprovalRequest>
   onApprove: (id: string) => Promise<boolean> | void
   onDeny: (id: string) => Promise<boolean> | void
 }
@@ -111,7 +109,7 @@ function normalizeGatewayApproval(
 }
 
 function normalizeAgentApproval(entry: ApprovalRequest): UnifiedApproval {
-  const preview = entry.context?.trim() || entry.action
+  const preview = entry.context.trim() || entry.action
   const toolName =
     entry.action
       .trim()
@@ -134,9 +132,9 @@ export function ApprovalsPage({
   onApprove,
   onDeny,
 }: ApprovalsPageProps) {
-  const [gatewayPending, setGatewayPending] = useState<GatewayApprovalEntry[]>(
-    [],
-  )
+  const [gatewayPending, setGatewayPending] = useState<
+    Array<GatewayApprovalEntry>
+  >([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [resolvingIds, setResolvingIds] = useState<
@@ -154,7 +152,7 @@ export function ApprovalsPage({
     setGatewayPending(pending)
 
     const seen = seenIdsRef.current
-    const arrivals: string[] = []
+    const arrivals: Array<string> = []
     for (const entry of pending) {
       if (!entry.id) continue
       if (!seen.has(entry.id)) {
@@ -203,7 +201,7 @@ export function ApprovalsPage({
     }
   }, [refreshPending])
 
-  const pendingRows = useMemo<UnifiedApproval[]>(() => {
+  const pendingRows = useMemo<Array<UnifiedApproval>>(() => {
     const normalizedGateway = gatewayPending
       .map(normalizeGatewayApproval)
       .filter((entry): entry is UnifiedApproval => Boolean(entry))

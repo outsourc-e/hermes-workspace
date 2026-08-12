@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { cn } from '@/lib/utils'
 import type { HubTask } from './task-board'
+import { cn } from '@/lib/utils'
 
 function formatRelativeTime(ts: number): string {
   const diffMs = Math.max(0, Date.now() - ts)
@@ -87,7 +87,7 @@ export type TeamMember = {
   backstory: string // Persona/context that shapes agent behavior
   status: string
   memoryPath?: string // Custom memory/workspace path for this agent
-  skillAllowlist?: string[] // Skills this agent is allowed to use (empty = all)
+  skillAllowlist?: Array<string> // Skills this agent is allowed to use (empty = all)
   modelOverride?: string // Runtime model override (takes precedence over modelId)
 }
 
@@ -110,15 +110,15 @@ type GatewayModelOption = {
 }
 
 type TeamPanelProps = {
-  team: TeamMember[]
-  gatewayModels?: GatewayModelOption[]
+  team: Array<TeamMember>
+  gatewayModels?: Array<GatewayModelOption>
   activeTemplateId?: TeamTemplateId
   agentTaskCounts?: Record<string, number>
   spawnState?: Record<string, 'idle' | 'spawning' | 'ready' | 'error'>
   agentSessionStatus?: Record<string, AgentSessionStatusEntry>
   agentSessionMap?: Record<string, string>
   agentModelNotApplied?: Record<string, boolean>
-  tasks?: HubTask[]
+  tasks?: Array<HubTask>
   onRetrySpawn?: (member: TeamMember) => void
   onKillSession?: (member: TeamMember) => void
   onApplyTemplate: (templateId: TeamTemplateId) => void
@@ -132,7 +132,7 @@ type TeamPanelProps = {
   onSelectAgent?: (agentId?: string) => void
 }
 
-const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
+const MODEL_BADGE_COLOR: Partial<Record<ModelPresetId, string>> = {
   auto: 'bg-neutral-200 text-neutral-700',
   opus: 'bg-orange-100 text-orange-700',
   sonnet: 'bg-blue-100 text-blue-700',

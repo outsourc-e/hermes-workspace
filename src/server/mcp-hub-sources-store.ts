@@ -23,7 +23,7 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { getStateDir } from './workspace-state-dir'
+import { getHermesHome } from './workspace-state-dir'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,18 +51,18 @@ export interface ValidationIssue {
 }
 
 export interface ReadHubSourcesResult {
-  sources: HubSourceEntry[]
+  sources: Array<HubSourceEntry>
   source: HubSourcesSource
   error?: string
   errorPath?: string
-  validationErrors?: ValidationIssue[]
+  validationErrors?: Array<ValidationIssue>
 }
 
 // ---------------------------------------------------------------------------
 // Built-in sources (always present, cannot be removed)
 // ---------------------------------------------------------------------------
 
-export const BUILTIN_SOURCES: HubSourceEntry[] = [
+export const BUILTIN_SOURCES: Array<HubSourceEntry> = [
   {
     id: 'mcp-get',
     name: 'Smithery Registry',
@@ -103,7 +103,7 @@ const KNOWN_TOP_FIELDS = new Set(['version', 'sources'])
 // ---------------------------------------------------------------------------
 
 export function hubSourcesFilePath(): string {
-  return join(getStateDir(), 'mcp-hub-sources.json')
+  return join(getHermesHome(), 'mcp-hub-sources.json')
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ function makeCacheKey(
 // Seed (empty user sources — built-ins are always injected separately)
 // ---------------------------------------------------------------------------
 
-const SEED_PAYLOAD = { version: 1, sources: [] as HubSourceEntry[] }
+const SEED_PAYLOAD = { version: 1, sources: [] as Array<HubSourceEntry> }
 
 // ---------------------------------------------------------------------------
 // Atomic bootstrap
@@ -207,13 +207,13 @@ function bootstrapSeed(final: string): boolean {
 // ---------------------------------------------------------------------------
 
 interface PayloadValidationResult {
-  sources: HubSourceEntry[]
-  errors: ValidationIssue[]
+  sources: Array<HubSourceEntry>
+  errors: Array<ValidationIssue>
 }
 
 function validatePayload(parsed: unknown): PayloadValidationResult {
-  const errors: ValidationIssue[] = []
-  const out: HubSourceEntry[] = []
+  const errors: Array<ValidationIssue> = []
+  const out: Array<HubSourceEntry> = []
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     errors.push({ path: '', message: 'root must be an object' })
@@ -334,7 +334,9 @@ function validatePayload(parsed: unknown): PayloadValidationResult {
 // Merge built-ins + user sources
 // ---------------------------------------------------------------------------
 
-function mergeWithBuiltins(userSources: HubSourceEntry[]): HubSourceEntry[] {
+function mergeWithBuiltins(
+  userSources: Array<HubSourceEntry>,
+): Array<HubSourceEntry> {
   return [...BUILTIN_SOURCES, ...userSources]
 }
 
@@ -441,9 +443,9 @@ export async function readHubSources(): Promise<ReadHubSourcesResult> {
 // ---------------------------------------------------------------------------
 
 async function readUserSources(): Promise<{
-  sources: HubSourceEntry[]
+  sources: Array<HubSourceEntry>
   error?: string
-  validationErrors?: ValidationIssue[]
+  validationErrors?: Array<ValidationIssue>
 }> {
   const path = hubSourcesFilePath()
   const stat = statKey(path)
@@ -485,7 +487,7 @@ async function readUserSources(): Promise<{
 // Internal: atomic write user sources
 // ---------------------------------------------------------------------------
 
-function writeUserSourcesSync(userSources: HubSourceEntry[]): void {
+function writeUserSourcesSync(userSources: Array<HubSourceEntry>): void {
   const path = hubSourcesFilePath()
   const dir = dirname(path)
   mkdirSync(dir, { recursive: true })
@@ -524,7 +526,7 @@ export function validateSourceEntry(
   raw: unknown,
 ):
   | { ok: true; entry: Omit<HubSourceEntry, 'builtin'> }
-  | { ok: false; errors: ValidationIssue[] } {
+  | { ok: false; errors: Array<ValidationIssue> } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return {
       ok: false,
@@ -532,7 +534,7 @@ export function validateSourceEntry(
     }
   }
   const p = raw as Record<string, unknown>
-  const errors: ValidationIssue[] = []
+  const errors: Array<ValidationIssue> = []
 
   const id = typeof p.id === 'string' ? p.id : ''
   if (!ID_RE.test(id)) {
@@ -629,8 +631,8 @@ function withCrudLock<T>(fn: () => Promise<T>): Promise<T> {
 export async function addHubSource(
   raw: unknown,
 ): Promise<
-  | { ok: true; sources: HubSourceEntry[] }
-  | { ok: false; errors: ValidationIssue[]; status?: number }
+  | { ok: true; sources: Array<HubSourceEntry> }
+  | { ok: false; errors: Array<ValidationIssue>; status?: number }
 > {
   const validation = validateSourceEntry(raw)
   if (!validation.ok) return { ok: false, errors: validation.errors }
@@ -660,8 +662,8 @@ export async function updateHubSource(
   id: string,
   raw: unknown,
 ): Promise<
-  | { ok: true; sources: HubSourceEntry[] }
-  | { ok: false; errors: ValidationIssue[]; status?: number }
+  | { ok: true; sources: Array<HubSourceEntry> }
+  | { ok: false; errors: Array<ValidationIssue>; status?: number }
 > {
   if (BUILTIN_IDS.has(id)) {
     return {
@@ -707,8 +709,8 @@ export async function updateHubSource(
 export async function deleteHubSource(
   id: string,
 ): Promise<
-  | { ok: true; sources: HubSourceEntry[] }
-  | { ok: false; errors: ValidationIssue[]; status?: number }
+  | { ok: true; sources: Array<HubSourceEntry> }
+  | { ok: false; errors: Array<ValidationIssue>; status?: number }
 > {
   if (BUILTIN_IDS.has(id)) {
     return {

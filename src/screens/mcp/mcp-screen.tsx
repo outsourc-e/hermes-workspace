@@ -161,7 +161,7 @@ export function McpScreen() {
               </div>
 
               {hubQuery.data?.warnings && hubQuery.data.warnings.length > 0 ? (
-                hubQuery.data.results && hubQuery.data.results.length > 0 ? (
+                hubQuery.data.results.length > 0 ? (
                   <p className="text-xs text-amber-700 dark:text-amber-300">
                     ⚠ One or more sources unavailable; showing local results.
                     <span className="ml-1 text-[11px] text-primary-500">
@@ -373,7 +373,11 @@ function MarketplaceGrid({
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <AnimatePresence initial={false}>
         {entries.map((entry) => {
-          const trust = TRUST_PILL[entry.trust] ?? TRUST_PILL.unverified
+          const trust = TRUST_PILL[entry.trust] ?? {
+            label: 'Unverified',
+            className:
+              'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
+          }
           const sourceLabel = SOURCE_LABEL[entry.source] ?? entry.source
 
           return (

@@ -1,9 +1,17 @@
 import { useCallback, useRef } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import type { TouchEvent } from 'react'
-import { useWorkspaceStore } from '@/stores/workspace-store'
+import {
+  buildChatCardNavigation,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 
-const TAB_ORDER = ['/chat/main', '/files', '/jobs', '/settings'] as const
+export const MOBILE_SWIPE_TAB_ORDER = [
+  '/chat/new',
+  '/files',
+  '/jobs',
+  '/settings',
+] as const
 
 const EDGE_ZONE = 24
 const LOCK_THRESHOLD = 12
@@ -66,7 +74,7 @@ export function useSwipeNavigation() {
       gestureRef.current = null
       return
     }
-    const touch = event.touches[0]
+    const touch = event.touches[0] as Touch | undefined
     if (!touch || shouldIgnoreTarget(event.target)) {
       gestureRef.current = null
       return
@@ -89,7 +97,7 @@ export function useSwipeNavigation() {
     const gesture = gestureRef.current
     if (!gesture) return
 
-    const touch = event.touches[0]
+    const touch = event.touches[0] as Touch | undefined
     if (!touch) return
 
     if (!gesture.locked) {
@@ -115,7 +123,7 @@ export function useSwipeNavigation() {
       gestureRef.current = null
       if (!gesture) return
 
-      const touch = event.changedTouches[0]
+      const touch = event.changedTouches[0] as Touch | undefined
       if (!touch) return
 
       const dx = touch.clientX - gesture.startX
@@ -138,12 +146,20 @@ export function useSwipeNavigation() {
 
       const nextIndex =
         dx < 0
-          ? Math.min(currentIndex + 1, TAB_ORDER.length - 1)
+          ? Math.min(currentIndex + 1, MOBILE_SWIPE_TAB_ORDER.length - 1)
           : Math.max(currentIndex - 1, 0)
       if (nextIndex === currentIndex) return
 
       triggerHaptic()
-      void navigate({ to: TAB_ORDER[nextIndex] as string })
+      if (nextIndex === 0) {
+        void navigate(
+          buildChatCardNavigation(
+            useWorkspaceStore.getState().activeChatCardId,
+          ),
+        )
+      } else {
+        void navigate({ to: MOBILE_SWIPE_TAB_ORDER[nextIndex] as string })
+      }
     },
     [navigate, pathname],
   )

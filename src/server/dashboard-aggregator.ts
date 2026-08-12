@@ -231,6 +231,12 @@ export type BuildOverviewOptions = {
   analyticsWindowDays?: number
   /** How many recent achievement unlocks to surface. Default 3. */
   achievementsLimit?: number
+  /**
+   * Achievement endpoints can start a full history scan in older Dashboard
+   * plugins. Keep them out of the routine overview refresh; callers opt in
+   * only after an operator asks to view the optional widget.
+   */
+  includeAchievements?: boolean
   /** How many log tail lines to surface. Default 24. */
   logsLimit?: number
 }
@@ -240,6 +246,7 @@ const DEFAULT_OPTIONS = {
   // window and gives the sparkline enough breathing room.
   analyticsWindowDays: 30,
   achievementsLimit: 3,
+  includeAchievements: false,
   logsLimit: 24,
 }
 
@@ -279,17 +286,32 @@ function readOptionalString(value: unknown): string | null {
 function normalizeStatus(
   raw: unknown,
   health: unknown,
+  detailedHealth: unknown,
 ): DashboardStatusSection | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
-  const state = readString(r.gateway_state) || readString(r.state)
+  const reportedState = readString(r.gateway_state) || readString(r.state)
+  // A Docker/supervisor-managed gateway may be live without the PID/service
+  // metadata that the dashboard's CLI-backed status command expects. Trust
+  // the gateway's own unauthenticated health contract over a stale `stopped`
+  // record, but only for that exact contradictory state; lifecycle states such
+  // as `draining` and `startup_failed` remain dashboard-authoritative.
+  const healthState =
+    health && typeof health === 'object'
+      ? readString((health as Record<string, unknown>).status).toLowerCase()
+      : ''
+  const state =
+    reportedState === 'stopped' &&
+    (healthState === 'ok' || healthState === 'healthy')
+      ? 'running'
+      : reportedState
   if (!state) return null
   // `/health/detailed` is the canonical source for currently-running
   // agent count. Falls back to legacy fields when the gateway endpoint
   // is missing/unreachable.
   let activeAgents: number | null = null
-  if (health && typeof health === 'object') {
-    const h = health as Record<string, unknown>
+  if (detailedHealth && typeof detailedHealth === 'object') {
+    const h = detailedHealth as Record<string, unknown>
     if (typeof h.active_agents === 'number') {
       activeAgents = h.active_agents
     }
@@ -347,14 +369,13 @@ function normalizePlatforms(raw: unknown): Array<DashboardPlatformEntry> {
 
 function normalizeCron(raw: unknown): DashboardCronSection | null {
   if (!raw) return null
-  let jobs: Array<Record<string, unknown>> = []
+  let jobs: Array<unknown> = []
   if (Array.isArray(raw)) {
-    jobs = raw as Array<Record<string, unknown>>
-  } else if (raw && typeof raw === 'object') {
+    jobs = raw
+  } else if (typeof raw === 'object') {
     const r = raw as Record<string, unknown>
-    if (Array.isArray(r.jobs)) jobs = r.jobs as Array<Record<string, unknown>>
+    if (Array.isArray(r.jobs)) jobs = r.jobs
   }
-  if (!Array.isArray(jobs)) return null
 
   let paused = 0
   let running = 0
@@ -804,7 +825,7 @@ function shortSkillName(raw: string): string {
  */
 function shortModelName(raw: string): string {
   if (!raw) return raw
-  return raw.split('/').slice(-1)[0]
+  return raw.split('/').at(-1) ?? raw
 }
 
 /**
@@ -826,22 +847,20 @@ function computeInsights(
   // 1. Peak day driver
   let peakIsToday = false
   if (analytics.daily.length >= 3) {
-    let peakIdx = 0
+    let peakDay: string | null = null
     let peakVal = 0
-    for (let i = 0; i < analytics.daily.length; i += 1) {
-      const total =
-        analytics.daily[i].inputTokens + analytics.daily[i].outputTokens
+    for (const day of analytics.daily) {
+      const total = day.inputTokens + day.outputTokens
       if (total > peakVal) {
         peakVal = total
-        peakIdx = i
+        peakDay = day.day
       }
     }
-    if (peakVal > 0) {
-      const driver =
-        analytics.topModels.length > 0
-          ? `, driven by ${shortModelName(analytics.topModels[0].id)}`
-          : ''
-      const peakDay = analytics.daily[peakIdx].day
+    if (peakVal > 0 && peakDay) {
+      const topModel = analytics.topModels[0]
+      const driver = topModel
+        ? `, driven by ${shortModelName(topModel.id)}`
+        : ''
       const todayIso = new Date().toISOString().slice(0, 10)
       peakIsToday = peakDay === todayIso
       out.push({
@@ -856,9 +875,12 @@ function computeInsights(
     const mid = Math.floor(analytics.daily.length / 2)
     let prior = 0
     let recent = 0
-    for (let i = 0; i < mid; i += 1) prior += analytics.daily[i].cacheReadTokens
-    for (let i = mid; i < analytics.daily.length; i += 1)
-      recent += analytics.daily[i].cacheReadTokens
+    for (const day of analytics.daily.slice(0, mid)) {
+      prior += day.cacheReadTokens
+    }
+    for (const day of analytics.daily.slice(mid)) {
+      recent += day.cacheReadTokens
+    }
     if (prior > 0) {
       const delta = ((recent - prior) / prior) * 100
       if (Math.abs(delta) >= 5) {
@@ -1091,11 +1113,18 @@ export async function buildDashboardOverview(
   options: BuildOverviewOptions & BuildOverviewExtraFetchers,
 ): Promise<DashboardOverview> {
   const opts = { ...DEFAULT_OPTIONS, ...options }
-  const { fetcher, analyticsWindowDays, achievementsLimit, logsLimit } = opts
+  const {
+    fetcher,
+    analyticsWindowDays,
+    achievementsLimit,
+    includeAchievements,
+    logsLimit,
+  } = opts
 
   const [
     statusRaw,
     healthRaw,
+    detailedHealthRaw,
     cronRaw,
     achRecentRaw,
     achAllRaw,
@@ -1106,14 +1135,24 @@ export async function buildDashboardOverview(
   ] = await Promise.all([
     safeJson<unknown>(fetcher, '/api/status'),
     options.gatewayFetcher
+      ? safeJson<unknown>(options.gatewayFetcher, '/health')
+      : Promise.resolve(null),
+    options.gatewayFetcher
       ? safeJson<unknown>(options.gatewayFetcher, '/health/detailed')
       : Promise.resolve(null),
     safeJson<unknown>(fetcher, '/api/cron/jobs'),
-    safeJson<unknown>(
-      fetcher,
-      `/api/plugins/hermes-achievements/recent-unlocks?limit=${achievementsLimit}`,
-    ),
-    safeJson<unknown>(fetcher, '/api/plugins/hermes-achievements/achievements'),
+    includeAchievements
+      ? safeJson<unknown>(
+          fetcher,
+          `/api/plugins/hermes-achievements/recent-unlocks?limit=${achievementsLimit}`,
+        )
+      : Promise.resolve(null),
+    includeAchievements
+      ? safeJson<unknown>(
+          fetcher,
+          '/api/plugins/hermes-achievements/achievements',
+        )
+      : Promise.resolve(null),
     safeJson<unknown>(fetcher, '/api/model/info'),
     safeJson<unknown>(
       fetcher,
@@ -1123,7 +1162,7 @@ export async function buildDashboardOverview(
     safeJson<unknown>(fetcher, `/api/logs?lines=${logsLimit}`),
   ])
 
-  const status = normalizeStatus(statusRaw, healthRaw)
+  const status = normalizeStatus(statusRaw, healthRaw, detailedHealthRaw)
   const platforms = normalizePlatforms(statusRaw)
   const cron = normalizeCron(cronRaw)
   const analytics = normalizeAnalytics(analyticsRaw, analyticsWindowDays)

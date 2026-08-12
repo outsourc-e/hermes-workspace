@@ -37,7 +37,7 @@ function readStoredUsers(): Record<string, PresenceHeartbeat> {
   try {
     const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY)
     if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, PresenceHeartbeat>
+    const parsed = JSON.parse(raw) as Record<string, PresenceHeartbeat> | null
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch {
     return {}
@@ -140,7 +140,7 @@ export function CollaborationPresence() {
     try {
       const channel = new BroadcastChannel(CHANNEL_NAME)
       channelRef.current = channel
-      channel.onmessage = (event: MessageEvent<PresenceMessage>) => {
+      channel.onmessage = (event: MessageEvent<PresenceMessage | null>) => {
         const message = event.data
         if (!message || typeof message !== 'object') return
         if (message.type === 'heartbeat') upsertHeartbeat(message)
@@ -224,7 +224,7 @@ export function CollaborationPresence() {
         <span className="text-primary-400">+{overflowCount} more</span>
       ) : null}
       <span className="hidden sm:inline text-primary-300">
-        {isSolo ? 'Only you' : `${users.length} viewing`}
+        {users.length} viewing
       </span>
     </div>
   )

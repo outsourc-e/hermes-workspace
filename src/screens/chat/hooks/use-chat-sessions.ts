@@ -61,16 +61,19 @@ type UseChatSessionsInput = {
   activeFriendlyId: string
   isNewChat: boolean
   forcedSessionKey?: string
+  enabled?: boolean
 }
 
 export function useChatSessions({
   activeFriendlyId,
   isNewChat,
   forcedSessionKey,
+  enabled = true,
 }: UseChatSessionsInput) {
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
     queryFn: fetchSessions,
+    enabled,
     refetchInterval: 5000,
   })
   const storedTitles = useSessionTitles()

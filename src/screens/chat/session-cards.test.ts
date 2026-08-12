@@ -1,0 +1,602 @@
+import { describe, expect, it } from 'vitest'
+
+import { projectSessionCards } from './session-cards'
+import type { SessionLineage, SessionMeta } from './types'
+
+function session(
+  key: string,
+  lineage?: SessionLineage,
+  updatedAt = 0,
+): SessionMeta {
+  return {
+    key,
+    friendlyId: key,
+    title: `legacy title for ${key}`,
+    updatedAt,
+    ...(lineage ? { lineage } : {}),
+  }
+}
+
+function continuationChain(): Array<SessionMeta> {
+  return [
+    session(
+      'root',
+      {
+        source: 'cli',
+        endReason: 'compression',
+        endedAt: 100,
+        lineageRootId: 'root',
+        lineageTipId: 'third',
+        compressionSegmentCount: 1,
+      },
+      100,
+    ),
+    session(
+      'second',
+      {
+        parentSessionId: 'root',
+        source: 'cli',
+        startedAt: 100,
+        endReason: 'compression',
+        endedAt: 200,
+        lineageRootId: 'root',
+        lineageTipId: 'third',
+        compressionSegmentCount: 2,
+      },
+      200,
+    ),
+    session(
+      'third',
+      {
+        parentSessionId: 'second',
+        source: 'cli',
+        startedAt: 200,
+        lineageRootId: 'root',
+        lineageTipId: 'third',
+        compressionSegmentCount: 3,
+      },
+      300,
+    ),
+  ]
+}
+
+describe('projectSessionCards', () => {
+  it('collapses three confirmed continuation segments into one stable card', () => {
+    const projection = projectSessionCards(continuationChain())
+
+    expect(projection.cards).toHaveLength(1)
+    expect(projection.roots).toHaveLength(1)
+    expect(projection.cards[0]).toMatchObject({
+      cardId: 'root',
+      canonicalSegmentKey: 'third',
+      continuationSegmentKeys: ['root', 'second', 'third'],
+      continuationCount: 3,
+      relationshipKind: 'root',
+      childNodes: [],
+      title: 'legacy title for root',
+      titleSource: 'auto',
+      updatedAt: 300,
+      archived: false,
+      pinned: false,
+    })
+    expect(projection.cards[0]?.parentCardId).toBeUndefined()
+    expect(projection.cardIdBySessionKey.get('root')).toBe('root')
+    expect(projection.cardIdBySessionKey.get('second')).toBe('root')
+    expect(projection.cardIdBySessionKey.get('third')).toBe('root')
+  })
+
+  it.each([
+    {
+      form: 'lifecycle-inferred',
+      parentLineage: {},
+      childLineage: {},
+    },
+    {
+      form: 'explicit lineage',
+      parentLineage: {
+        lineageRootId: 'parent',
+        lineageTipId: 'child',
+      },
+      childLineage: {
+        relationshipType: 'continuation',
+        lineageRootId: 'parent',
+        lineageTipId: 'child',
+      },
+    },
+  ])(
+    'keeps cross-source $form continuations as separate root cards',
+    ({ parentLineage, childLineage }) => {
+      const parent = session('parent', {
+        source: 'cli',
+        endReason: 'compression',
+        endedAt: 100,
+        ...parentLineage,
+      })
+      const child = session('child', {
+        parentSessionId: 'parent',
+        source: 'telegram',
+        startedAt: 100,
+        ...childLineage,
+      })
+
+      const projection = projectSessionCards([parent, child])
+
+      expect(projection.cards).toHaveLength(2)
+      expect(projection.roots.map((card) => card.cardId)).toEqual([
+        'child',
+        'parent',
+      ])
+      expect(projection.indexByCardId.get('parent')).toMatchObject({
+        continuationSegmentKeys: ['parent'],
+        childNodes: [],
+      })
+      expect(projection.indexByCardId.get('child')).toMatchObject({
+        relationshipKind: 'orphan',
+        continuationSegmentKeys: ['child'],
+        childNodes: [],
+      })
+      expect(projection.cardIdBySessionKey.get('parent')).toBe('parent')
+      expect(projection.cardIdBySessionKey.get('child')).toBe('child')
+    },
+  )
+
+  it('uses explicit server-authoritative relationship facts without re-inferring lifecycle order', () => {
+    const root = session(
+      'root',
+      {
+        source: 'cli',
+        endReason: 'compression',
+        endedAt: 200,
+        relationshipKind: 'root',
+      },
+      200,
+    )
+    const continuation = session(
+      'continuation',
+      {
+        parentSessionId: 'root',
+        source: 'cli',
+        startedAt: 150,
+        relationshipKind: 'continuation',
+      },
+      300,
+    )
+    const branch = session(
+      'branch',
+      {
+        parentSessionId: 'root',
+        source: 'cli',
+        relationshipKind: 'branch',
+      },
+      400,
+    )
+    const delegate = session(
+      'delegate',
+      {
+        parentSessionId: 'root',
+        source: 'tool',
+        relationshipKind: 'child',
+      },
+      350,
+    )
+    const orphan = session(
+      'orphan',
+      { source: 'cli', relationshipKind: 'orphan' },
+      100,
+    )
+
+    const projection = projectSessionCards([
+      root,
+      continuation,
+      branch,
+      delegate,
+      orphan,
+    ])
+
+    expect(projection.indexByCardId.get('root')).toMatchObject({
+      canonicalSegmentKey: 'continuation',
+      continuationSegmentKeys: ['root', 'continuation'],
+      childNodes: [
+        expect.objectContaining({
+          cardId: 'branch',
+          relationshipKind: 'branch',
+        }),
+        expect.objectContaining({
+          cardId: 'delegate',
+          relationshipKind: 'child',
+        }),
+      ],
+    })
+    expect(projection.indexByCardId.get('orphan')).toMatchObject({
+      relationshipKind: 'orphan',
+      childNodes: [],
+    })
+  })
+
+  it('uses a delegated-agent default only for an unnamed delegated child', () => {
+    const parent = session('parent', undefined, 10)
+    const delegated = {
+      ...session(
+        'delegated',
+        {
+          parentSessionId: 'parent',
+          relationshipKind: 'child',
+        },
+        20,
+      ),
+      title: undefined,
+    }
+
+    const projection = projectSessionCards([parent, delegated])
+
+    expect(projection.indexByCardId.get('delegated')).toMatchObject({
+      parentCardId: 'parent',
+      relationshipKind: 'child',
+      title: 'Delegated Agent Session',
+      titleSource: 'default',
+    })
+    expect(projection.indexByCardId.get('parent')?.title).toBe(
+      'legacy title for parent',
+    )
+  })
+
+  it('keeps branch and delegate components out of the parent continuation', () => {
+    const [root, second, third] = continuationChain()
+    const branch = session(
+      'branch',
+      {
+        parentSessionId: 'root',
+        source: 'cli',
+        sessionSource: 'fork',
+        lineageRootId: 'root',
+        lineageTipId: 'branch',
+        startedAt: 100,
+      },
+      500,
+    )
+    const delegate = session(
+      'delegate',
+      {
+        parentSessionId: 'second',
+        relationshipType: 'child_session',
+        source: 'cli',
+        lineageRootId: 'root',
+        lineageTipId: 'delegate',
+        startedAt: 100,
+      },
+      400,
+    )
+
+    const projection = projectSessionCards([
+      third!,
+      delegate,
+      root!,
+      branch,
+      second!,
+    ])
+    const parent = projection.indexByCardId.get('root')
+
+    expect(projection.roots).toHaveLength(1)
+    expect(projection.cards).toHaveLength(3)
+    expect(parent?.continuationSegmentKeys).toEqual(['root', 'second', 'third'])
+    expect(parent?.childNodes).toEqual([
+      expect.objectContaining({
+        cardId: 'branch',
+        sessionKey: 'branch',
+        relationshipKind: 'branch',
+      }),
+      expect.objectContaining({
+        cardId: 'delegate',
+        sessionKey: 'delegate',
+        relationshipKind: 'child',
+      }),
+    ])
+    expect(projection.indexByCardId.get('branch')).toMatchObject({
+      parentCardId: 'root',
+      continuationSegmentKeys: ['branch'],
+    })
+    expect(projection.indexByCardId.get('delegate')).toMatchObject({
+      parentCardId: 'root',
+      continuationSegmentKeys: ['delegate'],
+    })
+    expect(parent?.continuationSegmentKeys).not.toContain('branch')
+    expect(parent?.continuationSegmentKeys).not.toContain('delegate')
+  })
+
+  it('keeps three Card levels reachable while collapsing each confirmed continuation chain once', () => {
+    const root = session('root', undefined, 10)
+    const rootContinuation = session(
+      'root-tip',
+      {
+        parentSessionId: 'root',
+        relationshipKind: 'continuation',
+        source: 'cli',
+      },
+      20,
+    )
+    const child = session(
+      'child',
+      {
+        parentSessionId: 'root-tip',
+        relationshipKind: 'child',
+      },
+      30,
+    )
+    const childContinuation = session(
+      'child-tip',
+      {
+        parentSessionId: 'child',
+        relationshipKind: 'continuation',
+        source: 'cli',
+      },
+      40,
+    )
+    const grandchild = session(
+      'grandchild',
+      {
+        parentSessionId: 'child-tip',
+        relationshipKind: 'branch',
+      },
+      50,
+    )
+
+    const projection = projectSessionCards([
+      grandchild,
+      childContinuation,
+      rootContinuation,
+      child,
+      root,
+    ])
+
+    expect(projection.roots.map((card) => card.cardId)).toEqual(['root'])
+    expect(projection.cards.map((card) => card.cardId).sort()).toEqual([
+      'child',
+      'grandchild',
+      'root',
+    ])
+    expect(projection.indexByCardId.get('root')).toMatchObject({
+      canonicalSegmentKey: 'root-tip',
+      continuationSegmentKeys: ['root', 'root-tip'],
+      childNodes: [expect.objectContaining({ cardId: 'child' })],
+    })
+    expect(projection.indexByCardId.get('child')).toMatchObject({
+      parentCardId: 'root',
+      canonicalSegmentKey: 'child-tip',
+      continuationSegmentKeys: ['child', 'child-tip'],
+      childNodes: [expect.objectContaining({ cardId: 'grandchild' })],
+    })
+    expect(projection.indexByCardId.get('grandchild')).toMatchObject({
+      parentCardId: 'child',
+      childNodes: [],
+    })
+    expect(projection.cardIdBySessionKey.get('root-tip')).toBe('root')
+    expect(projection.cardIdBySessionKey.get('child-tip')).toBe('child')
+  })
+
+  it('projects child lifecycle activity only through its validated parent Card', () => {
+    const parent = session('parent', undefined, 10)
+    const child = session(
+      'child',
+      { parentSessionId: 'parent', relationshipType: 'child_session' },
+      20,
+    )
+
+    const projection = projectSessionCards([parent, child], {
+      childActivityByParentCardId: new Map<
+        string,
+        Map<
+          string,
+          {
+            status: 'idle' | 'running' | 'complete' | 'error'
+            updatedAt: number
+          }
+        >
+      >([
+        [
+          'parent',
+          new Map([['child', { status: 'running' as const, updatedAt: 100 }]]),
+        ],
+        [
+          'unrelated-parent',
+          new Map([['child', { status: 'error' as const, updatedAt: 200 }]]),
+        ],
+      ]),
+    })
+
+    expect(projection.indexByCardId.get('parent')?.childNodes).toEqual([
+      expect.objectContaining({
+        cardId: 'child',
+        status: 'running',
+        updatedAt: 100,
+      }),
+    ])
+  })
+
+  it('projects explicit root activity without inferring it from session timestamps', () => {
+    const parent = session('parent', undefined, 500)
+    const child = session(
+      'child',
+      { parentSessionId: 'parent', relationshipType: 'child_session' },
+      600,
+    )
+
+    const withoutActivity = projectSessionCards([parent, child])
+    expect(
+      withoutActivity.indexByCardId.get('parent')?.activity,
+    ).toBeUndefined()
+
+    const projection = projectSessionCards([parent, child], {
+      activityByCardId: new Map([
+        ['parent', { state: 'completed' as const, updatedAt: 700 }],
+        ['child', { state: 'error' as const, updatedAt: 800 }],
+      ]),
+    })
+
+    expect(projection.indexByCardId.get('parent')?.activity).toEqual({
+      state: 'completed',
+      updatedAt: 700,
+    })
+    expect(projection.indexByCardId.get('child')?.activity).toBeUndefined()
+  })
+
+  it('promotes invalid, cyclic, and missing relationships to safe orphan cards', () => {
+    const missing = session(
+      'missing',
+      { parentSessionId: 'not-loaded', relationshipType: 'child_session' },
+      300,
+    )
+    const invalid = session(
+      'invalid',
+      { parentSessionId: 'missing', relationshipType: 'unknown' },
+      200,
+    )
+    const cycleA = session(
+      'cycle-a',
+      { parentSessionId: 'cycle-b', relationshipType: 'child_session' },
+      100,
+    )
+    const cycleB = session(
+      'cycle-b',
+      { parentSessionId: 'cycle-a', relationshipType: 'child_session' },
+      50,
+    )
+
+    const projection = projectSessionCards([cycleB, invalid, missing, cycleA])
+
+    expect(projection.roots.map((card) => card.cardId)).toEqual([
+      'missing',
+      'invalid',
+      'cycle-a',
+      'cycle-b',
+    ])
+    for (const card of projection.cards) {
+      expect(card).toMatchObject({
+        relationshipKind: 'orphan',
+        childNodes: [],
+      })
+      expect(card.parentCardId).toBeUndefined()
+    }
+  })
+
+  it('keeps card identity, active mapping, title metadata, and ordering stable when the tip refreshes', () => {
+    const [root, second, third] = continuationChain()
+    const independent = session('independent', undefined, 10)
+    const cardMetadata = new Map([
+      [
+        'root',
+        {
+          manualTitle: 'Stable logical title',
+          autoTitle: 'Ignored automatic title',
+        },
+      ],
+    ])
+
+    const before = projectSessionCards([independent, root!, second!], {
+      activeSessionKey: 'second',
+      cardMetadata,
+    })
+    const after = projectSessionCards([third!, independent, second!, root!], {
+      activeSessionKey: 'third',
+      cardMetadata,
+    })
+
+    expect(before.roots.map((card) => card.cardId)).toEqual([
+      'root',
+      'independent',
+    ])
+    expect(after.roots.map((card) => card.cardId)).toEqual([
+      'root',
+      'independent',
+    ])
+    expect(before.activeCardId).toBe('root')
+    expect(after.activeCardId).toBe('root')
+    expect(before.indexByCardId.get('root')).toMatchObject({
+      cardId: 'root',
+      canonicalSegmentKey: 'second',
+      title: 'Stable logical title',
+      titleSource: 'manual',
+    })
+    expect(after.indexByCardId.get('root')).toMatchObject({
+      cardId: 'root',
+      canonicalSegmentKey: 'third',
+      title: 'Stable logical title',
+      titleSource: 'manual',
+    })
+  })
+
+  it('orders pinned roots by their original pin time while refusing pin metadata on children', () => {
+    const parent = session('parent', undefined, 10)
+    const child = session(
+      'child',
+      { parentSessionId: 'parent', relationshipType: 'child_session' },
+      300,
+    )
+    const newest = session('newest', undefined, 200)
+    const pinnedOlder = session('pinned-older', undefined, 100)
+    const pinnedNewer = session('pinned-newer', undefined, 300)
+    const metadata = new Map([
+      ['pinned-older', { pinned: true, pinnedAt: 10 }],
+      ['pinned-newer', { pinned: true, pinnedAt: 20 }],
+      ['child', { pinned: true }],
+    ])
+
+    const projection = projectSessionCards(
+      [parent, child, newest, pinnedOlder, pinnedNewer],
+      { cardMetadata: metadata },
+    )
+
+    expect(projection.roots.map((card) => card.cardId)).toEqual([
+      'pinned-older',
+      'pinned-newer',
+      'newest',
+      'parent',
+    ])
+    expect(projection.indexByCardId.get('pinned-older')?.pinned).toBe(true)
+    expect(projection.indexByCardId.get('newest')?.pinned).toBe(false)
+    expect(projection.indexByCardId.get('child')?.pinned).toBe(false)
+
+    const continuationMetadata = new Map([['second', { pinned: true }]])
+    const continuation = projectSessionCards(continuationChain(), {
+      cardMetadata: continuationMetadata,
+    })
+    expect(continuation.roots[0]).toMatchObject({
+      cardId: 'root',
+      pinned: false,
+    })
+  })
+
+  it('fails closed for persisted pins on orphaned child, fork, and cross-surface rows', () => {
+    const rows = [
+      session('root', undefined, 100),
+      session(
+        'orphan-child',
+        { parentSessionId: 'missing', relationshipType: 'child_session' },
+        300,
+      ),
+      session('orphan-fork', { sessionSource: 'fork' }, 200),
+      session('orphan-cross-surface', { isCrossSurfaceChild: true }, 150),
+    ]
+    const projection = projectSessionCards(rows, {
+      cardMetadata: new Map([
+        ['orphan-child', { pinned: true }],
+        ['orphan-fork', { pinned: true }],
+        ['orphan-cross-surface', { pinned: true }],
+        ['root', { pinned: true }],
+      ]),
+    })
+
+    expect(projection.roots.map((card) => card.cardId)).toEqual([
+      'root',
+      'orphan-child',
+      'orphan-fork',
+      'orphan-cross-surface',
+    ])
+    expect(projection.roots.map((card) => card.pinned)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ])
+    expect([...projection.pinEligibleCardIds]).toEqual(['root'])
+  })
+})

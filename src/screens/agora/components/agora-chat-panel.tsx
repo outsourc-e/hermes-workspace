@@ -6,8 +6,8 @@ import type { AgoraMessage, AgoraUser } from '../lib/agora-types'
 
 interface AgoraChatPanelProps {
   self: AgoraUser
-  others: AgoraUser[]
-  messages: AgoraMessage[]
+  others: Array<AgoraUser>
+  messages: Array<AgoraMessage>
   onSend: (body: string) => void
 }
 

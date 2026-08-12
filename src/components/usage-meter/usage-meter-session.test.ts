@@ -6,33 +6,41 @@ import {
 } from './usage-meter-session'
 
 describe('usage meter session targeting', () => {
-  it('uses the active chat session from the route pathname', () => {
-    expect(resolveUsageMeterSessionKey('/chat/main')).toBe('main')
-    expect(resolveUsageMeterSessionKey('/chat/new')).toBe('new')
-    expect(resolveUsageMeterSessionKey('/chat/session-123')).toBe('session-123')
-  })
-
-  it('decodes route params for chat sessions', () => {
-    expect(resolveUsageMeterSessionKey('/chat/local%2Fmirror')).toBe(
-      'local/mirror',
+  it('uses only the active source-qualified Card ID from the route pathname', () => {
+    expect(resolveUsageMeterSessionKey('/chat/remote%3Acard-123')).toBe(
+      'remote:card-123',
+    )
+    expect(resolveUsageMeterSessionKey('/chat/local%3Amirror')).toBe(
+      'local:mirror',
     )
   })
 
-  it('falls back to main outside chat routes', () => {
-    expect(resolveUsageMeterSessionKey('/settings')).toBe('main')
-    expect(resolveUsageMeterSessionKey('/dashboard')).toBe('main')
+  it('does not target bootstrap aliases, raw sessions, or non-chat routes as Cards', () => {
+    expect(resolveUsageMeterSessionKey('/chat/main')).toBeNull()
+    expect(resolveUsageMeterSessionKey('/chat/new')).toBeNull()
+    expect(resolveUsageMeterSessionKey('/chat/session-123')).toBeNull()
+    expect(resolveUsageMeterSessionKey('/chat/local%2Fmirror')).toBeNull()
+    expect(resolveUsageMeterSessionKey('/chat/remote%ZZbad')).toBeNull()
+    expect(resolveUsageMeterSessionKey('/settings')).toBeNull()
+    expect(resolveUsageMeterSessionKey('/dashboard')).toBeNull()
   })
 
-  it('only allows context alerts when the usage meter is visible on chat routes', () => {
+  it('only allows context alerts for visible source-qualified Card routes', () => {
     expect(
       shouldShowUsageMeterContextAlert({
         pathname: '/chat/main',
         visible: true,
       }),
+    ).toBe(false)
+    expect(
+      shouldShowUsageMeterContextAlert({
+        pathname: '/chat/remote%3Acard-123',
+        visible: true,
+      }),
     ).toBe(true)
     expect(
       shouldShowUsageMeterContextAlert({
-        pathname: '/chat/main',
+        pathname: '/chat/remote%3Acard-123',
         visible: false,
       }),
     ).toBe(false)

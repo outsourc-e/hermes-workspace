@@ -7,7 +7,6 @@
  *  - TTL stale flag
  *  - HERMES_HOME override for path resolution
  */
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import {
   mkdirSync,
   mkdtempSync,
@@ -17,6 +16,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // We re-import the module fresh for each test using dynamic import + cache busting,
 // but since Vitest caches modules, we use the exported reset helper instead.
@@ -97,13 +97,11 @@ describe('corrupt file → empty cache', () => {
 
     vi.resetModules()
     // Should not throw
-    let mod: Awaited<ReturnType<typeof loadCache>>
+    const mod: Awaited<ReturnType<typeof loadCache>> = await loadCache()
     expect(() => {
       // loadCache() is async, but the module-level readDisk() runs synchronously
       // during import. We just need to confirm no unhandled error.
     }).not.toThrow()
-    mod = await loadCache()
-
     // Cache should be empty (corrupt file ignored)
     expect(mod.getProbe('anything')).toBeNull()
   })

@@ -1,10 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import * as yaml from 'yaml'
+import { isAuthenticated } from '../../server/auth-middleware'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -18,8 +17,8 @@ import {
 import {
   formatSwarmWorkerLabel,
   rosterByWorkerId,
-  type SwarmRosterWorker,
 } from '../../server/swarm-roster'
+import type { SwarmRosterWorker } from '../../server/swarm-roster'
 
 type CrewDefinition = {
   id: string
@@ -31,16 +30,6 @@ type CrewDefinition = {
   skills?: Array<string>
   capabilities?: Array<string>
   profilePath: string | null
-}
-
-type DbStats = {
-  sessionCount: number
-  messageCount: number
-  toolCallCount: number
-  totalTokens: number
-  estimatedCostUsd: number | null
-  lastSessionTitle: string | null
-  lastSessionAt: number | null
 }
 
 function titleCase(value: string): string {
@@ -64,15 +53,13 @@ function buildCrewDefinitionFromRoster(
     role,
     specialty: worker?.specialty || undefined,
     mission: worker?.mission || undefined,
-    skills: worker?.skills?.length ? worker.skills : undefined,
-    capabilities: worker?.capabilities?.length
-      ? worker.capabilities
-      : undefined,
+    skills: worker?.skills.length ? worker.skills : undefined,
+    capabilities: worker?.capabilities.length ? worker.capabilities : undefined,
     profilePath: profile,
   }
 }
 
-function buildCrewDefinitions(): CrewDefinition[] {
+function buildCrewDefinitions(): Array<CrewDefinition> {
   const profilesDir = join(getClaudeRoot(), 'profiles')
   const dynamicProfiles = existsSync(profilesDir)
     ? readdirSync(profilesDir, { withFileTypes: true })
@@ -148,77 +135,6 @@ function checkProcessAlive(pid: number | null): boolean {
     return true
   } catch {
     return false
-  }
-}
-
-function readDbStats(claudeHome: string): DbStats {
-  const dbPath = join(claudeHome, 'state.db')
-  if (!existsSync(dbPath)) {
-    return {
-      sessionCount: 0,
-      messageCount: 0,
-      toolCallCount: 0,
-      totalTokens: 0,
-      estimatedCostUsd: null,
-      lastSessionTitle: null,
-      lastSessionAt: null,
-    }
-  }
-
-  try {
-    const script = `
-import json, sqlite3, sys
-path = sys.argv[1]
-out = {
-  "sessionCount": 0,
-  "messageCount": 0,
-  "toolCallCount": 0,
-  "totalTokens": 0,
-  "estimatedCostUsd": None,
-  "lastSessionTitle": None,
-  "lastSessionAt": None,
-}
-conn = sqlite3.connect(path)
-conn.row_factory = sqlite3.Row
-cur = conn.cursor()
-agg = cur.execute("""
-SELECT
-  COUNT(*) as session_count,
-  COALESCE(SUM(message_count), 0) as total_messages,
-  COALESCE(SUM(tool_call_count), 0) as total_tool_calls,
-  COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) as total_tokens,
-  SUM(estimated_cost_usd) as estimated_cost,
-  MAX(started_at) as last_session_at
-FROM sessions
-""").fetchone()
-if agg is not None:
-  out["sessionCount"] = agg["session_count"] or 0
-  out["messageCount"] = agg["total_messages"] or 0
-  out["toolCallCount"] = agg["total_tool_calls"] or 0
-  out["totalTokens"] = agg["total_tokens"] or 0
-  out["estimatedCostUsd"] = agg["estimated_cost"]
-last_row = cur.execute("SELECT title, started_at FROM sessions ORDER BY started_at DESC LIMIT 1").fetchone()
-if last_row is not None:
-  out["lastSessionTitle"] = last_row["title"]
-  out["lastSessionAt"] = last_row["started_at"]
-conn.close()
-print(json.dumps(out))
-`
-    const raw = execFileSync('python3', ['-c', script, dbPath], {
-      encoding: 'utf-8',
-      timeout: 3_000,
-    })
-    return JSON.parse(raw) as DbStats
-  } catch {
-    return {
-      sessionCount: 0,
-      messageCount: 0,
-      toolCallCount: 0,
-      totalTokens: 0,
-      estimatedCostUsd: null,
-      lastSessionTitle: null,
-      lastSessionAt: null,
-    }
   }
 }
 
@@ -320,20 +236,12 @@ export const Route = createFileRoute('/api/crew-status')({
               platforms: {},
               model: 'unknown',
               provider: 'unknown',
-              lastSessionTitle: null,
-              lastSessionAt: null,
-              sessionCount: 0,
-              messageCount: 0,
-              toolCallCount: 0,
-              totalTokens: 0,
-              estimatedCostUsd: null,
               cronJobCount: 0,
               assignedTaskCount: taskCounts[member.id] ?? 0,
             }
           }
 
           const gatewayInfo = readGatewayState(claudeHome)
-          const dbStats = readDbStats(claudeHome)
           const config = readConfig(claudeHome)
 
           return {
@@ -351,13 +259,6 @@ export const Route = createFileRoute('/api/crew-status')({
             platforms: gatewayInfo.platforms,
             model: config.model,
             provider: config.provider,
-            lastSessionTitle: dbStats.lastSessionTitle,
-            lastSessionAt: dbStats.lastSessionAt,
-            sessionCount: dbStats.sessionCount,
-            messageCount: dbStats.messageCount,
-            toolCallCount: dbStats.toolCallCount,
-            totalTokens: dbStats.totalTokens,
-            estimatedCostUsd: dbStats.estimatedCostUsd,
             cronJobCount: readCronJobCount(claudeHome),
             assignedTaskCount: taskCounts[member.id] ?? 0,
           }

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const VALID_SEED = {
   version: 1,
@@ -25,7 +25,7 @@ let homeDir: string
 let seedFile: string
 const originalHermesHome = process.env.HERMES_HOME
 const originalSeedPath = process.env.MCP_PRESETS_SEED_PATH
-const originalClaudePassword = process.env.CLAUDE_PASSWORD
+const originalPassword = process.env.CLAUDE_PASSWORD
 const originalHermesPassword = process.env.HERMES_PASSWORD
 
 interface PresetsRouteModule {
@@ -45,15 +45,13 @@ async function loadRoute(): Promise<PresetsRouteModule> {
 
 beforeEach(() => {
   vi.resetModules()
-  delete process.env.CLAUDE_PASSWORD
-  delete process.env.HERMES_PASSWORD
   homeDir = mkdtempSync(join(tmpdir(), 'hermes-presets-route-'))
-  mkdirSync(join(homeDir, 'workspace'), { recursive: true })
   const assetDir = mkdtempSync(join(tmpdir(), 'hermes-seed-route-'))
   seedFile = join(assetDir, 'mcp-presets.seed.json')
   writeFileSync(seedFile, JSON.stringify(VALID_SEED))
   process.env.HERMES_HOME = homeDir
   process.env.MCP_PRESETS_SEED_PATH = seedFile
+  delete process.env.HERMES_PASSWORD
 })
 
 afterEach(() => {
@@ -62,8 +60,8 @@ afterEach(() => {
   else process.env.HERMES_HOME = originalHermesHome
   if (originalSeedPath === undefined) delete process.env.MCP_PRESETS_SEED_PATH
   else process.env.MCP_PRESETS_SEED_PATH = originalSeedPath
-  if (originalClaudePassword === undefined) delete process.env.CLAUDE_PASSWORD
-  else process.env.CLAUDE_PASSWORD = originalClaudePassword
+  if (originalPassword === undefined) delete process.env.CLAUDE_PASSWORD
+  else process.env.CLAUDE_PASSWORD = originalPassword
   if (originalHermesPassword === undefined) delete process.env.HERMES_PASSWORD
   else process.env.HERMES_PASSWORD = originalHermesPassword
   rmSync(homeDir, { recursive: true, force: true })
@@ -101,7 +99,7 @@ describe('GET /api/mcp/presets', () => {
 
   it('returns 200 with source=invalid + error fields when user file is malformed', async () => {
     delete process.env.CLAUDE_PASSWORD
-    writeFileSync(join(homeDir, 'workspace', 'mcp-presets.json'), '{not valid json')
+    writeFileSync(join(homeDir, 'mcp-presets.json'), '{not valid json')
     const mod = await loadRoute()
     const res = await mod.Route.server.handlers.GET({
       request: new Request('http://localhost/api/mcp/presets'),
@@ -117,7 +115,7 @@ describe('GET /api/mcp/presets', () => {
     expect(body.ok).toBe(false)
     expect(body.source).toBe('invalid')
     expect(body.error).toBeTruthy()
-    expect(body.errorPath).toBe(join(homeDir, 'workspace', 'mcp-presets.json'))
+    expect(body.errorPath).toBe(join(homeDir, 'mcp-presets.json'))
     expect((body.validationErrors ?? []).length).toBeGreaterThan(0)
   })
 })

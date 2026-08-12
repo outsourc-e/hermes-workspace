@@ -2,7 +2,11 @@
  * Tests for generic-json source adapter — Phase 3.2.
  * Fixture-based — no live network.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getCache, setCache, touchCache } from '../cache'
+import { assertNotPrivate } from '../lib/ssrf-guard'
+import { fetchGenericJson } from './generic-json'
 
 vi.mock('../cache', () => ({
   getCache: vi.fn(),
@@ -16,10 +20,6 @@ vi.mock('../cache', () => ({
 vi.mock('../lib/ssrf-guard', () => ({
   assertNotPrivate: vi.fn().mockResolvedValue(undefined),
 }))
-
-import { getCache, setCache, touchCache } from '../cache'
-import { assertNotPrivate } from '../lib/ssrf-guard'
-import { fetchGenericJson } from './generic-json'
 
 const mockGetCache = vi.mocked(getCache)
 const mockSetCache = vi.mocked(setCache)
@@ -51,7 +51,7 @@ function mockFetch(
  * Build a mock Response whose body is a ReadableStream yielding `chunks`.
  * Used for response-size-cap tests.
  */
-function mockFetchWithStream(chunks: Uint8Array[]): void {
+function mockFetchWithStream(chunks: Array<Uint8Array>): void {
   let idx = 0
   const reader = {
     read: vi.fn(async () => {
@@ -98,7 +98,7 @@ describe('fetchGenericJson', () => {
         'community',
       )
       expect(result.entries.length).toBeGreaterThan(0)
-      expect(result.entries[0].name).toBe('my-server')
+      expect(result.entries[0]?.name).toBe('my-server')
     })
 
     it('parses top-level array []', async () => {
@@ -116,7 +116,7 @@ describe('fetchGenericJson', () => {
         'community',
       )
       expect(result.entries.length).toBeGreaterThan(0)
-      expect(result.entries[0].name).toBe('srv-a')
+      expect(result.entries[0]?.name).toBe('srv-a')
     })
 
     it('parses { manifests: [] } shape', async () => {
@@ -211,7 +211,7 @@ describe('fetchGenericJson', () => {
         'https://example.com',
         'unverified',
       )
-      expect(result.entries[0].trust).toBe('unverified')
+      expect(result.entries[0]?.trust).toBe('unverified')
     })
 
     it('promotes verified:true entries to community (trust cap prevents official)', async () => {
@@ -229,7 +229,7 @@ describe('fetchGenericJson', () => {
         'community',
       )
       // MEDIUM-3: user sources cannot emit 'official' — capped to 'community'
-      expect(result.entries[0].trust).toBe('community')
+      expect(result.entries[0]?.trust).toBe('community')
     })
   })
 
@@ -268,11 +268,10 @@ describe('fetchGenericJson', () => {
       })
 
       await fetchGenericJson('test-source', 'https://example.com', 'community')
-      const headers = fetchSpy.mock.calls[0][1]?.headers as Record<
-        string,
-        string
-      >
-      expect(headers['If-None-Match']).toBe('"abc123"')
+      const headers = fetchSpy.mock.calls[0]?.[1]?.headers as
+        | Record<string, string>
+        | undefined
+      expect(headers?.['If-None-Match']).toBe('"abc123"')
     })
 
     it('returns cached payload on 304', async () => {
@@ -503,7 +502,7 @@ describe('fetchGenericJson', () => {
         'community',
       )
       expect(result.entries).toHaveLength(1)
-      expect(result.entries[0].name).toBe('small-server')
+      expect(result.entries[0]?.name).toBe('small-server')
       expect(result.degraded).toBeUndefined()
     })
   })
@@ -631,7 +630,7 @@ describe('fetchGenericJson', () => {
         'https://corp.example.com/feed',
         'community',
       )
-      expect(result.entries[0].trust).toBe('community')
+      expect(result.entries[0]?.trust).toBe('community')
     })
 
     it('keeps unverified trust as-is', async () => {
@@ -647,7 +646,7 @@ describe('fetchGenericJson', () => {
         'https://corp.example.com/feed',
         'unverified',
       )
-      expect(result.entries[0].trust).toBe('unverified')
+      expect(result.entries[0]?.trust).toBe('unverified')
     })
 
     it('source field uses user:<sourceId> format for user sources', async () => {
@@ -663,7 +662,7 @@ describe('fetchGenericJson', () => {
         'https://corp.example.com/feed',
         'community',
       )
-      expect(result.entries[0].source).toBe('user:my-corp')
+      expect(result.entries[0]?.source).toBe('user:my-corp')
     })
   })
 })

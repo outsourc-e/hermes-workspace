@@ -21,21 +21,30 @@ import {
   useState,
 } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
+import { useQueryClient } from '@tanstack/react-query'
+import type { AuthStatus } from '@/lib/claude-auth'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
-import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
-import { useWorkspaceStore } from '@/stores/workspace-store'
+import {
+  createSessionCard,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import {
+  discardAbandonedNewSessionCards,
+  registerNewSessionCardForDiscard,
+  registerNewSessionCardForPrimaryModel,
+} from '@/screens/chat/new-session-discard'
+import { showErrorToast } from '@/components/error-toast'
+import {
+  CHAT_BOOTSTRAP_CARD_ID,
+  buildChatCardNavigation,
+  normalizeActiveChatCardId,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-// Lazy: ChatPanel statically imports ChatScreen and with it the chat
-// markdown pipeline; keeping it out of the eager entry means non-chat
-// routes stop paying for chat at first paint. The chat route itself
-// already lazy-loads ChatScreen through its own boundary.
-const ChatPanel = lazy(() =>
-  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
-)
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
@@ -48,6 +57,13 @@ import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
+// Lazy: ChatPanel statically imports ChatScreen and with it the chat
+// markdown pipeline; keeping it out of the eager entry means non-chat
+// routes stop paying for chat at first paint. The chat route itself
+// already lazy-loads ChatScreen through its own boundary.
+const ChatPanel = lazy(() =>
+  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
+)
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 
 const TerminalWorkspace = lazy(() =>
@@ -56,8 +72,28 @@ const TerminalWorkspace = lazy(() =>
   })),
 )
 
-export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
-  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+export function resolveShellActiveChatCardId(pathname: string): string | null {
+  if (pathname === '/new') return CHAT_BOOTSTRAP_CARD_ID
+  const match = pathname.match(/^\/chat\/([^/?#]+)$/)
+  if (!match?.[1]) return null
+  try {
+    return normalizeActiveChatCardId(decodeURIComponent(match[1]))
+  } catch {
+    return normalizeActiveChatCardId(match[1])
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function readShellSearch(value: unknown): {
+  embed?: unknown
+  mode?: unknown
+} {
+  const record = isRecord(value) ? value : {}
+  return { embed: record.embed, mode: record.mode }
+}
 
 type WorkspaceShellProps = {
   children?: React.ReactNode
@@ -65,6 +101,7 @@ type WorkspaceShellProps = {
 
 export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
@@ -82,6 +119,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
+  const activeChatCardId = useWorkspaceStore((s) => s.activeChatCardId)
+  const setActiveChatCardId = useWorkspaceStore((s) => s.setActiveChatCardId)
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
 
   // ChatGPT-style: track visual viewport height for keyboard-aware layout
@@ -152,12 +191,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       try {
         const res = await fetch('/api/connection-status', { cache: 'no-store' })
         if (!res.ok || cancelled) return
-        const data = (await res.json()) as {
-          ok?: boolean
-          chatReady?: boolean
-          modelConfigured?: boolean
-        }
-        if (data?.ok || (data?.chatReady && data?.modelConfigured)) {
+        const data: unknown = await res.json()
+        if (
+          isRecord(data) &&
+          (data.ok === true ||
+            (data.chatReady === true && data.modelConfigured === true))
+        ) {
           setAuthStatus({ authenticated: true, authRequired: false })
           setConnectionVerified(true)
         }
@@ -191,49 +230,72 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     return null
   })()
 
-  const chatMatch = pathname.match(/^\/chat\/(.+)$/)
-  const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
-  const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const routeChatCardId = resolveShellActiveChatCardId(pathname)
+  const activeFriendlyId = routeChatCardId ?? activeChatCardId
+  const isOnChatRoute = routeChatCardId !== null
   const isOnTerminalRoute = pathname.startsWith('/terminal')
-  const isOnPlaygroundRoute =
-    pathname === '/playground' || pathname.startsWith('/playground/')
-  const isOnHermesWorldLandingRoute =
-    pathname === '/hermes-world' ||
-    pathname.startsWith('/hermes-world/') ||
-    pathname === '/world' ||
-    pathname.startsWith('/world/')
-  const rawSearch = search as Record<string, unknown>
+  const shellSearch = readShellSearch(search)
   const isEmbeddedSurface =
-    rawSearch?.embed === '1' ||
-    rawSearch?.embed === 'true' ||
-    rawSearch?.mode === 'embed'
-  const isChromeFreeSurface = isEmbeddedSurface || isOnHermesWorldLandingRoute
+    shellSearch.embed === '1' ||
+    shellSearch.embed === 'true' ||
+    shellSearch.mode === 'embed'
+  const isChromeFreeSurface = isEmbeddedSurface
   const hideChatSidebar = isOnChatRoute && chatFocusMode
-  const showDesktopSidebarBackdrop =
-    !isChromeFreeSurface && !isMobile && !isOnChatRoute && !sidebarCollapsed
 
-  const isNewChat = activeFriendlyId === 'new'
+  useEffect(() => {
+    if (routeChatCardId !== null) setActiveChatCardId(routeChatCardId)
+  }, [routeChatCardId, setActiveChatCardId])
 
-  // Sessions state — shared semantic source for sidebar and chat header
-  const {
-    sessions,
-    sessionsLoading,
-    sessionsFetching,
-    sessionsError,
-    refetchSessions,
-  } = useChatSessions({
-    activeFriendlyId,
-    isNewChat,
-  })
+  useEffect(() => {
+    let cancelled = false
+    void discardAbandonedNewSessionCards(routeChatCardId).then((discarded) => {
+      if (cancelled || discarded.length === 0) return
+      void queryClient.invalidateQueries({
+        queryKey: sessionCardQueryKeys.lists,
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [queryClient, routeChatCardId])
 
-  const startNewChat = useCallback(() => {
+  useEffect(() => {
+    const discardOnPageHide = () => {
+      void discardAbandonedNewSessionCards(null, { keepalive: true })
+    }
+    window.addEventListener('pagehide', discardOnPageHide)
+    return () => window.removeEventListener('pagehide', discardOnPageHide)
+  }, [])
+
+  const startNewChat = useCallback(async () => {
+    if (creatingSession) return
     setCreatingSession(true)
-    navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } }).then(
-      () => {
-        setCreatingSession(false)
-      },
-    )
-  }, [navigate])
+    try {
+      const { card, discardToken } = await createSessionCard()
+      registerNewSessionCardForPrimaryModel(card.cardId)
+      if (discardToken) {
+        registerNewSessionCardForDiscard(card.cardId, discardToken)
+      }
+      await queryClient.invalidateQueries({
+        queryKey: sessionCardQueryKeys.lists,
+      })
+      await navigate(buildChatCardNavigation(card.cardId))
+    } catch (error) {
+      void discardAbandonedNewSessionCards(routeChatCardId).then(
+        (discarded) => {
+          if (discarded.length === 0) return
+          void queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.lists,
+          })
+        },
+      )
+      const message =
+        error instanceof Error ? error.message : 'Unable to create Session Card'
+      showErrorToast(message)
+    } finally {
+      setCreatingSession(false)
+    }
+  }, [creatingSession, navigate, queryClient, routeChatCardId])
 
   const handleSelectSession = useCallback(() => {
     // On mobile, collapse sidebar after selecting
@@ -243,7 +305,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [setSidebarCollapsed])
 
   const handleActiveSessionDelete = useCallback(() => {
-    navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })
+    navigate({
+      ...buildChatCardNavigation(CHAT_BOOTSTRAP_CARD_ID),
+      replace: true,
+    })
   }, [navigate])
 
   useEffect(() => {
@@ -304,9 +369,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
   }, [isMobile, setSidebarCollapsed, toggleSidebar])
 
-  // Public/launch surfaces should behave like normal web pages, not app-shell panes.
-  // This keeps /hermes-world and /world scrollable at the document level and avoids
-  // local-only workspace chrome for X/GitHub traffic.
   if (isChromeFreeSurface) {
     return <>{children}</>
   }
@@ -358,17 +420,15 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         <div
           className={cn(
             'grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden',
-            hideChatSidebar || isChromeFreeSurface
-              ? 'md:grid-cols-1'
-              : 'md:grid-cols-[auto_1fr]',
+            hideChatSidebar ? 'md:grid-cols-1' : 'md:grid-cols-[auto_1fr]',
           )}
         >
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
-          {!isChromeFreeSurface && !isMobile && !hideChatSidebar && (
+          {!isMobile && !hideChatSidebar && (
             <div className="relative z-30">
               <ChatSidebar
-                sessions={sessions}
+                sessions={[]}
                 activeFriendlyId={activeFriendlyId}
                 creatingSession={creatingSession}
                 onCreateSession={startNewChat}
@@ -376,10 +436,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 onToggleCollapse={toggleSidebar}
                 onSelectSession={handleSelectSession}
                 onActiveSessionDelete={handleActiveSessionDelete}
-                sessionsLoading={sessionsLoading}
-                sessionsFetching={sessionsFetching}
-                sessionsError={sessionsError}
-                onRetrySessions={refetchSessions}
+                sessionsLoading={false}
+                sessionsFetching={false}
+                sessionsError={null}
+                onRetrySessions={() => undefined}
               />
             </div>
           )}
@@ -395,7 +455,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               isMobile && !isOnChatRoute
                 ? 'pb-[calc(var(--tabbar-h,80px)+0.5rem)]'
                 : !isMobile &&
-                    !isChromeFreeSurface &&
                     !isOnChatRoute &&
                     settings.showSystemMetricsFooter
                   ? 'pb-7'
@@ -440,7 +499,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             <div
               className={[
                 'page-transition flex flex-col',
-                isChromeFreeSurface ? 'min-h-full' : 'h-full',
+                'h-full',
                 slideClass,
                 isOnTerminalRoute ? 'hidden' : '',
               ]
@@ -448,7 +507,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 .join(' ')}
             >
               {isMobile &&
-                !isChromeFreeSurface &&
                 !isOnChatRoute &&
                 !isOnTerminalRoute &&
                 mobilePageTitle && <MobilePageHeader title={mobilePageTitle} />}
@@ -456,48 +514,26 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
           </main>
 
-          {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute &&
-            !isOnPlaygroundRoute &&
-            !isChromeFreeSurface &&
-            !isMobile && (
-              <Suspense fallback={null}>
-                <ChatPanel />
-              </Suspense>
-            )}
+          {!isOnChatRoute && !isMobile && (
+            <Suspense fallback={null}>
+              <ChatPanel />
+            </Suspense>
+          )}
         </div>
 
-        {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
-        {!isChromeFreeSurface &&
-          !isOnChatRoute &&
-          !isOnPlaygroundRoute &&
-          !isMobile && <ChatPanelToggle />}
-
-        {showDesktopSidebarBackdrop ? (
-          <button
-            type="button"
-            aria-label="Collapse navigation sidebar"
-            onClick={() => setSidebarCollapsed(true)}
-            className={DESKTOP_SIDEBAR_BACKDROP_CLASS}
-          />
-        ) : null}
+        {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
 
         {!authState.checked ? (
           <ConnectionStartupScreen onConnected={handleStartupConnected} />
         ) : null}
       </div>
 
-      {!isChromeFreeSurface ? <MobileHamburgerMenu /> : null}
-      {!isChromeFreeSurface ? <MobileTabBar /> : null}
-      {!isChromeFreeSurface &&
-      !isMobile &&
-      !isOnChatRoute &&
-      settings.showSystemMetricsFooter ? (
+      <MobileHamburgerMenu />
+      <MobileTabBar />
+      {!isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}
-      {!isChromeFreeSurface ? (
-        <CommandPalette pathname={pathname} sessions={sessions} />
-      ) : null}
+      <CommandPalette pathname={pathname} sessions={[]} />
     </>
   )
 }

@@ -12,10 +12,10 @@ type TextSegment =
 
 const CHARS_PER_FRAME = 15
 
-function splitCodeFences(input: string): TextSegment[] {
+function splitCodeFences(input: string): Array<TextSegment> {
   if (!input) return []
 
-  const segments: TextSegment[] = []
+  const segments: Array<TextSegment> = []
   const fence = /```([^\n`]*)\n?([\s\S]*?)(```|$)/g
   let lastIndex = 0
 
@@ -23,7 +23,7 @@ function splitCodeFences(input: string): TextSegment[] {
     const full = match[0]
     const lang = (match[1] || '').trim()
     const code = match[2] || ''
-    const idx = match.index ?? 0
+    const idx = match.index
 
     if (idx > lastIndex) {
       segments.push({ type: 'text', value: input.slice(lastIndex, idx) })

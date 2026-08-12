@@ -6,18 +6,19 @@
 #   docker build -t hermes-workspace .
 # Run:
 #   docker run -p 3000:3000 -e HERMES_API_URL=http://host.docker.internal:8642 hermes-workspace
-# Or pull pre-built:
-#   docker pull ghcr.io/outsourc-e/hermes-workspace:latest
-#
 FROM tianon/gosu:1.17-bookworm AS gosu_source
 # ─── build stage ─────────────────────────────────────────────────────────
 FROM node:22-slim AS build
-RUN corepack enable && apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN corepack enable \
+    && corepack prepare pnpm@10.15.0 --activate \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Install deps (cache-friendly: copy only manifests first)
-# NOTE: pnpm-workspace.yaml carries the allowBuilds approvals (electron/esbuild/…);
-# it must be present or pnpm 10+/11 fatally errors on ignored build scripts.
+# pnpm-workspace.yaml carries the reviewed onlyBuiltDependencies allowlist. Copy
+# it before install so pnpm 10.15.0 applies the project's lifecycle-script policy.
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* .npmrc* ./
 RUN pnpm install --frozen-lockfile
 

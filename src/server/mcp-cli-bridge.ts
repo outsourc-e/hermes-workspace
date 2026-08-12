@@ -11,6 +11,7 @@ export interface CliTestResult {
   error: string | null
 }
 
+// eslint-disable-next-line no-control-regex -- ANSI escape sequences contain ESC by definition.
 const ANSI_RE = /\x1b\[[0-9;]*m/g
 const DEFAULT_TIMEOUT_MS = 60_000
 
@@ -124,8 +125,8 @@ export function parseHermesTestOutput(raw: string): CliTestResult {
     const failed = failedRe.exec(line)
     if (failed) {
       result.status = 'failed'
-      result.latencyMs = Number(failed[1])
-      result.error = failed[2].trim() || 'Connection failed'
+      result.latencyMs = Number(failed[1] ?? 0)
+      result.error = failed[2]?.trim() || 'Connection failed'
       continue
     }
     const connected = connectedRe.exec(line)
@@ -146,8 +147,8 @@ export function parseHermesTestOutput(raw: string): CliTestResult {
         // ~55 chars by the CLI) so the user can see the description was
         // cut off rather than thinking it's the full text. Codex feedback.
         result.discoveredTools.push({
-          name: tool[1],
-          description: tool[2].trim(),
+          name: tool[1] ?? '',
+          description: tool[2]?.trim() ?? '',
         })
       }
       // CLI prints a blank line between "Tools discovered: N" and the

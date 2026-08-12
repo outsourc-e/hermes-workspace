@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { AgentIdentityAvatar } from './agent-identity-avatar'
 import { cn } from '@/lib/utils'
 
 type AvatarProps = {
@@ -7,17 +8,14 @@ type AvatarProps = {
 }
 
 /**
- * Assistant avatar — Hermes Agent caduceus on Nous blue.
+ * Assistant avatar — the user's configured agent icon.
  */
 function AssistantAvatarComponent({ size = 28, className }: AvatarProps) {
   return (
-    <img
-      src="/claude-avatar.webp"
-      alt="Hermes Agent"
+    <AgentIdentityAvatar
+      size={size}
       className={cn('shrink-0', className)}
       style={{
-        width: size,
-        height: size,
         borderRadius: Math.max(4, Math.round(size * 0.15)),
       }}
     />

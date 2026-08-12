@@ -7,6 +7,7 @@ import {
   PreviewCardPopup,
   PreviewCardTrigger,
 } from '@/components/ui/preview-card'
+import { parseSessionCardStatusUsage } from '@/screens/chat/session-card-status'
 
 const POLL_MS = 15_000
 
@@ -32,10 +33,10 @@ function formatTokens(n: number): string {
 
 function ContextBarComponent({
   compact: _compact,
-  sessionId,
+  cardId,
 }: {
   compact?: boolean
-  sessionId?: string
+  cardId?: string
 }) {
   const [ctx, setCtx] = useState<ContextData>(EMPTY)
   const [showLabel, setShowLabel] = useState(false)
@@ -50,25 +51,18 @@ function ContextBarComponent({
   }, [])
 
   const refresh = useCallback(async () => {
+    if (!cardId) return
     try {
-      const params = sessionId
-        ? `?sessionId=${encodeURIComponent(sessionId)}`
-        : ''
-      const res = await fetch(`/api/context-usage${params}`)
+      const res = await fetch(
+        `/api/session-status?cardId=${encodeURIComponent(cardId)}&usageScope=latest-continuation`,
+      )
       if (!res.ok) return
-      const data = await res.json()
-      if (data.ok) {
-        setCtx({
-          contextPercent: data.contextPercent ?? 0,
-          model: data.model ?? '',
-          maxTokens: data.maxTokens ?? 0,
-          usedTokens: data.usedTokens ?? 0,
-        })
-      }
+      const usage = parseSessionCardStatusUsage(await res.json(), cardId)
+      if (usage) setCtx(usage)
     } catch {
       /* ignore */
     }
-  }, [sessionId])
+  }, [cardId])
 
   useEffect(() => {
     void refresh()

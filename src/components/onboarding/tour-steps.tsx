@@ -1,4 +1,5 @@
 import type { Step } from 'react-joyride'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 export const tourSteps: Array<Step> = [
   // Step 1: Welcome
@@ -15,9 +16,7 @@ export const tourSteps: Array<Step> = [
           gap: '12px',
         }}
       >
-        <img
-          src="/claude-avatar.webp"
-          alt="Hermes Agent"
+        <AgentIdentityAvatar
           style={{ width: 48, height: 48, borderRadius: 12 }}
         />
         <p style={{ textAlign: 'center', margin: 0 }}>

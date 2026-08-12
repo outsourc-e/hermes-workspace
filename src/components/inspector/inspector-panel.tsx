@@ -211,6 +211,10 @@ function FilesTab() {
 
 // ── Memory Tab ────────────────────────────────────────────────────────────────
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function MemoryTab() {
   const [files, setFiles] = useState<Array<{
     path: string
@@ -226,14 +230,18 @@ function MemoryTab() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
-      .then((json) => {
+      .then((json: unknown) => {
         if (!cancelled) {
-          const list = Array.isArray(json?.files) ? json.files : []
+          const list =
+            isRecord(json) && Array.isArray(json.files) ? json.files : []
           setFiles(
-            list.map((entry: Record<string, unknown>) => ({
-              path: String(entry?.path || ''),
-              name: String(entry?.name || entry?.path || ''),
-            })),
+            list.map((entry: unknown) => {
+              const record = isRecord(entry) ? entry : {}
+              return {
+                path: String(record.path || ''),
+                name: String(record.name || record.path || ''),
+              }
+            }),
           )
           setLoading(false)
         }
@@ -327,8 +335,9 @@ function SkillsTab() {
   const grouped: Record<string, Array<SkillItem>> = {}
   for (const skill of skills) {
     const cat = skill.category || 'Uncategorized'
-    if (!grouped[cat]) grouped[cat] = []
-    grouped[cat].push(skill)
+    const group = grouped[cat] as Array<SkillItem> | undefined
+    if (group) group.push(skill)
+    else grouped[cat] = [skill]
   }
 
   return (
@@ -402,21 +411,25 @@ function McpTab() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
-      .then((json) => {
+      .then((json: unknown) => {
         if (cancelled) return
-        const list = Array.isArray(json?.servers) ? json.servers : []
+        const list =
+          isRecord(json) && Array.isArray(json.servers) ? json.servers : []
         setServers(
-          list.map((entry: Record<string, unknown>) => ({
-            id: String(entry?.id || entry?.name || ''),
-            name: String(entry?.name || ''),
-            enabled: Boolean(entry?.enabled),
-            status:
-              typeof entry?.status === 'string' ? entry.status : undefined,
-            discoveredToolsCount:
-              typeof entry?.discoveredToolsCount === 'number'
-                ? entry.discoveredToolsCount
-                : undefined,
-          })),
+          list.map((entry: unknown) => {
+            const record = isRecord(entry) ? entry : {}
+            return {
+              id: String(record.id || record.name || ''),
+              name: String(record.name || ''),
+              enabled: Boolean(record.enabled),
+              status:
+                typeof record.status === 'string' ? record.status : undefined,
+              discoveredToolsCount:
+                typeof record.discoveredToolsCount === 'number'
+                  ? record.discoveredToolsCount
+                  : undefined,
+            }
+          }),
         )
         setLoading(false)
       })

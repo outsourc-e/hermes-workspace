@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { InlineApprovalCard } from './inline-approval-card'
+import { StreamingText } from './streaming-text'
+import type { HubTask } from './task-board'
+import type { ApprovalRequest } from '../lib/approvals-store'
+import type { SessionHistoryMessage } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/prompt-kit/markdown'
-import {
-  fetchSessionHistory,
-  type SessionHistoryMessage,
-} from '@/lib/gateway-api'
-import type { HubTask } from './task-board'
-import { InlineApprovalCard } from './inline-approval-card'
-import type { ApprovalRequest } from '../lib/approvals-store'
-import { StreamingText } from './streaming-text'
+import { fetchSessionHistory } from '@/lib/gateway-api'
 
 type OutputMessage = {
   role: 'assistant' | 'user' | 'tool'
@@ -18,7 +16,7 @@ type OutputMessage = {
 }
 
 type SessionOutputCacheEntry = {
-  messages: OutputMessage[]
+  messages: Array<OutputMessage>
   sessionEnded: boolean
   tokenCount: number
 }
@@ -29,7 +27,7 @@ const sessionOutputCache = new Map<string, SessionOutputCacheEntry>()
 export type AgentOutputPanelProps = {
   agentName: string
   sessionKey: string | null
-  tasks: HubTask[]
+  tasks: Array<HubTask>
   onClose: () => void
   onLine?: (line: string) => void
   /** Model preset id — shown in header badge e.g. 'pc1-coder', 'sonnet' */
@@ -50,13 +48,13 @@ export type AgentOutputPanelProps = {
    * the internal `messages` state. This is the Option A fix for the live
    * output panel — the parent already has the data, just pass it down.
    */
-  outputLines?: string[]
+  outputLines?: Array<string>
   /** Enable inline message input at the bottom of the output panel */
   enableMessaging?: boolean
   /** Callback when user sends a message to this agent */
   onSendMessage?: (sessionKey: string, message: string) => void
   /** Pending approval requests for this agent — shown as inline cards */
-  approvals?: ApprovalRequest[]
+  approvals?: Array<ApprovalRequest>
   /** Called when user approves an inline request */
   onApprove?: (id: string) => void
   /** Called when user denies an inline request */
@@ -179,11 +177,11 @@ function readEventRole(
 }
 
 function upsertAssistantStream(
-  previous: OutputMessage[],
+  previous: Array<OutputMessage>,
   text: string,
   replace: boolean,
-): OutputMessage[] {
-  const last = previous[previous.length - 1]
+): Array<OutputMessage> {
+  const last = previous.at(-1)
   if (last && last.role === 'assistant' && !last.done) {
     return [
       ...previous.slice(0, -1),
@@ -197,10 +195,10 @@ function upsertAssistantStream(
 }
 
 function appendAssistantMessage(
-  previous: OutputMessage[],
+  previous: Array<OutputMessage>,
   text: string,
-): OutputMessage[] {
-  const last = previous[previous.length - 1]
+): Array<OutputMessage> {
+  const last = previous.at(-1)
   if (last && last.role === 'assistant' && !last.done) {
     // Always finalize the last in-progress assistant message with the complete text.
     // This handles providers (e.g. Gemini via OpenRouter) that emit both streaming
@@ -217,15 +215,15 @@ function appendAssistantMessage(
   ]
 }
 
-function trimMessages(messages: OutputMessage[]): OutputMessage[] {
+function trimMessages(messages: Array<OutputMessage>): Array<OutputMessage> {
   if (messages.length <= MAX_CACHED_MESSAGES) return messages
   return messages.slice(-MAX_CACHED_MESSAGES)
 }
 
 function appendBoundedMessage(
-  previous: OutputMessage[],
+  previous: Array<OutputMessage>,
   message: OutputMessage,
-): OutputMessage[] {
+): Array<OutputMessage> {
   // Deduplicate: skip if an identical role+content message exists in the recent tail
   const tail = previous.slice(-10)
   if (
@@ -266,7 +264,7 @@ export function AgentOutputPanel({
   const [sendingMessage, setSendingMessage] = useState(false)
   const messageInputRef = useRef<HTMLInputElement>(null)
   const cachedInitial = readCachedSessionState(sessionKey)
-  const [messages, setMessages] = useState<OutputMessage[]>(
+  const [messages, setMessages] = useState<Array<OutputMessage>>(
     cachedInitial?.messages ?? [],
   )
   const [sessionEnded, setSessionEnded] = useState(
@@ -426,8 +424,8 @@ export function AgentOutputPanel({
         const payload = parseSsePayload(event.data as string)
         if (!payload) return
         if (!payloadMatchesSession(payload, sessionKey)) return
-        const state = readString(payload?.state).toLowerCase()
-        const error = readString(payload?.errorMessage)
+        const state = readString(payload.state).toLowerCase()
+        const error = readString(payload.errorMessage)
         if (state === 'error') {
           doneLabel = error
             ? `Session ended with error: ${error}`
@@ -578,7 +576,8 @@ export function AgentOutputPanel({
             )
             let lastStreamingAssistantIndex = -1
             for (let i = sortedMessages.length - 1; i >= 0; i -= 1) {
-              const msg = sortedMessages[i]
+              const msg = sortedMessages.at(i)
+              if (!msg) continue
               if (msg.role === 'assistant' && !msg.done) {
                 lastStreamingAssistantIndex = i
                 break
@@ -717,7 +716,7 @@ export function AgentOutputPanel({
       )}
 
       {/* Inline message input */}
-      {enableMessaging && sessionKey && !sessionEnded && (
+      {enableMessaging && sessionKey && onSendMessage && !sessionEnded && (
         <form
           className="mt-2 flex items-center gap-2"
           onSubmit={(e) => {
@@ -733,17 +732,7 @@ export function AgentOutputPanel({
             ])
             // Clear sessionEnded so we show the streaming cursor again
             setSessionEnded(false)
-            if (onSendMessage) {
-              onSendMessage(sessionKey, text)
-            } else {
-              fetch('/api/sessions/send', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ sessionKey, message: text }),
-              }).catch(() => {
-                /* best effort */
-              })
-            }
+            onSendMessage(sessionKey, text)
             setSendingMessage(false)
             messageInputRef.current?.focus()
           }}

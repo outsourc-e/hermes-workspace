@@ -1,4 +1,8 @@
 import { create } from 'zustand'
+import {
+  sanitizeCardOwnedMessage,
+  sanitizeCardOwnedValue,
+} from '../screens/chat/card-transcript-recovery'
 import type {
   ChatMessage,
   MessageContent,
@@ -6,8 +10,6 @@ import type {
   ThinkingContent,
   ToolCallContent,
 } from '../screens/chat/types'
-
-let _streamingPersistTimer: ReturnType<typeof setTimeout> | null = null
 
 export type ChatStreamEvent =
   | {
@@ -98,10 +100,12 @@ export type StreamingState = {
 type ChatState = {
   connectionState: ConnectionState
   lastError: string | null
-  /** Messages received via real-time stream, keyed by sessionKey */
+  /** Messages received via real-time stream; main Chat entries use Card IDs. */
   realtimeMessages: Map<string, Array<ChatMessage>>
   /** Current streaming state per session */
   streamingState: Map<string, StreamingState>
+  /** Independent immutable-run streams nested under the stable Card owner. */
+  cardStreamingRuns: Map<string, Map<string, StreamingState>>
   /** Timestamp of last received event */
   lastEventAt: number
   /**
@@ -113,10 +117,24 @@ type ChatState = {
 
   // Actions
   setConnectionState: (state: ConnectionState, error?: string) => void
-  processEvent: (event: ChatStreamEvent) => void
+  processEvent: (event: ChatStreamEvent, ownerCardId?: string) => void
+  processCardEvent: (cardId: string, event: ChatStreamEvent) => void
+  getCardRealtimeMessages: (cardId: string) => Array<ChatMessage>
+  getCardStreamingState: (cardId: string) => StreamingState | null
+  getCardStreamingStates: (cardId: string) => Array<StreamingState>
+  hydrateCardStreamingState: (cardId: string) => void
+  clearCard: (cardId: string) => void
+  clearCardRealtimeBuffer: (cardId: string) => void
+  clearCardStreaming: (cardId: string, runId?: string) => void
+  mergeCardHistoryMessages: (
+    cardId: string,
+    historyMessages: Array<ChatMessage>,
+  ) => Array<ChatMessage>
+  claimSessionStateForCard: (sessionKey: string, cardId: string) => void
   getRealtimeMessages: (sessionKey: string) => Array<ChatMessage>
   getStreamingState: (sessionKey: string) => StreamingState | null
   clearSession: (sessionKey: string) => void
+  handoffSession: (fromSessionKey: string, toSessionKey: string) => void
   clearRealtimeBuffer: (sessionKey: string) => void
   clearStreamingSession: (sessionKey: string) => void
   clearAllStreaming: () => void
@@ -133,13 +151,18 @@ type ChatState = {
 
   /** Sessions currently waiting for a response — survives component unmount */
   waitingSessionKeys: Set<string>
-  waitingSessionMeta: Record<string, { since: number; runId: string | null }>
+  waitingSessionMeta: Partial<
+    Record<string, { since: number; runId: string | null }>
+  >
   /** Mark a session as waiting for a response */
   setSessionWaiting: (sessionKey: string, runId?: string | null) => void
   /** Clear waiting state for a session */
   clearSessionWaiting: (sessionKey: string) => void
   /** Check if a session is waiting for a response */
   isSessionWaiting: (sessionKey: string) => boolean
+  setCardWaiting: (cardId: string, runId?: string | null) => void
+  clearCardWaiting: (cardId: string) => void
+  isCardWaiting: (cardId: string) => boolean
 
   /** Last activity description forwarded via heartbeat — used by ThinkingBubble
    *  to show meaningful progress during long reasoning stretches */
@@ -155,142 +178,255 @@ const createEmptyStreamingState = (): StreamingState => ({
   toolCalls: [],
 })
 
-function persistStreamingState(
-  sessionKey: string,
-  state: StreamingState,
-): void {
-  if (typeof sessionStorage === 'undefined') return
-  if (_streamingPersistTimer) clearTimeout(_streamingPersistTimer)
-  _streamingPersistTimer = setTimeout(() => {
-    sessionStorage.setItem(
-      `claude_streaming_${sessionKey}`,
-      JSON.stringify({ ...state, _savedAt: Date.now() }),
-    )
-  }, 500)
+const CARD_STREAMING_STORAGE_PREFIX = 'workspace.chat-card-streaming.v1:'
+const CARD_WAITING_STORAGE_PREFIX = 'workspace.chat-card-waiting.v1:'
+const LEGACY_CHAT_STORAGE_PREFIXES = [
+  'claude_waiting_',
+  'claude_streaming_',
+  'claude_realtime_',
+] as const
+const WAITING_TTL_MS = 120_000
+const CARD_STREAMING_ENVELOPE_VERSION = 2
+
+function isAuthoritativeCardId(cardId: string): boolean {
+  return cardId === cardId.trim() && /^(?:local|remote):\S+$/.test(cardId)
 }
 
-export function restoreStreamingState(
-  sessionKey: string,
-): StreamingState | null {
-  if (typeof sessionStorage === 'undefined') return null
+function withoutTransportOwnership(message: ChatMessage): ChatMessage {
+  return sanitizeCardOwnedMessage(message)
+}
 
-  const storageKey = `claude_streaming_${sessionKey}`
-  const raw = sessionStorage.getItem(storageKey)
-  if (!raw) return null
+function sanitizeCardStreamingState(state: StreamingState): StreamingState {
+  return sanitizeCardOwnedValue(state) as StreamingState
+}
+
+function cleanupLegacyChatStorage(): void {
+  if (typeof sessionStorage === 'undefined') return
+  try {
+    for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = sessionStorage.key(index)
+      if (
+        key &&
+        LEGACY_CHAT_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))
+      ) {
+        sessionStorage.removeItem(key)
+      }
+    }
+  } catch {
+    // Browser storage can be unavailable; live in-memory Card state still works.
+  }
+}
+
+function cardStorageKey(prefix: string, cardId: string): string {
+  return `${prefix}${encodeURIComponent(cardId)}`
+}
+
+function normalizeCardStreamingStates(
+  states: ReadonlyArray<StreamingState>,
+): Array<StreamingState> {
+  const normalized = new Map<string, StreamingState>()
+  let ownerOnly: StreamingState | null = null
+  for (const state of states) {
+    const sanitized = sanitizeCardStreamingState(state)
+    if (
+      (sanitized.runId !== null && typeof sanitized.runId !== 'string') ||
+      typeof sanitized.text !== 'string' ||
+      typeof sanitized.thinking !== 'string' ||
+      !Array.isArray(sanitized.lifecycleEvents) ||
+      !Array.isArray(sanitized.toolCalls)
+    ) {
+      continue
+    }
+    if (sanitized.runId) normalized.set(sanitized.runId, sanitized)
+    else ownerOnly = sanitized
+  }
+  return [...(ownerOnly ? [ownerOnly] : []), ...normalized.values()]
+}
+
+function writeCardStreamingStates(
+  cardId: string,
+  states: ReadonlyArray<StreamingState>,
+): void {
+  if (typeof sessionStorage === 'undefined' || !isAuthoritativeCardId(cardId)) {
+    return
+  }
+  const runs = normalizeCardStreamingStates(states)
+  if (runs.length === 0) {
+    removePersistedCardStreamingState(cardId)
+    return
+  }
+  cleanupLegacyChatStorage()
+  try {
+    sessionStorage.setItem(
+      cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
+      JSON.stringify({
+        version: CARD_STREAMING_ENVELOPE_VERSION,
+        cardId,
+        savedAt: Date.now(),
+        runs,
+      }),
+    )
+  } catch {
+    // In-memory Card state remains authoritative when persistence is denied.
+  }
+}
+
+function persistCardStreamingStates(
+  cardId: string,
+  states: ReadonlyArray<StreamingState>,
+): void {
+  if (!isAuthoritativeCardId(cardId)) return
+  // Each accepted event is a recovery checkpoint. Deferring this write behind
+  // a trailing timer can lose sibling runs when the page is remounted first.
+  writeCardStreamingStates(cardId, states)
+}
+
+function removePersistedCardStreamingState(cardId: string): void {
+  if (typeof sessionStorage === 'undefined') return
+  cleanupLegacyChatStorage()
+  try {
+    sessionStorage.removeItem(
+      cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId),
+    )
+  } catch {
+    // In-memory cleanup still succeeds when persistence is denied.
+  }
+}
+
+export function restoreCardStreamingStates(
+  cardId: string,
+): Array<StreamingState> {
+  if (typeof sessionStorage === 'undefined' || !isAuthoritativeCardId(cardId)) {
+    return []
+  }
+  cleanupLegacyChatStorage()
+  const storageKey = cardStorageKey(CARD_STREAMING_STORAGE_PREFIX, cardId)
+  let raw: string | null
+  try {
+    raw = sessionStorage.getItem(storageKey)
+  } catch {
+    return []
+  }
+  if (!raw) return []
 
   try {
-    const parsed = JSON.parse(raw) as StreamingState & { _savedAt?: unknown }
+    const parsed = JSON.parse(raw) as Record<string, unknown>
     const savedAt =
-      typeof parsed._savedAt === 'number' && Number.isFinite(parsed._savedAt)
-        ? parsed._savedAt
-        : null
-
-    if (!savedAt || Date.now() - savedAt > 60_000) {
+      typeof parsed.savedAt === 'number' && Number.isFinite(parsed.savedAt)
+        ? parsed.savedAt
+        : typeof parsed._savedAt === 'number' &&
+            Number.isFinite(parsed._savedAt)
+          ? parsed._savedAt
+          : null
+    if (!savedAt || savedAt <= 0) {
       sessionStorage.removeItem(storageKey)
-      return null
+      return []
     }
-
-    const { _savedAt, ...streamingState } = parsed
-    return streamingState
+    const {
+      _savedAt: _legacySavedAt,
+      savedAt: _legacySavedAtV2,
+      version: _legacyVersion,
+      cardId: _legacyCardId,
+      runs: _legacyRuns,
+      ...legacyState
+    } = parsed
+    const candidateStates =
+      parsed.version === CARD_STREAMING_ENVELOPE_VERSION &&
+      parsed.cardId === cardId &&
+      Array.isArray(parsed.runs)
+        ? (parsed.runs as Array<StreamingState>)
+        : [legacyState as StreamingState]
+    const sanitized = normalizeCardStreamingStates(candidateStates)
+    if (sanitized.length === 0) {
+      sessionStorage.removeItem(storageKey)
+      return []
+    }
+    const sanitizedRaw = JSON.stringify({
+      version: CARD_STREAMING_ENVELOPE_VERSION,
+      cardId,
+      savedAt,
+      runs: sanitized,
+    })
+    if (sanitizedRaw !== raw) sessionStorage.setItem(storageKey, sanitizedRaw)
+    return sanitized
   } catch {
     sessionStorage.removeItem(storageKey)
-    return null
+    return []
   }
 }
 
-const RECOVERY_MSG_PREFIX = 'claude_recovery_msg_'
-const RECOVERY_MSG_TTL_MS = 5 * 60 * 1000
-
-export function persistRecoveryMessage(
-  sessionKey: string,
-  message: ChatMessage,
-): void {
-  if (typeof sessionStorage === 'undefined') return
-  try {
-    sessionStorage.setItem(
-      `${RECOVERY_MSG_PREFIX}${sessionKey}`,
-      JSON.stringify({ message, storedAt: Date.now() }),
-    )
-  } catch {
-    // Ignore storage write failures (quota, private mode, etc.).
-  }
+export function restoreCardStreamingState(
+  cardId: string,
+): StreamingState | null {
+  return restoreCardStreamingStates(cardId).at(-1) ?? null
 }
 
-export function readRecoveryMessage(sessionKey: string): ChatMessage | null {
-  if (typeof sessionStorage === 'undefined') return null
-  const key = `${RECOVERY_MSG_PREFIX}${sessionKey}`
-  const raw = sessionStorage.getItem(key)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as {
-      message?: ChatMessage
-      storedAt?: number
-    }
-    if (!parsed.message) return null
-    if (
-      typeof parsed.storedAt !== 'number' ||
-      Date.now() - parsed.storedAt > RECOVERY_MSG_TTL_MS
-    ) {
-      sessionStorage.removeItem(key)
-      return null
-    }
-    return parsed.message
-  } catch {
-    sessionStorage.removeItem(key)
-    return null
-  }
-}
-
-export function clearRecoveryMessage(sessionKey: string): void {
-  if (typeof sessionStorage === 'undefined') return
-  sessionStorage.removeItem(`${RECOVERY_MSG_PREFIX}${sessionKey}`)
-}
-
-const WAITING_TTL_MS = 120_000
-const WAITING_STORAGE_PREFIX = 'claude_waiting_'
-
-function persistWaitingState(
-  sessionKey: string,
+function persistCardWaitingState(
+  cardId: string,
   meta: { since: number; runId: string | null },
 ): void {
-  if (typeof sessionStorage === 'undefined') return
-  sessionStorage.setItem(
-    `${WAITING_STORAGE_PREFIX}${sessionKey}`,
-    JSON.stringify(meta),
-  )
+  if (typeof sessionStorage === 'undefined' || !isAuthoritativeCardId(cardId)) {
+    return
+  }
+  cleanupLegacyChatStorage()
+  try {
+    sessionStorage.setItem(
+      cardStorageKey(CARD_WAITING_STORAGE_PREFIX, cardId),
+      JSON.stringify({ cardId, ...meta }),
+    )
+  } catch {
+    // In-memory Card state remains authoritative when persistence is denied.
+  }
 }
 
-function removeWaitingState(sessionKey: string): void {
+function removeCardWaitingState(cardId: string): void {
   if (typeof sessionStorage === 'undefined') return
-  sessionStorage.removeItem(`${WAITING_STORAGE_PREFIX}${sessionKey}`)
+  cleanupLegacyChatStorage()
+  try {
+    sessionStorage.removeItem(
+      cardStorageKey(CARD_WAITING_STORAGE_PREFIX, cardId),
+    )
+  } catch {
+    // In-memory cleanup still succeeds when persistence is denied.
+  }
 }
 
-function restoreWaitingSessions(): {
+function restoreWaitingCards(): {
   keys: Set<string>
-  meta: Record<string, { since: number; runId: string | null }>
+  meta: Partial<Record<string, { since: number; runId: string | null }>>
 } {
   const keys = new Set<string>()
-  const meta: Record<string, { since: number; runId: string | null }> = {}
+  const meta: Partial<Record<string, { since: number; runId: string | null }>> =
+    {}
   if (typeof sessionStorage === 'undefined') return { keys, meta }
+  cleanupLegacyChatStorage()
 
   const now = Date.now()
-  for (let i = sessionStorage.length - 1; i >= 0; i--) {
-    const storageKey = sessionStorage.key(i)
-    if (!storageKey || !storageKey.startsWith(WAITING_STORAGE_PREFIX)) continue
-    const sessionKey = storageKey.slice(WAITING_STORAGE_PREFIX.length)
+  for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+    const storageKey = sessionStorage.key(index)
+    if (!storageKey?.startsWith(CARD_WAITING_STORAGE_PREFIX)) continue
+    const encodedCardId = storageKey.slice(CARD_WAITING_STORAGE_PREFIX.length)
+    let cardId = ''
     try {
-      const parsed = JSON.parse(sessionStorage.getItem(storageKey) ?? '')
+      cardId = decodeURIComponent(encodedCardId)
+      const parsed = JSON.parse(sessionStorage.getItem(storageKey) ?? '') as {
+        cardId?: unknown
+        since?: unknown
+        runId?: unknown
+      }
       if (
-        typeof parsed.since === 'number' &&
-        now - parsed.since < WAITING_TTL_MS
+        !isAuthoritativeCardId(cardId) ||
+        parsed.cardId !== cardId ||
+        typeof parsed.since !== 'number' ||
+        now - parsed.since >= WAITING_TTL_MS
       ) {
-        keys.add(sessionKey)
-        meta[sessionKey] = {
-          since: parsed.since,
-          runId: typeof parsed.runId === 'string' ? parsed.runId : null,
-        }
-      } else {
         sessionStorage.removeItem(storageKey)
+        continue
+      }
+      keys.add(cardId)
+      meta[cardId] = {
+        since: parsed.since,
+        runId: typeof parsed.runId === 'string' ? parsed.runId : null,
       }
     } catch {
       sessionStorage.removeItem(storageKey)
@@ -433,6 +569,12 @@ function getMessageId(msg: ChatMessage | null | undefined): string | undefined {
   if (typeof messageId === 'string' && messageId.trim().length > 0)
     return messageId
   return undefined
+}
+
+function getMessageRunId(msg: ChatMessage | null | undefined): string {
+  if (!msg) return ''
+  const raw = msg as Record<string, unknown>
+  return normalizeString(raw.runId) || normalizeString(raw.run_id)
 }
 
 function getClientNonce(msg: ChatMessage | null | undefined): string {
@@ -635,13 +777,14 @@ function messageMultipartSignature(
   return `${msg.role ?? 'unknown'}:${content}:${attachments}`
 }
 
-const _restoredWaiting = restoreWaitingSessions()
+const _restoredWaiting = restoreWaitingCards()
 
 export const useChatStore = create<ChatState>((set, get) => ({
   connectionState: 'disconnected',
   lastError: null,
   realtimeMessages: new Map(),
   streamingState: new Map(),
+  cardStreamingRuns: new Map(),
   lastEventAt: 0,
   sendStreamRunIds: new Set(),
   waitingSessionKeys: _restoredWaiting.keys,
@@ -677,7 +820,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const nextKeys = new Set(get().waitingSessionKeys)
     nextKeys.add(sessionKey)
     const nextMeta = { ...get().waitingSessionMeta, [sessionKey]: meta }
-    persistWaitingState(sessionKey, meta)
+    cleanupLegacyChatStorage()
     set({ waitingSessionKeys: nextKeys, waitingSessionMeta: nextMeta })
   },
 
@@ -685,7 +828,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const nextKeys = new Set(get().waitingSessionKeys)
     nextKeys.delete(sessionKey)
     const { [sessionKey]: _, ...nextMeta } = get().waitingSessionMeta
-    removeWaitingState(sessionKey)
+    cleanupLegacyChatStorage()
     set({ waitingSessionKeys: nextKeys, waitingSessionMeta: nextMeta })
   },
 
@@ -693,14 +836,97 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return get().waitingSessionKeys.has(sessionKey)
   },
 
+  setCardWaiting: (cardId, runId) => {
+    if (!isAuthoritativeCardId(cardId)) return
+    const meta = {
+      since: get().waitingSessionMeta[cardId]?.since ?? Date.now(),
+      runId: runId ?? null,
+    }
+    const nextKeys = new Set(get().waitingSessionKeys)
+    nextKeys.add(cardId)
+    const nextMeta = { ...get().waitingSessionMeta, [cardId]: meta }
+    persistCardWaitingState(cardId, meta)
+    set({ waitingSessionKeys: nextKeys, waitingSessionMeta: nextMeta })
+  },
+
+  clearCardWaiting: (cardId) => {
+    if (!isAuthoritativeCardId(cardId)) return
+    const nextKeys = new Set(get().waitingSessionKeys)
+    nextKeys.delete(cardId)
+    const { [cardId]: _, ...nextMeta } = get().waitingSessionMeta
+    removeCardWaitingState(cardId)
+    set({ waitingSessionKeys: nextKeys, waitingSessionMeta: nextMeta })
+  },
+
+  isCardWaiting: (cardId) => {
+    return isAuthoritativeCardId(cardId) && get().waitingSessionKeys.has(cardId)
+  },
+
   setHeartbeatActivity: (activity) => {
     set({ heartbeatActivity: activity })
   },
 
-  processEvent: (event) => {
+  processEvent: (event, ownerCardId) => {
+    if (ownerCardId && !isAuthoritativeCardId(ownerCardId)) return
     const state = get()
-    const sessionKey = event.sessionKey
+    const sessionKey = ownerCardId ?? event.sessionKey
     const now = Date.now()
+    const cardRuns = ownerCardId
+      ? new Map(state.cardStreamingRuns.get(ownerCardId) ?? [])
+      : null
+    const explicitRunId =
+      normalizeString(event.runId) ||
+      (event.type === 'message' ||
+      event.type === 'user_message' ||
+      event.type === 'done'
+        ? getMessageRunId(event.message)
+        : '')
+    const cardRunId = ownerCardId
+      ? explicitRunId ||
+        (cardRuns?.size === 1 ? (cardRuns.keys().next().value ?? '') : '')
+      : ''
+    const previousStreamingState = (
+      streamingMap: Map<string, StreamingState>,
+    ) => {
+      if (ownerCardId && cardRuns && cardRunId) {
+        const exactRun = cardRuns.get(cardRunId)
+        if (exactRun) return exactRun
+        // A legacy owner-only projection may acquire its first immutable run.
+        // Once any immutable sibling exists, a new run starts empty.
+        if (cardRuns.size > 0) return createEmptyStreamingState()
+      }
+      return streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+    }
+    const commitStreamingState = (
+      streamingMap: Map<string, StreamingState>,
+      next: StreamingState,
+    ) => {
+      if (!ownerCardId || !cardRuns || !cardRunId) {
+        streamingMap.set(sessionKey, next)
+        set({ streamingState: streamingMap, lastEventAt: now })
+        return
+      }
+      const normalizedNext = sanitizeCardStreamingState({
+        ...next,
+        runId: cardRunId,
+      })
+      cardRuns.delete(cardRunId)
+      cardRuns.set(cardRunId, normalizedNext)
+      const nextCardRuns = new Map(state.cardStreamingRuns)
+      nextCardRuns.set(ownerCardId, cardRuns)
+      streamingMap.set(sessionKey, normalizedNext)
+      set({
+        streamingState: streamingMap,
+        cardStreamingRuns: nextCardRuns,
+        lastEventAt: now,
+      })
+      persistCardStreamingStates(ownerCardId, Array.from(cardRuns.values()))
+    }
+
+    // An owner-only event is admissible while there is at most one candidate
+    // run. Once a Card has concurrent runs, immutable run identity is required;
+    // guessing would overwrite the wrong lifecycle/content row.
+    if (ownerCardId && cardRuns && cardRuns.size > 1 && !cardRunId) return
 
     // Skip ALL events for runs being handled by send-stream.
     // send-stream is the authoritative handler for active sends — chat-events
@@ -750,16 +976,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
           event.message.role === 'assistant'
             ? stripFinalTagsFromMessage(event.message)
             : event.message
+        let browserMessage = ownerCardId
+          ? withoutTransportOwnership(normalizedMessage)
+          : normalizedMessage
+        const incomingRunId =
+          normalizeString(event.runId) || getMessageRunId(browserMessage)
+        if (browserMessage.role === 'assistant' && incomingRunId) {
+          browserMessage = {
+            ...browserMessage,
+            runId: incomingRunId,
+            stableId:
+              normalizeString(
+                (browserMessage as Record<string, unknown>).stableId,
+              ) || `stream-run:${incomingRunId}`,
+          }
+        }
 
-        const newId = getMessageId(normalizedMessage)
-        const newClientNonce = getClientNonce(normalizedMessage)
-        const newMultipartSignature =
-          messageMultipartSignature(normalizedMessage)
+        const newId = getMessageId(browserMessage)
+        const newClientNonce = getClientNonce(browserMessage)
+        const newMultipartSignature = messageMultipartSignature(browserMessage)
 
         const optimisticIndexByNonce =
           newClientNonce.length > 0
             ? sessionMessages.findIndex((existing) => {
-                if (existing.role !== normalizedMessage.role) return false
+                if (existing.role !== browserMessage.role) return false
                 const existingNonce = getClientNonce(existing)
                 if (
                   existingNonce.length === 0 ||
@@ -777,12 +1017,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const optimisticIndex =
           optimisticIndexByNonce >= 0
             ? optimisticIndexByNonce
-            : normalizedMessage.role === 'user'
+            : browserMessage.role === 'user'
               ? sessionMessages.findIndex((existing) => {
                   if (existing.role !== 'user') return false
                   if (!isOptimisticUserCandidate(existing)) return false
                   const existingText = extractMessageText(existing)
-                  const incomingText = extractMessageText(normalizedMessage)
+                  const incomingText = extractMessageText(browserMessage)
                   if (
                     existingText &&
                     incomingText &&
@@ -792,7 +1032,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   }
                   const existingAttachments = getAttachmentSignature(existing)
                   const incomingAttachments =
-                    getAttachmentSignature(normalizedMessage)
+                    getAttachmentSignature(browserMessage)
                   return (
                     existingText.length === 0 &&
                     incomingText.length === 0 &&
@@ -804,15 +1044,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         // Plain-text extraction for content-based dedup (catches identical
         // replies that arrive with different IDs from different channels).
-        const newPlainText = extractMessageText(normalizedMessage)
+        const newPlainText = extractMessageText(browserMessage)
         const isExternalInboundUser =
-          normalizedMessage.role === 'user' &&
+          browserMessage.role === 'user' &&
           isExternalInboundUserSource((event as any).source)
         const incomingEventTime =
           getMessageEventTime(normalizedMessage) ?? incomingReceiveTime
 
         const duplicateIndex = sessionMessages.findIndex((existing) => {
-          if (existing.role !== normalizedMessage.role) return false
+          if (existing.role !== browserMessage.role) return false
+          const existingRunId = getMessageRunId(existing)
+          if (
+            incomingRunId &&
+            existingRunId &&
+            incomingRunId !== existingRunId
+          ) {
+            return false
+          }
           const existingId = getMessageId(existing)
           if (newId && existingId && newId === existingId) return true
 
@@ -848,7 +1096,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         // Mark user messages from external sources
         const incomingMessage: ChatMessage = {
-          ...normalizedMessage,
+          ...browserMessage,
           __realtimeSource:
             event.type === 'user_message' ? (event as any).source : undefined,
           __receiveTime: incomingReceiveTime,
@@ -858,6 +1106,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (optimisticIndex >= 0) {
           const optimisticMessage = sessionMessages[optimisticIndex]
+          if (!optimisticMessage) break
           const incomingText = extractMessageText(incomingMessage)
           const optimisticText = extractMessageText(optimisticMessage)
           const incomingHasAttachments =
@@ -913,10 +1162,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
             newPlainText.length === 0 &&
             sessionMessages.length > 0
           ) {
-            const prevEmptyIdx = sessionMessages.findLastIndex(
-              (m) =>
-                m.role === 'assistant' && extractMessageText(m).length === 0,
-            )
+            let prevEmptyIdx = -1
+            for (
+              let index = sessionMessages.length - 1;
+              index >= 0;
+              index -= 1
+            ) {
+              const candidate = sessionMessages[index]
+              if (
+                candidate?.role === 'assistant' &&
+                extractMessageText(candidate).length === 0
+              ) {
+                prevEmptyIdx = index
+                break
+              }
+            }
             if (prevEmptyIdx >= 0) {
               sessionMessages[prevEmptyIdx] = incomingMessage
               messages.set(
@@ -936,7 +1196,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       case 'chunk': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
 
         // Server sends full accumulated text with fullReplace=true
         // Replace entire text (default), or append if fullReplace is explicitly false
@@ -948,32 +1208,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
           runId: event.runId ?? prev.runId,
         }
 
-        streamingMap.set(sessionKey, next)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        persistStreamingState(sessionKey, next)
+        commitStreamingState(streamingMap, next)
 
         break
       }
 
       case 'thinking': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
         const next: StreamingState = {
           ...prev,
           thinking: event.text,
           runId: event.runId ?? prev.runId,
         }
 
-        streamingMap.set(sessionKey, next)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        persistStreamingState(sessionKey, next)
+        commitStreamingState(streamingMap, next)
         break
       }
 
       case 'status':
       case 'lifecycle': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
         const next: StreamingState = {
           ...prev,
           runId: event.runId ?? prev.runId,
@@ -983,15 +1239,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ],
         }
 
-        streamingMap.set(sessionKey, next)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        persistStreamingState(sessionKey, next)
+        commitStreamingState(streamingMap, next)
         break
       }
 
       case 'tool': {
         const streamingMap = new Map(state.streamingState)
-        const prev = streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const prev = previousStreamingState(streamingMap)
 
         const toolCallId =
           event.toolCallId ??
@@ -1001,17 +1255,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         )
 
         const nextToolCalls = [...prev.toolCalls]
+        const existingToolCall = nextToolCalls[existingToolIndex]
 
-        if (existingToolIndex >= 0) {
+        const eventArgs = ownerCardId
+          ? sanitizeCardOwnedValue(event.args)
+          : event.args
+        if (existingToolCall) {
           nextToolCalls[existingToolIndex] = {
-            ...nextToolCalls[existingToolIndex],
+            ...existingToolCall,
             phase: event.phase,
-            args: event.args ?? nextToolCalls[existingToolIndex].args,
-            preview:
-              (event as any).preview ??
-              nextToolCalls[existingToolIndex].preview,
-            result:
-              (event as any).result ?? nextToolCalls[existingToolIndex].result,
+            args: eventArgs ?? existingToolCall.args,
+            preview: (event as any).preview ?? existingToolCall.preview,
+            result: (event as any).result ?? existingToolCall.result,
           }
         } else {
           // Create entry for ANY phase (complete, error, skill.loaded, artifact.created, etc.)
@@ -1020,7 +1275,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             id: toolCallId,
             name: event.name,
             phase: event.phase,
-            args: event.args,
+            args: eventArgs,
             preview: (event as any).preview,
             result: (event as any).result,
           })
@@ -1031,16 +1286,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
           runId: event.runId ?? prev.runId,
           toolCalls: nextToolCalls,
         }
+        const browserNext = ownerCardId
+          ? sanitizeCardStreamingState(next)
+          : next
 
-        streamingMap.set(sessionKey, next)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        persistStreamingState(sessionKey, next)
+        commitStreamingState(streamingMap, browserNext)
         break
       }
 
       case 'done': {
         const streamingMap = new Map(state.streamingState)
-        const streaming = streamingMap.get(sessionKey)
+        const streaming = ownerCardId
+          ? cardRuns?.get(cardRunId)
+          : streamingMap.get(sessionKey)
 
         // Build the complete message — prefer authoritative final payload (bug #8 fix)
         let completeMessage: ChatMessage | null = null
@@ -1056,17 +1314,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // ToolCallPill can render them even after streaming state is cleared.
           // Fast tool runs clear streaming state before React renders — embedding
           // __streamToolCalls ensures pills survive in the history message.
-          const streamToolCallsToEmbed = streaming?.toolCalls?.length
+          const streamToolCallsToEmbed = streaming?.toolCalls.length
             ? streaming.toolCalls
             : undefined
           completeMessage = {
-            ...cleanedMessage,
+            ...(ownerCardId
+              ? withoutTransportOwnership(cleanedMessage)
+              : cleanedMessage),
             timestamp: getMessageEventTime(cleanedMessage) ?? now,
             __receiveTime: now,
             __realtimeSequence: realtimeMessageSequence++,
-            __streamingStatus: (event.state === 'interrupted'
-              ? 'interrupted'
-              : 'complete') as any,
+            __streamingStatus:
+              event.state === 'interrupted'
+                ? 'interrupted'
+                : event.state === 'error'
+                  ? 'error'
+                  : 'complete',
             ...(streamToolCallsToEmbed
               ? { __streamToolCalls: streamToolCallsToEmbed }
               : {}),
@@ -1106,10 +1369,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
             timestamp: now,
             __receiveTime: now,
             __realtimeSequence: realtimeMessageSequence++,
-            __streamingStatus: 'complete',
+            __streamingStatus:
+              event.state === 'interrupted'
+                ? 'interrupted'
+                : event.state === 'error'
+                  ? 'error'
+                  : 'complete',
           }
         }
 
+        const terminalRunId =
+          normalizeString(event.runId) ||
+          getMessageRunId(completeMessage) ||
+          normalizeString(streaming?.runId)
+        if (completeMessage && terminalRunId) {
+          completeMessage = {
+            ...completeMessage,
+            runId: terminalRunId,
+            stableId:
+              normalizeString(
+                (completeMessage as Record<string, unknown>).stableId,
+              ) || `stream-run:${terminalRunId}`,
+          }
+        }
+        if (completeMessage && ownerCardId) {
+          completeMessage = withoutTransportOwnership(completeMessage)
+        }
+
+        let nextRealtimeMessages: Map<string, Array<ChatMessage>> | undefined
         if (completeMessage) {
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
@@ -1121,6 +1408,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const completeId = getMessageId(completeMessage)
           const isDuplicate = sessionMessages.some((existing) => {
             if (existing.role !== 'assistant') return false
+            const existingRunId = getMessageRunId(existing)
+            if (
+              terminalRunId &&
+              existingRunId &&
+              terminalRunId !== existingRunId
+            ) {
+              return false
+            }
             const existingId = getMessageId(existing)
             if (completeId && existingId && completeId === existingId)
               return true
@@ -1135,12 +1430,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
               sessionKey,
               sortMessagesChronologically(sessionMessages),
             )
-            set({ realtimeMessages: messages })
+            nextRealtimeMessages = messages
           } else {
             // If there IS a duplicate (e.g. a tagged pre-final message was stored),
             // replace it with the clean final version so the UI shows clean text.
             const existingIdx = sessionMessages.findIndex((existing) => {
               if (existing.role !== 'assistant') return false
+              const existingRunId = getMessageRunId(existing)
+              if (
+                terminalRunId &&
+                existingRunId &&
+                terminalRunId !== existingRunId
+              ) {
+                return false
+              }
               const existingId = getMessageId(existing)
               if (completeId && existingId && completeId === existingId)
                 return true
@@ -1157,28 +1460,170 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 sessionKey,
                 sortMessagesChronologically(sessionMessages),
               )
-              set({ realtimeMessages: messages })
+              nextRealtimeMessages = messages
             }
           }
-
-          // Persist the final assistant message to sessionStorage so it survives
-          // dev refresh / tab navigation until backend history catches up.
-          persistRecoveryMessage(sessionKey, completeMessage)
         }
 
-        // Clear streaming state immediately — tool calls are preserved via
-        // __streamToolCalls embedded on completeMessage above, so pills survive
-        // in the history message without needing streaming state alive.
-        // DO NOT keep a stub here — it keeps isRealtimeStreaming=true which
-        // injects an invisible streaming placeholder that causes a blank gap.
-        streamingMap.delete(sessionKey)
-        set({ streamingState: streamingMap, lastEventAt: now })
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem(`claude_streaming_${sessionKey}`)
+        // Publish the terminal message and remove its streaming projection in a
+        // single store update. Subscribers must never observe both rows for the
+        // same run, even when terminal persistence is still in flight.
+        if (ownerCardId && cardRuns && cardRunId) {
+          cardRuns.delete(cardRunId)
+          const nextCardRuns = new Map(state.cardStreamingRuns)
+          if (cardRuns.size > 0) nextCardRuns.set(ownerCardId, cardRuns)
+          else nextCardRuns.delete(ownerCardId)
+          const remaining = Array.from(cardRuns.values()).at(-1)
+          if (remaining) streamingMap.set(sessionKey, remaining)
+          else streamingMap.delete(sessionKey)
+          set({
+            ...(nextRealtimeMessages
+              ? { realtimeMessages: nextRealtimeMessages }
+              : {}),
+            streamingState: streamingMap,
+            cardStreamingRuns: nextCardRuns,
+            lastEventAt: now,
+          })
+          if (remaining) {
+            persistCardStreamingStates(
+              ownerCardId,
+              Array.from(cardRuns.values()),
+            )
+          } else removePersistedCardStreamingState(ownerCardId)
+        } else {
+          streamingMap.delete(sessionKey)
+          set({
+            ...(nextRealtimeMessages
+              ? { realtimeMessages: nextRealtimeMessages }
+              : {}),
+            streamingState: streamingMap,
+            lastEventAt: now,
+          })
+          if (ownerCardId) removePersistedCardStreamingState(ownerCardId)
         }
         break
       }
     }
+  },
+
+  processCardEvent: (cardId, event) => {
+    if (!isAuthoritativeCardId(cardId)) return
+    get().processEvent(event, cardId)
+  },
+
+  getCardRealtimeMessages: (cardId) => {
+    if (!isAuthoritativeCardId(cardId)) return []
+    return get().realtimeMessages.get(cardId) ?? []
+  },
+
+  getCardStreamingState: (cardId) => {
+    if (!isAuthoritativeCardId(cardId)) return null
+    return (
+      Array.from(get().cardStreamingRuns.get(cardId)?.values() ?? []).at(-1) ??
+      get().streamingState.get(cardId) ??
+      restoreCardStreamingState(cardId)
+    )
+  },
+
+  getCardStreamingStates: (cardId) => {
+    if (!isAuthoritativeCardId(cardId)) return []
+    const active = Array.from(
+      get().cardStreamingRuns.get(cardId)?.values() ?? [],
+    )
+    if (active.length > 0) return active
+    const restored = restoreCardStreamingStates(cardId)
+    if (restored.length > 0) return restored
+    const projected = get().streamingState.get(cardId)
+    return projected ? [projected] : []
+  },
+
+  hydrateCardStreamingState: (cardId) => {
+    if (
+      !isAuthoritativeCardId(cardId) ||
+      get().streamingState.has(cardId) ||
+      get().cardStreamingRuns.has(cardId)
+    )
+      return
+    const restored = restoreCardStreamingStates(cardId)
+    if (restored.length === 0) return
+    const streamingState = new Map(get().streamingState)
+    streamingState.set(cardId, restored.at(-1)!)
+    const cardStreamingRuns = new Map(get().cardStreamingRuns)
+    const restoredRuns = restored.filter(
+      (state): state is StreamingState & { runId: string } =>
+        typeof state.runId === 'string' && state.runId.length > 0,
+    )
+    if (restoredRuns.length > 0) {
+      cardStreamingRuns.set(
+        cardId,
+        new Map(restoredRuns.map((state) => [state.runId, state])),
+      )
+    }
+    set({ streamingState, cardStreamingRuns, lastEventAt: Date.now() })
+  },
+
+  clearCard: (cardId) => {
+    if (!isAuthoritativeCardId(cardId)) return
+    get().clearSession(cardId)
+    get().clearCardWaiting(cardId)
+    removePersistedCardStreamingState(cardId)
+  },
+
+  clearCardRealtimeBuffer: (cardId) => {
+    if (!isAuthoritativeCardId(cardId)) return
+    get().clearRealtimeBuffer(cardId)
+  },
+
+  clearCardStreaming: (cardId, runId) => {
+    if (!isAuthoritativeCardId(cardId)) return
+    if (!runId) {
+      get().clearStreamingSession(cardId)
+      const cardStreamingRuns = new Map(get().cardStreamingRuns)
+      cardStreamingRuns.delete(cardId)
+      set({ cardStreamingRuns })
+      removePersistedCardStreamingState(cardId)
+      return
+    }
+    const runs = new Map(get().cardStreamingRuns.get(cardId) ?? [])
+    if (!runs.delete(runId)) return
+    const cardStreamingRuns = new Map(get().cardStreamingRuns)
+    const streamingState = new Map(get().streamingState)
+    const remaining = Array.from(runs.values()).at(-1)
+    if (remaining) {
+      cardStreamingRuns.set(cardId, runs)
+      streamingState.set(cardId, remaining)
+      persistCardStreamingStates(cardId, Array.from(runs.values()))
+    } else {
+      cardStreamingRuns.delete(cardId)
+      streamingState.delete(cardId)
+      removePersistedCardStreamingState(cardId)
+    }
+    set({ cardStreamingRuns, streamingState })
+  },
+
+  mergeCardHistoryMessages: (cardId, historyMessages) => {
+    if (!isAuthoritativeCardId(cardId)) return historyMessages
+    return get().mergeHistoryMessages(cardId, historyMessages)
+  },
+
+  claimSessionStateForCard: (sessionKey, cardId) => {
+    if (!sessionKey || !isAuthoritativeCardId(cardId)) return
+    get().handoffSession(sessionKey, cardId)
+    const claimedMessages = get().realtimeMessages.get(cardId)
+    if (claimedMessages) {
+      const realtimeMessages = new Map(get().realtimeMessages)
+      realtimeMessages.set(
+        cardId,
+        claimedMessages.map(withoutTransportOwnership),
+      )
+      set({ realtimeMessages })
+    }
+    const runs = Array.from(get().cardStreamingRuns.get(cardId)?.values() ?? [])
+    const streaming = get().streamingState.get(cardId)
+    if (runs.length > 0) persistCardStreamingStates(cardId, runs)
+    else if (streaming) persistCardStreamingStates(cardId, [streaming])
+    const waiting = get().waitingSessionMeta[cardId]
+    if (waiting) persistCardWaitingState(cardId, waiting)
   },
 
   getRealtimeMessages: (sessionKey) => {
@@ -1192,9 +1637,98 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearSession: (sessionKey) => {
     const messages = new Map(get().realtimeMessages)
     const streaming = new Map(get().streamingState)
+    const cardStreamingRuns = new Map(get().cardStreamingRuns)
     messages.delete(sessionKey)
     streaming.delete(sessionKey)
-    set({ realtimeMessages: messages, streamingState: streaming })
+    cardStreamingRuns.delete(sessionKey)
+    set({
+      realtimeMessages: messages,
+      streamingState: streaming,
+      cardStreamingRuns,
+    })
+  },
+
+  handoffSession: (fromSessionKey, toSessionKey) => {
+    if (!fromSessionKey || !toSessionKey || fromSessionKey === toSessionKey)
+      return
+
+    const state = get()
+    const messages = new Map(state.realtimeMessages)
+    const sourceMessages = messages.get(fromSessionKey) ?? []
+    const targetMessages = messages.get(toSessionKey) ?? []
+    const mergedMessages = [...sourceMessages]
+    for (const message of targetMessages) {
+      const messageId = getMessageId(message)
+      const messageText = extractMessageText(message)
+      const isDuplicate = mergedMessages.some((existing) => {
+        if (existing.role !== message.role) return false
+        const existingId = getMessageId(existing)
+        if (messageId && existingId && messageId === existingId) return true
+        return Boolean(
+          messageText && messageText === extractMessageText(existing),
+        )
+      })
+      if (!isDuplicate) mergedMessages.push(message)
+    }
+    messages.delete(fromSessionKey)
+    if (mergedMessages.length > 0) {
+      messages.set(toSessionKey, sortMessagesChronologically(mergedMessages))
+    }
+
+    const streaming = new Map(state.streamingState)
+    const sourceStreaming = streaming.get(fromSessionKey)
+    const targetStreaming = streaming.get(toSessionKey)
+    streaming.delete(fromSessionKey)
+    if (sourceStreaming || targetStreaming) {
+      const primary = (sourceStreaming ?? targetStreaming) as StreamingState
+      const secondary = (targetStreaming ?? sourceStreaming) as StreamingState
+      const toolCalls = [...primary.toolCalls]
+      for (const toolCall of secondary.toolCalls) {
+        const index = toolCalls.findIndex(
+          (candidate) => candidate.id === toolCall.id,
+        )
+        if (index >= 0) toolCalls[index] = { ...toolCalls[index], ...toolCall }
+        else toolCalls.push(toolCall)
+      }
+      const lifecycleEvents = [...primary.lifecycleEvents]
+      for (const lifecycleEvent of secondary.lifecycleEvents) {
+        const isDuplicate = lifecycleEvents.some(
+          (candidate) =>
+            candidate.text === lifecycleEvent.text &&
+            candidate.timestamp === lifecycleEvent.timestamp,
+        )
+        if (!isDuplicate) lifecycleEvents.push(lifecycleEvent)
+      }
+      const nextStreaming: StreamingState = {
+        ...primary,
+        runId: primary.runId ?? secondary.runId ?? null,
+        text:
+          primary.text.length >= secondary.text.length
+            ? primary.text
+            : secondary.text,
+        thinking: primary.thinking || secondary.thinking,
+        toolCalls,
+        lifecycleEvents,
+      }
+      streaming.set(toSessionKey, nextStreaming)
+    }
+
+    const waitingSessionKeys = new Set(state.waitingSessionKeys)
+    const waitingSessionMeta = { ...state.waitingSessionMeta }
+    const sourceWaiting = waitingSessionMeta[fromSessionKey]
+    if (waitingSessionKeys.delete(fromSessionKey)) {
+      waitingSessionKeys.add(toSessionKey)
+      waitingSessionMeta[toSessionKey] =
+        waitingSessionMeta[toSessionKey] ?? sourceWaiting
+      delete waitingSessionMeta[fromSessionKey]
+    }
+
+    set({
+      realtimeMessages: messages,
+      streamingState: streaming,
+      waitingSessionKeys,
+      waitingSessionMeta,
+    })
   },
 
   clearRealtimeBuffer: (sessionKey) => {
@@ -1211,8 +1745,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearAllStreaming: () => {
-    if (get().streamingState.size === 0) return
-    set({ streamingState: new Map() })
+    if (get().streamingState.size === 0 && get().cardStreamingRuns.size === 0)
+      return
+    set({ streamingState: new Map(), cardStreamingRuns: new Map() })
   },
 
   mergeHistoryMessages: (sessionKey, historyMessages) => {

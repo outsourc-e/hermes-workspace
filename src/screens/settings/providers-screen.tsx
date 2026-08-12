@@ -149,10 +149,15 @@ type ClaudeCatalogEntry =
       [key: string]: unknown
     }
 
-function isClaudeCatalogEntry(
-  entry: ClaudeCatalogEntry | null,
-): entry is ClaudeCatalogEntry {
-  return entry !== null
+function isClaudeCatalogEntry(entry: unknown): entry is ClaudeCatalogEntry {
+  if (typeof entry === 'string') return true
+  return (
+    entry !== null &&
+    typeof entry === 'object' &&
+    typeof (entry as Record<string, unknown>).id === 'string' &&
+    typeof (entry as Record<string, unknown>).provider === 'string' &&
+    typeof (entry as Record<string, unknown>).name === 'string'
+  )
 }
 
 async function fetchModels(): Promise<{
@@ -199,7 +204,7 @@ async function fetchModels(): Promise<{
           : typeof record.owned_by === 'string' && record.owned_by.trim()
             ? record.owned_by.trim()
             : id.includes('/')
-              ? id.split('/')[0]
+              ? (id.split('/')[0] ?? 'hermes-agent')
               : 'hermes-agent'
 
       return {
@@ -458,9 +463,10 @@ function defaultFormatValue(
 function getDraftValue(
   setting: SettingDefinition,
   config: ClaudeConfig | undefined,
-  draftValues: Record<string, string>,
+  draftValues: Partial<Record<string, string>>,
 ): string {
-  if (draftValues[setting.id] !== undefined) return draftValues[setting.id]
+  const draftValue = draftValues[setting.id]
+  if (draftValue !== undefined) return draftValue
   if (!setting.path) return ''
   const rawValue = readPath(config, setting.path)
   if (setting.formatter) return setting.formatter(rawValue)

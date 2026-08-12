@@ -5,21 +5,234 @@ import {
   getConfig,
   getGatewayCapabilities,
   getSession,
-  listSessions,
 } from '../../server/claude-api'
-import {
-  isSyntheticSessionKey,
-  resolveMainChatSessionId,
-  shouldBindMainToPortableSession,
-} from '../../server/session-utils'
 import { getLocalSession } from '../../server/local-session-store'
 import { getActiveRunForSession } from '../../server/run-store'
+import { sessionCardService } from '../../server/session-card-service'
+import type { ResolvedSessionCard } from '../../server/session-card-service'
+import type { SessionCard } from '../../screens/chat/types'
 import { isAuthenticated } from '@/server/auth-middleware'
 import { readContextUsage } from '@/server/context-usage'
+
+type CardUsageState =
+  | 'idle'
+  | 'running'
+  | 'completed'
+  | 'error'
+  | 'pending_approval'
+
+type ProvenSegmentUsage = {
+  segmentKey: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  contextPercent: number
+  maxTokens: number
+  usedTokens: number
+}
+
+type CardUsageProjection = {
+  cardId: string
+  title: string
+  canonicalSource: 'local' | 'remote'
+  state: CardUsageState
+  updatedAt: number
+  usage: {
+    model: string
+    modelProvider: string
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+    contextPercent: number
+    maxTokens: number
+    usedTokens: number
+  }
+}
+
+type CardUsageScope = 'aggregate' | 'latest-continuation'
 
 function estimateTokensFromText(text: string): number {
   const chars = text.trim().length
   return chars > 0 ? Math.max(1, Math.ceil(chars / 4)) : 0
+}
+
+function cardState(card: SessionCard): CardUsageState {
+  return card.activity?.state ?? 'idle'
+}
+
+function isExactCardProjection(
+  resolved: ResolvedSessionCard,
+): resolved is ResolvedSessionCard & {
+  card: SessionCard & { canonicalSource: 'local' | 'remote' }
+} {
+  return (
+    resolved.collection.completeness === 'complete' &&
+    (resolved.card.canonicalSource === 'local' ||
+      resolved.card.canonicalSource === 'remote') &&
+    resolved.card.continuationSegmentKeys.length > 0
+  )
+}
+
+async function readRemoteSegmentUsage(
+  resolved: ResolvedSessionCard,
+  segmentKey: string,
+  activeTransport: 'dashboard' | 'gateway',
+): Promise<ProvenSegmentUsage | null> {
+  const source = resolved.sourceBySegmentKey.get(segmentKey)
+  const upstreamKey = resolved.upstreamKeyBySegmentKey.get(segmentKey)
+  if (
+    !upstreamKey ||
+    source !== activeTransport ||
+    resolved.card.canonicalSource !== 'remote' ||
+    resolved.card.canonicalTransport !== activeTransport
+  ) {
+    return null
+  }
+
+  try {
+    const session = await getSession(upstreamKey)
+    if (session.id !== upstreamKey) return null
+    const context = await readContextUsage(upstreamKey)
+    return {
+      segmentKey,
+      model: session.model || context.model,
+      inputTokens: session.input_tokens ?? 0,
+      outputTokens: session.output_tokens ?? 0,
+      contextPercent: context.contextPercent,
+      maxTokens: context.maxTokens,
+      usedTokens: context.usedTokens,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function readLocalSegmentUsage(
+  resolved: ResolvedSessionCard,
+  segmentKey: string,
+): Promise<ProvenSegmentUsage | null> {
+  const source = resolved.sourceBySegmentKey.get(segmentKey)
+  const upstreamKey = resolved.upstreamKeyBySegmentKey.get(segmentKey)
+  if (
+    !upstreamKey ||
+    source !== 'local' ||
+    resolved.card.canonicalSource !== 'local'
+  ) {
+    return null
+  }
+
+  const session = getLocalSession(upstreamKey)
+  if (!session || session.id !== upstreamKey) return null
+
+  try {
+    const context = await readContextUsage(upstreamKey)
+    const activeRun = await getActiveRunForSession(upstreamKey)
+    const runMatchesCard = Boolean(
+      activeRun &&
+      activeRun.sessionKey === upstreamKey &&
+      activeRun.cardId === resolved.card.cardId &&
+      activeRun.canonicalSegmentKey === segmentKey,
+    )
+    return {
+      segmentKey,
+      model: session.model ?? context.model,
+      inputTokens: context.usedTokens,
+      outputTokens: runMatchesCard
+        ? estimateTokensFromText(activeRun?.assistantText ?? '')
+        : 0,
+      contextPercent: context.contextPercent,
+      maxTokens: context.maxTokens,
+      usedTokens: context.usedTokens,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function projectCardUsage(
+  resolved: ResolvedSessionCard,
+  scope: CardUsageScope = 'aggregate',
+): Promise<CardUsageProjection | null> {
+  if (!isExactCardProjection(resolved)) return null
+
+  const capabilities = getGatewayCapabilities()
+  const activeTransport = capabilities.dashboard.available
+    ? 'dashboard'
+    : 'gateway'
+  const segmentKeys =
+    scope === 'latest-continuation'
+      ? [resolved.card.canonicalSegmentKey]
+      : resolved.card.continuationSegmentKeys
+  const segments = await Promise.all(
+    segmentKeys.map((segmentKey) =>
+      resolved.card.canonicalSource === 'remote'
+        ? capabilities.sessions
+          ? readRemoteSegmentUsage(resolved, segmentKey, activeTransport)
+          : Promise.resolve(null)
+        : readLocalSegmentUsage(resolved, segmentKey),
+    ),
+  )
+  const provenSegments = segments.filter(
+    (segment): segment is ProvenSegmentUsage => segment !== null,
+  )
+  const canonicalUsage = provenSegments.find(
+    (segment) => segment.segmentKey === resolved.card.canonicalSegmentKey,
+  )
+
+  let configuredModel = ''
+  let modelProvider = ''
+  if (
+    resolved.card.canonicalSource === 'remote' &&
+    provenSegments.length > 0 &&
+    capabilities.config
+  ) {
+    try {
+      const config = await getConfig()
+      configuredModel = config.model ?? ''
+      modelProvider = config.provider ?? ''
+    } catch {
+      // A Card projection remains valid without optional global model metadata.
+    }
+  }
+
+  const inputTokens = provenSegments.reduce(
+    (total, segment) => total + segment.inputTokens,
+    0,
+  )
+  const outputTokens = provenSegments.reduce(
+    (total, segment) => total + segment.outputTokens,
+    0,
+  )
+
+  return {
+    cardId: resolved.card.cardId,
+    title: resolved.card.title,
+    canonicalSource: resolved.card.canonicalSource,
+    state: cardState(resolved.card),
+    updatedAt: resolved.card.activity?.updatedAt ?? resolved.card.updatedAt,
+    usage: {
+      model:
+        canonicalUsage?.model ??
+        provenSegments.at(-1)?.model ??
+        configuredModel,
+      modelProvider,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      contextPercent: provenSegments.reduce(
+        (maximum, segment) => Math.max(maximum, segment.contextPercent),
+        0,
+      ),
+      maxTokens: provenSegments.reduce(
+        (total, segment) => total + segment.maxTokens,
+        0,
+      ),
+      usedTokens: provenSegments.reduce(
+        (total, segment) => total + segment.usedTokens,
+        0,
+      ),
+    },
+  }
 }
 
 export const Route = createFileRoute('/api/session-status')({
@@ -29,214 +242,40 @@ export const Route = createFileRoute('/api/session-status')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
-        await ensureGatewayProbed()
+
+        const searchParams = new URL(request.url).searchParams
+        const requestedCardId = searchParams.get('cardId')?.trim()
+        // Older Workspace bundles sent route bootstrap aliases as Card IDs.
+        // They do not identify Cards, but treating them as the aggregate request
+        // keeps an already-loaded client from surfacing a false usage error.
+        const cardId =
+          requestedCardId === 'main' || requestedCardId === 'new'
+            ? undefined
+            : requestedCardId
+        if (!cardId) {
+          return json({ ok: true, payload: { cards: [] } })
+        }
+
         try {
-          const capabilities = getGatewayCapabilities()
-          if (!capabilities.sessions) {
-            return json({
-              ok: true,
-              payload: {
-                status: 'idle',
-                sessionKey: 'new',
-                sessionLabel: '',
-                model: '',
-                modelProvider: '',
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
-                sessions: [],
-              },
-            })
-          }
-          const url = new URL(request.url)
-          const requestedKey = url.searchParams.get('sessionKey')?.trim() || ''
-          let sessionKey = requestedKey || 'main'
-          const pinPortableMain = shouldBindMainToPortableSession({
-            sessionKey,
-            dashboardAvailable: capabilities.dashboard.available,
-            enhancedChat: capabilities.enhancedChat,
-          })
-
-          if (sessionKey === 'new') {
-            const contextUsage = await readContextUsage('new')
-            return json({
-              ok: true,
-              payload: {
-                status: 'idle',
-                sessionKey: 'new',
-                sessionLabel: '',
-                model: contextUsage.model,
-                modelProvider: '',
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
-                contextPercent: contextUsage.contextPercent,
-                maxTokens: contextUsage.maxTokens,
-                usedTokens: contextUsage.usedTokens,
-                sessions: [],
-              },
-            })
-          }
-
-          if (sessionKey === 'main' && !pinPortableMain) {
-            try {
-              const sessions = await listSessions(30, 0)
-              const candidate = resolveMainChatSessionId(sessions)
-              if (candidate) {
-                sessionKey = candidate
-              }
-            } catch {
-              // Fall through to local/synthetic handling below.
-            }
-          }
-
-          if (pinPortableMain) {
-            const contextUsage = await readContextUsage('main')
-            const localMain = getLocalSession('main')
-            const activeRun = await getActiveRunForSession('main')
-            const outputTokens = estimateTokensFromText(
-              activeRun?.assistantText ?? '',
+          await ensureGatewayProbed()
+          const resolved = await sessionCardService.resolveCard(cardId)
+          const card = await projectCardUsage(
+            resolved,
+            searchParams.get('usageScope') === 'latest-continuation'
+              ? 'latest-continuation'
+              : 'aggregate',
+          )
+          if (!card) {
+            return json(
+              { ok: false, error: 'Card usage unavailable' },
+              { status: 409 },
             )
-            return json({
-              ok: true,
-              payload: {
-                status: activeRun ? activeRun.status : 'idle',
-                sessionKey: 'main',
-                sessionLabel: localMain?.title ?? '',
-                model: localMain?.model ?? contextUsage.model,
-                modelProvider: 'portable',
-                inputTokens: contextUsage.usedTokens,
-                outputTokens,
-                totalTokens: contextUsage.usedTokens + outputTokens,
-                contextPercent: contextUsage.contextPercent,
-                maxTokens: contextUsage.maxTokens,
-                usedTokens: contextUsage.usedTokens,
-                sessions: [],
-              },
-            })
           }
-
-          const localSession = getLocalSession(sessionKey)
-          if (localSession) {
-            const contextUsage = await readContextUsage(sessionKey)
-            const activeRun = await getActiveRunForSession(sessionKey)
-            const outputTokens = estimateTokensFromText(
-              activeRun?.assistantText ?? '',
-            )
-            return json({
-              ok: true,
-              payload: {
-                status: activeRun ? activeRun.status : 'idle',
-                sessionKey,
-                sessionLabel: localSession.title ?? '',
-                model: localSession.model ?? contextUsage.model,
-                modelProvider: 'local',
-                inputTokens: contextUsage.usedTokens,
-                outputTokens,
-                totalTokens: contextUsage.usedTokens + outputTokens,
-                contextPercent: contextUsage.contextPercent,
-                maxTokens: contextUsage.maxTokens,
-                usedTokens: contextUsage.usedTokens,
-                sessions: [],
-              },
-            })
-          }
-
-          if (isSyntheticSessionKey(sessionKey)) {
-            const contextUsage = await readContextUsage(sessionKey)
-            return json({
-              ok: true,
-              payload: {
-                status: 'idle',
-                sessionKey,
-                sessionLabel: '',
-                model: contextUsage.model,
-                modelProvider: '',
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
-                contextPercent: contextUsage.contextPercent,
-                maxTokens: contextUsage.maxTokens,
-                usedTokens: contextUsage.usedTokens,
-                sessions: [],
-              },
-            })
-          }
-
-          try {
-            const session = await getSession(sessionKey)
-            const config = capabilities.config
-              ? await getConfig()
-              : ({ model: '', provider: '' } as const)
-
-            const inputTokens = session.input_tokens ?? 0
-            const outputTokens = session.output_tokens ?? 0
-            const contextUsage = await readContextUsage(session.id)
-
-            return json({
-              ok: true,
-              payload: {
-                status: session.ended_at ? 'ended' : 'idle',
-                sessionKey: session.id,
-                sessionLabel: session.title ?? '',
-                model: session.model ?? config.model ?? '',
-                modelProvider: config.provider ?? '',
-                inputTokens,
-                outputTokens,
-                totalTokens: inputTokens + outputTokens,
-                contextPercent: contextUsage.contextPercent,
-                maxTokens: contextUsage.maxTokens,
-                usedTokens: contextUsage.usedTokens,
-                sessions: [
-                  {
-                    key: session.id,
-                    agentId: session.id,
-                    label: session.title ?? session.id,
-                    model: session.model ?? config.model ?? '',
-                    modelProvider: config.provider ?? '',
-                    updatedAt: session.last_active ?? session.started_at ?? 0,
-                    usage: {
-                      input: inputTokens,
-                      output: outputTokens,
-                    },
-                  },
-                ],
-              },
-            })
-          } catch (sessionErr) {
-            const message =
-              sessionErr instanceof Error
-                ? sessionErr.message
-                : String(sessionErr)
-            if (!/not found|404/i.test(message)) {
-              throw sessionErr
-            }
-            const contextUsage = await readContextUsage(sessionKey)
-            return json({
-              ok: true,
-              payload: {
-                status: 'idle',
-                sessionKey,
-                sessionLabel: '',
-                model: contextUsage.model,
-                modelProvider: '',
-                inputTokens: 0,
-                outputTokens: 0,
-                totalTokens: 0,
-                contextPercent: contextUsage.contextPercent,
-                maxTokens: contextUsage.maxTokens,
-                usedTokens: contextUsage.usedTokens,
-                sessions: [],
-              },
-            })
-          }
-        } catch (err) {
+          return json({ ok: true, payload: { cards: [card] } })
+        } catch {
           return json(
-            {
-              ok: false,
-              error: err instanceof Error ? err.message : String(err),
-            },
-            { status: 503 },
+            { ok: false, error: 'Card usage unavailable' },
+            { status: 404 },
           )
         }
       },

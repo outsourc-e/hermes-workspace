@@ -3,8 +3,6 @@ import path from 'node:path'
 import YAML from 'yaml'
 import { z } from 'zod'
 
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
-
 import { isAuthenticated } from './auth-middleware'
 import { ensureGatewayProbed, getCapabilities } from './gateway-capabilities'
 import { normalizeHermesConfigState } from './hermes-config-migration'
@@ -20,6 +18,7 @@ import {
   getDiscoveredModels,
   getDiscoveryStatus,
 } from './local-provider-discovery'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
 

@@ -37,7 +37,6 @@ import type {
 import {
   DEFAULT_SLASH_COMMANDS,
   SlashCommandMenu,
-  mergeSlashCommands,
 } from '@/components/slash-command-menu'
 import {
   PromptInput,
@@ -62,6 +61,9 @@ import {
 } from '@/hooks/use-search-modal'
 import { setLocalModelOverride } from '@/screens/chat/local-model-override'
 import { formatModelName } from '@/lib/format-model-name'
+import { fetchSessionCardStatusModel } from '@/screens/chat/session-card-status'
+import { cardDraftStorageKey } from '@/screens/chat/session-card-ui-state'
+import { createTextAttachmentDataUrl } from '@/screens/chat/attachment-envelope'
 
 type ChatComposerAttachment = {
   id: string
@@ -84,7 +86,7 @@ type ChatComposerProps = {
   ) => void
   isLoading: boolean
   disabled: boolean
-  sessionKey?: string
+  cardId?: string
   wrapperRef?: Ref<HTMLDivElement>
   composerRef?: Ref<ChatComposerHandle>
   focusKey?: string
@@ -126,11 +128,10 @@ function isClaude46Model(model: string): boolean {
   return normalized.includes('4-6') || normalized.includes('claude-4.6')
 }
 
-type SessionStatusApiResponse = {
-  ok?: boolean
-  payload?: unknown
-  error?: string
-  [key: string]: unknown
+/** `hermes-agent` is a Gateway routing alias, never a provider model choice. */
+function isGatewayDefaultAlias(model: string | undefined): boolean {
+  const normalized = model?.trim().toLowerCase()
+  return normalized === 'hermes-agent' || normalized === 'default'
 }
 
 type GatewayStatusApiResponse = {
@@ -216,42 +217,6 @@ type ClaudeAvailableModelsResponse = {
   providers: Array<ClaudeProviderOption>
 }
 
-type InstalledSkillSummary = {
-  id: string
-  name: string
-  description: string
-  installed: boolean
-  enabled: boolean
-}
-
-async function fetchInstalledSkills(): Promise<Array<InstalledSkillSummary>> {
-  const response = await fetch('/api/skills?tab=installed&limit=120')
-  if (!response.ok) {
-    throw new Error(`Skills request failed (${response.status})`)
-  }
-
-  const payload = (await response.json()) as {
-    skills?: Array<Record<string, unknown>>
-    ok?: boolean
-  }
-  const skills = Array.isArray(payload.skills) ? payload.skills : []
-
-  return skills
-    .map((entry) => {
-      const id =
-        readModelText(entry.id) ||
-        readModelText(entry.slug) ||
-        readModelText(entry.name)
-      if (!id) return null
-      const name = readModelText(entry.name) || id
-      const description = readModelText(entry.description)
-      const installed = entry.installed !== false
-      const enabled = entry.enabled !== false
-      return { id, name, description, installed, enabled }
-    })
-    .filter((entry): entry is InstalledSkillSummary => entry !== null)
-}
-
 async function fetchModels(): Promise<{
   ok?: boolean
   models?: Array<ModelCatalogEntry>
@@ -293,10 +258,11 @@ async function fetchModels(): Promise<{
         readModelText(record.name) ||
         readModelText(record.model)
       if (!id) return null
+      const slashIndex = id.indexOf('/')
       const provider =
         readModelText(record.provider) ||
         readModelText(record.owned_by) ||
-        (id.includes('/') ? id.split('/')[0] : 'hermes-agent')
+        (slashIndex >= 0 ? id.slice(0, slashIndex) : 'hermes-agent')
 
       return {
         ...record,
@@ -355,7 +321,7 @@ const LOCAL_PROVIDERS_SET = new Set(['ollama', 'atomic-chat'])
 async function switchModel(
   model: string,
   provider?: string,
-  _sessionKey?: string,
+  _cardId?: string,
 ): Promise<ModelSwitchResponse> {
   const modelId = model.trim()
   const modelProvider =
@@ -693,49 +659,6 @@ async function compressImageToDataUrl(file: File): Promise<string> {
   })
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function readModelFromStatusPayload(payload: unknown): string {
-  if (!isRecord(payload)) return ''
-
-  const directCandidates = [
-    payload.model,
-    payload.currentModel,
-    payload.modelAlias,
-  ]
-  for (const candidate of directCandidates) {
-    const text = readText(candidate)
-    if (text) return text
-  }
-
-  if (isRecord(payload.resolved)) {
-    const provider = readText(payload.resolved.modelProvider)
-    const model = readText(payload.resolved.model)
-    if (provider && model) return `${provider}/${model}`
-    if (model) return model
-  }
-
-  const nestedCandidates = [payload.status, payload.session, payload.payload]
-  for (const nested of nestedCandidates) {
-    const nestedModel = readModelFromStatusPayload(nested)
-    if (nestedModel) return nestedModel
-  }
-
-  return ''
-}
-
-function normalizeDraftSessionKey(sessionKey?: string): string {
-  if (typeof sessionKey !== 'string') return 'new'
-  const normalized = sessionKey.trim()
-  return normalized.length > 0 ? normalized : 'new'
-}
-
-function toDraftStorageKey(sessionKey?: string): string {
-  return `claude-draft-${normalizeDraftSessionKey(sessionKey)}`
-}
-
 function readSlashCommandQuery(inputValue: string): string | null {
   if (!inputValue.startsWith('/')) return null
   const newlineIndex = inputValue.indexOf('\n')
@@ -762,40 +685,16 @@ async function readResponseError(response: Response): Promise<string> {
   }
 }
 
-async function fetchCurrentModelFromStatus(
-  sessionKey?: string,
-): Promise<string> {
-  const controller = new AbortController()
-  const timeout = globalThis.setTimeout(() => controller.abort(), 7000)
-
-  try {
-    const query = sessionKey?.trim()
-      ? `?sessionKey=${encodeURIComponent(sessionKey.trim())}`
-      : ''
-    const response = await fetch(`/api/session-status${query}`, {
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      throw new Error(await readResponseError(response))
-    }
-
-    const payload = (await response.json()) as SessionStatusApiResponse
-    if (payload.ok === false) {
-      throw new Error(readText(payload.error) || 'Server unavailable')
-    }
-
-    return readModelFromStatusPayload(payload.payload ?? payload)
-  } catch (error) {
-    if (
-      (error instanceof DOMException && error.name === 'AbortError') ||
-      (error instanceof Error && error.name === 'AbortError')
-    ) {
-      throw new Error('Request timed out')
-    }
-    throw error
-  } finally {
-    globalThis.clearTimeout(timeout)
+async function fetchSlashCommands(): Promise<Array<SlashCommandDefinition>> {
+  const response = await fetch('/api/commands')
+  if (!response.ok) {
+    throw new Error(await readResponseError(response))
   }
+
+  const payload = (await response.json()) as {
+    commands?: Array<SlashCommandDefinition>
+  }
+  return Array.isArray(payload.commands) ? payload.commands : []
 }
 
 async function fetchGatewayMode(): Promise<string | null> {
@@ -849,6 +748,7 @@ function shortPathLabel(pathValue: string): string {
 }
 
 function thinkingLabel(level: ThinkingLevel): string {
+  if (level === 'adaptive') return 'Adaptive'
   if (level === 'off') return 'None'
   if (level === 'low') return 'Low'
   if (level === 'medium') return 'Medium'
@@ -875,7 +775,7 @@ function ChatComposerComponent({
   onSubmit,
   isLoading,
   disabled,
-  sessionKey,
+  cardId,
   wrapperRef,
   composerRef,
   focusKey,
@@ -1008,8 +908,9 @@ function ChatComposerComponent({
     },
   })
   const currentModelQuery = useQuery({
-    queryKey: ['claude', 'session-status-model', sessionKey || 'main'],
-    queryFn: () => fetchCurrentModelFromStatus(sessionKey),
+    queryKey: ['claude', 'session-card-status-model', cardId || 'new'],
+    queryFn: () => fetchSessionCardStatusModel(cardId),
+    enabled: Boolean(cardId),
     refetchInterval: 30_000,
     retry: false,
   })
@@ -1048,11 +949,13 @@ function ChatComposerComponent({
     retry: false,
     staleTime: 15_000,
   })
-  const installedSkillsQuery = useQuery({
-    queryKey: ['chat', 'composer', 'installed-skills'],
-    queryFn: fetchInstalledSkills,
+  const slashCommandsQuery = useQuery({
+    queryKey: ['chat', 'composer', 'slash-commands'],
+    queryFn: fetchSlashCommands,
     retry: false,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
   })
   const workspaceContextQuery = useQuery({
     queryKey: ['workspace', 'composer-context'],
@@ -1069,6 +972,9 @@ function ChatComposerComponent({
         queryClient.invalidateQueries({ queryKey: ['claude', 'models'] }),
         queryClient.invalidateQueries({
           queryKey: ['claude', 'session-status-model'],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['chat', 'composer', 'slash-commands'],
         }),
       ])
       setIsProfileMenuOpen(false)
@@ -1108,16 +1014,14 @@ function ChatComposerComponent({
   // Phase 4.2: (pinned model tracking kept for future use)
   void modelsQuery.data
 
-  // Per-session model override, persisted to localStorage keyed by sessionKey.
+  // Per-Card model override, persisted to localStorage keyed by Card ID.
   // Drives both the composer label and the model passed to startStreaming.
   // Replaces an earlier flow that PATCHed ~/.hermes/config.yaml — that path
   // 404s and would clobber the global default for every channel anyway.
-  const persistedSessionModel = useSessionModelStore((s) =>
-    s.getModel(sessionKey),
-  )
+  const persistedSessionModel = useSessionModelStore((s) => s.getModel(cardId))
   const setPersistedSessionModel = useSessionModelStore((s) => s.setModel)
 
-  // Model switching is now per-session via the persistent store above.
+  // Model switching is now per-Card via the persistent store above.
   // Previously this issued a PATCH /api/hermes-proxy/api/config to write to
   // ~/.hermes/config.yaml — that endpoint 404s and would clobber the global
   // default for every channel anyway. The mutation block + retry callback +
@@ -1127,9 +1031,9 @@ function ChatComposerComponent({
     function handleModelSelect(nextModel: string, provider?: string) {
       const model = nextModel.trim()
       if (!model) return
-      const normalizedSessionKey =
-        typeof sessionKey === 'string' && sessionKey.trim().length > 0
-          ? sessionKey.trim()
+      const normalizedCardId =
+        typeof cardId === 'string' && cardId.trim().length > 0
+          ? cardId.trim()
           : undefined
       if (
         shouldBlockZeroForkModelSwitch(
@@ -1143,17 +1047,17 @@ function ChatComposerComponent({
       }
       setModelNotice(null)
       const resolved = getResolvedModelKey(model, provider)
-      // Per-session, browser-local persistence. No global config write —
+      // Per-Card, browser-local persistence. No global config write —
       // picking a model here only affects this chat. The actual model is
       // passed on each request via the chat-completion `model` field.
-      if (normalizedSessionKey) {
-        setPersistedSessionModel(normalizedSessionKey, resolved)
+      if (normalizedCardId) {
+        setPersistedSessionModel(normalizedCardId, resolved)
       }
       setIsModelMenuOpen(false)
     },
     [
       gatewayModeQuery.data,
-      sessionKey,
+      cardId,
       setPersistedSessionModel,
       zeroForkModelInfoFlags,
     ],
@@ -1215,23 +1119,27 @@ function ChatComposerComponent({
     }
   }, [currentModel, thinkingLevel, onThinkingLevelChange])
 
-  const isModelSwitcherDisabled = disabled
-  const draftStorageKey = useMemo(
-    () => toDraftStorageKey(sessionKey),
-    [sessionKey],
-  )
+  const hasCardOwner = typeof cardId === 'string' && cardId.trim().length > 0
+  const isModelSwitcherDisabled = disabled || !hasCardOwner
+  const draftStorageKey = useMemo(() => cardDraftStorageKey(cardId), [cardId])
   // On new chat, currentModel is empty until a session is created.
   // Read the runtime model from the models query (first item is from the current provider).
   const configuredModel = useMemo(() => {
     const models = modelsQuery.data?.models ?? []
     if (!models.length) return ''
-    const first = models[0]
+    const first = models.at(0)
+    if (!first) return ''
     return typeof first === 'string' ? first : first.id || first.name || ''
   }, [modelsQuery.data])
   // Derive the label directly from the store so navigation between sessions
   // updates without a render-window flash from a stale React-state mirror.
   const modelButtonLabel =
-    persistedSessionModel || currentModel || configuredModel || '⚕ Hermes Agent'
+    (!isGatewayDefaultAlias(persistedSessionModel)
+      ? persistedSessionModel
+      : '') ||
+    (!isGatewayDefaultAlias(currentModel) ? currentModel : '') ||
+    configuredModel ||
+    '⚕ Hermes Agent'
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1335,8 +1243,12 @@ function ChatComposerComponent({
     return () => media.removeEventListener('change', updateIsMobile)
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return
+    if (!draftStorageKey) {
+      setValue('')
+      return
+    }
     const savedDraft = window.sessionStorage.getItem(draftStorageKey)
     setValue(savedDraft ?? '')
   }, [draftStorageKey])
@@ -1375,7 +1287,7 @@ function ChatComposerComponent({
 
   const persistDraft = useCallback(
     function persistDraft(nextValue: string) {
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined' || !draftStorageKey) return
       if (nextValue.length === 0) {
         window.sessionStorage.removeItem(draftStorageKey)
         return
@@ -1387,7 +1299,7 @@ function ChatComposerComponent({
 
   const clearDraft = useCallback(
     function clearDraft() {
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined' || !draftStorageKey) return
       window.sessionStorage.removeItem(draftStorageKey)
     },
     [draftStorageKey],
@@ -1482,18 +1394,25 @@ function ChatComposerComponent({
                 file.name && file.name.trim().length > 0
                   ? file.name.trim()
                   : `pasted-text-${timestamp}-${index + 1}.txt`
+              const contentType =
+                (isTextMimeType(file.type)
+                  ? normalizeMimeType(file.type)
+                  : '') ||
+                inferTextMimeTypeFromFileName(name) ||
+                'text/plain'
+              const portableContentType = contentType.split(';', 1)[0]!
+              const dataUrl = createTextAttachmentDataUrl(
+                textContent,
+                portableContentType,
+              )
+              if (!dataUrl) return null
               const textBytes = new TextEncoder().encode(textContent).length
               return {
                 id: crypto.randomUUID(),
                 name,
-                contentType:
-                  (isTextMimeType(file.type)
-                    ? normalizeMimeType(file.type)
-                    : '') ||
-                  inferTextMimeTypeFromFileName(name) ||
-                  'text/plain',
+                contentType: portableContentType,
                 size: textBytes,
-                dataUrl: textContent,
+                dataUrl,
                 kind: 'file',
               }
             }
@@ -1686,7 +1605,9 @@ function ChatComposerComponent({
     handleSubmit()
   }, [attachmentProcessingCount, handleSubmit])
 
-  // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
+  // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector.
+  // Bootstrap chats have no Card owner yet, so the shortcut stays inert rather
+  // than opening a picker whose selection cannot be persisted or requested.
   useEffect(() => {
     const handleModelShortcut = (event: KeyboardEvent) => {
       if (
@@ -1694,6 +1615,7 @@ function ChatComposerComponent({
         event.shiftKey &&
         event.key.toLowerCase() === 'm'
       ) {
+        if (isModelSwitcherDisabled) return
         event.preventDefault()
         event.stopPropagation()
         setIsModelMenuOpen((prev) => !prev)
@@ -1702,7 +1624,7 @@ function ChatComposerComponent({
     window.addEventListener('keydown', handleModelShortcut, true)
     return () =>
       window.removeEventListener('keydown', handleModelShortcut, true)
-  }, [])
+  }, [isModelSwitcherDisabled])
 
   const submitDisabled =
     disabled ||
@@ -1714,40 +1636,9 @@ function ChatComposerComponent({
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
     : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
-  const [serverCommands, setServerCommands] = useState<
-    Array<SlashCommandDefinition>
-  >([])
-
-  useEffect(() => {
-    fetch('/api/commands')
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then(
-        (data: {
-          commands?: Array<{ command: string; description: string }>
-        }) => {
-          setServerCommands(data.commands ?? [])
-        },
-      )
-      .catch(() => {
-        // fall back to DEFAULT_SLASH_COMMANDS only
-      })
-  }, [])
-
   const slashCommands = useMemo(
-    () =>
-      mergeSlashCommands(
-        mergeSlashCommands(DEFAULT_SLASH_COMMANDS, serverCommands),
-        (installedSkillsQuery.data ?? [])
-          .filter((skill) => skill.installed && skill.enabled)
-          .map((skill) => ({
-            command: `/${skill.id}`,
-            description: skill.description || `Run ${skill.name}`,
-          })),
-      ),
-    [serverCommands, installedSkillsQuery.data],
+    () => slashCommandsQuery.data ?? DEFAULT_SLASH_COMMANDS,
+    [slashCommandsQuery.data],
   )
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
@@ -2017,8 +1908,8 @@ function ChatComposerComponent({
   const [scrollHidden, setScrollHidden] = useState(false)
   // Reset scroll-hide state when session changes (prevents composer staying hidden when navigating)
   const prevSessionKeyRef = useRef<string | undefined>(undefined)
-  if (prevSessionKeyRef.current !== sessionKey) {
-    prevSessionKeyRef.current = sessionKey
+  if (prevSessionKeyRef.current !== cardId) {
+    prevSessionKeyRef.current = cardId
     if (scrollHidden) setScrollHidden(false)
   }
   useEffect(() => {
@@ -2459,6 +2350,16 @@ function ChatComposerComponent({
                         <button
                           type="button"
                           disabled={isModelSwitcherDisabled}
+                          aria-label={
+                            hasCardOwner
+                              ? `Select model, current model: ${modelButtonLabel}`
+                              : 'Model selection is available after this chat becomes a Session Card'
+                          }
+                          title={
+                            hasCardOwner
+                              ? modelButtonLabel
+                              : 'Send the first message to create a Session Card before selecting a model.'
+                          }
                           onClick={(event) => {
                             event.stopPropagation()
                             if (!isModelSwitcherDisabled) {
@@ -2961,6 +2862,97 @@ function ChatComposerComponent({
 
                           <div
                             className="relative flex min-w-0 items-center"
+                            ref={workspaceMenuRef}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsWorkspaceMenuOpen((open) => !open)
+                                setIsProfileMenuOpen(false)
+                                setIsThinkingMenuOpen(false)
+                                setIsModelMenuOpen(false)
+                              }}
+                              disabled={workspaceSelectMutation.isPending}
+                              className="inline-flex h-8 max-w-[9rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary-800/60"
+                              title={`Workspace context: ${workspaceButtonLabel}`}
+                            >
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v8A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-10Z" />
+                              </svg>
+                              <span className="truncate">
+                                {workspaceButtonLabel}
+                              </span>
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                            </button>
+                            {isWorkspaceMenuOpen && (
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[15rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                                  Workspace context
+                                </div>
+                                {workspaceEntries.length > 0 ? (
+                                  workspaceEntries.map((workspace) => {
+                                    const selected =
+                                      workspace.path === detectedWorkspacePath
+                                    return (
+                                      <button
+                                        key={workspace.path}
+                                        type="button"
+                                        onClick={() => {
+                                          if (selected) {
+                                            setIsWorkspaceMenuOpen(false)
+                                            return
+                                          }
+                                          workspaceSelectMutation.mutate(
+                                            workspace,
+                                          )
+                                        }}
+                                        disabled={
+                                          workspaceSelectMutation.isPending
+                                        }
+                                        className={cn(
+                                          'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                                          selected
+                                            ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                            : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                        )}
+                                      >
+                                        <span className="truncate font-medium">
+                                          {workspace.name}
+                                        </span>
+                                        <span className="mt-0.5 truncate text-[11px] text-neutral-500">
+                                          {workspace.path}
+                                        </span>
+                                      </button>
+                                    )
+                                  })
+                                ) : (
+                                  <div className="px-3 py-2 text-xs text-neutral-500">
+                                    No workspaces detected
+                                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={handleOpenWorkspaceManager}
+                                  className="mt-1 flex w-full rounded-lg px-3 py-2 text-left text-sm text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                                >
+                                  Browse workspace files…
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            className="relative flex min-w-0 items-center"
                             ref={thinkingMenuRef}
                           >
                             <button
@@ -3036,8 +3028,17 @@ function ChatComposerComponent({
                                 setIsThinkingMenuOpen(false)
                               }}
                               disabled={isModelSwitcherDisabled}
+                              aria-label={
+                                hasCardOwner
+                                  ? `Select model, current model: ${modelButtonLabel}`
+                                  : 'Model selection is available after this chat becomes a Session Card'
+                              }
                               className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-primary-100/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                              title={modelButtonLabel}
+                              title={
+                                hasCardOwner
+                                  ? modelButtonLabel
+                                  : 'Send the first message to create a Session Card before selecting a model.'
+                              }
                             >
                               <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
                                 {modelButtonLabel}
@@ -3240,7 +3241,7 @@ function ChatComposerComponent({
                 ) : null}
               </div>
               <div className="ml-1 flex shrink-0 items-center gap-0.5 md:gap-1">
-                <ContextBar compact sessionId={sessionKey} />
+                <ContextBar compact cardId={cardId} />
                 {voiceInput.isSupported || voiceRecorder.isSupported ? (
                   <PromptInputAction
                     tooltip={

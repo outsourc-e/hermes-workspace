@@ -75,6 +75,8 @@ describe('gateway-capabilities', () => {
             probed: true,
             sessions: false,
             enhancedChat: false,
+            latestDescendant: false,
+            sessionFork: false,
             skills: false,
             memory: true,
             config: false,
@@ -105,6 +107,8 @@ describe('gateway-capabilities', () => {
             probed: true,
             sessions: false,
             enhancedChat: false,
+            latestDescendant: false,
+            sessionFork: false,
             skills: false,
             memory: true,
             config: false,
@@ -339,6 +343,87 @@ describe('gateway-capabilities', () => {
     const caps = await mod.probeGateway({ force: true })
 
     expect(caps.conductor).toBe(true)
+    expect(caps.sessions).toBe(true)
+    expect(caps.sessionFork).toBe(false)
+    expect(caps.latestDescendant).toBe(false)
+  })
+
+  it('probes latest-descendant and gateway fork capabilities without mutating a session', async () => {
+    process.env.HERMES_API_URL = 'http://gateway.test'
+    process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+    const capabilityFetch = vi.fn(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url === 'http://dashboard.test/api/status') {
+          return new Response(JSON.stringify({ version: '0.13.0' }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://dashboard.test/') {
+          return new Response(
+            "<script>window.__HERMES_SESSION_TOKEN__ = 'test-token'</script>",
+            { headers: { 'content-type': 'text/html' } },
+          )
+        }
+        if (
+          url ===
+          'http://dashboard.test/api/sessions/__workspace_capability_probe__/latest-descendant'
+        ) {
+          return new Response(JSON.stringify({ detail: 'Session not found' }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://gateway.test/v1/capabilities') {
+          return new Response(
+            JSON.stringify({
+              features: { session_fork: true },
+              endpoints: {
+                session_fork: {
+                  method: 'POST',
+                  path: '/api/sessions/{session_id}/fork',
+                },
+              },
+            }),
+            { headers: { 'content-type': 'application/json' } },
+          )
+        }
+        if (url === 'http://gateway.test/v1/chat/completions') {
+          return new Response('', { status: 405 })
+        }
+        if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') {
+          return new Response('', { status: 404 })
+        }
+        if (url.endsWith('/api/mcp')) {
+          return new Response('', { status: 404 })
+        }
+        if (url === 'http://dashboard.test/api/config') {
+          return new Response(JSON.stringify({ config: {} }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { 'content-type': 'application/json' },
+        })
+      },
+    )
+    vi.stubGlobal('fetch', capabilityFetch)
+
+    const mod = await loadMod()
+    const caps = await mod.probeGateway({ force: true })
+
+    expect(caps.latestDescendant).toBe(true)
+    expect(caps.sessionFork).toBe(true)
+    expect(mod.getEnhancedCapabilities()).toMatchObject({
+      latestDescendant: true,
+      sessionFork: true,
+    })
+    expect(
+      capabilityFetch.mock.calls.some(([input, init]) => {
+        const method = (init?.method ?? 'GET').toUpperCase()
+        return method === 'POST' && String(input).endsWith('/fork')
+      }),
+    ).toBe(false)
   })
 
   describe('isLocalhostDeployment', () => {

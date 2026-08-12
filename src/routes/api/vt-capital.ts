@@ -125,8 +125,8 @@ function readWorkerRuntime(workerId: string): JsonRecord {
 }
 
 function summarizeLatestBias(records: Array<JsonRecord>): JsonRecord | null {
-  if (records.length === 0) return null
-  const latest = records[records.length - 1]
+  const latest = records.at(-1)
+  if (!latest) return null
   const candidates = Array.isArray(latest.council_candidates)
     ? latest.council_candidates
     : Array.isArray(latest.assets)

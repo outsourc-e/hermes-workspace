@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import type { EnhancedFeature } from '@/lib/feature-gates'
 
-interface GatewayStatus {
-  capabilities: Record<string, boolean>
-  claudeUrl: string
+interface GatewayStatusPayload {
+  capabilities?: Record<string, boolean>
 }
 
 export function useFeatureAvailable(feature: EnhancedFeature): boolean {
@@ -12,7 +11,7 @@ export function useFeatureAvailable(feature: EnhancedFeature): boolean {
     queryFn: async () => {
       const res = await fetch('/api/gateway-status')
       if (!res.ok) return null
-      return (await res.json()) as GatewayStatus
+      return (await res.json()) as GatewayStatusPayload
     },
     staleTime: 30_000,
     refetchInterval: 60_000,

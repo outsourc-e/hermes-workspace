@@ -25,7 +25,11 @@ const CONFIG_PATH = path.join(
 function readActiveModel(): string {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
-    const config = (YAML.parse(raw) as Record<string, unknown>) || {}
+    const parsed: unknown = YAML.parse(raw)
+    const config =
+      parsed && typeof parsed === 'object'
+        ? (parsed as Record<string, unknown>)
+        : {}
     const modelField = config.model
     if (typeof modelField === 'string') return modelField
     if (modelField && typeof modelField === 'object') {

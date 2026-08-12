@@ -156,7 +156,7 @@ const TIPS: ReadonlyArray<Tip> = [
       if (!a || a.source !== 'analytics') return 0
       const total = a.topModels.reduce((x, m) => x + m.calls, 0)
       if (total === 0) return 0
-      const top = a.topModels[0]
+      const top = a.topModels.at(0)
       if (!top) return 0
       return top.calls / total > 0.7 ? 45 : 0
     },
@@ -225,7 +225,7 @@ export function OperatorTipCard({
     const n = Number(raw)
     if (Number.isFinite(n) && n >= 0) setIndex(n % Math.max(1, ranked.length))
     // Only restore on first mount; tip rotation thereafter is manual.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [])
 
   useEffect(() => {
@@ -234,7 +234,8 @@ export function OperatorTipCard({
   }, [index])
 
   if (ranked.length === 0) return null
-  const tip = ranked[index % ranked.length]
+  const tip = ranked.at(index % ranked.length)
+  if (!tip) return null
   const tone = TONE_COLORS[tip.tone ?? 'info']
 
   const handleNext = () => setIndex((i) => (i + 1) % ranked.length)

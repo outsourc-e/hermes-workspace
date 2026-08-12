@@ -10,7 +10,6 @@ import {
   File01Icon,
   McpServerIcon,
   PuzzleIcon,
-  Rocket01Icon,
   Settings01Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
@@ -25,6 +24,10 @@ import type { TouchEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { useSettings } from '@/hooks/use-settings'
+import {
+  buildChatCardNavigation,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
 export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
@@ -57,16 +60,10 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
-    to: '/chat/main',
+    to: '/chat/new',
     match: (p) => p.startsWith('/chat') || p === '/new',
   },
-  {
-    id: 'playground',
-    label: 'Play',
-    icon: Rocket01Icon,
-    to: '/playground',
-    match: (p) => p.startsWith('/playground'),
-  },
+
   {
     id: 'files',
     label: 'Files',
@@ -135,6 +132,7 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
 
 export function MobileTabBar() {
   const navigate = useNavigate()
+  const activeChatCardId = useWorkspaceStore((state) => state.activeChatCardId)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navRef = useRef<HTMLElement>(null)
 
@@ -153,7 +151,9 @@ export function MobileTabBar() {
 
   // Drag-to-switch: horizontal swipe across pill switches tabs
   const handlePillTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
-    dragStartXRef.current = event.touches[0].clientX
+    const touch = event.touches[0]
+    if (!touch) return
+    dragStartXRef.current = touch.clientX
     dragStartTimeRef.current = Date.now()
     setIsDragging(false)
   }, [])
@@ -171,7 +171,9 @@ export function MobileTabBar() {
       setIsDragging(false)
 
       if (startX === null) return
-      const endX = event.changedTouches[0].clientX
+      const touch = event.changedTouches[0]
+      if (!touch) return
+      const endX = touch.clientX
       const delta = endX - startX
       const elapsed = Date.now() - (dragStartTimeRef.current ?? Date.now())
       const pillWidth = navRef.current?.getBoundingClientRect().width ?? 200
@@ -192,10 +194,15 @@ export function MobileTabBar() {
         nextIdx < MOBILE_NAV_TABS.length
       ) {
         hapticTap()
-        void navigate({ to: MOBILE_NAV_TABS[nextIdx].to })
+        const nextTab = MOBILE_NAV_TABS[nextIdx]
+        if (nextTab?.id === 'chat') {
+          void navigate(buildChatCardNavigation(activeChatCardId))
+        } else if (nextTab) {
+          void navigate({ to: nextTab.to })
+        }
       }
     },
-    [navigate, pathname],
+    [activeChatCardId, navigate, pathname],
   )
 
   // Measure pill for --tabbar-h (~80px total = pill + bottom offset)
@@ -290,7 +297,11 @@ export function MobileTabBar() {
                   // Don't fire navigate if this was a drag swipe
                   if (!isDragging) {
                     hapticTap()
-                    void navigate({ to: tab.to })
+                    if (tab.id === 'chat') {
+                      void navigate(buildChatCardNavigation(activeChatCardId))
+                    } else {
+                      void navigate({ to: tab.to })
+                    }
                   }
                 }}
                 aria-current={isActive ? 'page' : undefined}

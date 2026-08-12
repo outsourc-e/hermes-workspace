@@ -30,6 +30,13 @@ type ModelEntry = {
   [key: string]: unknown
 }
 
+type NormalizedModelEntry = {
+  provider: string
+  id: string
+  name: string
+  [key: string]: unknown
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value))
     return value as Record<string, unknown>
@@ -40,14 +47,16 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function normalizeModel(entry: unknown): ModelEntry | null {
+function normalizeModel(entry: unknown): NormalizedModelEntry | null {
   if (typeof entry === 'string') {
     const id = entry.trim()
     if (!id) return null
     return {
       id,
       name: id,
-      provider: id.includes('/') ? id.split('/')[0] : 'unknown',
+      provider: id.includes('/')
+        ? (id.split('/', 1).at(0) ?? 'unknown')
+        : 'unknown',
     }
   }
   const record = asRecord(entry)
@@ -65,20 +74,57 @@ function normalizeModel(entry: unknown): ModelEntry | null {
     provider:
       readString(record.provider) ||
       readString(record.owned_by) ||
-      (id.includes('/') ? id.split('/')[0] : 'unknown'),
+      (id.includes('/') ? (id.split('/', 1).at(0) ?? 'unknown') : 'unknown'),
   }
 }
 
-export function mergeModelEntries(
-  ...sources: Array<Array<ModelEntry | string>>
+/**
+ * Convert the Gateway's rich picker payload into the flat Workspace picker
+ * shape. `/v1/models` intentionally exposes the virtual `hermes-agent`
+ * compatibility alias; `/api/model/options` is the provider model catalog.
+ */
+export function modelsFromCurrentProviderOptions(
+  payload: unknown,
+  currentProvider: string,
 ): Array<ModelEntry> {
-  const merged: Array<ModelEntry> = []
+  const providerId = currentProvider.trim()
+  if (!providerId) return []
+  const providers = asRecord(payload).providers
+  if (!Array.isArray(providers)) return []
+
+  const row = providers.find((entry) => {
+    const record = asRecord(entry)
+    const id = readString(record.slug) || readString(record.id)
+    return id.toLowerCase() === providerId.toLowerCase()
+  })
+  if (!row) return []
+
+  const models = asRecord(row).models
+  if (!Array.isArray(models)) return []
+  return models
+    .map(normalizeModel)
+    .filter((entry): entry is NormalizedModelEntry => entry !== null)
+    .map((entry) => ({ ...entry, provider: providerId }))
+}
+
+function isGatewayVirtualModel(model: ModelEntry): boolean {
+  const id = readString(model.id)
+  const provider = readString(model.provider).toLowerCase()
+  return (
+    id === 'hermes-agent' && (provider === 'hermes' || provider === 'unknown')
+  )
+}
+
+export function mergeModelEntries(
+  ...sources: Array<Array<unknown>>
+): Array<NormalizedModelEntry> {
+  const merged: Array<NormalizedModelEntry> = []
   const seen = new Set<string>()
 
   for (const source of sources) {
     for (const model of source) {
       const normalized = normalizeModel(model)
-      if (!normalized?.id || seen.has(normalized.id)) continue
+      if (!normalized || seen.has(normalized.id)) continue
       merged.push(normalized)
       seen.add(normalized.id)
     }
@@ -216,8 +262,8 @@ function readClaudeDefaultModel(): ModelEntry | null {
 function resolveConfiguredSecret(value: unknown): string {
   const raw = readString(value)
   if (!raw) return ''
-  const envMatch = raw.match(/^\$\{?([A-Z0-9_]+)\}?$/i)
-  if (envMatch) return process.env[envMatch[1]] ?? ''
+  const envName = raw.match(/^\$\{?([A-Z0-9_]+)\}?$/i)?.[1]
+  if (envName) return process.env[envName] ?? ''
   return raw
 }
 
@@ -323,7 +369,7 @@ async function fetchConfiguredLiveModels(): Promise<Array<ModelEntry>> {
             : []
         models = rawModels
           .map(normalizeModel)
-          .filter((entry): entry is ModelEntry => entry !== null)
+          .filter((entry): entry is NormalizedModelEntry => entry !== null)
           .map((entry) => ({
             ...entry,
             provider: readString(entry.provider) || endpoint.provider,
@@ -435,7 +481,27 @@ async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
       : []
   return rawModels
     .map(normalizeModel)
-    .filter((e): e is ModelEntry => e !== null)
+    .filter((e): e is NormalizedModelEntry => e !== null)
+}
+
+async function fetchCurrentProviderModelOptions(
+  currentProvider: string,
+): Promise<Array<ModelEntry>> {
+  if (!currentProvider) return []
+  const headers: Record<string, string> = {}
+  if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
+  try {
+    const response = await fetch(`${CLAUDE_API}/api/model/options`, { headers })
+    if (!response.ok) return []
+    return modelsFromCurrentProviderOptions(
+      await response.json(),
+      currentProvider,
+    )
+  } catch {
+    // Older gateways may not expose this endpoint. Existing config and
+    // OpenAI-compatible discovery still provide a safe fallback.
+    return []
+  }
 }
 
 export const Route = createFileRoute('/api/models')({
@@ -457,6 +523,17 @@ export const Route = createFileRoute('/api/models')({
           if (defaultModel) {
             models = models.filter((m) => m.id !== defaultModel.id)
             models.unshift(defaultModel)
+          }
+
+          // `/v1/models` is intentionally a compatibility endpoint and lists
+          // `hermes-agent`, a virtual default alias. Populate the active
+          // provider's real selectable inventory from the Gateway picker API.
+          const providerCatalog = await fetchCurrentProviderModelOptions(
+            defaultModel?.provider ?? '',
+          )
+          if (providerCatalog.length > 0) {
+            models = mergeModelEntries(models, providerCatalog)
+            source = `${source}+model-options`
           }
 
           // Merge providers.*.models + provider defaults + model_aliases
@@ -502,6 +579,11 @@ export const Route = createFileRoute('/api/models')({
           for (const m of localModels) {
             ensureProviderInConfig(m.provider)
           }
+
+          // Do not offer Gateway's generic OpenAI-compatible alias as an
+          // explicit model choice. Selecting it leaks a virtual name to a
+          // provider instead of retaining the configured default.
+          models = models.filter((model) => !isGatewayVirtualModel(model))
 
           const configuredProviders = Array.from(
             new Set(

@@ -232,11 +232,10 @@ export function getRequestIp(request: Request): string {
   }
   // Node's Request does not expose the socket; the adapter that constructs it
   // (TanStack Start / undici) may attach `remoteAddress` under a well-known
-  // symbol. Fall back to loopback when nothing is available so we fail *safe*
-  // (no LAN/Tailscale bypass for unknown peers).
+  // symbol. An unknown peer must never be treated as loopback.
   const maybeAddress = (request as unknown as { remoteAddress?: string })
     .remoteAddress
-  return (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
+  return maybeAddress?.trim() ?? ''
 }
 
 function isLocalRequest(request: Request): boolean {

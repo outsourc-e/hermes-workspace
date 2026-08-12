@@ -8,9 +8,18 @@
  *  (c) partial fill keeps Install button disabled
  *  (d) full fill commits with merged overrides
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+
+import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
+import {
+  detectPlaceholders,
+  isArgPlaceholder,
+  isEnvPlaceholder,
+  isUrlPlaceholder,
+} from './lib/placeholder-detect'
+import type { HubMcpEntry } from './hooks/use-mcp-hub'
 
 vi.mock('@/components/ui/dialog', () => ({
   DialogRoot: ({
@@ -49,15 +58,6 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/toast', () => ({
   toast: vi.fn(),
 }))
-
-import { InstallConfirmationDialog } from './components/install-confirmation-dialog'
-import type { HubMcpEntry } from './hooks/use-mcp-hub'
-import {
-  detectPlaceholders,
-  isArgPlaceholder,
-  isEnvPlaceholder,
-  isUrlPlaceholder,
-} from './lib/placeholder-detect'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -332,9 +332,9 @@ describe('(c) partial fill keeps Install disabled', () => {
     })
 
     // Fill only the arg, leave env empty
-    const argInput = container.querySelector(
+    const argInput = container.querySelector<HTMLInputElement>(
       '[data-testid="placeholder-input-args[1]"]',
-    ) as HTMLInputElement | null
+    )
     expect(argInput).not.toBeNull()
 
     await React.act(async () => {
@@ -427,7 +427,10 @@ describe('(d) full fill — commits with merged overrides', () => {
       command: 'npx',
     })
     // Overridden arg at index 1
-    const body = capturedBody as { args: string[]; env: Record<string, string> }
+    const body = capturedBody as {
+      args: Array<string>
+      env: Record<string, string>
+    }
     expect(body.args[1]).toBe('/real/path/mcp')
     expect(body.env['MY_API_KEY']).toBe('my-real-api-key')
     expect(onInstalled).toHaveBeenCalledOnce()

@@ -15,15 +15,16 @@ import {
   probeGateway,
 } from './gateway-capabilities'
 import {
-  createSession as createDashboardSession,
   deleteSession as deleteDashboardSession,
-  forkSession as forkDashboardSession,
+  getLatestDescendant as getDashboardLatestDescendant,
   getSession as getDashboardSession,
+  getSessionExport as getDashboardSessionExport,
   getSessionMessages as getDashboardSessionMessages,
   listSessions as listDashboardSessions,
   searchSessions as searchDashboardSessions,
   updateSession as updateDashboardSession,
 } from './claude-dashboard-api'
+import type { SessionLineage, SessionSummary } from '../screens/chat/types'
 
 const _authHeaders = (): Record<string, string> =>
   BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
@@ -46,12 +47,30 @@ export type ClaudeSession = {
   input_tokens?: number
   output_tokens?: number
   parent_session_id?: string | null
+  relationship_type?: string | null
+  parent_title?: string | null
+  parent_source?: string | null
+  session_source?: string | null
+  _lineage_root_id?: string | null
+  _lineage_tip_id?: string | null
+  _compression_segment_count?: number | null
+  _parent_lineage_root_id?: string | null
+  _parent_lineage_tip_id?: string | null
+  _cross_surface_child_session?: boolean | null
+  pre_compression_snapshot?: boolean | null
   last_active?: number | null
   preview?: string | null
 }
 
+export type ClaudeSessionSummary = SessionSummary & {
+  key: string
+  friendlyId: string
+  [key: string]: unknown
+}
+
 export type ClaudeMessage = {
-  id: number
+  /** Stable when supplied by the upstream; some dashboard rows omit it. */
+  id?: number | string
   session_id: string
   role: string
   content: string | null
@@ -61,6 +80,41 @@ export type ClaudeMessage = {
   timestamp: number
   token_count?: number | null
   finish_reason?: string | null
+}
+
+export type ClaudeSessionSource = 'dashboard' | 'gateway'
+
+export type ClaudeSessionPage = {
+  sessions: Array<ClaudeSession>
+  source: ClaudeSessionSource
+  limit: number
+  offset: number
+  total?: number
+  snapshot?: string
+  hasMore: boolean
+  pagination: 'supported'
+}
+
+export type ClaudeMessagesResult = {
+  messages: Array<ClaudeMessage>
+  source: ClaudeSessionSource
+  resolvedSessionId?: string
+  total?: number
+  truncated?: boolean
+}
+
+export type GetMessagesOptions = {
+  /** Read the requested persisted segment instead of resolving it to a resume tip. */
+  exact?: boolean
+}
+
+export class ClaudeMessageIdentityError extends Error {
+  constructor(requestedSessionId: string, returnedSessionId: string) {
+    super(
+      `Gateway history segment mismatch (${requestedSessionId} requested, ${returnedSessionId} returned).`,
+    )
+    this.name = 'ClaudeMessageIdentityError'
+  }
 }
 
 export type ClaudeConfig = {
@@ -125,23 +179,59 @@ export async function checkHealth(): Promise<{ status: string }> {
 
 // ── Sessions ─────────────────────────────────────────────────────
 
-export async function listSessions(
+export async function listSessionsPage(
   limit = 50,
   offset = 0,
-): Promise<Array<ClaudeSession>> {
-  if (getCapabilities().dashboard.available) {
+  pinnedSource?: ClaudeSessionSource,
+): Promise<ClaudeSessionPage> {
+  const source =
+    pinnedSource ??
+    (getCapabilities().dashboard.available ? 'dashboard' : 'gateway')
+  if (source === 'dashboard') {
     const resp = await listDashboardSessions(limit, offset)
-    return resp.sessions as Array<ClaudeSession>
+    const sessions = resp.sessions as Array<ClaudeSession>
+    return {
+      sessions,
+      source: 'dashboard',
+      limit: resp.limit,
+      offset: resp.offset,
+      total: resp.total,
+      ...(typeof resp.snapshot === 'string' ? { snapshot: resp.snapshot } : {}),
+      hasMore: resp.offset + sessions.length < resp.total,
+      pagination: 'supported',
+    }
   }
   const resp = await claudeGet<{
     items?: Array<ClaudeSession>
     data?: Array<ClaudeSession>
     total?: number
+    snapshot?: string
   }>(`/api/sessions?limit=${limit}&offset=${offset}`)
   // The gateway (OpenAI-compat) returns { object: 'list', data: [...] }, while the
   // dashboard / older gateway shape uses { items: [...] }. Accept either, and never
   // return undefined (callers .map over this).
-  return resp.items ?? resp.data ?? []
+  const sessions = resp.items ?? resp.data ?? []
+  return {
+    sessions,
+    source: 'gateway',
+    limit,
+    offset,
+    ...(typeof resp.total === 'number' ? { total: resp.total } : {}),
+    ...(typeof resp.snapshot === 'string' ? { snapshot: resp.snapshot } : {}),
+    hasMore:
+      typeof resp.total === 'number'
+        ? offset + sessions.length < resp.total
+        : sessions.length >= limit,
+    pagination: 'supported',
+  }
+}
+
+/** Preserve the existing array-returning wrapper for all non-card callers. */
+export async function listSessions(
+  limit = 50,
+  offset = 0,
+): Promise<Array<ClaudeSession>> {
+  return (await listSessionsPage(limit, offset)).sessions
 }
 
 export async function getSession(sessionId: string): Promise<ClaudeSession> {
@@ -159,10 +249,11 @@ export async function createSession(opts?: {
   title?: string
   model?: string
 }): Promise<ClaudeSession> {
-  if (getCapabilities().dashboard.available) {
-    const resp = await createDashboardSession(opts || {})
-    return resp.session as ClaudeSession
-  }
+  // The Dashboard owns the read projection but deliberately has no
+  // POST /api/sessions route. Creating through it returns 405 even when its
+  // session list is healthy. The Gateway is the authoritative session writer
+  // and persists an empty row immediately, which lets the Card resolver find
+  // it before the first chat message.
   const resp = await claudePost<{ session: ClaudeSession }>(
     '/api/sessions',
     opts || {},
@@ -193,23 +284,111 @@ export async function deleteSession(sessionId: string): Promise<void> {
   return claudeDeleteReq(`/api/sessions/${sessionId}`)
 }
 
-export async function getMessages(
+/**
+ * Discard only a freshly created, still-empty Gateway row. This always targets
+ * the Gateway writer rather than the Dashboard read projection. The caller
+ * supplies an additional Card-owned capability and revalidates the Card before
+ * invoking this conservative final check.
+ */
+export async function deleteEmptyGatewaySession(
   sessionId: string,
-): Promise<Array<ClaudeMessage>> {
-  if (getCapabilities().dashboard.available) {
+): Promise<boolean> {
+  const session = await claudeGet<{ session: ClaudeSession }>(
+    `/api/sessions/${sessionId}`,
+  )
+  const current = session.session
+  if (
+    current.id !== sessionId ||
+    current.message_count !== 0 ||
+    (typeof current.title === 'string' && current.title.trim().length > 0)
+  ) {
+    return false
+  }
+  await claudeDeleteReq(`/api/sessions/${sessionId}`)
+  return true
+}
+
+export async function getMessagesResult(
+  sessionId: string,
+  pinnedSource?: ClaudeSessionSource,
+  options?: GetMessagesOptions,
+): Promise<ClaudeMessagesResult> {
+  const source =
+    pinnedSource ??
+    (getCapabilities().dashboard.available ? 'dashboard' : 'gateway')
+  if (source === 'dashboard') {
+    if (options?.exact) {
+      const resp = await getDashboardSessionExport(sessionId)
+      return {
+        messages: resp.messages as Array<ClaudeMessage>,
+        source: 'dashboard',
+        ...(typeof resp.id === 'string' ? { resolvedSessionId: resp.id } : {}),
+      }
+    }
     const resp = await getDashboardSessionMessages(sessionId)
-    return resp.messages as Array<ClaudeMessage>
+    const messages = resp.messages as Array<ClaudeMessage>
+    return {
+      messages,
+      source: 'dashboard',
+      ...(typeof resp.session_id === 'string'
+        ? { resolvedSessionId: resp.session_id }
+        : {}),
+      ...messagePageMetadata(resp, messages.length),
+    }
   }
   const resp = await claudeGet<{
     items?: Array<ClaudeMessage>
     data?: Array<ClaudeMessage>
     messages?: Array<ClaudeMessage>
     total?: number
+    truncated?: boolean
+    has_more?: boolean
+    hasMore?: boolean
+    session_id?: string
   }>(`/api/sessions/${sessionId}/messages`)
   // Gateway (OpenAI-compat) returns { object: 'list', data: [...] }; dashboard / older
   // shape uses { items: [...] }; some message endpoints use { messages: [...] }.
   // Accept any, and never return undefined (callers read .length / .map / .slice).
-  return resp.items ?? resp.data ?? resp.messages ?? []
+  const messages = resp.items ?? resp.data ?? resp.messages ?? []
+  const hasReturnedSessionId = Object.prototype.hasOwnProperty.call(
+    resp,
+    'session_id',
+  )
+  if (
+    options?.exact &&
+    hasReturnedSessionId &&
+    (typeof resp.session_id !== 'string' || resp.session_id !== sessionId)
+  ) {
+    const returned =
+      typeof resp.session_id === 'string' && resp.session_id.length > 0
+        ? resp.session_id
+        : 'invalid'
+    throw new ClaudeMessageIdentityError(sessionId, returned)
+  }
+  const metadata = messagePageMetadata(resp, messages.length)
+  return {
+    messages,
+    source: 'gateway',
+    ...(typeof resp.session_id === 'string'
+      ? { resolvedSessionId: resp.session_id }
+      : options?.exact
+        ? { resolvedSessionId: sessionId }
+        : {}),
+    ...metadata,
+    // Exact Card-history reads are authoritative only with positive source
+    // evidence that the response was not silently bounded. Interactive legacy
+    // reads retain their prior best-effort metadata shape.
+    ...(options?.exact && metadata.truncated === undefined
+      ? { truncated: true }
+      : {}),
+  }
+}
+
+/** Preserve the existing array-returning wrapper for all non-card callers. */
+export async function getMessages(
+  sessionId: string,
+): Promise<Array<ClaudeMessage>> {
+  return (await getMessagesResult(sessionId)).messages
 }
 
 export async function searchSessions(
@@ -224,16 +403,178 @@ export async function searchSessions(
   )
 }
 
+export type LatestDescendantResolution = {
+  requestedSessionId: string
+  sessionId: string
+  path: Array<string>
+  changed: boolean
+  supported: boolean
+}
+
+function unsupportedDescendant(
+  requestedSessionId: string,
+): LatestDescendantResolution {
+  return {
+    requestedSessionId,
+    sessionId: requestedSessionId,
+    path: [requestedSessionId],
+    changed: false,
+    supported: false,
+  }
+}
+
+/**
+ * Resolve through the dashboard's read-only lineage endpoint when explicitly
+ * advertised. History navigation must remain usable on older or broken
+ * deployments, so every unsupported/error/malformed path safely returns the
+ * requested ID.
+ */
+export async function getLatestDescendant(
+  sessionId: string,
+): Promise<LatestDescendantResolution> {
+  try {
+    const capabilities = await ensureGatewayProbed()
+    if (!capabilities.latestDescendant || !capabilities.dashboard.available) {
+      return unsupportedDescendant(sessionId)
+    }
+
+    const result = await getDashboardLatestDescendant(sessionId)
+    const validPath =
+      Array.isArray(result.path) &&
+      result.path.length > 0 &&
+      result.path.every(
+        (entry): entry is string =>
+          typeof entry === 'string' && entry.trim().length > 0,
+      )
+    const valid =
+      result.requested_session_id === sessionId &&
+      typeof result.session_id === 'string' &&
+      result.session_id.trim().length > 0 &&
+      validPath &&
+      result.path[0] === sessionId &&
+      result.path[result.path.length - 1] === result.session_id &&
+      typeof result.changed === 'boolean' &&
+      result.changed === (result.session_id !== sessionId)
+
+    if (!valid) return unsupportedDescendant(sessionId)
+    return {
+      requestedSessionId: sessionId,
+      sessionId: result.session_id,
+      path: result.path,
+      changed: result.changed,
+      supported: true,
+    }
+  } catch {
+    return unsupportedDescendant(sessionId)
+  }
+}
+
+export type ForkSessionOptions = {
+  title?: string
+}
+
+export type ForkSessionResult = {
+  session: ClaudeSession
+  forkedFrom: string | null
+}
+
+export class SessionForkUnavailableError extends Error {
+  constructor() {
+    super('Whole-session fork is unavailable on this Hermes backend.')
+    this.name = 'SessionForkUnavailableError'
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function messagePageMetadata(
+  value: unknown,
+  messageCount: number,
+): Pick<ClaudeMessagesResult, 'total' | 'truncated'> {
+  if (!isRecord(value)) return {}
+  const total =
+    typeof value.total === 'number' &&
+    Number.isSafeInteger(value.total) &&
+    value.total >= 0
+      ? value.total
+      : undefined
+  const explicitTruncated =
+    typeof value.truncated === 'boolean'
+      ? value.truncated
+      : typeof value.has_more === 'boolean'
+        ? value.has_more
+        : typeof value.hasMore === 'boolean'
+          ? value.hasMore
+          : undefined
+  const truncated =
+    total === undefined
+      ? explicitTruncated
+      : total !== messageCount || explicitTruncated === true
+  return {
+    ...(total === undefined ? {} : { total }),
+    ...(truncated === undefined ? {} : { truncated }),
+  }
+}
+
+function parseForkParentIdentity(
+  value: unknown,
+  expectedParent: string,
+): string | null {
+  if (value === undefined || value === null) return null
+  if (
+    typeof value !== 'string' ||
+    value.trim().length === 0 ||
+    value !== expectedParent
+  ) {
+    throw new Error(
+      'Hermes fork response did not identify the requested parent session.',
+    )
+  }
+  return value
+}
+
+/** Whole-session fork deliberately targets only the advertised gateway API. */
 export async function forkSession(
   sessionId: string,
-): Promise<{ session: ClaudeSession; forked_from: string }> {
-  if (getCapabilities().dashboard.available) {
-    return forkDashboardSession(sessionId) as Promise<{
-      session: ClaudeSession
-      forked_from: string
-    }>
+  options?: ForkSessionOptions,
+): Promise<ForkSessionResult> {
+  const capabilities = await ensureGatewayProbed()
+  if (!capabilities.sessionFork) {
+    throw new SessionForkUnavailableError()
   }
-  return claudePost(`/api/sessions/${sessionId}/fork`)
+
+  const result = await claudePost<unknown>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/fork`,
+    options ?? {},
+  )
+  if (!isRecord(result) || !isRecord(result.session)) {
+    throw new Error('Hermes fork response was malformed.')
+  }
+  const childId = result.session.id
+  if (typeof childId !== 'string' || childId.trim().length === 0) {
+    throw new Error('Hermes fork response did not include a child session ID.')
+  }
+  if (childId.trim() === sessionId) {
+    throw new Error('Hermes fork response identified the parent as its child.')
+  }
+
+  const explicitParent = parseForkParentIdentity(result.forked_from, sessionId)
+  const sessionParent = parseForkParentIdentity(
+    result.session.parent_session_id,
+    sessionId,
+  )
+  if (explicitParent === null && sessionParent === null) {
+    throw new Error(
+      'Hermes fork response did not identify the requested parent session.',
+    )
+  }
+
+  return {
+    session: result.session as ClaudeSession,
+    forkedFrom: explicitParent,
+  }
 }
 
 // ── Conversion helpers (Claude → Chat format) ─────────────────
@@ -320,9 +661,70 @@ export function toChatMessage(
 }
 
 /** Convert a ClaudeSession to the session summary format the frontend expects */
-export function toSessionSummary(
-  session: ClaudeSession,
-): Record<string, unknown> {
+export function toSessionSummary(session: ClaudeSession): ClaudeSessionSummary {
+  const hasLineageFacts =
+    session.parent_session_id != null ||
+    session.relationship_type != null ||
+    session.parent_title != null ||
+    session.parent_source != null ||
+    session.session_source != null ||
+    session._lineage_root_id != null ||
+    session._lineage_tip_id != null ||
+    session._compression_segment_count != null ||
+    session._parent_lineage_root_id != null ||
+    session._parent_lineage_tip_id != null ||
+    session._cross_surface_child_session != null ||
+    session.pre_compression_snapshot != null ||
+    session.source != null ||
+    session.end_reason != null
+
+  const lineage: SessionLineage | undefined = hasLineageFacts
+    ? {
+        ...(session.parent_session_id
+          ? { parentSessionId: session.parent_session_id }
+          : {}),
+        ...(session.relationship_type
+          ? { relationshipType: session.relationship_type }
+          : {}),
+        ...(session.parent_title ? { parentTitle: session.parent_title } : {}),
+        ...(session.parent_source
+          ? { parentSource: session.parent_source }
+          : {}),
+        ...(session.session_source
+          ? { sessionSource: session.session_source }
+          : {}),
+        ...(session._lineage_root_id
+          ? { lineageRootId: session._lineage_root_id }
+          : {}),
+        ...(session._lineage_tip_id
+          ? { lineageTipId: session._lineage_tip_id }
+          : {}),
+        ...(typeof session._compression_segment_count === 'number'
+          ? { compressionSegmentCount: session._compression_segment_count }
+          : {}),
+        ...(session._parent_lineage_root_id
+          ? { parentLineageRootId: session._parent_lineage_root_id }
+          : {}),
+        ...(session._parent_lineage_tip_id
+          ? { parentLineageTipId: session._parent_lineage_tip_id }
+          : {}),
+        ...(typeof session._cross_surface_child_session === 'boolean'
+          ? { isCrossSurfaceChild: session._cross_surface_child_session }
+          : {}),
+        ...(typeof session.pre_compression_snapshot === 'boolean'
+          ? { isPreCompressionSnapshot: session.pre_compression_snapshot }
+          : {}),
+        ...(session.source ? { source: session.source } : {}),
+        ...(session.end_reason ? { endReason: session.end_reason } : {}),
+        ...(typeof session.started_at === 'number'
+          ? { startedAt: session.started_at * 1000 }
+          : {}),
+        ...(typeof session.ended_at === 'number'
+          ? { endedAt: session.ended_at * 1000 }
+          : {}),
+      }
+    : undefined
+
   return {
     key: session.id,
     friendlyId: session.id,
@@ -354,6 +756,7 @@ export function toSessionSummary(
       completionTokens: session.output_tokens ?? 0,
       totalTokens: (session.input_tokens ?? 0) + (session.output_tokens ?? 0),
     },
+    ...(lineage ? { lineage } : {}),
   }
 }
 
@@ -426,7 +829,7 @@ export async function streamChat(
     }
   }
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
 

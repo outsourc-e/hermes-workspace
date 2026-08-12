@@ -49,17 +49,6 @@ export type GatewaySessionsResponse = {
   sessions?: Array<GatewaySession>
 }
 
-export type GatewaySessionStatusResponse = {
-  status?: string
-  progress?: number
-  model?: string
-  tokenCount?: number
-  totalTokens?: number
-  usage?: GatewaySessionUsage
-  error?: string
-  [key: string]: unknown
-}
-
 export type GatewayModelCatalogEntry =
   | string
   | {
@@ -99,10 +88,28 @@ export type GatewayModelDefaultResponse = {
 export type GatewayAgentActionResponse = {
   ok?: boolean
   error?: string
+  cardId?: string
+  parentCardId?: string | null
+}
+
+export type GatewayAgentCardBinding = {
+  kind: 'session-card-owner'
+  cardId: string
+  parentCardId: string | null
+  canonicalSource: 'remote'
+  canonicalSegmentKey: string
+  canonicalTransport: 'gateway'
 }
 
 export type GatewayAgentPauseResponse = GatewayAgentActionResponse & {
   paused?: boolean
+  cardId?: string
+  parentCardId?: string | null
+}
+
+export type GatewayAgentPauseCardOwner = {
+  cardId: string
+  parentCardId?: string | null
 }
 
 async function readError(response: Response): Promise<string> {
@@ -140,7 +147,7 @@ export type SessionHistoryMessage = {
 
 export type SessionHistoryResponse = {
   ok?: boolean
-  messages?: SessionHistoryMessage[]
+  messages?: Array<SessionHistoryMessage>
   error?: string
 }
 
@@ -178,7 +185,7 @@ export type SendToSessionResponse = {
 }
 
 export async function sendToSession(
-  sessionKey: string,
+  cardBinding: GatewayAgentCardBinding,
   message: string,
 ): Promise<SendToSessionResponse> {
   const controller = new AbortController()
@@ -187,7 +194,7 @@ export async function sendToSession(
     const response = await fetch(makeEndpoint('/api/session-send'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey, message }),
+      body: JSON.stringify({ cardBinding, message }),
       signal: controller.signal,
     })
     const payload = (await response
@@ -229,28 +236,6 @@ export async function fetchSessions(): Promise<GatewaySessionsResponse> {
     throw new Error('Session API returned an unexpected response shape')
   }
   return payload
-}
-
-export async function fetchSessionStatus(
-  key: string,
-): Promise<GatewaySessionStatusResponse> {
-  const response = await fetch(
-    makeEndpoint(`/api/session-status?key=${encodeURIComponent(key)}`),
-  )
-  if (!response.ok) {
-    throw new Error(await readError(response))
-  }
-
-  const payload = (await response.json()) as Record<string, unknown>
-  const normalized =
-    payload &&
-    typeof payload === 'object' &&
-    payload.payload &&
-    typeof payload.payload === 'object'
-      ? payload.payload
-      : payload
-
-  return normalized as GatewaySessionStatusResponse
 }
 
 export async function fetchModels(): Promise<GatewayModelsResponse> {
@@ -366,19 +351,24 @@ export async function setDefaultModel(
 }
 
 export async function steerAgent(
-  sessionKey: string,
+  cardBinding: GatewayAgentCardBinding,
   message: string,
 ): Promise<GatewayAgentActionResponse> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
 
   try {
-    const response = await fetch(makeEndpoint('/api/agent-steer'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey, message }),
-      signal: controller.signal,
-    })
+    const response = await fetch(
+      makeEndpoint(
+        `/api/session-cards/${encodeURIComponent(cardBinding.cardId)}/steer`,
+      ),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cardBinding, message }),
+        signal: controller.signal,
+      },
+    )
 
     const payload = (await response
       .json()
@@ -404,18 +394,23 @@ export async function steerAgent(
 }
 
 export async function killAgentSession(
-  sessionKey: string,
+  cardBinding: GatewayAgentCardBinding,
 ): Promise<GatewayAgentActionResponse> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
 
   try {
-    const response = await fetch(makeEndpoint('/api/agent-kill'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey }),
-      signal: controller.signal,
-    })
+    const response = await fetch(
+      makeEndpoint(
+        `/api/session-cards/${encodeURIComponent(cardBinding.cardId)}/kill`,
+      ),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cardBinding }),
+        signal: controller.signal,
+      },
+    )
 
     const payload = (await response
       .json()
@@ -456,8 +451,8 @@ export type GatewayApprovalEntry = {
 
 export type GatewayApprovalsResponse = {
   ok?: boolean
-  approvals?: GatewayApprovalEntry[]
-  pending?: GatewayApprovalEntry[]
+  approvals?: Array<GatewayApprovalEntry>
+  pending?: Array<GatewayApprovalEntry>
 }
 
 export async function fetchGatewayApprovals(): Promise<GatewayApprovalsResponse> {
@@ -500,19 +495,27 @@ export async function resolveGatewayApproval(
 }
 
 export async function toggleAgentPause(
-  sessionKey: string,
+  owner: GatewayAgentPauseCardOwner,
   pause: boolean,
 ): Promise<GatewayAgentPauseResponse> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
 
   try {
-    const response = await fetch(makeEndpoint('/api/agent-pause'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionKey, pause }),
-      signal: controller.signal,
-    })
+    const response = await fetch(
+      makeEndpoint(
+        `/api/session-cards/${encodeURIComponent(owner.cardId)}/pause`,
+      ),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          pause,
+          parentCardId: owner.parentCardId ?? null,
+        }),
+        signal: controller.signal,
+      },
+    )
 
     const payload = (await response
       .json()

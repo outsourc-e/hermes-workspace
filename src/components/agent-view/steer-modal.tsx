@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { GatewayAgentCardBinding } from '@/lib/gateway-api'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -12,14 +13,14 @@ import { steerAgent } from '@/lib/gateway-api'
 type SteerModalProps = {
   open: boolean
   agentName: string
-  sessionKey?: string
+  cardBinding: GatewayAgentCardBinding
   onOpenChange: (open: boolean) => void
 }
 
 export function SteerModal({
   open,
   agentName,
-  sessionKey,
+  cardBinding,
   onOpenChange,
 }: SteerModalProps) {
   const [message, setMessage] = useState('')
@@ -34,12 +35,11 @@ export function SteerModal({
 
   async function handleSend() {
     const trimmedMessage = message.trim()
-    const normalizedSessionKey = sessionKey?.trim() ?? ''
-    if (!trimmedMessage || !normalizedSessionKey || pending) return
+    if (!trimmedMessage || pending) return
 
     setPending(true)
     try {
-      await steerAgent(normalizedSessionKey, trimmedMessage)
+      await steerAgent(cardBinding, trimmedMessage)
       toast(`Directive sent to ${agentName}`, { type: 'success' })
       setMessage('')
       onOpenChange(false)
@@ -87,7 +87,7 @@ export function SteerModal({
             </Button>
             <Button
               size="sm"
-              disabled={pending || message.trim().length === 0 || !sessionKey}
+              disabled={pending || message.trim().length === 0}
               onClick={function onClickSend() {
                 void handleSend()
               }}

@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
 import type { ApprovalRequest } from '../lib/approvals-store'
+import { cn } from '@/lib/utils'
 
 type ApprovalsBellProps = {
-  approvals: ApprovalRequest[]
+  approvals: Array<ApprovalRequest>
   onApprove: (id: string) => Promise<boolean> | void
   onDeny: (id: string) => Promise<boolean> | void
 }

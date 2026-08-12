@@ -220,7 +220,7 @@ function normalizeSecurity(value: unknown): SecurityRisk {
   }
 }
 
-const CATEGORY_ALIASES: Record<string, string> = {
+const CATEGORY_ALIASES: Partial<Record<string, string>> = {
   research: 'Search & Research',
   'search-and-research': 'Search & Research',
   search: 'Search & Research',

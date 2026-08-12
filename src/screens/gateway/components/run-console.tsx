@@ -6,12 +6,14 @@ import {
   ViewIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { fetchSessionHistory } from '@/lib/gateway-api'
-import { cn } from '@/lib/utils'
-import { RunLearnings, type RunLearningsProps } from './run-learnings'
+import { RunLearnings } from './run-learnings'
 import { MissionEventLog } from './mission-event-log'
+import { onFeedEvent } from './feed-event-bus'
+import type { FeedEvent } from './feed-event-bus'
+import type { RunLearningsProps } from './run-learnings'
 import type { MissionEvent } from '@/screens/gateway/lib/mission-events'
-import { onFeedEvent, type FeedEvent } from './feed-event-bus'
+import { cn } from '@/lib/utils'
+import { fetchSessionHistory } from '@/lib/gateway-api'
 
 type RunArtifact = {
   id: string
@@ -24,7 +26,7 @@ type RunArtifact = {
 
 type RunReport = {
   summary: string
-  keyFindings: string[]
+  keyFindings: Array<string>
   duration: string
   totalTokens: number
   totalCost: number
@@ -53,14 +55,14 @@ type RunConsoleProps = {
   onSteerAgent?: (agentId: string, message: string) => void
   onApprove?: (approvalId: string) => void
   onDeny?: (approvalId: string) => void
-  sessionKeys?: string[]
+  sessionKeys?: Array<string>
   agentNameMap?: Record<string, string>
-  artifacts?: RunArtifact[]
+  artifacts?: Array<RunArtifact>
   report?: RunReport
-  missionEvents?: MissionEvent[]
+  missionEvents?: Array<MissionEvent>
   learnings?: RunLearningsProps['learnings']
   onAddLearning?: RunLearningsProps['onAddLearning']
-  tabs?: ConsoleTab[]
+  tabs?: Array<ConsoleTab>
   minimalChrome?: boolean
 }
 
@@ -163,6 +165,7 @@ function extractContent(msg: {
 function sanitizeArgsPreview(args?: string): string {
   if (!args) return 'No arguments'
   const cleaned = args
+    // eslint-disable-next-line no-control-regex -- Tool arguments must have C0 controls removed before display.
     .replace(/[\u0000-\u001F\u007F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -175,6 +178,8 @@ function parseTimestampToSeconds(timestamp: string): number {
   const parts = timestamp.split(':').map(Number)
   if (parts.length !== 3 || parts.some((value) => Number.isNaN(value))) return 0
   const [hours, minutes, seconds] = parts
+  if (hours === undefined || minutes === undefined || seconds === undefined)
+    return 0
   return hours * 3600 + minutes * 60 + seconds
 }
 
@@ -251,8 +256,8 @@ export function RunConsole({
   const [streamView, setStreamView] = useState<StreamView>('combined')
   const [steerTarget, setSteerTarget] = useState<string | null>(null)
   const [steerInput, setSteerInput] = useState('')
-  const [historyEvents, setHistoryEvents] = useState<LiveStreamEvent[]>([])
-  const [feedEvents, setFeedEvents] = useState<LiveStreamEvent[]>([])
+  const [historyEvents, setHistoryEvents] = useState<Array<LiveStreamEvent>>([])
+  const [feedEvents, setFeedEvents] = useState<Array<LiveStreamEvent>>([])
   const [isAutoScroll, setIsAutoScroll] = useState(true)
   const [copiedArtifactId, setCopiedArtifactId] = useState<string | null>(null)
   const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(
@@ -260,7 +265,7 @@ export function RunConsole({
   )
   const streamEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const allowedTabs = useMemo<ConsoleTab[]>(
+  const allowedTabs = useMemo<Array<ConsoleTab>>(
     () => (tabs && tabs.length > 0 ? tabs : TAB_OPTIONS.map((tab) => tab.id)),
     [tabs],
   )
@@ -268,11 +273,11 @@ export function RunConsole({
   // Fetch session history for all session keys
   const fetchAllHistory = useCallback(async () => {
     if (!sessionKeys?.length) return
-    const allEvents: LiveStreamEvent[] = []
+    const allEvents: Array<LiveStreamEvent> = []
     for (const key of sessionKeys) {
       try {
         const res = await fetchSessionHistory(key)
-        const msgs = res?.messages ?? []
+        const msgs = res.messages ?? []
         const agentName = agentNameMap?.[key] ?? 'Agent'
         for (const msg of msgs) {
           const content = extractContent(msg)
@@ -367,8 +372,9 @@ export function RunConsole({
   }, [feedEvents, historyEvents])
 
   const timelineBuckets = useMemo(() => {
-    if (displayEvents.length === 0) return []
-    const firstSeconds = parseTimestampToSeconds(displayEvents[0].timestamp)
+    const firstEvent = displayEvents.at(0)
+    if (!firstEvent) return []
+    const firstSeconds = parseTimestampToSeconds(firstEvent.timestamp)
     const ordered = [...displayEvents].sort(
       (a, b) =>
         parseTimestampToSeconds(a.timestamp) -
@@ -417,14 +423,16 @@ export function RunConsole({
       agentName,
       events,
     }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [displayEvents])
 
   const copyArtifactContent = useCallback(async (artifact: RunArtifact) => {
     const textToCopy = artifact.content || artifact.path || artifact.name
-    if (!textToCopy || !navigator?.clipboard?.writeText) return
+    const clipboard = (navigator as unknown as { clipboard?: Clipboard })
+      .clipboard
+    if (!textToCopy || !clipboard) return
     try {
-      await navigator.clipboard.writeText(textToCopy)
+      await clipboard.writeText(textToCopy)
       setCopiedArtifactId(artifact.id)
       setTimeout(
         () =>
@@ -879,7 +887,7 @@ export function RunConsole({
               eventsByAgent.length >= 3 ? (
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
+                    const latestEvent = lane.events.at(-1)
                     const laneDotClass =
                       latestEvent?.eventType === 'error'
                         ? 'bg-red-400'
@@ -938,7 +946,7 @@ export function RunConsole({
                   )}
                 >
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
+                    const latestEvent = lane.events.at(-1)
                     const laneDotClass =
                       latestEvent?.eventType === 'error'
                         ? 'bg-red-400'

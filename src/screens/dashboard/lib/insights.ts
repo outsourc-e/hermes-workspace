@@ -47,19 +47,21 @@ export function buildInsights(
   if (daily.length >= 3) {
     let peakIdx = 0
     let peakVal = 0
-    for (let i = 0; i < daily.length; i += 1) {
-      const total = daily[i].inputTokens + daily[i].outputTokens
+    for (const [i, day] of daily.entries()) {
+      const total = day.inputTokens + day.outputTokens
       if (total > peakVal) {
         peakVal = total
         peakIdx = i
       }
     }
     if (peakVal > 0) {
-      const top = analytics.topModels[0]
+      const peakDay = daily.at(peakIdx)
+      if (!peakDay) return out
+      const top = analytics.topModels.at(0)
       const driver = top ? `, driven by ${formatModelName(top.id)}` : ''
       out.push({
         tone: 'info',
-        text: `Usage peaked ${shortDate(daily[peakIdx].day)} (${formatTokens(peakVal)} tokens)${driver}.`,
+        text: `Usage peaked ${shortDate(peakDay.day)} (${formatTokens(peakVal)} tokens)${driver}.`,
       })
     }
   }
@@ -69,9 +71,8 @@ export function buildInsights(
     const mid = Math.floor(daily.length / 2)
     let priorCache = 0
     let recentCache = 0
-    for (let i = 0; i < mid; i += 1) priorCache += daily[i].cacheReadTokens
-    for (let i = mid; i < daily.length; i += 1)
-      recentCache += daily[i].cacheReadTokens
+    for (const day of daily.slice(0, mid)) priorCache += day.cacheReadTokens
+    for (const day of daily.slice(mid)) recentCache += day.cacheReadTokens
     if (priorCache > 0) {
       const delta = ((recentCache - priorCache) / priorCache) * 100
       if (Math.abs(delta) >= 5) {

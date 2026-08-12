@@ -2,11 +2,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
-  listExternalMemoryCandidates,
-  editExternalMemoryCandidate,
   approveExternalMemoryCandidate,
-  rejectExternalMemoryCandidate,
   deleteExternalMemoryCandidate,
+  editExternalMemoryCandidate,
+  listExternalMemoryCandidates,
+  rejectExternalMemoryCandidate,
 } from '../../../server/external-memory-browser'
 
 export const Route = createFileRoute('/api/external-memory/candidates')({

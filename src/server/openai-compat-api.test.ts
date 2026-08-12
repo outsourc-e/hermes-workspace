@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { openaiChat, parseOpenAIStream } from './openai-compat-api'
 
-function createStreamResponse(chunks: string[]): Response {
+function createStreamResponse(chunks: Array<string>): Response {
   const encoder = new TextEncoder()
   return new Response(
     new ReadableStream({
@@ -32,6 +32,52 @@ afterEach(() => {
 })
 
 describe('openaiChat', () => {
+  it('omits an unspecified model so the Gateway resolves its configured primary model', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [{ id: 'hermes-agent' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await openaiChat([{ role: 'user', content: 'hello' }], {
+      stream: false,
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('model')
+  })
+
+  it('omits the Gateway virtual hermes-agent alias even when stale Composer state sends it', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await openaiChat([{ role: 'user', content: 'hello' }], {
+      model: 'hermes-agent',
+      stream: false,
+    })
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('model')
+  })
+
   it('sends Hermes session continuity headers with authentication when available', async () => {
     process.env.HERMES_API_TOKEN = 'test-token'
     const fetchMock = vi
@@ -45,17 +91,16 @@ describe('openaiChat', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await openaiChat([{ role: 'user', content: 'hello' }], {
-      model: 'hermes-agent',
+      model: 'gpt-5.6-terra',
       sessionId: 'workspace-session-1',
     })
 
-    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<
-      string,
-      string
-    >
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    const headers = init.headers as Record<string, string>
     expect(headers.Authorization).toBe('Bearer test-token')
     expect(headers['X-Hermes-Session-Id']).toBe('workspace-session-1')
     expect(headers['X-Claude-Session-Id']).toBe('workspace-session-1')
+    expect(JSON.parse(String(init.body)).model).toBe('gpt-5.6-terra')
   })
 
   it('sends Hermes session continuity headers even without a bearer token', async () => {

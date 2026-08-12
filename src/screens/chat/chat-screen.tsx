@@ -11,49 +11,90 @@ import {
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
-import {
-  deriveFriendlyIdFromKey,
-  isMissingAuth,
-  readError,
-  textFromMessage,
-} from './utils'
+import { isMissingAuth, textFromMessage } from './utils'
 import {
   advanceStickyStreamingText,
   createOptimisticMessage,
   createResponseWaitSnapshot,
+  getChatSessionSourceState,
   isTerminalActiveRunStatus,
   shouldClearWaitingForAssistantMessage,
+  shouldPinMainSession,
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
+  appendSessionCardTransientMessage,
+  archiveSessionCard,
+  branchSessionCard,
   chatQueryKeys,
   clearHistoryMessages,
+  fetchCompleteSessionCardHistory,
+  fetchRecentSessionCardHistory,
   fetchStatus,
+  isAuthoritativeCompleteSessionCardHistory,
+  isDisplayableRecentSessionCardHistory,
+  isSessionCardRootHistoryLoaded,
+  mergeFetchedOlderRecentSessionCardHistoryWindow,
+  mergeRefreshedRecentSessionCardHistoryWindows,
+  moveLegacyHistoryMessagesToSessionCard,
+  moveSessionCardHistoryMessages,
+  moveSessionCardHistoryToCard,
+  recentSessionCardHistoryWindowSignature,
+  reconcileSessionCardHistoryResponseDurably,
+  retainCompleteSessionCardProjections,
+  sessionCardQueryKeys,
+  setSessionCardHandoffAuthority,
   updateHistoryMessageByClientId,
   updateHistoryMessageByClientIdEverywhere,
+  updateSessionCardHistoryMessages,
+  updateSessionCardMetadata,
+  updateSessionCardTransientMessageByClientId,
   updateSessionLastMessage,
 } from './chat-queries'
+import {
+  consumeNewSessionCardPrimaryModel,
+  retainNewSessionCard,
+} from './new-session-discard'
 import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
 import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
+  checkpointPendingRecoveryMessage,
   clearPendingSendForSession,
   consumePendingSend,
+  getNewChatProvisionalOwnerId,
+  getPendingRecoveryMessages,
   hasPendingGeneration,
   hasPendingSend,
   isRecentSession,
+  persistPendingMessage,
+  readPendingMessage,
+  removeRejectedPendingMessage,
   resetPendingSend,
   setPendingGeneration,
+  updatePendingMessageByClientId,
 } from './pending-send'
+import {
+  appendCardTranscriptRecoveryMessage,
+  checkpointCardTranscriptRecoveryMessage,
+  isCardTranscriptRecoveryMessagePortable,
+  mergeCardTranscriptRecoveryMessages,
+  removeRejectedCardTranscriptRecoveryMessage,
+} from './card-transcript-recovery'
+import { resetWorkspaceChatIndexedDb } from './card-transcript-indexeddb'
+import { parsePortableAttachmentDataUrl } from './attachment-envelope'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
 import { snapshotOptimisticUserMessages } from './hooks/optimistic-message-reinject'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useStreamingMessage } from './hooks/use-streaming-message'
-import { useActiveRunCheck } from './hooks/use-active-run-check'
+import {
+  activeRunCheckUrl,
+  useActiveRunCheck,
+} from './hooks/use-active-run-check'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
@@ -66,6 +107,13 @@ import {
   CHAT_RUN_COMMAND_EVENT,
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
+import { findSessionCardDescendant } from './session-cards'
+import type { AuthoritativeCardHandoff } from './hooks/use-streaming-message'
+import type {
+  SessionCardHandoffAuthority,
+  SessionCardHistoryResponse,
+  SessionCardListWire,
+} from './chat-queries'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
@@ -78,7 +126,7 @@ import type {
   ThinkingLevel,
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
-import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
+import type { ChatAttachment, ChatMessage, SessionCard } from './types'
 import type { AgentActivity } from '@/stores/chat-activity-store'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
@@ -94,7 +142,11 @@ import { hapticTap } from '@/lib/haptics'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
-import { useWorkspaceStore } from '@/stores/workspace-store'
+import {
+  CHAT_BOOTSTRAP_CARD_ID,
+  buildChatCardNavigation,
+  useWorkspaceStore,
+} from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
@@ -104,26 +156,43 @@ import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
-import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
+import { useChatStore } from '@/stores/chat-store'
 import { useSessionModelStore } from '@/stores/session-model-store'
+import { fetchSessionCardStatusModel } from '@/screens/chat/session-card-status'
+import {
+  cardThinkingStorageKey,
+  removeLegacySegmentUiStorage,
+} from '@/screens/chat/session-card-ui-state'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) {
-  _localModelOverride = model
-}
-
 type ChatScreenProps = {
   activeFriendlyId: string
+  activeCard?: SessionCard
+  inspectedChildCardId?: string
+  sessionCardList?: SessionCardListWire
+  hasMoreSessionCards?: boolean
+  loadingMoreSessionCards?: boolean
+  moreSessionCardsError?: string | null
+  onLoadMoreSessionCards?: () => void
   isNewChat?: boolean
-  onSessionResolved?: (payload: {
-    sessionKey: string
-    friendlyId: string
-  }) => void
+  onSessionResolved?: (
+    payload:
+      | {
+          sessionKey: string
+          friendlyId: string
+          reason: 'canonical'
+        }
+      | {
+          fromSessionKey: string
+          sessionKey: string
+          friendlyId: string
+          reason: 'bootstrap' | 'stream-handoff'
+        },
+  ) => void
   forcedSessionKey?: string
   /** Hide header + file explorer + terminal for panel mode */
   compact?: boolean
@@ -135,9 +204,22 @@ type ChatScreenProps = {
   embedded?: boolean
 }
 
+type WorkspaceChatAdmissionRetry = {
+  ownerKey: string
+  safeMessage: string
+  retryPersistence: () => Promise<boolean>
+  continueAfterAdmission: () => Promise<void>
+}
+
 type PortableHistoryMessage = {
   role: 'user' | 'assistant' | 'system'
   content: string
+}
+
+/** The Gateway default is a routing alias, not an explicit provider model. */
+function isGatewayDefaultAlias(model: string | undefined): boolean {
+  const normalized = model?.trim().toLowerCase()
+  return normalized === 'hermes-agent' || normalized === 'default'
 }
 
 function normalizeMimeType(value: unknown): string {
@@ -236,7 +318,7 @@ function exportConversationTranscript(payload: {
       const text = textFromMessage(message).trim()
       const attachments = Array.isArray(message.attachments)
         ? message.attachments
-            .map((attachment) => attachment?.name?.trim())
+            .map((attachment) => attachment.name?.trim())
             .filter((value): value is string => Boolean(value))
         : []
 
@@ -294,11 +376,11 @@ function messageFallbackSignature(message: ChatMessage): string {
     ? message.attachments
         .map((attachment) => {
           const name =
-            typeof attachment?.name === 'string' ? attachment.name : ''
+            typeof attachment.name === 'string' ? attachment.name : ''
           const size =
-            typeof attachment?.size === 'number' ? String(attachment.size) : ''
+            typeof attachment.size === 'number' ? String(attachment.size) : ''
           const type =
-            typeof attachment?.contentType === 'string'
+            typeof attachment.contentType === 'string'
               ? attachment.contentType
               : ''
           return `${name}:${size}:${type}`
@@ -368,48 +450,6 @@ function getMessageStatusValue(message: ChatMessage): string {
   return normalizeMessageValue((message as Record<string, unknown>).status)
 }
 
-function getMessageTimestampValue(message: ChatMessage): number | null {
-  const raw = message as Record<string, unknown>
-  const candidates = [
-    raw.timestamp,
-    raw.__createdAt,
-    raw.createdAt,
-    raw.created_at,
-  ]
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-      return candidate < 1_000_000_000_000 ? candidate * 1000 : candidate
-    }
-    if (typeof candidate === 'string') {
-      const parsed = Date.parse(candidate)
-      if (!Number.isNaN(parsed)) return parsed
-    }
-  }
-
-  return null
-}
-
-function getMessageAttachmentSignature(message: ChatMessage): string {
-  if (!Array.isArray(message.attachments) || message.attachments.length === 0) {
-    return ''
-  }
-
-  return message.attachments
-    .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
-      const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
-      const type =
-        typeof attachment?.contentType === 'string'
-          ? attachment.contentType
-          : ''
-      return `${name}:${size}:${type}`
-    })
-    .sort()
-    .join('|')
-}
-
 function isOptimisticUserMessage(message: ChatMessage): boolean {
   const raw = message as Record<string, unknown>
   return (
@@ -418,35 +458,70 @@ function isOptimisticUserMessage(message: ChatMessage): boolean {
   )
 }
 
-function shouldCollapseTextDuplicate(
+export function shouldCollapseTextDuplicate(
   existing: ChatMessage,
   candidate: ChatMessage,
 ): boolean {
   if (existing.role !== candidate.role) return false
 
+  const identityValues = (message: ChatMessage, keys: Array<string>) => {
+    const raw = message as Record<string, unknown>
+    return new Set(
+      keys.map((key) => normalizeMessageValue(raw[key])).filter(Boolean),
+    )
+  }
+  const sharesIdentity = (left: Set<string>, right: Set<string>) =>
+    [...left].some((identity) => right.has(identity))
+
+  const existingStableIds = identityValues(existing, [
+    'stableId',
+    'stable_id',
+    'id',
+    'messageId',
+    'message_id',
+  ])
+  const candidateStableIds = identityValues(candidate, [
+    'stableId',
+    'stable_id',
+    'id',
+    'messageId',
+    'message_id',
+  ])
+
   if (candidate.role === 'assistant') {
-    return true
+    const existingRunIds = identityValues(existing, [
+      'runId',
+      'run_id',
+      'providerRunId',
+      'provider_run_id',
+    ])
+    const candidateRunIds = identityValues(candidate, [
+      'runId',
+      'run_id',
+      'providerRunId',
+      'provider_run_id',
+    ])
+    if (sharesIdentity(existingRunIds, candidateRunIds)) return true
+    if (existingRunIds.size > 0 && candidateRunIds.size > 0) return false
+    return sharesIdentity(existingStableIds, candidateStableIds)
   }
 
   if (candidate.role !== 'user') return false
-
-  const existingTs = getMessageTimestampValue(existing)
-  const candidateTs = getMessageTimestampValue(candidate)
-  if (existingTs !== null && candidateTs !== null) {
-    if (Math.abs(existingTs - candidateTs) > 15_000) return false
+  // Distinct server message IDs are immutable evidence of distinct user turns.
+  if (existingStableIds.size > 0 && candidateStableIds.size > 0) {
+    return sharesIdentity(existingStableIds, candidateStableIds)
   }
 
-  // Collapse same-turn user duplicates even after the optimistic marker has been
-  // cleared. The send path can leave us with an optimistic local message plus a
-  // confirmed/history copy after completion; requiring one side to still look
-  // optimistic misses that handoff and leaves both visible.
-  const existingSig = getMessageAttachmentSignature(existing)
-  const candidateSig = getMessageAttachmentSignature(candidate)
-  if (existingSig && candidateSig) {
-    return existingSig === candidateSig
-  }
-
-  return true
+  const clientKeys = [
+    'clientId',
+    'client_id',
+    'nonce',
+    'idempotencyKey',
+    '__optimisticId',
+  ]
+  const existingClientIds = identityValues(existing, clientKeys)
+  const candidateClientIds = identityValues(candidate, clientKeys)
+  return sharesIdentity(existingClientIds, candidateClientIds)
 }
 
 function stripQueuedWrapperFromUserMessage(message: ChatMessage): ChatMessage {
@@ -467,27 +542,108 @@ function stripQueuedWrapperFromUserMessage(message: ChatMessage): ChatMessage {
 
 export function ChatScreen({
   activeFriendlyId,
+  activeCard,
+  inspectedChildCardId,
+  sessionCardList,
+  hasMoreSessionCards = false,
+  loadingMoreSessionCards = false,
+  moreSessionCardsError = null,
+  onLoadMoreSessionCards,
   isNewChat = false,
   onSessionResolved,
   forcedSessionKey,
   compact = false,
   embedded = false,
 }: ChatScreenProps) {
+  const sessionCards = useMemo(
+    () => retainCompleteSessionCardProjections(sessionCardList)?.cards,
+    [sessionCardList],
+  )
   const navigate = useNavigate()
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
   const setChatFocusMode = useWorkspaceStore((s) => s.setChatFocusMode)
   const queryClient = useQueryClient()
+  const [cardHandoff, setCardHandoff] = useState<{
+    cardId: string
+    canonicalSegmentKey: string
+  } | null>(null)
+  const activeCardContainsHandoff = Boolean(
+    activeCard &&
+    cardHandoff?.cardId === activeCard.cardId &&
+    activeCard.continuationSegmentKeys.includes(
+      cardHandoff.canonicalSegmentKey,
+    ),
+  )
+  // A just-accepted handoff bridges the interval before the Card projection
+  // refreshes. Once that projection contains the handed-off segment, its
+  // canonical tip is newer authority and may already have advanced again.
+  const activeCardCanonicalSegmentKey =
+    activeCard &&
+    cardHandoff?.cardId === activeCard.cardId &&
+    !activeCardContainsHandoff
+      ? cardHandoff.canonicalSegmentKey
+      : activeCard?.canonicalSegmentKey
+  const inspectedChildCard = activeCard
+    ? findSessionCardDescendant(activeCard, inspectedChildCardId)
+    : undefined
+  useEffect(() => {
+    if (
+      cardHandoff &&
+      (!activeCard ||
+        cardHandoff.cardId !== activeCard.cardId ||
+        activeCardContainsHandoff)
+    ) {
+      setCardHandoff(null)
+    }
+  }, [activeCard, activeCardContainsHandoff, cardHandoff])
   const [sending, setSending] = useState(false)
-  const [_creatingSession, setCreatingSession] = useState(false)
+
   const [sessionsOpen, setSessionsOpen] = useState(false)
+  const activeCardIdRef = useRef(activeCard?.cardId)
+  activeCardIdRef.current = activeCard?.cardId
   const [error, setError] = useState<string | null>(null)
+  const [workspaceChatAdmissionRetry, setWorkspaceChatAdmissionRetry] =
+    useState<WorkspaceChatAdmissionRetry | null>(null)
+  const [workspaceChatAdmissionRetryBusy, setWorkspaceChatAdmissionRetryBusy] =
+    useState(false)
+  const workspaceChatAdmissionRetryBusyRef = useRef(false)
+  const [
+    workspaceChatAdmissionRetryError,
+    setWorkspaceChatAdmissionRetryError,
+  ] = useState<string | null>(null)
+  const [renamingCardTitle, setRenamingCardTitle] = useState(false)
+  const [pendingCardIds, setPendingCardIds] = useState<Set<string>>(
+    () => new Set(),
+  )
   const [isRedirecting, setIsRedirecting] = useState(false)
   const { headerRef, composerRef, mainRef, pinGroupMinHeight, headerHeight } =
     useChatMeasurements()
   useTapDebug(mainRef, { label: 'chat-main' })
   const chatMode = useChatMode()
-  const isPortableMode = chatMode === 'portable'
-  const portableChatFriendlyId = isPortableMode ? 'main' : activeFriendlyId
+  const activeCardSource = activeCard?.canonicalSource
+  const hasVerifiedCardSource =
+    !activeCard || activeCardSource === 'local' || activeCardSource === 'remote'
+  const cardTransportReady =
+    hasVerifiedCardSource &&
+    (!activeCard || Boolean(activeCardCanonicalSegmentKey?.trim()))
+  // Existing Cards are routed by their server-verified canonical source. The
+  // global mode remains authoritative only for legacy and bootstrap routes.
+  const isPortableMode = activeCard
+    ? activeCardSource === 'local'
+    : chatMode === 'portable'
+  // Portable `main` remains a legacy existing-session transport only. Every
+  // New Chat starts from the server bootstrap sentinel so its verified Card
+  // handoff, rather than a client-side main alias, owns the route transition.
+  const isPortableMainSession = isPortableMode && !activeCard && !isNewChat
+  const transportFriendlyId = activeCard
+    ? activeCard.cardId
+    : isPortableMainSession
+      ? 'main'
+      : activeFriendlyId
+  const cardSourceError =
+    activeCard && !cardTransportReady
+      ? 'Session Card canonical source is missing or invalid.'
+      : null
   // --- Issue #43 fix: lift waitingForResponse into persistent Zustand store ---
   // The store survives component unmount, so navigating away mid-stream
   const [liveToolActivity, setLiveToolActivity] = useState<
@@ -505,30 +661,54 @@ export function ChatScreen({
   >([])
   const [isCompacting, setIsCompacting] = useState(false)
   const [researchResetKey, setResearchResetKey] = useState(0)
-  // Per-session thinking level — stored in sessionStorage keyed by session
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
-    if (typeof window === 'undefined') return 'low'
-    const key = `claude-thinking-${activeFriendlyId || 'new'}`
+  // Per-Card thinking level. Backend continuation segments never own UI state.
+  // Derive the incoming Card's value during render, then commit it in a layout
+  // effect so the prior Card's level cannot be painted during a route update.
+  const thinkingOwner = activeCard?.cardId
+  const persistedThinkingLevel = useMemo(() => {
+    if (typeof window === 'undefined' || !thinkingOwner) return null
+    const key = cardThinkingStorageKey(thinkingOwner)
+    if (!key) return null
     const stored = window.sessionStorage.getItem(key)
-    if (
-      stored === 'off' ||
+    return stored === 'off' ||
       stored === 'low' ||
       stored === 'medium' ||
       stored === 'high' ||
       stored === 'adaptive'
+      ? stored
+      : null
+  }, [thinkingOwner])
+  const [thinkingState, setThinkingState] = useState<{
+    owner?: string
+    level: ThinkingLevel
+  }>(() => ({
+    owner: thinkingOwner,
+    level: persistedThinkingLevel ?? 'low',
+  }))
+  const thinkingLevel =
+    thinkingState.owner === thinkingOwner
+      ? thinkingState.level
+      : (persistedThinkingLevel ?? 'low')
+  const setThinkingLevel = useCallback(
+    (level: ThinkingLevel) => setThinkingState({ owner: thinkingOwner, level }),
+    [thinkingOwner],
+  )
+  const thinkingInitializedOwnerRef = useRef(thinkingOwner)
+  const thinkingInitializedByUserRef = useRef(persistedThinkingLevel !== null)
+  if (thinkingInitializedOwnerRef.current !== thinkingOwner) {
+    thinkingInitializedOwnerRef.current = thinkingOwner
+    thinkingInitializedByUserRef.current = persistedThinkingLevel !== null
+  }
+  useLayoutEffect(() => {
+    setThinkingState((current) =>
+      current.owner === thinkingOwner
+        ? current
+        : { owner: thinkingOwner, level: persistedThinkingLevel ?? 'low' },
     )
-      return stored
-    return 'low'
-  })
-  // Tracks whether the user has explicitly picked a thinking level for this session.
-  // A missing/absent sessionStorage key means we should fall back to the Hermes config default.
-  const thinkingInitializedByUserRef = useRef(false)
+  }, [persistedThinkingLevel, thinkingOwner])
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const key = `claude-thinking-${activeFriendlyId || 'new'}`
-    thinkingInitializedByUserRef.current =
-      window.sessionStorage.getItem(key) !== null
-  }, [activeFriendlyId])
+    removeLegacySegmentUiStorage(activeCard?.continuationSegmentKeys ?? [])
+  }, [activeCard?.continuationSegmentKeys])
   const { alertOpen, alertThreshold, alertPercent, dismissAlert } =
     useContextAlert()
 
@@ -540,7 +720,32 @@ export function ChatScreen({
   const activeSendRef = useRef<{
     sessionKey: string
     friendlyId: string
+    cardId?: string
     clientId: string
+    provisionalOwnerId?: string
+  } | null>(null)
+  // A live send-stream reader is authoritative over its waiting state. Keep
+  // this separate from sessionStorage-backed recovery so a continuation cannot
+  // hide its status while the successor Card projection catches up.
+  const liveStreamSessionKeyRef = useRef<string | null>(null)
+  // Re-render when a reader is acquired so recovery and message-list gates see
+  // the ref-based ownership transition immediately.
+  const [localReaderOwnershipVersion, setLocalReaderOwnershipVersion] =
+    useState(0)
+  const isLocalLiveStreamOwner = useCallback(
+    (browserOwnerKey: string | undefined) =>
+      Boolean(
+        browserOwnerKey &&
+        activeSendRef.current &&
+        liveStreamSessionKeyRef.current &&
+        (activeSendRef.current.cardId ?? activeSendRef.current.sessionKey) ===
+          browserOwnerKey,
+      ),
+    [],
+  )
+  const streamHandoffRouteRef = useRef<{
+    sessionKey: string
+    friendlyId: string
   } | null>(null)
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -563,60 +768,314 @@ export function ChatScreen({
   const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
   const sseConnectionState = useChatStore((s) => s.connectionState)
 
+  // Card routes and the `new` bootstrap sentinel never feed an identity into the
+  // retired session inventory. Keep the legacy hooks mounted on inert state so
+  // React hook ordering stays stable without creating a second active-session
+  // or history path.
+  const legacyRouteFriendlyId = activeCard ? 'new' : activeFriendlyId
+  const legacyForcedSessionKey = activeCard ? undefined : forcedSessionKey
+  const legacySessionInventoryEnabled = !activeCard && !isNewChat
   const {
     sessionsQuery,
     sessions,
     activeSession,
     activeExists,
-    activeSessionKey,
-    activeTitle,
+    activeSessionKey: legacyActiveSessionKey,
+    activeTitle: legacyActiveTitle,
     sessionsError,
     sessionsLoading: _sessionsLoading,
     sessionsFetching: _sessionsFetching,
     refetchSessions: _refetchSessions,
-  } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
+  } = useChatSessions({
+    activeFriendlyId: legacyRouteFriendlyId,
+    isNewChat: isNewChat || Boolean(activeCard),
+    forcedSessionKey: legacyForcedSessionKey,
+    enabled: legacySessionInventoryEnabled,
+  })
+  const activeSessionKey =
+    activeCardCanonicalSegmentKey ?? legacyActiveSessionKey
+  const activeTitle = activeCard?.title ?? legacyActiveTitle
+  const legacyRedirecting = !activeCard && isRedirecting
+  const sessionSource = activeCard
+    ? (activeCardSource ?? 'unknown')
+    : getChatSessionSourceState({
+        embedded,
+        sessionsStatus: sessionsQuery.status,
+        source: activeSession?.lineage?.source,
+      })
   const {
-    historyQuery,
-    historyMessages,
-    messageCount,
-    historyError,
-    resolvedSessionKey,
-    activeCanonicalKey,
-    sessionKeyForHistory,
+    historyQuery: legacyHistoryQuery,
+    historyMessages: legacyHistoryMessages,
+    messageCount: legacyMessageCount,
+    historyError: legacyHistoryError,
+    resolvedSessionKey: legacyResolvedSessionKey,
+    activeCanonicalKey: legacyActiveCanonicalKey,
+    sessionKeyForHistory: legacySessionKeyForHistory,
   } = useChatHistory({
-    activeFriendlyId: portableChatFriendlyId,
-    activeSessionKey,
-    forcedSessionKey,
-    isNewChat,
-    isRedirecting,
-    activeExists,
-    sessionsReady: sessionsQuery.isSuccess,
+    activeFriendlyId: activeCard ? 'new' : transportFriendlyId,
+    activeSessionKey: activeCard ? '' : activeSessionKey,
+    forcedSessionKey: legacyForcedSessionKey,
+    isNewChat: isNewChat || Boolean(activeCard),
+    isRedirecting: legacyRedirecting,
+    activeExists: activeCard ? true : activeExists,
+    sessionsReady: activeCard ? true : sessionsQuery.isSuccess,
     queryClient,
     historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
-    portableMode: isPortableMode,
+    // This legacy hook's portable mode specifically means the global `main`
+    // conversation. A local Card keeps its canonical Card identity.
+    portableMode: isPortableMainSession,
+    sessionSource,
+    onCanonicalSessionResolved: useCallback(
+      ({
+        requestedSessionKey,
+        sessionKey,
+      }: {
+        requestedSessionKey: string
+        sessionKey: string
+      }) => {
+        const currentRequestedSessionKey =
+          forcedSessionKey || activeSessionKey || activeFriendlyId
+        if (requestedSessionKey !== currentRequestedSessionKey) return
+        if (!onSessionResolved) return
+        setIsRedirecting(true)
+        onSessionResolved({
+          sessionKey,
+          friendlyId: sessionKey,
+          reason: 'canonical',
+        })
+      },
+      [activeFriendlyId, activeSessionKey, forcedSessionKey, onSessionResolved],
+    ),
   })
+
+  const cardHistoryQueryKey = sessionCardQueryKeys.history(
+    activeCard?.cardId ?? '',
+  )
+  const cardHistoryQuery = useQuery({
+    queryKey: cardHistoryQueryKey,
+    queryFn: async ({ signal }) => {
+      if (!activeCard || !activeCardCanonicalSegmentKey) {
+        throw new Error('Session Card route is not resolved')
+      }
+      const server = await fetchRecentSessionCardHistory({
+        cardId: activeCard.cardId,
+        canonicalSegmentKey: activeCardCanonicalSegmentKey,
+        continuationSegmentKeys: activeCard.continuationSegmentKeys,
+        signal,
+      })
+      const previous =
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          cardHistoryQueryKey,
+        )
+      return reconcileSessionCardHistoryResponseDurably(
+        previous
+          ? mergeRefreshedRecentSessionCardHistoryWindows(
+              server,
+              previous,
+              activeCard.continuationSegmentKeys,
+            )
+          : server,
+        {
+          previous,
+          continuationSegmentKeys: activeCard.continuationSegmentKeys,
+        },
+      )
+    },
+    enabled:
+      cardTransportReady &&
+      Boolean(activeCard) &&
+      Boolean(activeCardCanonicalSegmentKey) &&
+      !isNewChat,
+    refetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
+  })
+  const inspectedChildHistoryQueryKey = sessionCardQueryKeys.childHistory(
+    activeCard?.cardId ?? '',
+    inspectedChildCard?.cardId ?? '',
+  )
+  const inspectedChildHistoryQuery = useQuery({
+    queryKey: inspectedChildHistoryQueryKey,
+    queryFn: async ({ signal }) => {
+      if (!activeCard || !inspectedChildCard) {
+        throw new Error('Inspected child Card is not validated')
+      }
+      const server = await fetchCompleteSessionCardHistory({
+        parentCardId: activeCard.cardId,
+        cardId: inspectedChildCard.cardId,
+        canonicalSegmentKey: inspectedChildCard.sessionKey,
+        continuationSegmentKeys: inspectedChildCard.continuationSegmentKeys,
+        signal,
+      })
+      return reconcileSessionCardHistoryResponseDurably(server, {
+        previous: queryClient.getQueryData<SessionCardHistoryResponse>(
+          inspectedChildHistoryQueryKey,
+        ),
+        continuationSegmentKeys: inspectedChildCard.continuationSegmentKeys,
+      })
+    },
+    enabled:
+      cardTransportReady &&
+      Boolean(activeCard) &&
+      Boolean(inspectedChildCard) &&
+      !isNewChat,
+    retry: 1,
+    refetchOnWindowFocus: true,
+  })
+  const historyQuery = activeCard ? cardHistoryQuery : legacyHistoryQuery
+  const bootstrapPendingOwnerId = isNewChat
+    ? getNewChatProvisionalOwnerId()
+    : ''
+  const bootstrapPendingQuery = useQuery({
+    queryKey: ['chat', 'pending-send-v4', bootstrapPendingOwnerId],
+    queryFn: () => readPendingMessage('new', 'new', bootstrapPendingOwnerId),
+    enabled: isNewChat && Boolean(bootstrapPendingOwnerId),
+  })
+  const bootstrapPending = bootstrapPendingQuery.data ?? null
+  const bootstrapRecoveryMessages = bootstrapPending
+    ? getPendingRecoveryMessages(bootstrapPending)
+    : []
+  const historyMessages = activeCard
+    ? (cardHistoryQuery.data?.messages ?? [])
+    : isNewChat
+      ? mergeCardTranscriptRecoveryMessages(
+          legacyHistoryMessages,
+          bootstrapRecoveryMessages,
+        )
+      : legacyHistoryMessages
+  const messageCount = activeCard ? historyMessages.length : legacyMessageCount
+  const cardRootHistoryLoaded =
+    !activeCard ||
+    isSessionCardRootHistoryLoaded(activeCard, cardHistoryQuery.data)
+  const historyError = activeCard
+    ? (cardSourceError ?? cardHistoryQuery.error?.message ?? null)
+    : legacyHistoryError
+  const displayedHistoryQuery = inspectedChildCard
+    ? inspectedChildHistoryQuery
+    : historyQuery
+  const displayedCardHistory = inspectedChildCard
+    ? inspectedChildHistoryQuery.data
+    : activeCard
+      ? cardHistoryQuery.data
+      : undefined
+  const displayedCardHistoryRetryable = displayedCardHistory?.retryable === true
+  const displayedCardHistoryReady =
+    !activeCard ||
+    (inspectedChildCard
+      ? isAuthoritativeCompleteSessionCardHistory(displayedCardHistory)
+      : isDisplayableRecentSessionCardHistory(displayedCardHistory))
+  const [loadingOlderCardHistory, setLoadingOlderCardHistory] = useState(false)
+  const loadOlderCardHistory = useCallback(async () => {
+    const current = cardHistoryQuery.data
+    if (
+      inspectedChildCard ||
+      !current?.previousCursor ||
+      current.retryable ||
+      !activeCard ||
+      !activeCardCanonicalSegmentKey ||
+      loadingOlderCardHistory
+    ) {
+      return false
+    }
+    const previousCursor = current.previousCursor
+    const requestedWindowSignature =
+      recentSessionCardHistoryWindowSignature(current)
+    setLoadingOlderCardHistory(true)
+    try {
+      const older = await fetchRecentSessionCardHistory({
+        cardId: activeCard.cardId,
+        canonicalSegmentKey: activeCardCanonicalSegmentKey,
+        continuationSegmentKeys: activeCard.continuationSegmentKeys,
+        cursor: previousCursor,
+      })
+      const latest =
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          cardHistoryQueryKey,
+        )
+      const merged = mergeFetchedOlderRecentSessionCardHistoryWindow(
+        older,
+        latest,
+        activeCard.continuationSegmentKeys,
+        previousCursor,
+        requestedWindowSignature,
+      )
+      if (!merged || merged === latest) return false
+      const durable = await reconcileSessionCardHistoryResponseDurably(merged, {
+        previous: latest,
+        continuationSegmentKeys: activeCard.continuationSegmentKeys,
+      })
+      if (
+        queryClient.getQueryData<SessionCardHistoryResponse>(
+          cardHistoryQueryKey,
+        ) !== latest
+      ) {
+        return false
+      }
+      queryClient.setQueryData(cardHistoryQueryKey, durable)
+      return true
+    } finally {
+      setLoadingOlderCardHistory(false)
+    }
+  }, [
+    activeCard,
+    activeCardCanonicalSegmentKey,
+    cardHistoryQuery.data,
+    cardHistoryQueryKey,
+    inspectedChildCard,
+    loadingOlderCardHistory,
+    queryClient,
+  ])
+  const displayedHistoryError = inspectedChildCard
+    ? (inspectedChildHistoryQuery.error?.message ?? null)
+    : historyError
+  const resolvedSessionKey = activeCard
+    ? activeCardCanonicalSegmentKey
+    : legacyResolvedSessionKey
+  const activeCanonicalKey = activeCard
+    ? activeCardCanonicalSegmentKey
+    : legacyActiveCanonicalKey
+  const sessionKeyForHistory = activeCard
+    ? activeCardCanonicalSegmentKey
+    : legacySessionKeyForHistory
+  // A partial transcript stays fail-closed unless this mounted reader owns the
+  // Card or a persisted Card stream was explicitly hydrated for it. Hydration
+  // is Card-scoped and cannot surface unrelated raw-session activity.
+  const hasOwnedCardStreamingState = useChatStore((state) =>
+    activeCard ? state.streamingState.has(activeCard.cardId) : false,
+  )
+  const canShowLiveActivity =
+    displayedCardHistoryReady ||
+    hasOwnedCardStreamingState ||
+    isLocalLiveStreamOwner(activeCard.cardId)
 
   // --- Waiting state management (Issue #43 + #449) ---
   // resolvedSessionKey is now available (defined above from useChatHistory).
   const storeWaiting = useChatStore((s) => s.waitingSessionKeys)
   const sessionKeyForWaiting = useRef<string | undefined>(undefined)
+  const cardIdForWaiting = useRef<string | undefined>(undefined)
   const pendingVerifySessionKeyRef = useRef<string | undefined>(undefined)
+  const activeRunCheckDoneForSessionRef = useRef<string | undefined>(undefined)
 
-  // Keep the waiting-state ref in sync with the resolved session key
-  sessionKeyForWaiting.current = resolvedSessionKey
+  // A `new` route can momentarily resolve legacy history to `main` before its
+  // optimistic cache is present. Waiting is owned by the send target, so never
+  // let that fallback move a live new-chat wait state onto `main`.
+  cardIdForWaiting.current = activeCard?.cardId
+  sessionKeyForWaiting.current = isNewChat
+    ? 'new'
+    : (activeCard?.cardId ?? resolvedSessionKey)
 
   // Synchronously detect stale waiting state from sessionStorage.
   // This runs during render (not in an effect) so the guard in
   // waitingForResponse is active on the very first render, preventing
   // a flash of the "Thinking" indicator when reopening an old session.
   const needsStaleCheck =
-    resolvedSessionKey &&
+    sessionKeyForWaiting.current &&
     !isNewChat &&
-    storeWaiting.has(resolvedSessionKey) &&
-    pendingVerifySessionKeyRef.current !== resolvedSessionKey
+    storeWaiting.has(sessionKeyForWaiting.current) &&
+    !isLocalLiveStreamOwner(sessionKeyForWaiting.current) &&
+    pendingVerifySessionKeyRef.current !== sessionKeyForWaiting.current
 
   if (needsStaleCheck) {
-    pendingVerifySessionKeyRef.current = resolvedSessionKey
+    pendingVerifySessionKeyRef.current = sessionKeyForWaiting.current
+    activeRunCheckDoneForSessionRef.current = undefined
   }
 
   // Track whether the active-run API check has completed.
@@ -628,60 +1087,97 @@ export function ChatScreen({
     const key = sessionKeyForWaiting.current
     if (!key) return hasPendingSend() || hasPendingGeneration()
 
+    // An open local send-stream reader is authoritative through a handoff.
+    // Do not let recovery validation hide it while the Card projection moves.
+    if (storeWaiting.has(key) && isLocalLiveStreamOwner(key)) {
+      return true
+    }
+
     // If we restored waiting state from sessionStorage but haven't verified
     // with the API yet, don't show thinking — it might be stale (Issue #449).
     if (
       storeWaiting.has(key) &&
       pendingVerifySessionKeyRef.current === key &&
-      !activeRunCheckDone
+      activeRunCheckDoneForSessionRef.current !== key
     ) {
       return false
     }
 
     return storeWaiting.has(key)
-  }, [storeWaiting, activeRunCheckDone])
+  }, [storeWaiting, activeRunCheckDone, localReaderOwnershipVersion])
 
   const setWaitingForResponse = useCallback((waiting: boolean) => {
     const store = useChatStore.getState()
     const key = sessionKeyForWaiting.current
     if (!key) return
+    const cardId = cardIdForWaiting.current
     if (waiting) {
-      store.setSessionWaiting(key)
+      if (cardId) store.setCardWaiting(cardId)
+      else store.setSessionWaiting(key)
     } else {
-      store.clearSessionWaiting(key)
+      if (cardId) store.clearCardWaiting(cardId)
+      else store.clearSessionWaiting(key)
     }
   }, [])
   // verification before showing thinking (Issue #449).
   useEffect(() => {
     const currentSessionKey = resolvedSessionKey
-    if (!currentSessionKey || isNewChat) return
+    const browserOwnerKey = activeCard?.cardId ?? currentSessionKey
+    if (!currentSessionKey || !browserOwnerKey || isNewChat) return
     const store = useChatStore.getState()
-    if (store.isSessionWaiting(currentSessionKey)) {
-      pendingVerifySessionKeyRef.current = currentSessionKey
+    const isWaiting = activeCard
+      ? store.isCardWaiting(activeCard.cardId)
+      : store.isSessionWaiting(currentSessionKey)
+    if (isWaiting) {
+      if (isLocalLiveStreamOwner(browserOwnerKey)) {
+        // This wait belongs to an open local reader, not recovered storage.
+        pendingVerifySessionKeyRef.current = undefined
+        activeRunCheckDoneForSessionRef.current = browserOwnerKey
+        setActiveRunCheckDone(true)
+        return
+      }
+      pendingVerifySessionKeyRef.current = browserOwnerKey
+      activeRunCheckDoneForSessionRef.current = undefined
       setActiveRunCheckDone(false)
     } else {
       // No restored waiting state — no need to verify
       pendingVerifySessionKeyRef.current = undefined
+      activeRunCheckDoneForSessionRef.current = browserOwnerKey
       setActiveRunCheckDone(true)
     }
-  }, [resolvedSessionKey, isNewChat])
+  }, [activeCard, isLocalLiveStreamOwner, resolvedSessionKey, isNewChat])
 
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
     sessionKey: resolvedSessionKey ?? '',
+    cardId: activeCard?.cardId,
     enabled:
-      !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
-    onCheckComplete: useCallback(() => {
-      setActiveRunCheckDone(true)
-    }, []),
+      cardTransportReady &&
+      !isNewChat &&
+      Boolean(resolvedSessionKey) &&
+      !isLocalLiveStreamOwner(activeCard?.cardId ?? resolvedSessionKey) &&
+      historyQuery.isSuccess,
+    shouldApplyResult: useCallback(
+      (sessionKey: string) =>
+        !isLocalLiveStreamOwner(activeCard?.cardId ?? sessionKey),
+      [activeCard?.cardId, isLocalLiveStreamOwner],
+    ),
+    onCheckComplete: useCallback(
+      (sessionKey: string) => {
+        activeRunCheckDoneForSessionRef.current =
+          activeCard?.cardId ?? sessionKey
+        setActiveRunCheckDone(true)
+      },
+      [activeCard?.cardId],
+    ),
   })
 
   // Wire SSE realtime stream for instant message delivery
   const {
     messages: realtimeMessages,
     lastCompletedRunAt,
-    connectionState,
+    connectionState: inferredConnectionState,
     isRealtimeStreaming,
     realtimeStreamingText,
     realtimeStreamingThinking,
@@ -691,19 +1187,25 @@ export function ChatScreen({
     clearCompletedStreaming,
     streamingRunId,
     activeToolCalls,
+    realtimeStreamingStates = [],
   } = useRealtimeChatHistory({
-    sessionKey: isPortableMode
-      ? 'main'
+    sessionKey: activeCard
+      ? activeCardCanonicalSegmentKey || ''
       : isNewChat
         ? 'new'
-        : resolvedSessionKey ||
-          sessionKeyForHistory ||
-          activeCanonicalKey ||
-          'main',
-    friendlyId: portableChatFriendlyId,
+        : isPortableMainSession
+          ? 'main'
+          : resolvedSessionKey ||
+            sessionKeyForHistory ||
+            activeCanonicalKey ||
+            'main',
+    friendlyId: transportFriendlyId,
+    cardId: activeCard?.cardId,
     historyMessages,
-    portableMode: isPortableMode,
+    // Do not let the legacy portable hook coerce a local Card to `main`.
+    portableMode: isPortableMainSession,
     enabled:
+      cardTransportReady &&
       // Always enable for new chats in portable mode (no sessions API to resolve).
       // In enhanced mode, wait for session resolution before subscribing.
       ((isPortableMode && isNewChat) ||
@@ -711,7 +1213,7 @@ export function ChatScreen({
           Boolean(
             resolvedSessionKey || sessionKeyForHistory || activeCanonicalKey,
           ))) &&
-      !isRedirecting,
+      !legacyRedirecting,
     onUserMessage: useCallback(() => {
       // External message arrived (e.g. from Telegram) — show thinking indicator
       setWaitingForResponse(true)
@@ -788,6 +1290,13 @@ export function ChatScreen({
       setIsCompacting(false)
     }, []),
   })
+
+  // useChatStream currently infers its initialized literal state too narrowly;
+  // the runtime store emits all three connection states.
+  const connectionState = inferredConnectionState as
+    | 'connected'
+    | 'connecting'
+    | 'disconnected'
 
   // Keep activity stream open persistently — opens on mount so it's ready
   // before the first tool call fires (avoids connection latency gap).
@@ -895,15 +1404,29 @@ export function ChatScreen({
     }
   }, [streamStop])
 
-  const streamFinish = useCallback(() => {
-    streamStop()
-    if (failsafeTimerRef.current) {
-      window.clearTimeout(failsafeTimerRef.current)
-      failsafeTimerRef.current = null
-    }
-    setPendingGeneration(false)
-    setWaitingForResponse(false)
-  }, [streamStop])
+  const streamFinish = useCallback(
+    (sessionKey?: string, cardId?: string) => {
+      streamStop()
+      if (failsafeTimerRef.current) {
+        window.clearTimeout(failsafeTimerRef.current)
+        failsafeTimerRef.current = null
+      }
+      setPendingGeneration(false)
+      const activeSend = activeSendRef.current
+      const targetCardId = cardId ?? activeSend?.cardId
+      const targetSessionKey = sessionKey ?? activeSend?.sessionKey
+      if (targetCardId) {
+        useChatStore.getState().clearCardWaiting(targetCardId)
+      }
+      if (targetSessionKey) {
+        useChatStore.getState().clearSessionWaiting(targetSessionKey)
+      }
+      if (!targetCardId && !targetSessionKey) {
+        setWaitingForResponse(false)
+      }
+    },
+    [streamStop],
+  )
 
   const streamStart = useCallback(() => {
     if (!activeFriendlyId || isNewChat) return
@@ -918,22 +1441,23 @@ export function ChatScreen({
   refreshHistoryRef.current = function refreshHistory() {
     if (historyQuery.isFetching) return
 
-    // Snapshot any unconfirmed optimistic user messages BEFORE refetch.
-    // The refetch replaces the query cache with server data — if the server
-    // hasn't processed the user's POST yet, the optimistic message vanishes.
-    const historySessionKey = isPortableMode
+    if (activeCard) {
+      // Card query reconciliation reloads the exact persisted recovery envelope;
+      // never snapshot or re-inject a legacy history cache for a Card.
+      void historyQuery.refetch()
+      return
+    }
+
+    const historySessionKey = isPortableMainSession
       ? 'main'
       : activeSessionKey || sessionKeyForHistory || resolvedSessionKey || 'main'
     const reInjectOptimistic = snapshotOptimisticUserMessages(
       queryClient,
-      portableChatFriendlyId,
+      transportFriendlyId,
       historySessionKey,
     )
 
-    void historyQuery.refetch().then(() => {
-      // Re-inject optimistic messages that weren't in the server response
-      reInjectOptimistic()
-    })
+    void historyQuery.refetch().then(reInjectOptimistic)
   }
 
   const clearTimerRef = useRef<number | null>(null)
@@ -959,15 +1483,16 @@ export function ChatScreen({
   // Issue #43 polling fallback: when waiting but SSE hasn't reconnected,
   // poll the active-run endpoint every 5s to detect completion.
   useEffect(() => {
-    if (!waitingForResponse || !resolvedSessionKey) return
+    if (!cardTransportReady || !waitingForResponse || !resolvedSessionKey)
+      return
     if (sseConnectionState === 'connected') return // SSE will deliver the event
     const interval = window.setInterval(async () => {
       try {
-        const res = await fetch(
-          `/api/sessions/${encodeURIComponent(resolvedSessionKey)}/active-run`,
+        const response = await fetch(
+          activeRunCheckUrl(resolvedSessionKey, activeCard?.cardId),
         )
-        if (!res.ok) return
-        const data = await res.json()
+        if (!response.ok) return
+        const data = await response.json()
         if (!data.ok) return
         // Run not yet registered (gateway lag during silent processing) → keep waiting
         if (!data.run) return
@@ -981,16 +1506,28 @@ export function ChatScreen({
       }
     }, 5000)
     return () => window.clearInterval(interval)
-  }, [waitingForResponse, resolvedSessionKey, sseConnectionState, streamFinish])
+  }, [
+    activeCard?.cardId,
+    cardTransportReady,
+    waitingForResponse,
+    resolvedSessionKey,
+    sseConnectionState,
+    streamFinish,
+  ])
 
   useAutoSessionTitle({
     friendlyId: activeFriendlyId,
     sessionKey: resolvedSessionKey,
     activeSession,
+    sessionCard: activeCard,
     messages: historyMessages,
     messageCount,
     enabled:
-      !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
+      cardTransportReady &&
+      !isNewChat &&
+      Boolean(resolvedSessionKey) &&
+      historyQuery.isSuccess &&
+      cardRootHistoryLoaded,
   })
 
   // Phase 4.1: Smart Model Suggestions
@@ -1008,32 +1545,11 @@ export function ChatScreen({
   const currentModelQuery = useQuery({
     queryKey: [
       'claude',
-      'session-status-model',
-      resolvedSessionKey || activeFriendlyId || 'main',
+      'session-card-status-model',
+      activeCard?.cardId || 'new',
     ],
-    queryFn: async () => {
-      try {
-        const statusSessionKey =
-          resolvedSessionKey || activeFriendlyId || 'main'
-        const query = statusSessionKey
-          ? `?sessionKey=${encodeURIComponent(statusSessionKey)}`
-          : ''
-        const res = await fetch(`/api/session-status${query}`)
-        if (!res.ok) return ''
-        const data = await res.json()
-        const payload = data.payload ?? data
-        // Same logic as chat-composer: read model from status payload
-        if (payload.model) return String(payload.model)
-        if (payload.currentModel) return String(payload.currentModel)
-        if (payload.modelAlias) return String(payload.modelAlias)
-        if (payload.resolved?.modelProvider && payload.resolved?.model) {
-          return `${payload.resolved.modelProvider}/${payload.resolved.model}`
-        }
-        return ''
-      } catch {
-        return ''
-      }
-    },
+    queryFn: () => fetchSessionCardStatusModel(activeCard?.cardId),
+    enabled: Boolean(activeCard?.cardId),
     refetchInterval: 30_000,
     retry: false,
   })
@@ -1047,7 +1563,7 @@ export function ChatScreen({
         const res = await fetch('/api/hermes-config')
         if (!res.ok) return 'low'
         const data = (await res.json()) as { config?: Record<string, unknown> }
-        const agentSection = data?.config?.agent
+        const agentSection = data.config?.agent
         if (
           agentSection &&
           typeof agentSection === 'object' &&
@@ -1078,7 +1594,14 @@ export function ChatScreen({
   }, [modelsQuery.data])
 
   const gatewayModel = currentModelQuery.data || ''
-  const currentModel = _localModelOverride || gatewayModel
+  // Isolated route/handoff mounts replace React's dispatcher, so this parent
+  // intentionally reads the Card store snapshot instead of subscribing. The
+  // Composer owns its reactive label; sendMessage performs a fresh store read
+  // below so the first send after a selection cannot observe this snapshot.
+  const persistedCardModel = useSessionModelStore
+    .getState()
+    .getModel(activeCard?.cardId)
+  const currentModel = persistedCardModel || gatewayModel
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)
@@ -1086,58 +1609,39 @@ export function ChatScreen({
     thinkingLevelRef.current = thinkingLevel
   }, [thinkingLevel])
 
-  // Auto-upgrade thinking to adaptive for Claude 4.6 when session first loads
-  const thinkingInitializedRef = useRef(false)
-  useEffect(() => {
-    if (!currentModel) return
-    if (thinkingInitializedRef.current) return
-    thinkingInitializedRef.current = true
-    const is46 =
-      currentModel.toLowerCase().includes('4-6') ||
-      currentModel.toLowerCase().includes('claude-4.6')
-    if (is46) {
-      const key = `claude-thinking-${activeFriendlyId || 'new'}`
-      const stored =
-        typeof window !== 'undefined'
-          ? window.sessionStorage.getItem(key)
-          : null
-      // Only auto-set if not explicitly configured
-      if (!stored) {
-        setThinkingLevel('adaptive')
-      }
-    }
-  }, [currentModel, activeFriendlyId])
-
-  // If no per-session thinking level override exists, inherit from Hermes config
+  // A Card without an explicit override derives its initial level from the
+  // selected model first, then the Hermes config. This effect runs only for
+  // the currently mounted Card owner.
   useEffect(() => {
     if (thinkingInitializedByUserRef.current) return
-    const configEffort = reasoningEffortQuery.data
-    if (!configEffort) return
-    if (
-      configEffort === 'off' ||
-      configEffort === 'low' ||
-      configEffort === 'medium' ||
-      configEffort === 'high'
-    ) {
-      setThinkingLevel(configEffort)
+    const normalizedModel = currentModel.toLowerCase()
+    const adaptiveModel =
+      normalizedModel.includes('4-6') || normalizedModel.includes('claude-4.6')
+    if (adaptiveModel) {
+      setThinkingLevel('adaptive')
+      return
     }
-  }, [reasoningEffortQuery.data])
+    const configEffort = reasoningEffortQuery.data
+    if (configEffort) setThinkingLevel(configEffort)
+  }, [currentModel, reasoningEffortQuery.data])
 
-  // Persist thinking level changes to sessionStorage
+  // Persist only explicit Card-owned choices. Bootstrap chats keep their
+  // temporary thinking state in memory until an authoritative Card exists.
   const handleThinkingLevelChange = useCallback(
     (level: ThinkingLevel) => {
       setThinkingLevel(level)
+      thinkingInitializedByUserRef.current = true
       if (typeof window !== 'undefined') {
-        const key = `claude-thinking-${activeFriendlyId || 'new'}`
-        window.sessionStorage.setItem(key, level)
+        const key = cardThinkingStorageKey(activeCard?.cardId)
+        if (key) window.sessionStorage.setItem(key, level)
       }
     },
-    [activeFriendlyId],
+    [activeCard?.cardId],
   )
 
   const { suggestion, dismiss, dismissForSession } = useModelSuggestions({
-    currentModel, // Real model from session-status (fail closed if empty)
-    sessionKey: resolvedSessionKey || 'main',
+    currentModel, // Card-scoped status or Card-owned preference.
+    cardId: activeCard?.cardId ?? '',
     messages: historyMessages.map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: textFromMessage(m),
@@ -1152,81 +1656,275 @@ export function ChatScreen({
     startStreaming,
     cancelStreaming,
   } = useStreamingMessage({
-    pinMainSession:
-      activeFriendlyId === 'main' &&
-      (resolvedSessionKey || activeFriendlyId || 'main') === 'main',
+    pinMainSession: shouldPinMainSession({
+      activeFriendlyId,
+      resolvedSessionKey,
+      portableMode: isPortableMode,
+      sessionSource,
+    }),
+    activeCard,
+    sessionCards,
+    onCardHandoff: useCallback(
+      (
+        handoff: AuthoritativeCardHandoff,
+        authority: SessionCardHandoffAuthority,
+      ) => {
+        const activeSend = activeSendRef.current
+        if (
+          !activeSend ||
+          authority.cardId !== handoff.cardId ||
+          activeSend.cardId !== handoff.cardId ||
+          activeSend.sessionKey !== handoff.fromSegmentKey
+        ) {
+          return false
+        }
+        if (
+          !moveSessionCardHistoryMessages(
+            queryClient,
+            handoff,
+            authority,
+            sessionCards,
+          )
+        ) {
+          return false
+        }
+        if (
+          activeCard &&
+          !setSessionCardHandoffAuthority(queryClient, activeCard, authority)
+        ) {
+          return false
+        }
+        streamHandoffRouteRef.current = {
+          sessionKey: handoff.canonicalSegmentKey,
+          friendlyId: handoff.cardId,
+        }
+        activeSendRef.current = {
+          ...activeSend,
+          sessionKey: handoff.canonicalSegmentKey,
+          friendlyId: handoff.cardId,
+          cardId: handoff.cardId,
+        }
+        cardIdForWaiting.current = handoff.cardId
+        sessionKeyForWaiting.current = handoff.cardId
+        liveStreamSessionKeyRef.current = handoff.canonicalSegmentKey
+        setCardHandoff({
+          cardId: handoff.cardId,
+          canonicalSegmentKey: handoff.canonicalSegmentKey,
+        })
+        void queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.lists,
+        })
+        void queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.detail(handoff.cardId),
+          exact: true,
+        })
+        return true
+      },
+      [activeCard, queryClient, sessionCards],
+    ),
     onSessionResolved: useCallback(
-      ({
+      async ({
+        fromSessionKey,
         sessionKey,
         friendlyId,
+        reason,
       }: {
+        fromSessionKey: string
         sessionKey: string
         friendlyId: string
+        reason: 'bootstrap' | 'stream-handoff'
       }) => {
         const activeSend = activeSendRef.current
+        const sourceFriendlyId = activeSend?.friendlyId || activeFriendlyId
+        const sourceSessionKey = activeSend?.sessionKey || fromSessionKey
+        const currentAuthoritativeSessionKey =
+          forcedSessionKey ||
+          activeSend?.sessionKey ||
+          resolvedSessionKey ||
+          activeCanonicalKey ||
+          activeSessionKey ||
+          activeFriendlyId
+        const alreadyResolved =
+          sessionKey === activeFriendlyId &&
+          friendlyId === activeFriendlyId &&
+          currentAuthoritativeSessionKey === sessionKey
+        if (!alreadyResolved) {
+          // Stage the expected route before the outer route owner can navigate.
+          // Its callback may synchronously rerender this screen before this
+          // continuation resumes; otherwise the route-key effect can mistake an
+          // authoritative handoff for unrelated navigation and clear the stream.
+          streamHandoffRouteRef.current = { sessionKey, friendlyId }
+          try {
+            await onSessionResolved?.({
+              fromSessionKey,
+              sessionKey,
+              friendlyId,
+              reason,
+            })
+          } catch (error) {
+            if (
+              streamHandoffRouteRef.current?.sessionKey === sessionKey &&
+              streamHandoffRouteRef.current.friendlyId === friendlyId
+            ) {
+              streamHandoffRouteRef.current = null
+            }
+            throw error
+          }
+        }
         if (activeSend) {
           activeSendRef.current = {
             ...activeSend,
             sessionKey,
             friendlyId,
+            ...(friendlyId.startsWith('remote:') ||
+            friendlyId.startsWith('local:')
+              ? { cardId: friendlyId }
+              : {}),
           }
+          const resolvedCardId =
+            friendlyId.startsWith('remote:') || friendlyId.startsWith('local:')
+              ? friendlyId
+              : activeSend.cardId
+          cardIdForWaiting.current = resolvedCardId
+          sessionKeyForWaiting.current = resolvedCardId ?? sessionKey
+          liveStreamSessionKeyRef.current = sessionKey
         }
-        if (
-          sessionKey === activeFriendlyId &&
-          friendlyId === activeFriendlyId
-        ) {
-          return
+        if (alreadyResolved) return
+        if (reason === 'bootstrap') {
+          // The server only emits a bootstrap handoff after a fresh
+          // authoritative Card projection. Refresh the route's Card list as
+          // the stable Card ID replaces the `new` bootstrap segment.
+          void queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.lists,
+          })
         }
-        onSessionResolved?.({ sessionKey, friendlyId })
+        if (reason === 'bootstrap') {
+          await moveLegacyHistoryMessagesToSessionCard(
+            queryClient,
+            friendlyId,
+            sessionKey,
+          )
+        } else if (!activeCard) {
+          // A bootstrap can be immediately followed by a successor handoff in
+          // the same stream reader batch, before the route has mounted the
+          // first Card. Keep the transient overlay on that final Card.
+          moveSessionCardHistoryToCard(
+            queryClient,
+            sourceFriendlyId,
+            sourceSessionKey,
+            friendlyId,
+            sessionKey,
+          )
+        }
       },
-      [activeFriendlyId, onSessionResolved],
+      [
+        activeCanonicalKey,
+        activeFriendlyId,
+        activeSessionKey,
+        forcedSessionKey,
+        onSessionResolved,
+        queryClient,
+        resolvedSessionKey,
+      ],
     ),
     onStarted: useCallback(
-      ({ runId }: { runId: string | null }) => {
+      async ({ runId }: { runId: string | null }) => {
         const activeSend = activeSendRef.current
         if (!activeSend?.clientId) return
-        updateHistoryMessageByClientIdEverywhere(
-          queryClient,
-          activeSend.clientId,
-          (message) => ({
-            ...message,
-            status: 'sent',
-            // Clear __optimisticId so isOptimisticUserMessage returns false.
-            // Without this the message keeps being treated as pending and
-            // gets re-persisted, causing transcript duplication. Fixes #506.
-            __optimisticId: undefined,
-            runId: runId ?? message.runId,
-          }),
-        )
+        const markAccepted = (message: ChatMessage): ChatMessage => ({
+          ...message,
+          status: 'sent',
+          // Clear __optimisticId so isOptimisticUserMessage returns false.
+          // Without this the message keeps being treated as pending and
+          // gets re-persisted, causing transcript duplication. Fixes #506.
+          __optimisticId: undefined,
+          runId: runId ?? message.runId,
+        })
+        if (activeSend.cardId) {
+          await updateSessionCardTransientMessageByClientId(
+            queryClient,
+            activeSend.cardId,
+            activeSend.sessionKey,
+            activeSend.clientId,
+            markAccepted,
+          )
+        } else {
+          updateHistoryMessageByClientIdEverywhere(
+            queryClient,
+            activeSend.clientId,
+            markAccepted,
+          )
+          await updatePendingMessageByClientId(
+            activeSend.sessionKey,
+            activeSend.clientId,
+            markAccepted,
+            activeSend.provisionalOwnerId,
+          )
+        }
         setSending(false)
       },
       [queryClient],
     ),
     onComplete: useCallback(
-      (message: ChatMessage) => {
+      async (completedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
+        const completedSessionKey = activeSend?.sessionKey
+        const completedCardId = activeSend?.cardId
         if (activeSend?.clientId) {
           updateHistoryMessageByClientIdEverywhere(
             queryClient,
             activeSend.clientId,
-            (message) => ({
-              ...message,
+            (historyMessage) => ({
+              ...historyMessage,
               status: 'done',
             }),
           )
         }
         if (activeSend?.sessionKey) {
-          persistRecoveryMessage(activeSend.sessionKey, message)
-          clearPendingSendForSession(
-            activeSend.sessionKey,
-            activeSend.friendlyId,
-          )
+          let terminalPersisted = true
+          if (activeSend.cardId) {
+            terminalPersisted = Boolean(
+              await checkpointCardTranscriptRecoveryMessage(
+                { cardId: activeSend.cardId },
+                completedMessage,
+              ),
+            )
+            await appendSessionCardTransientMessage(
+              queryClient,
+              activeSend.cardId,
+              activeSend.sessionKey,
+              completedMessage,
+              { persistRecovery: false },
+            )
+          }
+          if (activeSend.provisionalOwnerId && !activeSend.cardId) {
+            // A successful bootstrap stream may complete before any Card
+            // handoff. Retain both sides of the turn until a verified Card
+            // migration owns them, so remounting cannot erase the answer.
+            terminalPersisted = await checkpointPendingRecoveryMessage(
+              'new',
+              'new',
+              completedMessage,
+              activeSend.provisionalOwnerId,
+            )
+          } else {
+            await clearPendingSendForSession(
+              activeSend.sessionKey,
+              activeSend.friendlyId,
+            )
+          }
+          if (!terminalPersisted) {
+            setError(
+              'The response completed, but it could not be saved for recovery after reload.',
+            )
+          }
         }
         activeSendRef.current = null
+        liveStreamSessionKeyRef.current = null
         refreshHistoryRef.current()
         setSending(false)
         // Clear waitingForResponse so ThinkingBubble hides and message renders
-        streamFinish()
+        streamFinish(completedSessionKey, completedCardId)
         // Play notification sound if the user opted in (Settings → Chat).
         // Read directly from the store to avoid re-creating this callback on every settings change.
         if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
@@ -1235,22 +1933,77 @@ export function ChatScreen({
       },
       [queryClient, streamFinish],
     ),
-    onError: useCallback(
-      (messageText: string) => {
+    onInterrupted: useCallback(
+      async (interruptedMessage: ChatMessage) => {
         const activeSend = activeSendRef.current
-        if (activeSend?.clientId && !isMissingAuth(messageText)) {
-          updateHistoryMessageByClientIdEverywhere(
+        if (!activeSend) return
+        const persisted = activeSend.cardId
+          ? Boolean(
+              await checkpointCardTranscriptRecoveryMessage(
+                { cardId: activeSend.cardId },
+                interruptedMessage,
+              ),
+            )
+          : await checkpointPendingRecoveryMessage(
+              activeSend.sessionKey,
+              activeSend.friendlyId,
+              interruptedMessage,
+              activeSend.provisionalOwnerId,
+            )
+        if (activeSend.cardId) {
+          await appendSessionCardTransientMessage(
             queryClient,
-            activeSend.clientId,
-            (message) => ({
-              ...message,
-              status: 'error',
-            }),
+            activeSend.cardId,
+            activeSend.sessionKey,
+            interruptedMessage,
+            { persistRecovery: false },
           )
         }
+        if (!persisted) {
+          setError(
+            'The stream was interrupted, but its partial response could not be saved for recovery after reload.',
+          )
+        }
+      },
+      [queryClient],
+    ),
+    onError: useCallback(
+      async (messageText: string) => {
+        const activeSend = activeSendRef.current
+        const failedSessionKey = activeSend?.sessionKey
+        const failedCardId = activeSend?.cardId
+        if (activeSend?.clientId && !isMissingAuth(messageText)) {
+          const markFailed = (message: ChatMessage): ChatMessage => ({
+            ...message,
+            status: 'error',
+          })
+          if (activeSend.cardId) {
+            await updateSessionCardTransientMessageByClientId(
+              queryClient,
+              activeSend.cardId,
+              activeSend.sessionKey,
+              activeSend.clientId,
+              markFailed,
+            )
+          } else {
+            updateHistoryMessageByClientIdEverywhere(
+              queryClient,
+              activeSend.clientId,
+              markFailed,
+            )
+            await updatePendingMessageByClientId(
+              activeSend.sessionKey,
+              activeSend.clientId,
+              markFailed,
+              activeSend.provisionalOwnerId,
+            )
+          }
+        }
         activeSendRef.current = null
+        liveStreamSessionKeyRef.current = null
         setSending(false)
         if (isMissingAuth(messageText)) {
+          streamFinish(failedSessionKey, failedCardId)
           if (!embedded) {
             try {
               navigate({ to: '/', replace: true })
@@ -1264,10 +2017,9 @@ export function ChatScreen({
         setError(errorMessage)
         toast('Failed to send message', { type: 'error' })
         showErrorToast(messageText)
-        setPendingGeneration(false)
-        setWaitingForResponse(false)
+        streamFinish(failedSessionKey, failedCardId)
       },
-      [navigate, queryClient],
+      [navigate, queryClient, streamFinish],
     ),
     onMessageAccepted: useCallback(
       (_sessionKey: string, friendlyId: string, clientId: string) => {
@@ -1296,37 +2048,38 @@ export function ChatScreen({
       },
       [queryClient],
     ),
-    onAbort: useCallback(() => {
+    onReaderOpened: useCallback((sessionKey: string) => {
+      // Ownership starts at actual reader acquisition, not request creation.
+      // A stale/superseded request cannot claim another send's session.
+      if (activeSendRef.current?.sessionKey === sessionKey) {
+        liveStreamSessionKeyRef.current = sessionKey
+        setLocalReaderOwnershipVersion((version) => version + 1)
+      }
+    }, []),
+    onAbort: useCallback((abortedSessionKey: string) => {
+      const activeSend = activeSendRef.current
+      // The hook captures the reader's origin key. Never let a late abort for
+      // that reader clear a newer destination send or its recovery-confirmed
+      // wait after route navigation.
+      if (activeSend?.sessionKey === abortedSessionKey && activeSend.cardId) {
+        useChatStore.getState().clearCardWaiting(activeSend.cardId)
+      } else {
+        useChatStore.getState().clearSessionWaiting(abortedSessionKey)
+      }
+      if (activeSend?.sessionKey !== abortedSessionKey) return
       activeSendRef.current = null
+      liveStreamSessionKeyRef.current = null
       setSending(false)
       setPendingGeneration(false)
-      setWaitingForResponse(false)
-    }, [setWaitingForResponse]),
+    }, []),
     acceptedTimeoutMs: modelsQuery.data?.streamAcceptedTimeoutMs,
     handoffTimeoutMs: modelsQuery.data?.streamHandoffTimeoutMs,
   })
 
-  // Cancel any in-flight stream when the user navigates between sessions or
-  // starts a new chat. Without this, an SSE stream from session A keeps
-  // running after the user navigates away — and any chunks it had already
-  // buffered before our abort takes effect could land in session B (the
-  // newly active session). See #297 (cross-session response contamination).
-  // Note: useStreamingMessage also has its own generation-token guard for
-  // the buffered-chunk race, but cancelling here is the cleaner contract
-  // (an in-flight response that the user navigated away from is no longer
-  // wanted in either session).
-  const navCancelKeyRef = useRef<string | null>(null)
-  useEffect(() => {
-    const navKey = `${activeCanonicalKey ?? ''}::${isNewChat ? 'new' : activeFriendlyId}`
-    if (navCancelKeyRef.current === null) {
-      navCancelKeyRef.current = navKey
-      return
-    }
-    if (navCancelKeyRef.current !== navKey) {
-      navCancelKeyRef.current = navKey
-      cancelStreaming()
-    }
-  }, [activeCanonicalKey, activeFriendlyId, isNewChat, cancelStreaming])
+  // A stream is owned by the Card/session that started it, not by the currently
+  // selected route. `useStreamingMessage` records that owner and dispatches each
+  // event back to it, so changing Chats must not abort an accepted agent run.
+  // Explicit Stop and starting a replacement send still call cancelStreaming().
 
   const activeIsRealtimeStreaming = isPortableMode
     ? localIsStreaming
@@ -1356,10 +2109,49 @@ export function ChatScreen({
       activeRealtimeStreamingText ||
       stickyStreamingTextRef.current.text
     : ''
+  const activeStreamingStates = useMemo(
+    () =>
+      isPortableMode
+        ? localIsStreaming
+          ? [
+              {
+                runId: streamingRunId ?? null,
+                text: stableActiveStreamingText,
+                thinking: realtimeStreamingThinking,
+                lifecycleEvents: realtimeLifecycleEvents,
+                toolCalls: activeToolCalls,
+              },
+            ]
+          : []
+        : realtimeStreamingStates.length > 0
+          ? realtimeStreamingStates
+          : activeIsRealtimeStreaming
+            ? [
+                {
+                  runId: streamingRunId,
+                  text: stableActiveStreamingText,
+                  thinking: realtimeStreamingThinking,
+                  lifecycleEvents: realtimeLifecycleEvents,
+                  toolCalls: activeToolCalls,
+                },
+              ]
+            : [],
+    [
+      activeToolCalls,
+      activeIsRealtimeStreaming,
+      isPortableMode,
+      localIsStreaming,
+      realtimeLifecycleEvents,
+      realtimeStreamingStates,
+      realtimeStreamingThinking,
+      stableActiveStreamingText,
+      streamingRunId,
+    ],
+  )
 
   // Use realtime-merged messages for display (SSE + history)
   // Re-apply display filter to realtime messages
-  const finalDisplayMessages = useMemo(() => {
+  const parentDisplayMessages = useMemo(() => {
     const filtered = realtimeMessages.filter((msg) => {
       if (msg.role === 'user') {
         const text = stripQueuedWrapper(textFromMessage(msg))
@@ -1448,110 +2240,68 @@ export function ChatScreen({
       .filter((msg) => dedupedSet.has(msg))
       .map((msg) => stripQueuedWrapperFromUserMessage(msg))
 
-    if (!activeIsRealtimeStreaming) {
-      return deduped
-    }
+    if (activeStreamingStates.length === 0) return deduped
 
-    let nextMessages = [...deduped]
-    const streamToolCalls = activeToolCalls.map((toolCall) => ({
-      ...toolCall,
-      phase: toolCall.phase,
-    }))
-
-    const streamingMsg = {
-      role: 'assistant',
-      content: [],
-      __optimisticId: 'streaming-current',
-      __streamingStatus: 'streaming',
-      __streamingText: stableActiveStreamingText,
-      __streamingThinking: realtimeStreamingThinking,
-      __streamToolCalls: streamToolCalls,
-    } as ChatMessage
-
-    // Check if the server has already returned a completed assistant message
-    // that overlaps with the streaming text. If so, drop the streaming
-    // placeholder to avoid showing the same response twice.
-    const streamingText = stableActiveStreamingText.trim()
-    const hasServerAssistantVersion = nextMessages.some((msg) => {
-      if (msg.role !== 'assistant') return false
-      if (msg.__streamingStatus === 'streaming') return false
-      // Any non-streaming assistant message that appears after the last user
-      // message is potentially the same response — match by text overlap
-      if (streamingText.length > 0) {
-        const msgText = textFromMessage(msg).trim()
-        if (
-          msgText.length > 0 &&
-          (msgText === streamingText ||
-            msgText.startsWith(streamingText) ||
-            streamingText.startsWith(msgText))
-        ) {
-          return true
-        }
-      }
-      // Also match by tool calls: if the server message has the same tool
-      // calls as the streaming placeholder, it's the same response
-      if (streamToolCalls.length > 0) {
-        const msgContent = Array.isArray(msg.content) ? msg.content : []
-        const msgToolCalls = msgContent.filter(
-          (p: any) => p.type === 'toolCall',
-        )
-        if (
-          msgToolCalls.length > 0 &&
-          msgToolCalls.length === streamToolCalls.length
-        ) {
-          return streamToolCalls.every((stc: any) =>
-            msgToolCalls.some((mtc: any) => mtc.name === stc.name),
-          )
-        }
-      }
-      return false
-    })
-    if (hasServerAssistantVersion) {
-      return nextMessages
-    }
-
-    const existingStreamIdx = nextMessages.findIndex(
-      (message) => message.__streamingStatus === 'streaming',
+    const nextMessages = deduped.filter(
+      (message) => message.__streamingStatus !== 'streaming',
     )
-
-    if (existingStreamIdx >= 0) {
-      nextMessages[existingStreamIdx] = {
-        ...nextMessages[existingStreamIdx],
-        ...streamingMsg,
-      }
-      // Remove any other streaming messages (e.g. from mergeHistoryMessages
-      // appending a realtime message after finalDisplayMessages already
-      // injected a placeholder). Keep only one streaming placeholder.
-      const keepIdx = existingStreamIdx
-      nextMessages = nextMessages.filter(
-        (m, i) => i === keepIdx || m.__streamingStatus !== 'streaming',
+    for (const stream of activeStreamingStates) {
+      const runId = stream.runId?.trim() || null
+      const streamingText =
+        runId && runId === streamingRunId
+          ? stableActiveStreamingText || stream.text
+          : stream.text
+      const hasServerAssistantVersion = nextMessages.some(
+        (message) =>
+          message.role === 'assistant' &&
+          message.__streamingStatus !== 'streaming' &&
+          Boolean(runId && message.runId === runId),
       )
-      return nextMessages
-    }
-
-    const lastUserIdx = nextMessages.reduce(
-      (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
-      -1,
-    )
-    if (lastUserIdx >= 0 && lastUserIdx === nextMessages.length - 1) {
-      nextMessages.push(streamingMsg)
-    } else if (lastUserIdx >= 0) {
-      nextMessages.splice(lastUserIdx + 1, 0, streamingMsg)
-    } else {
-      nextMessages.push(streamingMsg)
+      if (hasServerAssistantVersion) continue
+      nextMessages.push({
+        role: 'assistant',
+        content: [],
+        __optimisticId:
+          activeStreamingStates.length === 1
+            ? 'streaming-current'
+            : `streaming-${runId ?? 'pending'}`,
+        __streamingStatus: 'streaming',
+        __streamingText: streamingText,
+        __streamingThinking: stream.thinking,
+        __streamToolCalls: stream.toolCalls,
+        ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
+      } as ChatMessage)
     }
     return nextMessages
   }, [
-    activeToolCalls,
-    activeIsRealtimeStreaming,
-    activeRealtimeStreamingText,
+    activeStreamingStates,
     realtimeMessages,
-    realtimeStreamingThinking,
+    stableActiveStreamingText,
+    streamingRunId,
   ])
+
+  const inspectedChildDisplayMessages = useMemo(() => {
+    const messages = inspectedChildHistoryQuery.data?.messages ?? []
+    return messages
+      .filter((message) => {
+        if (message.role === 'user') {
+          const text = stripQueuedWrapper(textFromMessage(message))
+          return !text.startsWith('A subagent task')
+        }
+        if (message.role !== 'assistant') return false
+        if (textFromMessage(message).trim().length > 0) return true
+        const content = Array.isArray(message.content) ? message.content : []
+        return content.some((part) => part.type === 'toolCall')
+      })
+      .map((message) => stripQueuedWrapperFromUserMessage(message))
+  }, [inspectedChildHistoryQuery.data?.messages])
+  const finalDisplayMessages = inspectedChildCard
+    ? inspectedChildDisplayMessages
+    : parentDisplayMessages
 
   const derivedStreamingInfo = useMemo(() => {
     if (activeIsRealtimeStreaming) {
-      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+      const last = parentDisplayMessages.at(-1)
       const id = isPortableMode
         ? localStreamingMessageId
         : last?.role === 'assistant'
@@ -1559,8 +2309,8 @@ export function ChatScreen({
           : null
       return { isStreaming: true, streamingMessageId: id }
     }
-    if (waitingForResponse && finalDisplayMessages.length > 0) {
-      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+    if (waitingForResponse && parentDisplayMessages.length > 0) {
+      const last = parentDisplayMessages.at(-1)
       if (last && last.role === 'assistant') {
         const isStreamingPlaceholder =
           (last as any).__streamingStatus === 'streaming'
@@ -1577,7 +2327,7 @@ export function ChatScreen({
     return { isStreaming: false, streamingMessageId: null as string | null }
   }, [
     waitingForResponse,
-    finalDisplayMessages,
+    parentDisplayMessages,
     activeIsRealtimeStreaming,
     isPortableMode,
     localStreamingMessageId,
@@ -1597,9 +2347,10 @@ export function ChatScreen({
       return
     }
     if (responseWaitSnapshotRef.current) return
-    responseWaitSnapshotRef.current =
-      createResponseWaitSnapshot(finalDisplayMessages)
-  }, [waitingForResponse, finalDisplayMessages])
+    responseWaitSnapshotRef.current = createResponseWaitSnapshot(
+      parentDisplayMessages,
+    )
+  }, [waitingForResponse, parentDisplayMessages])
 
   useEffect(() => {
     if (!waitingForResponse) {
@@ -1611,14 +2362,16 @@ export function ChatScreen({
     }
     const snapshot = responseWaitSnapshotRef.current
     if (!snapshot) return
-    if (shouldClearWaitingForAssistantMessage(finalDisplayMessages, snapshot)) {
+    if (
+      shouldClearWaitingForAssistantMessage(parentDisplayMessages, snapshot)
+    ) {
       if (clearTimerRef.current) return
       clearTimerRef.current = window.setTimeout(() => {
         clearTimerRef.current = null
         streamFinish()
       }, 50)
     }
-  }, [finalDisplayMessages, waitingForResponse, streamFinish])
+  }, [parentDisplayMessages, waitingForResponse, streamFinish])
 
   useEffect(() => {
     const wasStreaming = prevIsRealtimeStreamingRef.current
@@ -1632,29 +2385,13 @@ export function ChatScreen({
     }
   }, [activeIsRealtimeStreaming, waitingForResponse, streamFinish])
 
-  const handleSwitchModel = useCallback(async () => {
-    if (!suggestion) return
-
-    try {
-      const res = await fetch('/api/model-switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionKey: resolvedSessionKey || 'main',
-          model: suggestion.suggestedModel,
-        }),
-      })
-
-      if (res.ok) {
-        dismiss()
-        // Optionally show success toast or update UI
-      }
-    } catch (err) {
-      setError(
-        `Failed to switch model. ${err instanceof Error ? err.message : String(err)}`,
-      )
-    }
-  }, [suggestion, resolvedSessionKey, dismiss])
+  const handleSwitchModel = useCallback(() => {
+    if (!suggestion || !activeCard?.cardId) return
+    useSessionModelStore
+      .getState()
+      .setModel(activeCard.cardId, suggestion.suggestedModel)
+    dismiss()
+  }, [activeCard?.cardId, dismiss, suggestion])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
   const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity) as (
@@ -1703,18 +2440,20 @@ export function ChatScreen({
             }
           : null
       : null
-  const serverError = statusError?.message ?? sessionsError ?? historyError
+  const legacySessionsError = activeCard ? null : sessionsError
+  const serverError =
+    statusError?.message ?? legacySessionsError ?? displayedHistoryError
   const serverErrorStatus = statusError?.status
   const showErrorNotice = Boolean(serverError) && !isNewChat
   const handleRefetch = useCallback(() => {
     void statusQuery.refetch()
-    void sessionsQuery.refetch()
-    void historyQuery.refetch()
-  }, [statusQuery, sessionsQuery, historyQuery])
+    if (!activeCard) void sessionsQuery.refetch()
+    void displayedHistoryQuery.refetch()
+  }, [activeCard, statusQuery, sessionsQuery, displayedHistoryQuery])
 
   const handleRefreshHistory = useCallback(() => {
-    void historyQuery.refetch()
-  }, [historyQuery])
+    void displayedHistoryQuery.refetch()
+  }, [displayedHistoryQuery])
 
   useEffect(() => {
     const handleRefreshRequest = () => {
@@ -1747,7 +2486,7 @@ export function ChatScreen({
       void historyQuery.refetch()
     }, 2000)
     return () => window.clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+  }, []) // Mount-only initialization.
 
   useEffect(() => {
     function handleSSEDrop() {
@@ -1784,7 +2523,11 @@ export function ChatScreen({
 
   const shouldRedirectToNew =
     !isNewChat &&
+    !activeCard &&
     !forcedSessionKey &&
+    // `main` is an explicitly allowed bootstrap identity. It must remain in
+    // place until a server-verified Card handoff replaces it.
+    activeFriendlyId !== 'main' &&
     !isRecentSession(activeFriendlyId) &&
     sessionsQuery.isSuccess &&
     sessions.length > 0 &&
@@ -1793,7 +2536,7 @@ export function ChatScreen({
     !historyQuery.isSuccess
 
   useEffect(() => {
-    if (isRedirecting) {
+    if (legacyRedirecting) {
       if (error) setError(null)
       return
     }
@@ -1804,13 +2547,14 @@ export function ChatScreen({
     if (
       sessionsQuery.isSuccess &&
       !activeExists &&
-      !sessionsError &&
-      !historyError
+      !legacySessionsError &&
+      !displayedHistoryError
     ) {
       if (error) setError(null)
       return
     }
-    const messageText = sessionsError ?? historyError ?? statusError?.message
+    const messageText =
+      legacySessionsError ?? displayedHistoryError ?? statusError?.message
     if (!messageText) {
       if (error?.startsWith('Failed to load')) {
         setError(null)
@@ -1820,10 +2564,10 @@ export function ChatScreen({
     if (isMissingAuth(messageText) && !embedded) {
       navigate({ to: '/', replace: true })
     }
-    const message = sessionsError
-      ? `Failed to load sessions. ${sessionsError}`
-      : historyError
-        ? `Failed to load history. ${historyError}`
+    const message = legacySessionsError
+      ? `Failed to load sessions. ${legacySessionsError}`
+      : displayedHistoryError
+        ? `Failed to load history. ${displayedHistoryError}`
         : statusError
           ? `Hermes Agent unavailable. ${statusError.message}`
           : null
@@ -1832,40 +2576,63 @@ export function ChatScreen({
     activeExists,
     error,
     statusError,
-    historyError,
-    isRedirecting,
+    displayedHistoryError,
+    legacyRedirecting,
     navigate,
-    sessionsError,
+    legacySessionsError,
     sessionsQuery.isSuccess,
     shouldRedirectToNew,
   ])
 
   useEffect(() => {
     if (!isRedirecting) return
-    if (isNewChat) {
+    if (activeCard || isNewChat) {
       setIsRedirecting(false)
       return
     }
     if (!shouldRedirectToNew && sessionsQuery.isSuccess) {
       setIsRedirecting(false)
     }
-  }, [isNewChat, isRedirecting, sessionsQuery.isSuccess, shouldRedirectToNew])
+  }, [
+    activeCard,
+    isNewChat,
+    isRedirecting,
+    sessionsQuery.isSuccess,
+    shouldRedirectToNew,
+  ])
 
   useEffect(() => {
+    if (activeCard) return
     if (embedded) return
     if (isNewChat) return
     if (!sessionsQuery.isSuccess) return
     if (sessions.length === 0) return
     if (!shouldRedirectToNew) return
-    resetPendingSend()
-    clearHistoryMessages(queryClient, activeFriendlyId, sessionKeyForHistory)
-    const latestSession = sessions[0]?.friendlyId ?? 'new'
-    navigate({
-      to: '/chat/$sessionKey',
-      params: { sessionKey: latestSession },
-      replace: true,
-    })
+    void (async () => {
+      try {
+        await resetPendingSend()
+      } catch {
+        setError(
+          'The conversation was not reset because pending recovery could not be cleared safely.',
+        )
+        return
+      }
+      clearHistoryMessages(
+        queryClient,
+        activeFriendlyId,
+        sessionKeyForHistory || activeFriendlyId,
+      )
+      navigate({
+        to: '/chat/$sessionKey',
+        // Nonbootstrap legacy identities cannot become a Card route by selecting
+        // an arbitrary raw session-list row. Restart only from the explicit
+        // bootstrap sentinel, which may later advance through a verified handoff.
+        params: { sessionKey: 'new' },
+        replace: true,
+      })
+    })()
   }, [
+    activeCard,
     activeFriendlyId,
     historyQuery.isFetching,
     historyQuery.isSuccess,
@@ -1879,9 +2646,9 @@ export function ChatScreen({
     embedded,
   ])
 
-  const hideUi = shouldRedirectToNew || isRedirecting
+  const hideUi = shouldRedirectToNew || legacyRedirecting
   const isFocusMode = !compact && chatFocusMode
-  const showComposer = !isRedirecting
+  const showComposer = !legacyRedirecting
 
   const handleToggleFocusMode = useCallback(() => {
     if (compact) return
@@ -1947,7 +2714,7 @@ export function ChatScreen({
    * Response arrives via SSE stream, not via this function.
    */
   const sendMessage = useCallback(
-    function sendMessage(
+    async function sendMessage(
       sessionKey: string,
       friendlyId: string,
       body: string,
@@ -1955,7 +2722,15 @@ export function ChatScreen({
       fastMode = false,
       skipOptimistic = false,
       existingClientId = '',
+      provisionalOwnerId = '',
     ) {
+      // Claim New Session's one-shot primary-model default before retaining the
+      // Card. Retaining removes the browser-owned creation/discard lifecycle
+      // before optimistic or network work can race with route navigation.
+      const isFirstSendFromNewSession = activeCard
+        ? consumeNewSessionCardPrimaryModel(activeCard.cardId)
+        : false
+      if (activeCard) retainNewSessionCard(activeCard.cardId)
       // Read from ref so we always get the latest value without capturing it in deps
       const currentThinkingLevel = thinkingLevelRef.current
       setLocalActivity('reading')
@@ -1991,12 +2766,21 @@ export function ChatScreen({
           normalizedAttachments,
         )
         optimisticClientId = clientId
-        appendHistoryMessage(
-          queryClient,
-          friendlyId,
-          sessionKey,
-          optimisticMessage,
-        )
+        if (activeCard && activeCardCanonicalSegmentKey) {
+          await appendSessionCardTransientMessage(
+            queryClient,
+            activeCard.cardId,
+            activeCardCanonicalSegmentKey,
+            optimisticMessage,
+          )
+        } else {
+          appendHistoryMessage(
+            queryClient,
+            friendlyId,
+            sessionKey,
+            optimisticMessage,
+          )
+        }
         updateSessionLastMessage(
           queryClient,
           sessionKey,
@@ -2009,11 +2793,16 @@ export function ChatScreen({
       setSending(true)
       setError(null)
       clearCompletedStreaming()
+      // A send request alone is not live-stream ownership. That begins only
+      // when useStreamingMessage obtains an actual SSE reader.
+      liveStreamSessionKeyRef.current = null
       setWaitingForResponse(true)
       activeSendRef.current = {
         sessionKey,
         friendlyId,
+        ...(activeCard ? { cardId: activeCard.cardId } : {}),
         clientId: optimisticClientId,
+        ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
       }
 
       // Failsafe: clear waitingForResponse after 120s no matter what
@@ -2061,7 +2850,9 @@ export function ChatScreen({
           size: attachment.size,
         }
       })
-      const history = buildPortableHistory(finalDisplayMessages)
+      // Child inspection changes only what is rendered. Sends always continue
+      // the parent Card with its independently maintained parent transcript.
+      const history = buildPortableHistory(parentDisplayMessages)
 
       try {
         streamStart()
@@ -2071,9 +2862,30 @@ export function ChatScreen({
         }
       }
 
-      void startStreaming({
+      // Only the browser-owned New Session flow gets a one-shot default-model
+      // exemption. An empty pre-existing Card still uses its resolved gateway
+      // model, and an explicit Card-owned selection always wins.
+      const cardId = activeCard?.cardId
+      const explicitCardModel = cardId
+        ? useSessionModelStore.getState().getModel(cardId)
+        : ''
+      // `hermes-agent`/`default` are Gateway routing aliases. They may survive
+      // in a Card status or old localStorage, but must never be sent as an
+      // explicit provider model to Codex.
+      const requestModel = cardId
+        ? (!isGatewayDefaultAlias(explicitCardModel)
+            ? explicitCardModel
+            : '') ||
+          (isFirstSendFromNewSession || isGatewayDefaultAlias(gatewayModel)
+            ? undefined
+            : gatewayModel)
+        : isGatewayDefaultAlias(currentModel)
+          ? undefined
+          : currentModel
+      await startStreaming({
         sessionKey,
         friendlyId,
+        cardId: activeCard?.cardId,
         message: enrichedBody,
         history,
         attachments:
@@ -2081,17 +2893,14 @@ export function ChatScreen({
         thinking:
           currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
         fastMode,
-        model: currentModel || undefined,
+        model: requestModel || undefined,
         idempotencyKey: optimisticClientId || crypto.randomUUID(),
-      }).catch((err: unknown) => {
-        const messageText = err instanceof Error ? err.message : String(err)
-        if (import.meta.env.DEV) {
-          console.warn('[chat] send-stream failed', messageText)
-        }
       })
     },
     [
-      finalDisplayMessages,
+      activeCard,
+      activeCardCanonicalSegmentKey,
+      parentDisplayMessages,
       clearCompletedStreaming,
       queryClient,
       setLocalActivity,
@@ -2099,23 +2908,23 @@ export function ChatScreen({
       streamFinish,
       streamStart,
       currentModel,
+      gatewayModel,
     ],
   )
 
   useLayoutEffect(() => {
-    if (isNewChat) return
-    const pending = consumePendingSend(
-      isPortableMode
+    if (isNewChat || !cardTransportReady) return
+    const currentSessionKey = activeCard
+      ? activeCardCanonicalSegmentKey || ''
+      : isPortableMode
         ? 'main'
-        : forcedSessionKey || resolvedSessionKey || activeSessionKey,
-      portableChatFriendlyId,
-    )
+        : forcedSessionKey || resolvedSessionKey || activeSessionKey
+    const pending = consumePendingSend(currentSessionKey, transportFriendlyId)
     if (!pending) return
     pendingStartRef.current = true
-    const historyKey = chatQueryKeys.history(
-      pending.friendlyId,
-      pending.sessionKey,
-    )
+    const historyKey = activeCard
+      ? sessionCardQueryKeys.history(activeCard.cardId)
+      : chatQueryKeys.history(transportFriendlyId, currentSessionKey)
     const cached = queryClient.getQueryData(historyKey)
     const cachedMessages = Array.isArray((cached as any)?.messages)
       ? (cached as any).messages
@@ -2132,32 +2941,53 @@ export function ChatScreen({
       }
       return false
     })
-    if (!alreadyHasOptimistic) {
-      appendHistoryMessage(
-        queryClient,
-        pending.friendlyId,
-        pending.sessionKey,
-        pending.optimisticMessage,
-      )
-    }
-    setWaitingForResponse(true)
-    sendMessage(
-      pending.sessionKey,
-      pending.friendlyId,
-      pending.message,
-      pending.attachments,
-      false,
-      true,
-      typeof pending.optimisticMessage.clientId === 'string'
-        ? pending.optimisticMessage.clientId
-        : '',
-    )
+    void (async () => {
+      try {
+        if (!alreadyHasOptimistic) {
+          if (activeCard && activeCardCanonicalSegmentKey) {
+            await appendSessionCardTransientMessage(
+              queryClient,
+              activeCard.cardId,
+              activeCardCanonicalSegmentKey,
+              pending.optimisticMessage,
+            )
+          } else {
+            appendHistoryMessage(
+              queryClient,
+              transportFriendlyId,
+              currentSessionKey,
+              pending.optimisticMessage,
+            )
+          }
+        }
+        setWaitingForResponse(true)
+        await sendMessage(
+          currentSessionKey,
+          transportFriendlyId,
+          pending.message,
+          pending.attachments,
+          false,
+          true,
+          typeof pending.optimisticMessage.clientId === 'string'
+            ? pending.optimisticMessage.clientId
+            : '',
+        )
+      } catch {
+        setWaitingForResponse(false)
+        setError(
+          'This message was not sent because its recovery state could not be saved safely.',
+        )
+      }
+    })()
   }, [
+    activeCard,
+    activeCardCanonicalSegmentKey,
     activeSessionKey,
+    cardTransportReady,
     forcedSessionKey,
     isNewChat,
     isPortableMode,
-    portableChatFriendlyId,
+    transportFriendlyId,
     queryClient,
     resolvedSessionKey,
     sendMessage,
@@ -2165,6 +2995,7 @@ export function ChatScreen({
 
   const retryQueuedMessage = useCallback(
     function retryQueuedMessage(message: ChatMessage, mode: 'manual' | 'auto') {
+      if (!cardTransportReady) return false
       if (!isRetryableQueuedMessage(message)) return false
 
       const body = textFromMessage(message).trim()
@@ -2179,16 +3010,18 @@ export function ChatScreen({
         return false
       }
 
-      const sessionKeyForSend = isPortableMode
-        ? 'main'
-        : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
+      const sessionKeyForSend = activeCard
+        ? activeCardCanonicalSegmentKey || ''
+        : isPortableMode
+          ? 'main'
+          : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
       const sessionKeyForMessage = sessionKeyForHistory || sessionKeyForSend
       const existingClientId = getMessageClientId(message)
 
       if (existingClientId) {
         updateHistoryMessageByClientId(
           queryClient,
-          portableChatFriendlyId,
+          transportFriendlyId,
           sessionKeyForMessage,
           existingClientId,
           function markSending(currentMessage) {
@@ -2210,7 +3043,7 @@ export function ChatScreen({
 
       sendMessage(
         sessionKeyForSend,
-        portableChatFriendlyId,
+        transportFriendlyId,
         body,
         attachments,
         false,
@@ -2220,10 +3053,13 @@ export function ChatScreen({
       return true
     },
     [
+      activeCard,
+      activeCardCanonicalSegmentKey,
       activeSessionKey,
+      cardTransportReady,
       forcedSessionKey,
       isPortableMode,
-      portableChatFriendlyId,
+      transportFriendlyId,
       queryClient,
       resolvedSessionKey,
       sessionKeyForHistory,
@@ -2233,11 +3069,11 @@ export function ChatScreen({
 
   const flushRetryableMessages = useCallback(
     function flushRetryableMessages() {
-      for (const message of finalDisplayMessages) {
+      for (const message of parentDisplayMessages) {
         retryQueuedMessage(message, 'auto')
       }
     },
-    [finalDisplayMessages, retryQueuedMessage],
+    [parentDisplayMessages, retryQueuedMessage],
   )
 
   const handleRetryMessage = useCallback(
@@ -2250,13 +3086,6 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (false) {
-      // Server connection checks removed — Hermes Agent uses direct API
-      hasSeenDisconnectRef.current = true
-      retriedQueuedMessageKeysRef.current.clear()
-      return
-    }
-
     if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()
@@ -2291,91 +3120,6 @@ export function ChatScreen({
     }
   }, [flushRetryableMessages, handleRefetch])
 
-  const createSessionForMessage = useCallback(
-    async (preferredFriendlyId?: string) => {
-      setCreatingSession(true)
-      try {
-        const res = await fetch('/api/sessions', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(
-            preferredFriendlyId && preferredFriendlyId.trim().length > 0
-              ? { friendlyId: preferredFriendlyId }
-              : {},
-          ),
-        })
-        if (!res.ok) throw new Error(await readError(res))
-
-        const data = (await res.json()) as {
-          sessionKey?: string
-          friendlyId?: string
-        }
-
-        const sessionKey =
-          typeof data.sessionKey === 'string' ? data.sessionKey : ''
-        const friendlyId =
-          typeof data.friendlyId === 'string' &&
-          data.friendlyId.trim().length > 0
-            ? data.friendlyId.trim()
-            : (preferredFriendlyId?.trim() ?? '') ||
-              deriveFriendlyIdFromKey(sessionKey)
-
-        if (!sessionKey || !friendlyId) {
-          throw new Error('Invalid session response')
-        }
-
-        queryClient.invalidateQueries({ queryKey: chatQueryKeys.sessions })
-        return { sessionKey, friendlyId }
-      } finally {
-        setCreatingSession(false)
-      }
-    },
-    [queryClient],
-  )
-
-  const upsertSessionInCache = useCallback(
-    (friendlyId: string, lastMessage: ChatMessage) => {
-      if (!friendlyId) return
-      queryClient.setQueryData(
-        chatQueryKeys.sessions,
-        function upsert(existing: unknown) {
-          const sessions = Array.isArray(existing)
-            ? (existing as Array<SessionMeta>)
-            : []
-          const now = Date.now()
-          const existingIndex = sessions.findIndex((session) => {
-            return (
-              session.friendlyId === friendlyId || session.key === friendlyId
-            )
-          })
-
-          if (existingIndex === -1) {
-            return [
-              {
-                key: friendlyId,
-                friendlyId,
-                updatedAt: now,
-                lastMessage,
-                titleStatus: 'idle',
-              },
-              ...sessions,
-            ]
-          }
-
-          return sessions.map((session, index) => {
-            if (index !== existingIndex) return session
-            return {
-              ...session,
-              updatedAt: now,
-              lastMessage,
-            }
-          })
-        },
-      )
-    },
-    [queryClient],
-  )
-
   const scrollChatToBottom = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
       const viewport = document.querySelector('[data-chat-scroll-viewport]')
@@ -2406,7 +3150,16 @@ export function ChatScreen({
           resolvedSessionKey ||
           activeSessionKey ||
           activeFriendlyId
-        clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
+        if (activeCard && activeCardCanonicalSegmentKey) {
+          updateSessionCardHistoryMessages(
+            queryClient,
+            activeCard.cardId,
+            activeCardCanonicalSegmentKey,
+            () => [],
+          )
+        } else {
+          clearHistoryMessages(queryClient, activeFriendlyId, sessionKey)
+        }
         toast('Chat cleared', { type: 'success' })
         return true
       }
@@ -2441,6 +3194,8 @@ export function ChatScreen({
       return false
     },
     [
+      activeCard,
+      activeCardCanonicalSegmentKey,
       activeFriendlyId,
       activeSessionKey,
       finalDisplayMessages,
@@ -2452,7 +3207,7 @@ export function ChatScreen({
   )
 
   const send = useCallback(
-    (
+    async (
       body: string,
       attachments: Array<ChatComposerAttachment>,
       fastMode: boolean,
@@ -2460,6 +3215,10 @@ export function ChatScreen({
     ) => {
       const trimmedBody = body.trim()
       if (trimmedBody.length === 0 && attachments.length === 0) return
+      if (!cardTransportReady) {
+        setError(cardSourceError)
+        return
+      }
       if (attachments.length === 0 && handleUiSlashCommand(trimmedBody)) return
 
       // Deduplicate sends with identical content within a 500ms window.
@@ -2474,111 +3233,278 @@ export function ChatScreen({
       lastSendKeyRef.current = sendKey
       lastSendAtRef.current = now
 
-      // Haptic feedback on mobile when message is sent
-      if (isMobile) hapticTap()
-
-      helpers.reset()
-
-      // Scroll to bottom immediately so user sees their message + incoming response
-      requestAnimationFrame(() => scrollChatToBottom('smooth'))
-
       const attachmentPayload: Array<ChatAttachment> = attachments.map(
         (attachment) => ({
-          ...attachment,
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-          id: attachment.id ?? crypto.randomUUID(),
+          id: attachment.id || crypto.randomUUID(),
+          name: attachment.name,
+          contentType: attachment.contentType,
+          size: attachment.size,
+          dataUrl: attachment.dataUrl,
         }),
       )
+      // Every accepted send needs a durable owner before transport starts;
+      // post-accept assistant checkpoints depend on this admission record.
+      const missingPortableAttachment = attachmentPayload.some(
+        (attachment) =>
+          !parsePortableAttachmentDataUrl(
+            attachment.dataUrl,
+            attachment.contentType,
+          ),
+      )
+      const optimistic = createOptimisticMessage(trimmedBody, attachmentPayload)
+      const durableOptimisticMessage = optimistic.optimisticMessage
+      const durableClientId = optimistic.clientId
+      if (
+        missingPortableAttachment ||
+        !isCardTranscriptRecoveryMessagePortable(optimistic.optimisticMessage)
+      ) {
+        const safeMessage =
+          attachmentPayload.length > 0
+            ? 'This message was not sent because its attachments cannot be stored safely for recovery. Remove or reduce the attachments and try again.'
+            : 'This first message was not sent because it cannot be stored safely until the new conversation is created. Reduce it and try again.'
+        setError(safeMessage)
+        toast(safeMessage, { type: 'error' })
+        showErrorToast(safeMessage)
+        return
+      }
 
-      if (isNewChat) {
-        // In portable mode, use 'main' — no server-side sessions exist.
-        // In enhanced mode, create a UUID thread for the sessions API.
-        const threadId = isPortableMode ? 'main' : crypto.randomUUID()
-        const { optimisticMessage } = createOptimisticMessage(
-          trimmedBody,
-          attachmentPayload,
-        )
-        appendHistoryMessage(queryClient, threadId, threadId, optimisticMessage)
-        upsertSessionInCache(threadId, optimisticMessage)
-        setPendingGeneration(true)
-        setSending(true)
-        setWaitingForResponse(true)
+      const sessionKeyForSend = isNewChat
+        ? 'new'
+        : activeCard
+          ? activeCardCanonicalSegmentKey || ''
+          : isPortableMode
+            ? 'main'
+            : forcedSessionKey ||
+              resolvedSessionKey ||
+              activeSessionKey ||
+              'main'
 
-        if (!isPortableMode) {
-          void createSessionForMessage(threadId).catch((err: unknown) => {
-            if (import.meta.env.DEV) {
-              console.warn('[chat] failed to register new thread', err)
+      const provisionalOwnerId = isNewChat ? getNewChatProvisionalOwnerId() : ''
+
+      const retryOwnerKey = activeCard?.cardId
+        ? `${activeCard.canonicalSource}:${activeCard.cardId}`
+        : isNewChat
+          ? 'new'
+          : `${sessionKeyForSend}:${transportFriendlyId}`
+      const persistExactAdmission = async (): Promise<boolean> => {
+        let persisted = false
+        try {
+          if (activeCard) {
+            persisted = Boolean(
+              await appendCardTranscriptRecoveryMessage(
+                { cardId: activeCard.cardId },
+                durableOptimisticMessage,
+              ),
+            )
+            if (!persisted) {
+              await removeRejectedCardTranscriptRecoveryMessage(
+                { cardId: activeCard.cardId },
+                durableClientId,
+              )
             }
-            void queryClient.invalidateQueries({
-              queryKey: chatQueryKeys.sessions,
+          } else {
+            persisted = await persistPendingMessage({
+              sessionKey: sessionKeyForSend,
+              friendlyId: isNewChat ? 'new' : transportFriendlyId,
+              ...(provisionalOwnerId ? { provisionalOwnerId } : {}),
+              message: trimmedBody,
+              attachments: attachmentPayload,
+              optimisticMessage: durableOptimisticMessage,
             })
-          })
+          }
+        } catch {
+          persisted = false
         }
+        return persisted
+      }
 
-        sendMessage(
-          threadId,
-          threadId,
+      const continueAfterAdmission = async (): Promise<void> => {
+        if (activeCard) {
+          await appendSessionCardTransientMessage(
+            queryClient,
+            activeCard.cardId,
+            sessionKeyForSend,
+            durableOptimisticMessage,
+            { persistRecovery: false },
+          )
+        } else {
+          appendHistoryMessage(
+            queryClient,
+            isNewChat ? 'new' : transportFriendlyId,
+            sessionKeyForSend,
+            durableOptimisticMessage,
+          )
+        }
+        updateSessionLastMessage(
+          queryClient,
+          sessionKeyForSend,
+          isNewChat ? 'new' : transportFriendlyId,
+          durableOptimisticMessage,
+        )
+
+        helpers.reset()
+        // Haptic feedback on mobile only after the durable overlay is accepted.
+        if (isMobile) hapticTap()
+        requestAnimationFrame(() => scrollChatToBottom('smooth'))
+
+        await sendMessage(
+          sessionKeyForSend,
+          isNewChat ? 'new' : transportFriendlyId,
           trimmedBody,
           attachmentPayload,
           fastMode,
           true,
-          typeof optimisticMessage.clientId === 'string'
-            ? optimisticMessage.clientId
-            : '',
+          durableClientId,
+          provisionalOwnerId,
         )
-        // In portable mode, navigate to /chat/main instead of UUID
-        if (!embedded) {
-          navigate({
-            to: '/chat/$sessionKey',
-            params: { sessionKey: threadId },
-            replace: true,
-          })
-        }
-        return
       }
 
-      const sessionKeyForSend = isPortableMode
-        ? 'main'
-        : forcedSessionKey || resolvedSessionKey || activeSessionKey || 'main'
-      sendMessage(
-        sessionKeyForSend,
-        isPortableMode ? 'main' : activeFriendlyId,
-        trimmedBody,
-        attachmentPayload,
-        fastMode,
-      )
+      const persisted = await persistExactAdmission()
+      if (!persisted) {
+        const safeMessage =
+          attachmentPayload.length > 0
+            ? 'This message was not sent because its attachments could not be saved for recovery. Free browser storage or remove the attachments, then try again.'
+            : activeCard
+              ? 'This message was not sent because it could not be saved safely. Free browser storage and try again.'
+              : 'This first message was not sent because it could not be saved safely. Free browser storage and try again.'
+        if (!embedded && retryOwnerKey) {
+          workspaceChatAdmissionRetryBusyRef.current = false
+          setWorkspaceChatAdmissionRetry({
+            ownerKey: retryOwnerKey,
+            safeMessage,
+            retryPersistence: persistExactAdmission,
+            continueAfterAdmission,
+          })
+          setWorkspaceChatAdmissionRetryError(null)
+        }
+        setError(safeMessage)
+        toast(safeMessage, { type: 'error' })
+        showErrorToast(safeMessage)
+        return
+      }
+      setWorkspaceChatAdmissionRetry(null)
+      setWorkspaceChatAdmissionRetryError(null)
+      workspaceChatAdmissionRetryBusyRef.current = false
+      await continueAfterAdmission()
     },
     [
+      activeCard,
+      activeCardCanonicalSegmentKey,
       activeFriendlyId,
       activeSessionKey,
-      createSessionForMessage,
+      cardSourceError,
+      cardTransportReady,
+      embedded,
       forcedSessionKey,
       isNewChat,
-      navigate,
-      onSessionResolved,
+      isPortableMode,
       scrollChatToBottom,
       sendMessage,
-      upsertSessionInCache,
+      transportFriendlyId,
       queryClient,
       resolvedSessionKey,
       handleUiSlashCommand,
     ],
   )
 
-  const handleAbortStreaming = useCallback(() => {
+  const workspaceChatAdmissionOwnerKey = activeCard?.cardId
+    ? `${activeCard.canonicalSource}:${activeCard.cardId}`
+    : isNewChat
+      ? 'new'
+      : `${
+          isPortableMode
+            ? 'main'
+            : forcedSessionKey ||
+              resolvedSessionKey ||
+              activeSessionKey ||
+              'main'
+        }:${transportFriendlyId}`
+  useEffect(() => {
+    workspaceChatAdmissionRetryBusyRef.current = false
+    setWorkspaceChatAdmissionRetry(null)
+    setWorkspaceChatAdmissionRetryError(null)
+    setWorkspaceChatAdmissionRetryBusy(false)
+  }, [workspaceChatAdmissionOwnerKey])
+
+  const handleResetWorkspaceChatRecoveryAndRetry = useCallback(async () => {
+    const pending = workspaceChatAdmissionRetry
+    if (!pending || workspaceChatAdmissionRetryBusyRef.current) return
+    if (pending.ownerKey !== workspaceChatAdmissionOwnerKey) {
+      setWorkspaceChatAdmissionRetry(null)
+      setWorkspaceChatAdmissionRetryError(null)
+      return
+    }
+
+    workspaceChatAdmissionRetryBusyRef.current = true
+    setWorkspaceChatAdmissionRetryBusy(true)
+    setWorkspaceChatAdmissionRetryError(null)
+    try {
+      const database = await resetWorkspaceChatIndexedDb()
+      database.close()
+    } catch {
+      workspaceChatAdmissionRetryBusyRef.current = false
+      setWorkspaceChatAdmissionRetryError(
+        'The Workspace chat recovery cache could not be reset. This message was not retried or sent.',
+      )
+      setWorkspaceChatAdmissionRetryBusy(false)
+      return
+    }
+
+    let persisted = false
+    try {
+      persisted = await pending.retryPersistence()
+    } catch {
+      persisted = false
+    }
+    if (!persisted) {
+      workspaceChatAdmissionRetryBusyRef.current = false
+      setWorkspaceChatAdmissionRetryError(
+        'The recovery cache was reset, but this message still could not be saved safely. No message was sent.',
+      )
+      setWorkspaceChatAdmissionRetryBusy(false)
+      return
+    }
+
+    setWorkspaceChatAdmissionRetry(null)
+    setWorkspaceChatAdmissionRetryError(null)
+    setError(null)
+    setWorkspaceChatAdmissionRetryBusy(false)
+    await pending.continueAfterAdmission()
+  }, [workspaceChatAdmissionOwnerKey, workspaceChatAdmissionRetry])
+
+  const handleAbortStreaming = useCallback(async () => {
     const activeSend = activeSendRef.current
     if (activeSend?.clientId) {
-      updateHistoryMessageByClientIdEverywhere(
-        queryClient,
-        activeSend.clientId,
-        (message) => ({
-          ...message,
-          status: 'sent',
-        }),
-      )
+      const markCancelled = (message: ChatMessage): ChatMessage => ({
+        ...message,
+        status: 'error',
+      })
+      if (activeSend.cardId) {
+        await updateSessionCardTransientMessageByClientId(
+          queryClient,
+          activeSend.cardId,
+          activeSend.sessionKey,
+          activeSend.clientId,
+          markCancelled,
+        )
+      } else {
+        updateHistoryMessageByClientIdEverywhere(
+          queryClient,
+          activeSend.clientId,
+          markCancelled,
+        )
+      }
+      if (!activeSend.cardId) {
+        await updatePendingMessageByClientId(
+          activeSend.sessionKey,
+          activeSend.clientId,
+          markCancelled,
+          activeSend.provisionalOwnerId,
+        )
+      }
     }
+    await cancelStreaming()
     activeSendRef.current = null
-    cancelStreaming()
     setSending(false)
     setPendingGeneration(false)
     setWaitingForResponse(false)
@@ -2597,7 +3523,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleRunCommand(event: Event) {
       const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
-      if (!detail?.command) return
+      if (!detail.command) return
       runPaletteSlashCommand(detail.command)
     }
 
@@ -2610,7 +3536,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleSubmitSelection(event: Event) {
       const detail = (event as CustomEvent<ChatSubmitSelectionDetail>).detail
-      const text = detail?.text?.trim()
+      const text = detail.text.trim()
       if (!text) return
       send(text, [], false, commandHelpers)
     }
@@ -2678,8 +3604,51 @@ export function ChatScreen({
 
   const historyLoading =
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-    (historyQuery.isLoading && !historyQuery.data) || isRedirecting
+    (displayedHistoryQuery.isLoading && !displayedHistoryQuery.data) ||
+    legacyRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
+  const incompleteHistoryNotice =
+    displayedCardHistory && !displayedCardHistoryReady ? (
+      <div className="mx-4 mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200">
+        <p role="status" aria-live="polite">
+          {inspectedChildCard
+            ? 'History is incomplete for the inspected child Card. Available messages remain visible.'
+            : 'History is incomplete for this Session Card. Available messages remain visible.'}{' '}
+          {displayedCardHistory.missingSegments.length === 0
+            ? 'More history may become available.'
+            : displayedCardHistory.missingSegments.length === 1
+              ? '1 part could not be loaded.'
+              : `${displayedCardHistory.missingSegments.length} parts could not be loaded.`}
+        </p>
+        {displayedCardHistoryRetryable ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-md border border-amber-400 px-2.5 py-1 text-xs font-semibold hover:bg-amber-100 disabled:cursor-wait disabled:opacity-70 dark:border-amber-600 dark:hover:bg-amber-900/40"
+            aria-label={
+              inspectedChildCard
+                ? 'Retry inspected child history'
+                : 'Retry parent conversation history'
+            }
+            aria-busy={displayedHistoryQuery.isFetching}
+            disabled={displayedHistoryQuery.isFetching}
+            onClick={() => void displayedHistoryQuery.refetch()}
+          >
+            {displayedHistoryQuery.isFetching ? 'Retrying…' : 'Retry history'}
+          </button>
+        ) : null}
+      </div>
+    ) : null
+  const snapshotDurabilityNotice =
+    displayedCardHistory?.completeSnapshotDurability === 'failed' ? (
+      <div
+        className="mx-4 mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200"
+        role="alert"
+        aria-live="assertive"
+      >
+        Transcript recovery storage is unavailable. This complete transcript is
+        not guaranteed to survive a reload until storage recovers.
+      </div>
+    ) : null
   const errorNotice = useMemo(() => {
     if (!showErrorNotice) return null
     if (!serverError) return null
@@ -2722,8 +3691,125 @@ export function ChatScreen({
     // agent view panel removed
   }, [])
 
+  const findSessionCard = useCallback(
+    (cardId: string) => sessionCards?.find((card) => card.cardId === cardId),
+    [sessionCards],
+  )
+
+  const runCardMutation = useCallback(
+    async (cardId: string, mutation: () => Promise<void>) => {
+      if (pendingCardIds.has(cardId)) return
+      setPendingCardIds((current) => new Set(current).add(cardId))
+      try {
+        await mutation()
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.lists,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: sessionCardQueryKeys.detail(cardId),
+          }),
+        ])
+      } catch (mutationError) {
+        const message =
+          mutationError instanceof Error
+            ? mutationError.message
+            : 'Card action failed'
+        toast(message, { type: 'error' })
+      } finally {
+        setPendingCardIds((current) => {
+          const next = new Set(current)
+          next.delete(cardId)
+          return next
+        })
+      }
+    },
+    [pendingCardIds, queryClient],
+  )
+
+  const handleRenameCard = useCallback(
+    async (cardId: string, nextTitle: string) => {
+      const card = findSessionCard(cardId)
+      if (card?.relationshipKind !== 'root') return
+      await runCardMutation(cardId, async () => {
+        await updateSessionCardMetadata(cardId, { manualTitle: nextTitle })
+      })
+    },
+    [findSessionCard, runCardMutation],
+  )
+
+  const handleTogglePinCard = useCallback(
+    async (cardId: string) => {
+      const card = findSessionCard(cardId)
+      if (card?.relationshipKind !== 'root') return
+      await runCardMutation(cardId, async () => {
+        await updateSessionCardMetadata(cardId, { pinned: !card.pinned })
+      })
+    },
+    [findSessionCard, runCardMutation],
+  )
+
+  const handleBranchCard = useCallback(
+    async (cardId: string) => {
+      const card = findSessionCard(cardId)
+      if (card?.relationshipKind !== 'root') return
+      const canonicalSegmentKey =
+        activeCard?.cardId === cardId
+          ? (activeCardCanonicalSegmentKey ?? card.canonicalSegmentKey)
+          : card.canonicalSegmentKey
+      const idempotencyKey = crypto.randomUUID()
+      await runCardMutation(cardId, async () => {
+        await branchSessionCard(cardId, canonicalSegmentKey, { idempotencyKey })
+      })
+    },
+    [
+      activeCard?.cardId,
+      activeCardCanonicalSegmentKey,
+      findSessionCard,
+      runCardMutation,
+    ],
+  )
+
+  const handleArchiveCard = useCallback(
+    async (cardId: string) => {
+      const card = findSessionCard(cardId)
+      if (card?.relationshipKind !== 'root') return
+      await runCardMutation(cardId, async () => {
+        await archiveSessionCard(cardId)
+        if (activeCardIdRef.current === cardId) {
+          setSessionsOpen(false)
+          await navigate({
+            ...buildChatCardNavigation(CHAT_BOOTSTRAP_CARD_ID),
+            replace: true,
+          })
+        }
+      })
+    },
+    [findSessionCard, navigate, runCardMutation],
+  )
+
   const handleRenameActiveSessionTitle = useCallback(
     async (nextTitle: string) => {
+      if (activeCard) {
+        if (activeCard.relationshipKind !== 'root') return
+        setRenamingCardTitle(true)
+        try {
+          await updateSessionCardMetadata(activeCard.cardId, {
+            manualTitle: nextTitle,
+          })
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: sessionCardQueryKeys.lists,
+            }),
+            queryClient.invalidateQueries({
+              queryKey: sessionCardQueryKeys.detail(activeCard.cardId),
+            }),
+          ])
+        } finally {
+          setRenamingCardTitle(false)
+        }
+        return
+      }
       const sessionKey =
         resolvedSessionKey || activeSession?.key || activeSessionKey || ''
       if (!sessionKey) return
@@ -2734,9 +3820,11 @@ export function ChatScreen({
       )
     },
     [
+      activeCard,
       activeSession?.friendlyId,
       activeSession?.key,
       activeSessionKey,
+      queryClient,
       renameSession,
       resolvedSessionKey,
     ],
@@ -2793,12 +3881,17 @@ export function ChatScreen({
           {!compact && (
             <ChatHeader
               activeTitle={activeTitle}
-              onRenameTitle={handleRenameActiveSessionTitle}
-              renamingTitle={renamingSessionTitle}
+              onRenameTitle={
+                !activeCard || activeCard.relationshipKind === 'root'
+                  ? handleRenameActiveSessionTitle
+                  : undefined
+              }
+              renamingTitle={renamingSessionTitle || renamingCardTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
-              sessions={sessions ?? []}
+              sessionCards={sessionCards}
               activeFriendlyId={activeFriendlyId}
+              inspectedChildCardId={inspectedChildCardId}
               onSelectSession={(key) =>
                 void navigate({
                   to: '/chat/$sessionKey',
@@ -2808,7 +3901,7 @@ export function ChatScreen({
               showFileExplorerButton={!isMobile && !isFocusMode}
               fileExplorerCollapsed={fileExplorerCollapsed}
               onToggleFileExplorer={handleToggleFileExplorer}
-              dataUpdatedAt={historyQuery.dataUpdatedAt}
+              dataUpdatedAt={displayedHistoryQuery.dataUpdatedAt}
               onRefresh={handleRefreshHistory}
               agentModel={currentModel}
               agentConnected={mobileHeaderStatus === 'connected'}
@@ -2827,6 +3920,34 @@ export function ChatScreen({
           {errorNotice && (
             <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>
           )}
+          {snapshotDurabilityNotice}
+          {incompleteHistoryNotice}
+          {!embedded && workspaceChatAdmissionRetry ? (
+            <div
+              className="mx-4 mt-2 rounded-lg border border-red-300 bg-red-50 px-3 py-3 text-sm text-red-950 dark:border-red-700/60 dark:bg-red-950/30 dark:text-red-100"
+              role="alert"
+              aria-live="assertive"
+            >
+              <p>{workspaceChatAdmissionRetry.safeMessage}</p>
+              <p className="mt-1 font-semibold">
+                Unsent local Workspace chat recovery data will be discarded.
+              </p>
+              {workspaceChatAdmissionRetryError ? (
+                <p className="mt-1">{workspaceChatAdmissionRetryError}</p>
+              ) : null}
+              <button
+                type="button"
+                className="mt-2 rounded-md border border-red-400 px-2.5 py-1 text-xs font-semibold hover:bg-red-100 disabled:cursor-wait disabled:opacity-70 dark:border-red-600 dark:hover:bg-red-900/40"
+                aria-busy={workspaceChatAdmissionRetryBusy}
+                disabled={workspaceChatAdmissionRetryBusy}
+                onClick={() => void handleResetWorkspaceChatRecoveryAndRetry()}
+              >
+                {workspaceChatAdmissionRetryBusy
+                  ? 'Resetting Workspace chat recovery cache…'
+                  : 'Reset Workspace chat recovery cache and retry'}
+              </button>
+            </div>
+          ) : null}
           {pendingApprovals.length > 0 && (
             <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
               <div className="space-y-2">
@@ -2875,23 +3996,27 @@ export function ChatScreen({
             </div>
           )}
 
-          {hideUi ? null : (
-            <ContextBar
-              sessionId={
-                resolvedSessionKey ||
-                activeCanonicalKey ||
-                activeSession?.key ||
-                activeSessionKey
-              }
-            />
-          )}
+          {hideUi ? null : <ContextBar cardId={activeCard?.cardId} />}
 
           {hideUi ? null : (
             <ChatMessageList
               messages={finalDisplayMessages}
-              onRetryMessage={handleRetryMessage}
+              onRetryMessage={
+                inspectedChildCard ? undefined : handleRetryMessage
+              }
               onRefresh={handleRefreshHistory}
               loading={historyLoading}
+              hasOlderHistory={Boolean(
+                !inspectedChildCard && cardHistoryQuery.data?.previousCursor,
+              )}
+              loadingOlderHistory={
+                !inspectedChildCard && loadingOlderCardHistory
+              }
+              onLoadOlderHistory={
+                !inspectedChildCard && cardHistoryQuery.data?.previousCursor
+                  ? loadOlderCardHistory
+                  : undefined
+              }
               empty={historyEmpty}
               emptyState={
                 <ChatEmptyState
@@ -2903,8 +4028,12 @@ export function ChatScreen({
               }
               notice={null}
               noticePosition="end"
-              waitingForResponse={waitingForResponse}
-              sessionKey={activeCanonicalKey}
+              waitingForResponse={
+                !canShowLiveActivity || inspectedChildCard
+                  ? false
+                  : waitingForResponse
+              }
+              sessionKey={inspectedChildCard?.sessionKey ?? activeCanonicalKey}
               pinToTop={false}
               pinGroupMinHeight={pinGroupMinHeight}
               headerHeight={headerHeight}
@@ -2912,25 +4041,59 @@ export function ChatScreen({
               bottomOffset={
                 isMobile ? mobileScrollBottomOffset : terminalPanelInset
               }
-              isStreaming={derivedStreamingInfo.isStreaming}
-              streamingMessageId={derivedStreamingInfo.streamingMessageId}
+              isStreaming={
+                !canShowLiveActivity || inspectedChildCard
+                  ? false
+                  : derivedStreamingInfo.isStreaming
+              }
+              streamingMessageId={
+                !canShowLiveActivity || inspectedChildCard
+                  ? null
+                  : derivedStreamingInfo.streamingMessageId
+              }
               streamingText={
-                stableActiveStreamingText ||
-                completedStreamingText.current ||
-                undefined
+                !canShowLiveActivity || inspectedChildCard
+                  ? undefined
+                  : stableActiveStreamingText ||
+                    completedStreamingText.current ||
+                    undefined
               }
               streamingThinking={
-                realtimeStreamingThinking ||
-                completedStreamingThinking.current ||
-                undefined
+                !canShowLiveActivity || inspectedChildCard
+                  ? undefined
+                  : realtimeStreamingThinking ||
+                    completedStreamingThinking.current ||
+                    undefined
               }
-              lifecycleEvents={realtimeLifecycleEvents}
+              lifecycleEvents={
+                !canShowLiveActivity || inspectedChildCard
+                  ? []
+                  : realtimeLifecycleEvents
+              }
               hideSystemMessages
-              activeToolCalls={activeToolCalls}
-              liveToolActivity={liveToolActivity}
-              researchCard={researchCard}
-              isCompacting={isCompacting}
-              sending={sending}
+              activeToolCalls={
+                !canShowLiveActivity || inspectedChildCard
+                  ? []
+                  : activeToolCalls
+              }
+              liveToolActivity={
+                !canShowLiveActivity || inspectedChildCard
+                  ? []
+                  : liveToolActivity
+              }
+              researchCard={
+                !displayedCardHistoryReady || inspectedChildCard
+                  ? undefined
+                  : researchCard
+              }
+              isCompacting={
+                !canShowLiveActivity || inspectedChildCard
+                  ? false
+                  : isCompacting
+              }
+              sending={
+                !canShowLiveActivity || inspectedChildCard ? false : sending
+              }
             />
           )}
           {showComposer ? (
@@ -2938,26 +4101,23 @@ export function ChatScreen({
               onSubmit={send}
               onAbort={handleAbortStreaming}
               isLoading={sending || waitingForResponse}
-              disabled={sending || hideUi}
-              sessionKey={
-                isNewChat
-                  ? undefined
-                  : forcedSessionKey ||
-                    resolvedSessionKey ||
-                    activeCanonicalKey ||
-                    activeSessionKey
-              }
+              disabled={sending || hideUi || !cardTransportReady}
+              cardId={activeCard?.cardId}
               wrapperRef={composerRef}
               composerRef={composerHandleRef}
               embedded={embedded}
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
               focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
               thinkingLevel={thinkingLevel}
               onThinkingLevelChange={handleThinkingLevelChange}
             />
           ) : null}
         </main>
-        {!compact && !isFocusMode && <AgentViewPanel />}
+        {!compact && !isFocusMode && (
+          <AgentViewPanel
+            activeCard={activeCard}
+            sessionCardList={sessionCardList}
+          />
+        )}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
 
@@ -2976,13 +4136,15 @@ export function ChatScreen({
         <MobileSessionsPanel
           open={sessionsOpen}
           onClose={() => setSessionsOpen(false)}
-          sessions={sessions}
+          sessionCards={sessionCards ?? []}
           activeFriendlyId={activeFriendlyId}
-          onSelectSession={(friendlyId) => {
+          inspectedChildCardId={inspectedChildCardId}
+          onSelectSession={(cardId, inspectChildCardId) => {
             setSessionsOpen(false)
             void navigate({
               to: '/chat/$sessionKey',
-              params: { sessionKey: friendlyId },
+              params: { sessionKey: cardId },
+              search: inspectChildCardId ? { inspect: inspectChildCardId } : {},
             })
           }}
           onNewChat={() => {
@@ -2992,6 +4154,15 @@ export function ChatScreen({
               params: { sessionKey: 'new' },
             })
           }}
+          onRenameCard={handleRenameCard}
+          onTogglePin={handleTogglePinCard}
+          onBranchCard={handleBranchCard}
+          onArchiveCard={handleArchiveCard}
+          pendingCardIds={pendingCardIds}
+          hasMoreOlderSessions={hasMoreSessionCards}
+          loadingOlderSessions={loadingMoreSessionCards}
+          olderSessionsError={moreSessionCardsError}
+          onLoadOlderSessions={onLoadMoreSessionCards}
         />
       )}
 

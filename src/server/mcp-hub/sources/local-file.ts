@@ -8,13 +8,13 @@ import { readPresets } from '../../mcp-presets-store'
 import type { HubMcpEntry } from '../types'
 
 export interface LocalFileResult {
-  entries: HubMcpEntry[]
-  warnings?: string[]
+  entries: Array<HubMcpEntry>
+  warnings?: Array<string>
 }
 
 export async function fetchLocalFile(): Promise<LocalFileResult> {
   const result = await readPresets()
-  const warnings: string[] = []
+  const warnings: Array<string> = []
 
   if (result.source === 'invalid') {
     warnings.push(
@@ -31,7 +31,7 @@ export async function fetchLocalFile(): Promise<LocalFileResult> {
     }
   }
 
-  const entries: HubMcpEntry[] = result.presets.map((preset) => ({
+  const entries: Array<HubMcpEntry> = result.presets.map((preset) => ({
     id: `local:${preset.name}`,
     name: preset.name,
     description: preset.description,

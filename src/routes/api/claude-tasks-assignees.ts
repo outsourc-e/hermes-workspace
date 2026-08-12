@@ -5,17 +5,17 @@
  * Falls back to profile directory listing if the gateway doesn't have
  * a /api/tasks/assignees endpoint.
  */
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
-import { isAuthenticated } from '../../server/auth-middleware'
+import YAML from 'yaml'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
   CLAUDE_DASHBOARD_URL,
 } from '../../server/gateway-capabilities'
-import fs from 'node:fs'
-import path from 'node:path'
-import os from 'node:os'
-import YAML from 'yaml'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 type RawAssignee = {
   id?: unknown
@@ -40,18 +40,16 @@ const PROFILES_PATH = path.join(CLAUDE_HOME, 'profiles')
 
 function readConfig(): Record<string, unknown> {
   try {
-    return (
-      (YAML.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as Record<
-        string,
-        unknown
-      >) ?? {}
-    )
+    const parsed: unknown = YAML.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : {}
   } catch {
     return {}
   }
 }
 
-function getProfileNames(): string[] {
+function getProfileNames(): Array<string> {
   try {
     return fs.readdirSync(PROFILES_PATH).filter((name) => {
       try {

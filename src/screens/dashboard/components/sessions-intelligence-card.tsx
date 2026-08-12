@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'
+import { resolveSessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
 
 export type SessionRowData = {
   key: string
@@ -14,6 +16,13 @@ export type SessionRowData = {
   tokenCount: number
   startedAt: number | null
   updatedAt: number | null
+}
+
+export function resolveSessionRowCardNavigation(
+  response: SessionCardListWire | undefined,
+  session: Pick<SessionRowData, 'key'>,
+) {
+  return resolveSessionCardProducerNavigation(response, [session.key])
 }
 
 const KIND_ICONS: Record<string, string> = {
@@ -44,13 +53,13 @@ function sessionGlyph(s: {
   key: string
 }): string {
   if (typeof s.key === 'string' && s.key.startsWith('cron_')) {
-    return KIND_ICONS.cron
+    return KIND_ICONS.cron ?? '⏰'
   }
   const sourceKey = s.source?.toLowerCase()
-  if (sourceKey && KIND_ICONS[sourceKey]) return KIND_ICONS[sourceKey]
-  const kindKey = s.kind?.toLowerCase()
-  if (kindKey && KIND_ICONS[kindKey]) return KIND_ICONS[kindKey]
-  return KIND_ICONS.chat
+  if (sourceKey && KIND_ICONS[sourceKey]) return KIND_ICONS[sourceKey] ?? '💬'
+  const kindKey = s.kind.toLowerCase()
+  if (kindKey && KIND_ICONS[kindKey]) return KIND_ICONS[kindKey] ?? '💬'
+  return KIND_ICONS.chat ?? '💬'
 }
 
 function relativeTime(ms: number | null): string {
@@ -71,7 +80,7 @@ function formatTokens(n: number): string {
 }
 
 function shortTitle(s: SessionRowData): string {
-  const t = s.title?.trim()
+  const t = s.title.trim()
   if (t && t.length > 0 && t !== s.key) return t
   // Fall back to friendly slug from the key
   return `Session ${s.key.slice(0, 8)}`
@@ -109,8 +118,8 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
     })
   }
   if (
-    s.status?.toLowerCase() === 'error' ||
-    s.status?.toLowerCase() === 'failed'
+    s.status.toLowerCase() === 'error' ||
+    s.status.toLowerCase() === 'failed'
   ) {
     badges.push({
       label: 'error',
@@ -147,20 +156,23 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
  * - hot row gets a soft accent border so the operator sees what's
  *   running right now without scanning IDs
  *
- * Click row → navigates to /chat/<sessionKey>.
+ * Click row → navigates only through the authoritative Session Card mapping.
  */
 export function SessionsIntelligenceCard({
   sessions,
+  cardResponse,
 }: {
   sessions: Array<SessionRowData>
+  cardResponse?: SessionCardListWire
 }) {
   const navigate = useNavigate()
   const enriched = useMemo(() => {
     return sessions.map((s) => ({
       session: s,
       badges: buildBadges(s),
+      navigation: resolveSessionRowCardNavigation(cardResponse, s),
     }))
-  }, [sessions])
+  }, [cardResponse, sessions])
 
   // Highlight: top hot session, otherwise top tool-heavy, otherwise top recent.
   const highlightId = useMemo(() => {
@@ -202,12 +214,7 @@ export function SessionsIntelligenceCard({
           </span>
           <button
             type="button"
-            onClick={() =>
-              navigate({
-                to: '/chat/$sessionKey',
-                params: { sessionKey: 'main' },
-              })
-            }
+            onClick={() => navigate({ to: '/chat' })}
             className="rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
             style={{
               borderColor: 'var(--theme-border)',
@@ -235,20 +242,25 @@ export function SessionsIntelligenceCard({
         // Operators that want fewer can still toggle to a deep
         // sessions route in iter N+1.
         <ul className="flex flex-1 flex-col gap-1 overflow-hidden">
-          {enriched.slice(0, 14).map(({ session: s, badges }) => {
+          {enriched.slice(0, 14).map(({ session: s, badges, navigation }) => {
             const isHighlight = s.key === highlightId
             const icon = sessionGlyph(s)
             return (
               <li key={s.key}>
                 <button
                   type="button"
-                  onClick={() =>
-                    navigate({
+                  disabled={!navigation}
+                  onClick={() => {
+                    if (!navigation) return
+                    void navigate({
                       to: '/chat/$sessionKey',
-                      params: { sessionKey: s.key },
+                      params: { sessionKey: navigation.cardId },
+                      search: navigation.inspectedChildCardId
+                        ? { inspect: navigation.inspectedChildCardId }
+                        : {},
                     })
-                  }
-                  className="group flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors hover:bg-[var(--theme-card)]/80"
+                  }}
+                  className="group flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors hover:bg-[var(--theme-card)]/80 disabled:cursor-default disabled:opacity-60"
                   style={{
                     borderColor: isHighlight
                       ? 'color-mix(in srgb, var(--theme-accent) 50%, transparent)'

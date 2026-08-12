@@ -17,6 +17,13 @@
  * US-501: placeholder detection + inline fill.
  */
 import { useRef, useState } from 'react'
+import {
+  detectPlaceholders,
+  isStillPlaceholder,
+} from '../lib/placeholder-detect'
+import type { HubMcpEntry } from '../hooks/use-mcp-hub'
+import type { McpClientInput } from '@/types/mcp'
+import type { PlaceholderField } from '../lib/placeholder-detect'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -25,13 +32,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from '@/components/ui/toast'
-import type { HubMcpEntry } from '../hooks/use-mcp-hub'
-import type { McpClientInput } from '@/types/mcp'
-import {
-  detectPlaceholders,
-  isStillPlaceholder,
-} from '../lib/placeholder-detect'
-import type { PlaceholderField } from '../lib/placeholder-detect'
 
 interface Props {
   entry: HubMcpEntry | null
@@ -64,7 +64,7 @@ const FIELD =
 function applyOverrides(
   template: McpClientInput,
   placeholders: Array<PlaceholderField>,
-  overrides: Record<string, string>,
+  overrides: Partial<Record<string, string>>,
 ): McpClientInput {
   const out: McpClientInput = {
     ...template,
@@ -79,11 +79,12 @@ function applyOverrides(
     } else if (ph.kind === 'arg') {
       // Parse index from "args[N]"
       const m = ph.path.match(/^args\[(\d+)\]$/)
-      if (m) {
-        const idx = parseInt(m[1], 10)
+      const rawIndex = m?.[1]
+      if (rawIndex !== undefined) {
+        const idx = parseInt(rawIndex, 10)
         if (out.args) out.args[idx] = val
       }
-    } else if (ph.kind === 'env') {
+    } else {
       // Path is "env.KEY"
       const key = ph.path.slice(4) // strip "env."
       if (out.env) out.env[key] = val

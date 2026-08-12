@@ -3,7 +3,17 @@
  *
  * Uses vi.mock to isolate store functions from real filesystem I/O.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  addHubSource,
+  deleteHubSource,
+  readHubSources,
+  updateHubSource,
+} from '../../../server/mcp-hub-sources-store'
+import { isAuthenticated } from '../../../server/auth-middleware'
+import { Route as HubSourcesRoute } from './hub-sources'
+import { Route as HubSourcesIdRoute } from './hub-sources.$id'
 
 vi.mock('../../../server/mcp-hub-sources-store', () => ({
   readHubSources: vi.fn(),
@@ -14,16 +24,6 @@ vi.mock('../../../server/mcp-hub-sources-store', () => ({
 vi.mock('../../../server/auth-middleware', () => ({
   isAuthenticated: vi.fn(),
 }))
-
-import {
-  readHubSources,
-  addHubSource,
-  updateHubSource,
-  deleteHubSource,
-} from '../../../server/mcp-hub-sources-store'
-import { isAuthenticated } from '../../../server/auth-middleware'
-import { Route as HubSourcesRoute } from './hub-sources'
-import { Route as HubSourcesIdRoute } from './hub-sources.$id'
 
 const mockReadHubSources = vi.mocked(readHubSources)
 const mockAddHubSource = vi.mocked(addHubSource)
@@ -61,41 +61,37 @@ function makeRequest(method: string, url: string, body?: unknown): Request {
 }
 
 async function callGet(request: Request) {
-  const handlers = HubSourcesRoute.options.server?.handlers as Record<
-    string,
-    (ctx: { request: Request }) => Promise<Response>
-  >
-  return handlers['GET']({ request })
+  const handlers = HubSourcesRoute.options.server?.handlers as {
+    GET: (ctx: { request: Request }) => Promise<Response>
+  }
+  return handlers.GET({ request })
 }
 
 async function callPost(request: Request) {
-  const handlers = HubSourcesRoute.options.server?.handlers as Record<
-    string,
-    (ctx: { request: Request }) => Promise<Response>
-  >
-  return handlers['POST']({ request })
+  const handlers = HubSourcesRoute.options.server?.handlers as {
+    POST: (ctx: { request: Request }) => Promise<Response>
+  }
+  return handlers.POST({ request })
 }
 
 async function callPut(request: Request, id: string) {
-  const handlers = HubSourcesIdRoute.options.server?.handlers as Record<
-    string,
-    (ctx: {
+  const handlers = HubSourcesIdRoute.options.server?.handlers as {
+    PUT: (ctx: {
       request: Request
       params: Record<string, string>
     }) => Promise<Response>
-  >
-  return handlers['PUT']({ request, params: { id } })
+  }
+  return handlers.PUT({ request, params: { id } })
 }
 
 async function callDelete(request: Request, id: string) {
-  const handlers = HubSourcesIdRoute.options.server?.handlers as Record<
-    string,
-    (ctx: {
+  const handlers = HubSourcesIdRoute.options.server?.handlers as {
+    DELETE: (ctx: {
       request: Request
       params: Record<string, string>
     }) => Promise<Response>
-  >
-  return handlers['DELETE']({ request, params: { id } })
+  }
+  return handlers.DELETE({ request, params: { id } })
 }
 
 beforeEach(() => {

@@ -7,9 +7,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
-  updateHubSource,
   deleteHubSource,
   readHubSources,
+  updateHubSource,
 } from '../../../server/mcp-hub-sources-store'
 import { invalidateUserSourceCache } from '../../../server/mcp-hub/sources/generic-json'
 

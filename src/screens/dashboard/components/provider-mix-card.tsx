@@ -98,7 +98,9 @@ export function ProviderMixCard({
           label: klass.label,
           tokens: m.tokens,
           sessions: m.sessions,
-          tone: FAMILY_TONES[map.size % FAMILY_TONES.length],
+          tone:
+            FAMILY_TONES[map.size % FAMILY_TONES.length] ??
+            'var(--theme-accent)',
         })
       }
     }
@@ -122,7 +124,8 @@ export function ProviderMixCard({
   })
 
   const conic = `conic-gradient(${stops.join(', ')})`
-  const top = buckets[0]
+  const top = buckets.at(0)
+  if (!top) return null
   const topPct = (top.tokens / totalTokens) * 100
 
   return (

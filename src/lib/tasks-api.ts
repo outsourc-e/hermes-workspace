@@ -290,6 +290,8 @@ export function isOverdue(task: ClaudeTask): boolean {
   // new Date("2026-04-02") parses as UTC midnight, which in EST is the
   // previous evening — causing everything to appear one day early.
   const [year, month, day] = task.due_date.split('-').map(Number)
+  if (year === undefined || month === undefined || day === undefined)
+    return false
   const due = new Date(year, month - 1, day) // local midnight
   const today = new Date()
   today.setHours(0, 0, 0, 0)

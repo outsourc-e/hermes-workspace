@@ -1,5 +1,5 @@
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 function formatCount(n: number): string {
   if (!n || n <= 0) return '0'

@@ -19,6 +19,7 @@ import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 type ProfileSummary = {
   name: string
@@ -183,8 +184,8 @@ export function ProfilesScreen() {
   }, [createOpen, wizardStep, allModels.length, fetchAllModels])
 
   useEffect(() => {
-    setDescriptionDraft(detailQuery.data?.profile?.description ?? '')
-  }, [detailQuery.data?.profile?.description, detailsName])
+    setDescriptionDraft(detailQuery.data?.profile.description ?? '')
+  }, [detailQuery.data?.profile.description, detailsName])
 
   const nameValid =
     /^[A-Za-z0-9_-]+$/.test(newProfileName.trim()) &&
@@ -353,8 +354,7 @@ export function ProfilesScreen() {
                         : 'bg-gradient-to-br from-primary-200 to-primary-300 dark:from-neutral-700 dark:to-neutral-600',
                     )}
                   >
-                    <img
-                      src="/claude-avatar.webp"
+                    <AgentIdentityAvatar
                       alt={profile.name}
                       className={cn(
                         'size-20 rounded-full border-2 object-cover',
@@ -867,8 +867,7 @@ export function ProfilesScreen() {
           <div className="shrink-0 border-b border-primary-200 px-6 pb-4 pt-5 dark:border-neutral-800">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <img
-                  src="/claude-avatar.webp"
+                <AgentIdentityAvatar
                   alt={detailsName || ''}
                   className="size-12 rounded-full border-2 border-primary-200 object-cover dark:border-neutral-700"
                 />

@@ -6,15 +6,15 @@ import { getMessageTimestamp, textFromMessage } from '../utils'
 import {
   cleanupExpiredPendingSends,
   clearPendingMessage,
+  getPendingRecoveryMessages,
   persistPendingMessage,
   readPendingMessage,
 } from '../pending-send'
-import {
-  clearRecoveryMessage,
-  readRecoveryMessage,
-} from '../../../stores/chat-store'
+import { mergeCardTranscriptRecoveryMessages } from '../card-transcript-recovery'
 import { useChatSettingsStore } from '../../../hooks/use-chat-settings'
+import { resolveLatestDescendant } from '../latest-descendant'
 import type { PendingSendPayload } from '../pending-send'
+import type { ChatSessionSourceState } from '../chat-screen-utils'
 import type { QueryClient } from '@tanstack/react-query'
 import type { ChatMessage, HistoryResponse } from '../types'
 
@@ -33,6 +33,36 @@ type UseChatHistoryInput = {
   historyRefetchInterval?: number
   /** When true, skip all server history fetching (portable mode). */
   portableMode?: boolean
+  /** Unknown cold metadata defers both lineage and history until classified. */
+  sessionSource?: ChatSessionSourceState
+  onCanonicalSessionResolved?: (payload: {
+    requestedSessionKey: string
+    sessionKey: string
+  }) => void
+}
+
+export function shouldResolveCanonicalHistory(payload: {
+  shouldFetchHistory: boolean
+  sessionSource: ChatSessionSourceState
+  sessionKey: string
+}): boolean {
+  return (
+    payload.shouldFetchHistory &&
+    payload.sessionSource === 'remote' &&
+    payload.sessionKey !== 'new'
+  )
+}
+
+export function isCanonicalHistoryResolutionReady(payload: {
+  shouldFetchHistory: boolean
+  sessionSource: ChatSessionSourceState
+  resolverSucceeded: boolean
+}): boolean {
+  return (
+    !payload.shouldFetchHistory ||
+    payload.sessionSource === 'local' ||
+    payload.resolverSucceeded
+  )
 }
 
 function normalizeSessionCandidate(value: string | undefined): string {
@@ -125,8 +155,9 @@ function parseExecNotification(text: string): ExecNotification | null {
 
   if (!name) {
     const withoutPrefix = trimmed.replace(/^Exec completed[:\s-]*/i, '').trim()
-    const nameMatch = withoutPrefix.match(/^([^\(\{\[]+?)(?:\s*\(|\s*$)/)
-    if (nameMatch) name = nameMatch[1].trim()
+    const nameMatch = withoutPrefix.match(/^([^([{]+?)(?:\s*\(|\s*$)/)
+    const matchedName = nameMatch?.[1]
+    if (matchedName) name = matchedName.trim()
   }
 
   if (exitCode === null) {
@@ -165,13 +196,11 @@ function getAttachmentSignature(message: ChatMessage): string {
 
   return message.attachments
     .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const name = typeof attachment.name === 'string' ? attachment.name : ''
       const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
+        typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment?.contentType === 'string'
-          ? attachment.contentType
-          : ''
+        typeof attachment.contentType === 'string' ? attachment.contentType : ''
       return `${name}:${size}:${type}`
     })
     .sort()
@@ -225,38 +254,6 @@ function hasConfirmedPendingMessage(
   })
 }
 
-/**
- * Extract the best available string ID from a ChatMessage without type-unsafe
- * `as any` casts. ChatMessage carries `[key: string]: unknown` so bracket
- * access is perfectly legal and keeps TypeScript's narrowing intact.
- */
-function extractMsgId(msg: ChatMessage): string {
-  const id =
-    msg['id'] ?? msg['message_id'] ?? msg['clientId'] ?? msg['client_id']
-  return typeof id === 'string' ? id : ''
-}
-
-/** Check whether a history array already contains an equivalent message. */
-function historyContainsMessage(
-  messages: Array<ChatMessage>,
-  candidate: ChatMessage,
-): boolean {
-  if (!candidate.role) return false
-  const candidateText = textFromMessage(candidate).trim()
-  const candidateId = extractMsgId(candidate)
-
-  return messages.some((msg) => {
-    if (msg.role !== candidate.role) return false
-    const msgId = extractMsgId(msg)
-    if (candidateId && msgId && candidateId === msgId) return true
-    if (candidateText) {
-      const msgText = textFromMessage(msg).trim()
-      if (msgText === candidateText) return true
-    }
-    return false
-  })
-}
-
 export function useChatHistory({
   activeFriendlyId,
   activeSessionKey,
@@ -268,6 +265,8 @@ export function useChatHistory({
   queryClient,
   historyRefetchInterval,
   portableMode = false,
+  sessionSource = 'remote',
+  onCanonicalSessionResolved,
 }: UseChatHistoryInput) {
   const explicitRouteSessionKey = useMemo(() => {
     const normalizedFriendlyId = normalizeSessionCandidate(activeFriendlyId)
@@ -315,6 +314,39 @@ export function useChatHistory({
       (!isRedirecting &&
         (hasDirectSessionKey || !sessionsReady || activeExists)))
 
+  const shouldResolveCanonicalSession = shouldResolveCanonicalHistory({
+    shouldFetchHistory,
+    sessionSource,
+    sessionKey: sessionKeyForHistory,
+  })
+  const latestDescendantQuery = useQuery({
+    queryKey: chatQueryKeys.latestDescendant(sessionKeyForHistory),
+    queryFn: ({ signal }) =>
+      resolveLatestDescendant(sessionKeyForHistory, { signal }),
+    enabled: shouldResolveCanonicalSession,
+    retry: false,
+    staleTime: 30_000,
+    gcTime: 1000 * 60 * 10,
+  })
+  const canonicalResolution = latestDescendantQuery.data
+  const canonicalChanged =
+    canonicalResolution?.requestedSessionKey === sessionKeyForHistory &&
+    canonicalResolution.changed
+  const canonicalResolutionReady = isCanonicalHistoryResolutionReady({
+    shouldFetchHistory,
+    sessionSource,
+    resolverSucceeded:
+      shouldResolveCanonicalSession && latestDescendantQuery.isSuccess,
+  })
+
+  useEffect(() => {
+    if (!canonicalChanged) return
+    onCanonicalSessionResolved?.({
+      requestedSessionKey: canonicalResolution.requestedSessionKey,
+      sessionKey: canonicalResolution.sessionKey,
+    })
+  }, [canonicalChanged, canonicalResolution, onCanonicalSessionResolved])
+
   const effectiveFriendlyId = portableMode ? 'main' : activeFriendlyId
   const effectiveSessionKeyForHistory = portableMode
     ? 'main'
@@ -330,7 +362,7 @@ export function useChatHistory({
 
   const historyQuery = useQuery({
     queryKey: historyKey,
-    queryFn: async function fetchHistoryForSession() {
+    queryFn: async function fetchHistoryForSession({ signal }) {
       if (portableMode) {
         return readPortableHistory()
       }
@@ -347,41 +379,23 @@ export function useChatHistory({
       const serverData = await fetchHistory({
         sessionKey: sessionKeyForHistory,
         friendlyId: activeFriendlyId,
+        signal,
       })
 
-      let dataWithRecovery = serverData
-
-      // Merge recovery buffer: if the backend history hasn't caught up with a
-      // recently-streamed assistant message (e.g. after dev refresh), inject it
-      // so the message doesn't vanish from the UI.
-      if (typeof window !== 'undefined') {
-        const recoveryMessage = readRecoveryMessage(sessionKeyForHistory)
-        if (recoveryMessage) {
-          if (historyContainsMessage(serverData.messages, recoveryMessage)) {
-            clearRecoveryMessage(sessionKeyForHistory)
-          } else {
-            const mergedMessages = [...serverData.messages, recoveryMessage]
-            mergedMessages.sort(
-              (a, b) => getMessageTimestamp(a) - getMessageTimestamp(b),
-            )
-            dataWithRecovery = { ...serverData, messages: mergedMessages }
-          }
-        }
-      }
-
-      if (!optimisticMessages.length) return dataWithRecovery
+      if (!optimisticMessages.length) return serverData
 
       const merged = mergeOptimisticHistoryMessages(
-        dataWithRecovery.messages,
+        serverData.messages,
         optimisticMessages,
       )
 
       return {
-        ...dataWithRecovery,
+        ...serverData,
         messages: merged,
       }
     },
-    enabled: shouldFetchHistory,
+    enabled:
+      shouldFetchHistory && canonicalResolutionReady && !canonicalChanged,
     initialData: function useInitialHistory(): HistoryResponse | undefined {
       if (portableMode) {
         return (
@@ -410,19 +424,28 @@ export function useChatHistory({
 
   useEffect(() => {
     cleanupExpiredPendingSends()
-    setPersistedPending(
-      readPendingMessage(sessionKeyForHistory, activeFriendlyId),
-    )
+    let cancelled = false
+    void readPendingMessage(sessionKeyForHistory, activeFriendlyId)
+      .then((pending) => {
+        if (!cancelled) setPersistedPending(pending)
+      })
+      .catch(() => {
+        if (!cancelled) setPersistedPending(null)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [activeFriendlyId, sessionKeyForHistory])
 
   const rawHistoryMessages = useMemo(() => {
+    if (!canonicalResolutionReady || canonicalChanged) return []
     return Array.isArray(historyQuery.data?.messages)
       ? historyQuery.data.messages
       : []
-  }, [historyQuery.data?.messages])
+  }, [canonicalChanged, canonicalResolutionReady, historyQuery.data?.messages])
 
   useEffect(() => {
-    if (!sessionKeyForHistory || sessionKeyForHistory === 'new') return
+    if (!sessionKeyForHistory) return
 
     const optimisticMessages = rawHistoryMessages.filter(
       isOptimisticUserMessage,
@@ -431,8 +454,9 @@ export function useChatHistory({
 
     const latestOptimisticMessage =
       optimisticMessages[optimisticMessages.length - 1]
+    if (!latestOptimisticMessage) return
 
-    persistPendingMessage({
+    void persistPendingMessage({
       sessionKey: sessionKeyForHistory,
       friendlyId: activeFriendlyId,
       message: textFromMessage(latestOptimisticMessage),
@@ -440,19 +464,28 @@ export function useChatHistory({
         ? latestOptimisticMessage.attachments
         : [],
       optimisticMessage: latestOptimisticMessage,
+    }).catch(() => {
+      // History hydration cannot turn a failed durability admission into a
+      // browser-owned pending row.
     })
   }, [activeFriendlyId, rawHistoryMessages, sessionKeyForHistory])
 
   useEffect(() => {
     if (!persistedPending) return
+    // The bootstrap transcript is Card-owned provisional recovery. Only the
+    // verified Card migration path may relinquish it.
+    if (persistedPending.sessionKey === 'new') return
     if (
       hasConfirmedPendingMessage(
         rawHistoryMessages,
         persistedPending.optimisticMessage,
       )
     ) {
-      clearPendingMessage(persistedPending.sessionKey)
-      setPersistedPending(null)
+      void clearPendingMessage(persistedPending.sessionKey)
+        .then(() => setPersistedPending(null))
+        .catch(() => {
+          // Keep the pending row mounted until durable deletion succeeds.
+        })
     }
   }, [persistedPending, rawHistoryMessages])
 
@@ -460,17 +493,20 @@ export function useChatHistory({
   const stableHistoryMessagesRef = useRef<Array<ChatMessage>>([])
   const historyMessages = useMemo(() => {
     const messages = persistedPending
-      ? mergeOptimisticHistoryMessages(rawHistoryMessages, [
-          persistedPending.optimisticMessage,
-        ])
+      ? persistedPending.sessionKey === 'new'
+        ? mergeCardTranscriptRecoveryMessages(
+            rawHistoryMessages,
+            getPendingRecoveryMessages(persistedPending),
+          )
+        : mergeOptimisticHistoryMessages(rawHistoryMessages, [
+            persistedPending.optimisticMessage,
+          ])
       : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
       last && typeof (last as { id?: string }).id === 'string'
         ? (last as { id?: string }).id
         : ''
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     const signature = `${messages.length}:${last?.role ?? ''}:${lastId}:${textFromMessage(last ?? { role: 'user', content: [] }).slice(-32)}`
     if (signature === stableHistorySignatureRef.current) {
       return stableHistoryMessagesRef.current
@@ -550,6 +586,7 @@ export function useChatHistory({
     // Messages with real text + tool calls are real responses — always show them
     for (let i = 0; i < filtered.length; i++) {
       const msg = filtered[i]
+      if (!msg) continue
       if (msg.role !== 'assistant') continue
       const content = Array.isArray(msg.content) ? msg.content : []
       const hasToolCall = content.some(
@@ -616,6 +653,7 @@ export function useChatHistory({
 
   return {
     historyQuery,
+    latestDescendantQuery,
     historyMessages,
     displayMessages,
     messageCount,
@@ -684,6 +722,7 @@ function mergeOptimisticHistoryMessages(
 
     if (matchingServerIndex >= 0) {
       const serverMessage = merged[matchingServerIndex]
+      if (!serverMessage) continue
       const serverHasAttachments =
         Array.isArray(serverMessage.attachments) &&
         serverMessage.attachments.length > 0

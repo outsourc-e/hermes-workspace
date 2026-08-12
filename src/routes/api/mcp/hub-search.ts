@@ -7,6 +7,7 @@
  *   q       Free-text search query (default '')
  *   source  'all' | 'mcp-get' | 'local' (default 'all')
  *   limit   Max results 1..100 (default 20)
+ *   offset  Optional result offset for pagination (default 0)
  *
  * Auth-gated via isAuthenticated.
  * Rate-limited: 60 req/min per IP.
@@ -46,17 +47,21 @@ export const Route = createFileRoute('/api/mcp/hub-search')({
         const q = url.searchParams.get('q') ?? ''
         const rawSource = url.searchParams.get('source') ?? 'all'
         const rawLimit = url.searchParams.get('limit') ?? '20'
-        const rawOffset = url.searchParams.get('offset') ?? '0'
+        const rawOffset = url.searchParams.get('offset')
 
         const source: SearchSource = VALID_SOURCES.has(rawSource)
           ? (rawSource as SearchSource)
           : 'all'
 
         const limit = Math.min(100, Math.max(1, parseInt(rawLimit, 10) || 20))
-        const offset = Math.max(0, parseInt(rawOffset, 10) || 0)
+        const offset = Math.max(0, parseInt(rawOffset ?? '0', 10) || 0)
 
         try {
-          const result = await unifiedSearch(q, source, limit, offset)
+          // Preserve the three-argument backend call for the common first page.
+          // Pass the optional offset only when callers request pagination.
+          const result = rawOffset === null
+            ? await unifiedSearch(q, source, limit)
+            : await unifiedSearch(q, source, limit, offset)
           return Response.json({
             ok: true,
             results: result.results,

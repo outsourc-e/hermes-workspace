@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/outsourc-e/hermes-workspace/main/install.sh | bash
 #
 # What it does:
-#   1. Verifies Node 22+, git, pnpm
+#   1. Verifies Node 22+ and git, then installs pinned pnpm
 #   2. Installs hermes-agent via Nous's official upstream installer
 #   3. Clones hermes-workspace
 #   4. Sets up .env, enables the Hermes API server, installs deps,
@@ -19,6 +19,8 @@ REPO_URL="${REPO_URL:-https://github.com/outsourc-e/hermes-workspace.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/hermes-workspace}"
 GATEWAY_PORT="${GATEWAY_PORT:-8642}"
 NOUS_INSTALLER_URL="${NOUS_INSTALLER_URL:-https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh}"
+readonly PNPM_VERSION="10.15.0"
+readonly PINNED_PNPM_BIN="$HOME/.local/bin/pnpm"
 
 # ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -51,18 +53,35 @@ ensure_path() {
   esac
 }
 
-pnpm_cmd() {
-  if command -v pnpm &>/dev/null; then
-    pnpm "$@"
-    return
+install_pnpm_command() {
+  local pnpm_bin="$PINNED_PNPM_BIN"
+  local pnpm_bin_dir
+  local installed_version
+  local resolved_pnpm
+
+  pnpm_bin_dir="$(dirname "$pnpm_bin")"
+  mkdir -p "$pnpm_bin_dir"
+  if command -v corepack &>/dev/null; then
+    printf '#!/usr/bin/env bash\nexec corepack "pnpm@%s" "$@"\n' \
+      "$PNPM_VERSION" > "$pnpm_bin"
+  else
+    printf '#!/usr/bin/env bash\nexec npx --yes "pnpm@%s" "$@"\n' \
+      "$PNPM_VERSION" > "$pnpm_bin"
   fi
-  if command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null; then
-    corepack pnpm "$@"
-    return
+  chmod 0755 "$pnpm_bin"
+
+  ensure_path "$pnpm_bin_dir"
+  hash -r
+  resolved_pnpm="$(command -v pnpm || true)"
+  if [[ "$resolved_pnpm" != "$pnpm_bin" ]]; then
+    red "Unable to resolve the pinned pnpm command at $pnpm_bin"
+    exit 1
   fi
-  red "pnpm is not available in this shell."
-  red "Try opening a new shell, or install pnpm manually: https://pnpm.io/installation"
-  exit 1
+  installed_version="$("$pnpm_bin" --version)"
+  if [[ "$installed_version" != "$PNPM_VERSION" ]]; then
+    red "pnpm $installed_version resolved from $pnpm_bin; expected $PNPM_VERSION."
+    exit 1
+  fi
 }
 
 ensure_env_key() {
@@ -116,17 +135,11 @@ green "  git $(git --version | awk '{print $3}') ✓"
 need curl "Install curl (usually: apt install curl / brew install curl)"
 green "  curl ✓"
 
-if ! command -v pnpm &>/dev/null; then
-  yellow "  pnpm not found — installing via corepack…"
-  if command -v corepack &>/dev/null; then
-    corepack enable 2>/dev/null || true
-    corepack prepare pnpm@latest --activate 2>/dev/null || true
-  fi
-  if ! command -v pnpm &>/dev/null && ! (command -v corepack &>/dev/null && corepack pnpm --version &>/dev/null); then
-    npm install -g pnpm
-  fi
+if ! command -v corepack &>/dev/null; then
+  need npm "Install npm (included with Node.js) to run pnpm ${PNPM_VERSION}."
 fi
-green "  pnpm $(pnpm_cmd --version) ✓"
+install_pnpm_command
+green "  pnpm $("$PINNED_PNPM_BIN" --version) ✓"
 
 # ─── install hermes-agent (delegate to Nous upstream installer) ──────────
 # hermes-agent is NOT on PyPI. It installs from source via Nous's own
@@ -212,8 +225,8 @@ if [[ -f "$HERMES_ENV_PATH" ]]; then
   fi
 fi
 
-cyan "→ Installing npm deps (pnpm install)…"
-pnpm_cmd install --silent
+cyan "→ Installing npm deps (pnpm install --frozen-lockfile)…"
+"$PINNED_PNPM_BIN" install --frozen-lockfile --silent
 green "  deps installed ✓"
 
 # ─── seed Hermes skills (Conductor needs workspace-dispatch) ─────────────
@@ -288,8 +301,8 @@ Next steps (two terminals):
        hermes gateway run
      (first run may prompt for hermes setup)
 
-  2) Start the workspace UI:
-       cd $INSTALL_DIR && pnpm dev
+  2) Start the workspace UI with the pinned pnpm executable:
+       cd "$INSTALL_DIR" && "$PINNED_PNPM_BIN" dev
 
   3) Open http://localhost:3000
 

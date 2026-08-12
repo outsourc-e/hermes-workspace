@@ -115,6 +115,16 @@ describe('maskSecretsInPlace (secret echo guard)', () => {
     const second = JSON.stringify(maskSecretsInPlace(s))
     expect(first).toBe(second)
   })
+
+  it('normalizes missing indexed values without leaking or throwing', () => {
+    const s = normalizeMcpServer({ name: 'x' })!
+    Object.assign(s.env, { EMPTY_ENV: undefined })
+    Object.assign(s.headers, { 'X-Empty': undefined })
+
+    expect(() => maskSecretsInPlace(s)).not.toThrow()
+    expect(s.env.EMPTY_ENV).toBe('')
+    expect(s.headers['X-Empty']).toBe('')
+  })
 })
 
 describe('normalizeTestResult', () => {
@@ -337,6 +347,6 @@ describe('normalizeMcpListFromConfig (Phase 1.5 fallback)', () => {
       },
     })
     expect(list.length).toBe(1)
-    expect(list[0].name).toBe('gh')
+    expect(list[0]?.name).toBe('gh')
   })
 })

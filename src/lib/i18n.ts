@@ -313,7 +313,7 @@ export const LOCALE_LABELS: Record<LocaleId, string> = {
   es: 'Español',
   fr: 'Français',
   de: 'Deutsch',
-  zh: '中文（简体）',
+  zh: '中文',
   'zh-TW': '繁體中文',
   ja: '日本語',
   ko: '한국어',
@@ -331,7 +331,7 @@ export function getLocale(): LocaleId {
   const full = navigator.language
   if (full in LOCALES) return full as LocaleId
   const lang = full.split('-')[0]
-  if (lang in LOCALES) return lang as LocaleId
+  if (lang && lang in LOCALES) return lang as LocaleId
   return 'en'
 }
 
@@ -342,5 +342,5 @@ export function setLocale(id: LocaleId): void {
 
 export function t(key: TranslationKey): string {
   const locale = getLocale()
-  return LOCALES[locale]?.[key] ?? LOCALES.en[key] ?? key
+  return LOCALES[locale][key]
 }

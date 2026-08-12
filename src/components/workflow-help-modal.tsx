@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 type HelpSection = {
   title: string
-  bullets: string[]
+  bullets: Array<string>
 }
 
 export function WorkflowHelpModal({
@@ -17,7 +17,7 @@ export function WorkflowHelpModal({
 }: {
   title: string
   eyebrow?: string
-  sections: HelpSection[]
+  sections: Array<HelpSection>
   triggerLabel?: string
   compact?: boolean
 }) {

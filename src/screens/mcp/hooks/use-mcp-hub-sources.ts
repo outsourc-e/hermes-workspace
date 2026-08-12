@@ -11,7 +11,7 @@ export type { HubSourceEntry }
 
 export interface HubSourcesResponse {
   ok: boolean
-  sources: HubSourceEntry[]
+  sources: Array<HubSourceEntry>
   source: string
   error?: string
   validationErrors?: Array<{ path: string; message: string }>
@@ -62,8 +62,8 @@ export type UpdateSourceInput = Omit<AddSourceInput, 'id'>
 export function useAddHubSource() {
   const qc = useQueryClient()
   return useMutation<
-    { ok: true; sources: HubSourceEntry[] },
-    { errors: MutationError[] },
+    { ok: true; sources: Array<HubSourceEntry> },
+    { errors: Array<MutationError> },
     AddSourceInput
   >({
     mutationFn: async (input) => {
@@ -74,8 +74,8 @@ export function useAddHubSource() {
       })
       const body = (await res.json()) as {
         ok: boolean
-        sources?: HubSourceEntry[]
-        errors?: MutationError[]
+        sources?: Array<HubSourceEntry>
+        errors?: Array<MutationError>
       }
       if (!body.ok) {
         throw {
@@ -94,8 +94,8 @@ export function useAddHubSource() {
 export function useUpdateHubSource() {
   const qc = useQueryClient()
   return useMutation<
-    { ok: true; sources: HubSourceEntry[] },
-    { errors: MutationError[] },
+    { ok: true; sources: Array<HubSourceEntry> },
+    { errors: Array<MutationError> },
     { id: string; input: UpdateSourceInput }
   >({
     mutationFn: async ({ id, input }) => {
@@ -109,8 +109,8 @@ export function useUpdateHubSource() {
       )
       const body = (await res.json()) as {
         ok: boolean
-        sources?: HubSourceEntry[]
-        errors?: MutationError[]
+        sources?: Array<HubSourceEntry>
+        errors?: Array<MutationError>
       }
       if (!body.ok) {
         throw {
@@ -129,8 +129,8 @@ export function useUpdateHubSource() {
 export function useDeleteHubSource() {
   const qc = useQueryClient()
   return useMutation<
-    { ok: true; sources: HubSourceEntry[] },
-    { errors: MutationError[] },
+    { ok: true; sources: Array<HubSourceEntry> },
+    { errors: Array<MutationError> },
     string
   >({
     mutationFn: async (id) => {
@@ -142,8 +142,8 @@ export function useDeleteHubSource() {
       )
       const body = (await res.json()) as {
         ok: boolean
-        sources?: HubSourceEntry[]
-        errors?: MutationError[]
+        sources?: Array<HubSourceEntry>
+        errors?: Array<MutationError>
       }
       if (!body.ok) {
         throw {

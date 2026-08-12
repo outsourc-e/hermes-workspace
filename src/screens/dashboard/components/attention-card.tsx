@@ -4,7 +4,6 @@ import {
   AlertCircleIcon,
   CheckmarkCircle02Icon,
   ConsoleIcon,
-  KanbanIcon,
   Settings02Icon,
   Time04Icon,
 } from '@hugeicons/core-free-icons'
@@ -20,7 +19,7 @@ const SOURCE_ICON: Record<DashboardIncident['source'], typeof AlertCircleIcon> =
     log: ConsoleIcon,
     config: Settings02Icon,
     gateway: AlertCircleIcon,
-    kanban: KanbanIcon,
+    kanban: AlertCircleIcon,
   }
 
 /**
@@ -99,7 +98,7 @@ export function AttentionCard({
                 : item.severity === 'warn'
                   ? 'var(--theme-warning)'
                   : 'var(--theme-muted)'
-            const Icon = SOURCE_ICON[item.source] ?? AlertCircleIcon
+            const Icon = SOURCE_ICON[item.source]
             const content = (
               <div className="flex items-start gap-2">
                 <HugeiconsIcon

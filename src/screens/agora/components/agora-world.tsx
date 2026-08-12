@@ -7,7 +7,7 @@
  * - Speech bubbles above users with active messages
  * - Click-to-walk for mobile/desktop
  */
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useRef } from 'react'
 import { AgoraAvatar } from './agora-avatar'
 import type {
@@ -19,7 +19,7 @@ import type {
 interface AgoraWorldProps {
   world: TWorld
   self: AgoraUser
-  others: AgoraUser[]
+  others: Array<AgoraUser>
   activeBubbles: Map<string, AgoraMessage>
   onTapWalk?: (worldX: number, worldY: number) => void
   onSelectUser?: (user: AgoraUser) => void

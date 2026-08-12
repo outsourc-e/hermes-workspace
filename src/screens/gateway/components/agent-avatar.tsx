@@ -404,7 +404,7 @@ export function AgentAvatar({
   )
 }
 
-export const AGENT_ACCENT_COLORS: AgentAccentColor[] = [
+export const AGENT_ACCENT_COLORS: Array<AgentAccentColor> = [
   {
     bar: 'bg-orange-500',
     border: 'border-orange-500',
@@ -491,3 +491,19 @@ export const AGENT_ACCENT_COLORS: AgentAccentColor[] = [
       '#0ea5e9',
     ][index] ?? '#f97316',
 }))
+
+const DEFAULT_AGENT_ACCENT_COLOR: AgentAccentColor = {
+  bar: 'bg-orange-500',
+  border: 'border-orange-500',
+  avatar: 'bg-orange-100',
+  text: 'text-orange-600',
+  ring: 'ring-orange-500/20',
+  hex: '#f97316',
+}
+
+export function getAgentAccentColor(index: number): AgentAccentColor {
+  return (
+    AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length] ??
+    DEFAULT_AGENT_ACCENT_COLOR
+  )
+}

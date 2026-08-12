@@ -2,7 +2,7 @@
  * AgoraProfileDrawer — view/edit user profile.
  * Self profile is editable. Others are read-only with a "wave" CTA.
  */
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import type {
   AgoraAvatarId,
@@ -11,11 +11,11 @@ import type {
   AgoraUser,
 } from '../lib/agora-types'
 
-const ALL_AVATARS: {
+const ALL_AVATARS: Array<{
   id: AgoraAvatarId
   label: string
   tier: 'greek' | 'emoji'
-}[] = [
+}> = [
   { id: 'hermes', label: 'Hermes', tier: 'greek' },
   { id: 'athena', label: 'Athena', tier: 'greek' },
   { id: 'apollo', label: 'Apollo', tier: 'greek' },
@@ -36,7 +36,7 @@ const ALL_AVATARS: {
   { id: 'panda', label: 'Panda', tier: 'emoji' },
 ]
 
-const STATUS_OPTIONS: AgoraStatus[] = ['online', 'away', 'busy']
+const STATUS_OPTIONS: Array<AgoraStatus> = ['online', 'away', 'busy']
 
 interface AgoraProfileDrawerProps {
   open: boolean
@@ -62,7 +62,7 @@ export function AgoraProfileDrawer({
   useEffect(() => {
     if (user) {
       setEditName(user.profile.displayName)
-      setEditBio(user.profile.bio ?? '')
+      setEditBio(user.profile.bio)
       setEditStatus(user.profile.status)
     }
   }, [user?.profile.id])

@@ -35,6 +35,22 @@ describe('buildDashboardOverview', () => {
     expect(overview.analytics).toBeNull()
   })
 
+  it('does not trigger achievement scans for the standard dashboard overview', async () => {
+    const requestedPaths: Array<string> = []
+    const fetcher: DashboardFetcher = async (path) => {
+      requestedPaths.push(path)
+      return new Response('not found', { status: 404 })
+    }
+
+    await buildDashboardOverview({ fetcher })
+
+    expect(
+      requestedPaths.some((path) =>
+        path.startsWith('/api/plugins/hermes-achievements/'),
+      ),
+    ).toBe(false)
+  })
+
   it('parses /api/status into status + platforms', async () => {
     const fetcher = makeFetcher({
       '/api/status': {
@@ -157,6 +173,45 @@ describe('buildDashboardOverview', () => {
     expect(overview.status?.activeAgents).toBe(2)
   })
 
+  it('recognizes a healthy externally supervised gateway when dashboard state is stale', async () => {
+    const fetcher = makeFetcher({
+      '/api/status': {
+        gateway_state: 'stopped',
+        active_sessions: 4,
+        platforms: {},
+      },
+    })
+    const gatewayFetcher: DashboardFetcher = (path) =>
+      Promise.resolve(
+        path === '/health'
+          ? jsonResponse({ status: 'ok' })
+          : path === '/health/detailed'
+            ? new Response('unauthorized', { status: 401 })
+            : new Response('not found', { status: 404 }),
+      )
+
+    const overview = await buildDashboardOverview({ fetcher, gatewayFetcher })
+
+    expect(overview.status?.gatewayState).toBe('running')
+    expect(overview.status?.activeAgents).toBe(0)
+  })
+
+  it('does not override a stopped dashboard state from an unhealthy gateway response', async () => {
+    const fetcher = makeFetcher({
+      '/api/status': { gateway_state: 'stopped', platforms: {} },
+    })
+    const gatewayFetcher: DashboardFetcher = (path) =>
+      Promise.resolve(
+        path === '/health'
+          ? jsonResponse({ status: 'degraded' })
+          : new Response('not found', { status: 404 }),
+      )
+
+    const overview = await buildDashboardOverview({ fetcher, gatewayFetcher })
+
+    expect(overview.status?.gatewayState).toBe('stopped')
+  })
+
   it('parses skills usage and emits a top-skill insight', async () => {
     const fetcher = makeFetcher({
       '/api/analytics/usage': {
@@ -207,7 +262,7 @@ describe('buildDashboardOverview', () => {
     const overview = await buildDashboardOverview({ fetcher })
     expect(overview.skillsUsage?.distinctSkills).toBe(55)
     expect(overview.skillsUsage?.topSkills).toHaveLength(2)
-    expect(overview.skillsUsage?.topSkills[0].skill).toBe(
+    expect(overview.skillsUsage?.topSkills[0]?.skill).toBe(
       'systematic-debugging',
     )
     const skillInsight = overview.insights.find((i) =>
@@ -266,6 +321,7 @@ describe('buildDashboardOverview', () => {
     const overview = await buildDashboardOverview({
       fetcher,
       achievementsLimit: 2,
+      includeAchievements: true,
     })
     expect(overview.achievements?.recentUnlocks).toHaveLength(2)
     expect(overview.achievements?.recentUnlocks[0]).toMatchObject({

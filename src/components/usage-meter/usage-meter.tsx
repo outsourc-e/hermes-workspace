@@ -26,10 +26,10 @@ const STORAGE_KEY = 'clawsuite-usage-meter-alerts'
 const STATS_VIEW_STORAGE_KEY = 'clawsuite-stats-view'
 const THRESHOLDS = [50, 75, 90]
 
-type StatsView = 'session' | 'provider' | 'cost' | 'agents'
+type StatsView = 'cards' | 'provider' | 'cost' | 'agents'
 
 const STATS_VIEW_LABELS: Record<StatsView, string> = {
-  session: 'Session Stats',
+  cards: 'Card Stats',
   provider: 'Provider Usage',
   cost: 'Cost Breakdown',
   agents: 'Agent Activity',
@@ -56,16 +56,16 @@ function savePreferredProvider(provider: string) {
 }
 
 function getStoredStatsView(): StatsView {
-  if (typeof window === 'undefined') return 'session'
+  if (typeof window === 'undefined') return 'cards'
   try {
     const stored = window.localStorage.getItem(STATS_VIEW_STORAGE_KEY)
-    if (stored && ['session', 'provider', 'cost', 'agents'].includes(stored)) {
+    if (stored && ['cards', 'provider', 'cost', 'agents'].includes(stored)) {
       return stored as StatsView
     }
   } catch {
     /* ignore */
   }
-  return 'session'
+  return 'cards'
 }
 
 function saveStatsView(view: StatsView) {
@@ -97,7 +97,7 @@ type UsageSummary = {
   contextPercent: number
   dailyCost: number
   models: Array<ModelUsage>
-  sessions: Array<SessionUsage>
+  cards: Array<CardUsage>
 }
 
 type ModelUsage = {
@@ -107,20 +107,21 @@ type ModelUsage = {
   costUsd: number
 }
 
-type SessionUsage = {
-  id: string
+type CardUsage = {
+  cardId: string
+  title: string
+  canonicalSource: 'local' | 'remote'
+  state: 'idle' | 'running' | 'completed' | 'error' | 'pending_approval'
   model: string
   inputTokens: number
   outputTokens: number
+  contextPercent: number
   costUsd: number
-  startedAt?: number
-  updatedAt?: number
+  updatedAt: number
 }
 
-type SessionStatusResponse = {
-  ok?: boolean
+type CardStatusResponse = {
   payload?: unknown
-  error?: string
 }
 
 type UsageLine = {
@@ -184,207 +185,86 @@ function calculateCost(
   )
 }
 
-function normalizeModelUsage(raw: unknown): Array<ModelUsage> {
-  if (!raw) return []
-  if (Array.isArray(raw)) {
-    return raw
-      .map((entry) => {
-        if (!entry || typeof entry !== 'object') return null
-        const model = String(entry.model ?? entry.id ?? '')
-        if (!model) return null
-        const inputTokens = readNumber(
-          entry.inputTokens ??
-            entry.input_tokens ??
-            entry.promptTokens ??
-            entry.prompt_tokens,
-        )
-        const outputTokens = readNumber(
-          entry.outputTokens ??
-            entry.output_tokens ??
-            entry.completionTokens ??
-            entry.completion_tokens,
-        )
-        const costProvided = readNumber(
-          entry.costUsd ?? entry.cost ?? entry.usd,
-        )
-        const costUsd =
-          costProvided > 0
-            ? costProvided
-            : calculateCost(model, inputTokens, outputTokens)
-        return { model, inputTokens, outputTokens, costUsd }
-      })
-      .filter(Boolean) as Array<ModelUsage>
-  }
-
-  if (typeof raw === 'object') {
-    return Object.entries(raw as Record<string, unknown>)
-      .map(([model, data]) => {
-        if (!data || typeof data !== 'object') return null
-        const inputTokens = readNumber(
-          (data as any).inputTokens ??
-            (data as any).input_tokens ??
-            (data as any).promptTokens ??
-            (data as any).prompt_tokens,
-        )
-        const outputTokens = readNumber(
-          (data as any).outputTokens ??
-            (data as any).output_tokens ??
-            (data as any).completionTokens ??
-            (data as any).completion_tokens,
-        )
-        const costProvided = readNumber(
-          (data as any).costUsd ?? (data as any).cost ?? (data as any).usd,
-        )
-        const costUsd =
-          costProvided > 0
-            ? costProvided
-            : calculateCost(model, inputTokens, outputTokens)
-        return { model, inputTokens, outputTokens, costUsd }
-      })
-      .filter(Boolean) as Array<ModelUsage>
-  }
-
-  return []
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
-function normalizeSessions(raw: unknown): Array<SessionUsage> {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object') return null
-      const model = String(entry.model ?? entry.provider ?? '')
-      const id = String(
-        entry.id ?? entry.key ?? entry.sessionId ?? entry.sessionKey ?? '',
-      )
-      if (!id && !model) return null
-      const inputTokens = readNumber(
-        entry.inputTokens ??
-          entry.input_tokens ??
-          entry.promptTokens ??
-          entry.prompt_tokens,
-      )
-      const outputTokens = readNumber(
-        entry.outputTokens ??
-          entry.output_tokens ??
-          entry.completionTokens ??
-          entry.completion_tokens,
-      )
-      const costProvided = readNumber(entry.costUsd ?? entry.cost ?? entry.usd)
-      const costUsd =
-        costProvided > 0
-          ? costProvided
-          : calculateCost(model, inputTokens, outputTokens)
-      const startedAt = readNumber(
-        entry.startedAt ??
-          entry.started_at ??
-          entry.createdAt ??
-          entry.created_at,
-      )
-      const updatedAt = readNumber(
-        entry.updatedAt ??
-          entry.updated_at ??
-          entry.lastUpdated ??
-          entry.last_updated,
-      )
-      return {
-        id: id || model || 'session',
-        model: model || 'unknown',
-        inputTokens,
-        outputTokens,
-        costUsd,
-        startedAt: startedAt || undefined,
-        updatedAt: updatedAt || undefined,
-      }
-    })
-    .filter(Boolean) as Array<SessionUsage>
-}
+const CARD_STATES = new Set<CardUsage['state']>([
+  'idle',
+  'running',
+  'completed',
+  'error',
+  'pending_approval',
+])
 
-function parseSessionStatus(payload: unknown): UsageSummary {
-  const root = payload && typeof payload === 'object' ? (payload as any) : {}
-  const usage = root.today ?? root.usage ?? root.summary ?? root.totals ?? root
+function parseCardUsage(raw: unknown): CardUsage | null {
+  if (!isRecord(raw) || !isRecord(raw.usage)) return null
+  const cardId = typeof raw.cardId === 'string' ? raw.cardId.trim() : ''
+  const title = typeof raw.title === 'string' ? raw.title.trim() : ''
+  const canonicalSource = raw.canonicalSource
+  const state = raw.state
+  if (
+    !cardId ||
+    !title ||
+    (canonicalSource !== 'local' && canonicalSource !== 'remote') ||
+    typeof state !== 'string' ||
+    !CARD_STATES.has(state as CardUsage['state'])
+  ) {
+    return null
+  }
 
-  const tokensRoot = usage?.tokens ?? usage?.tokenUsage ?? usage
-  const inputTokens = readNumber(
-    tokensRoot?.inputTokens ??
-      tokensRoot?.input_tokens ??
-      tokensRoot?.promptTokens ??
-      tokensRoot?.prompt_tokens ??
-      usage?.inputTokens ??
-      usage?.input_tokens ??
-      usage?.promptTokens ??
-      usage?.prompt_tokens,
-  )
-  const outputTokens = readNumber(
-    tokensRoot?.outputTokens ??
-      tokensRoot?.output_tokens ??
-      tokensRoot?.completionTokens ??
-      tokensRoot?.completion_tokens ??
-      usage?.outputTokens ??
-      usage?.output_tokens ??
-      usage?.completionTokens ??
-      usage?.completion_tokens,
-  )
-  const contextPercent = readPercent(
-    usage?.contextPercent ??
-      usage?.context_percent ??
-      usage?.context ??
-      root?.contextPercent ??
-      root?.context_percent,
-  )
-
-  const modelUsage = normalizeModelUsage(
-    root.models ?? root.modelUsage ?? root.usageByModel ?? usage?.models,
-  )
-
-  const sessions = normalizeSessions(root.sessions ?? root.history ?? [])
-
-  const baseModel =
-    String(root.model ?? usage?.model ?? '').trim() ||
-    (modelUsage[0]?.model ?? 'unknown')
-  const dailyCostProvided = readNumber(
-    usage?.costUsd ??
-      usage?.dailyCost ??
-      usage?.cost ??
-      root?.costUsd ??
-      root?.dailyCost ??
-      root?.cost,
-  )
-  const dailyCostFromModels = modelUsage.reduce(
-    (sum, model) => sum + model.costUsd,
-    0,
-  )
-  const dailyCostFromTokens =
-    baseModel === 'unknown'
-      ? 0
-      : calculateCost(baseModel, inputTokens, outputTokens)
-  const dailyCost =
-    dailyCostProvided > 0
-      ? dailyCostProvided
-      : dailyCostFromModels > 0
-        ? dailyCostFromModels
-        : dailyCostFromTokens
-
-  const models =
-    modelUsage.length > 0
-      ? modelUsage
-      : baseModel !== 'unknown'
-        ? [
-            {
-              model: baseModel,
-              inputTokens,
-              outputTokens,
-              costUsd: dailyCost,
-            },
-          ]
-        : []
-
+  const model =
+    typeof raw.usage.model === 'string' && raw.usage.model.trim()
+      ? raw.usage.model.trim()
+      : 'unknown'
+  const inputTokens = readNumber(raw.usage.inputTokens)
+  const outputTokens = readNumber(raw.usage.outputTokens)
   return {
+    cardId,
+    title,
+    canonicalSource,
+    state: state as CardUsage['state'],
+    model,
     inputTokens,
     outputTokens,
-    contextPercent,
-    dailyCost,
-    models,
-    sessions,
+    contextPercent: readPercent(raw.usage.contextPercent),
+    costUsd: calculateCost(model, inputTokens, outputTokens),
+    updatedAt: readNumber(raw.updatedAt),
+  }
+}
+
+function parseCardStatus(payload: unknown): UsageSummary {
+  const root = isRecord(payload) ? payload : {}
+  const cards = Array.isArray(root.cards)
+    ? root.cards
+        .map(parseCardUsage)
+        .filter((card): card is CardUsage => card !== null)
+    : []
+  const modelsByName = new Map<string, ModelUsage>()
+  for (const card of cards) {
+    if (card.model === 'unknown') continue
+    const current = modelsByName.get(card.model) ?? {
+      model: card.model,
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+    }
+    current.inputTokens += card.inputTokens
+    current.outputTokens += card.outputTokens
+    current.costUsd += card.costUsd
+    modelsByName.set(card.model, current)
+  }
+
+  return {
+    inputTokens: cards.reduce((total, card) => total + card.inputTokens, 0),
+    outputTokens: cards.reduce((total, card) => total + card.outputTokens, 0),
+    contextPercent: cards.reduce(
+      (maximum, card) => Math.max(maximum, card.contextPercent),
+      0,
+    ),
+    dailyCost: cards.reduce((total, card) => total + card.costUsd, 0),
+    models: [...modelsByName.values()],
+    cards,
   }
 }
 
@@ -444,17 +324,15 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
-  const statusSessionKey = useMemo(
-    () => resolveUsageMeterSessionKey(pathname),
-    [pathname],
-  )
+  const statusCardId = useMemo(() => {
+    const routeCardId = resolveUsageMeterSessionKey(pathname)
+    return routeCardId && routeCardId !== 'new' ? routeCardId : null
+  }, [pathname])
   const contextAlertsEnabled = useMemo(
     () => shouldShowUsageMeterContextAlert({ pathname, visible }),
     [pathname, visible],
   )
-  const [usage, setUsage] = useState<UsageSummary>(() =>
-    parseSessionStatus(null),
-  )
+  const [usage, setUsage] = useState<UsageSummary>(() => parseCardStatus(null))
   const [error, setError] = useState<string | null>(null)
   const [providerUsage, setProviderUsage] = useState<Array<ProviderUsageEntry>>(
     [],
@@ -479,8 +357,8 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
 
   const refresh = useCallback(async () => {
     try {
-      const query = statusSessionKey
-        ? `?sessionKey=${encodeURIComponent(statusSessionKey)}`
+      const query = statusCardId
+        ? `?cardId=${encodeURIComponent(statusCardId)}`
         : ''
       const res = await fetch(`/api/session-status${query}`)
       if (!res.ok) {
@@ -489,9 +367,9 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
           data?.error || data?.message || res.statusText || 'Request failed',
         )
       }
-      const data = (await res.json()) as SessionStatusResponse
+      const data = (await res.json()) as CardStatusResponse
       const payload = data.payload ?? data
-      const parsed = parseSessionStatus(payload)
+      const parsed = parseCardStatus(payload)
       setUsage(parsed)
       setError(null)
     } catch (err) {
@@ -503,7 +381,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         toast('Failed to fetch usage data', { type: 'error' })
       }
     }
-  }, [statusSessionKey])
+  }, [statusCardId])
 
   const refreshProviders = useCallback(async () => {
     try {
@@ -652,7 +530,8 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
       )
       const total = tokenLines.reduce((sum, l) => sum + (l.used ?? 0), 0)
       if (total > 0) {
-        byProvider[p.displayName.split(' ')[0]] = { input: total, output: 0 }
+        const displayName = p.displayName.split(' ')[0] ?? p.displayName
+        byProvider[displayName] = { input: total, output: 0 }
       }
     })
     return byProvider
@@ -724,7 +603,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
   // Render pill content based on stats view
   const renderPillContent = () => {
     switch (statsView) {
-      case 'session':
+      case 'cards':
         return (
           <>
             <div className="flex items-center gap-1">
@@ -897,22 +776,20 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
             {renderPillContent()}
           </MenuTrigger>
           <MenuContent align="end" className="min-w-[180px]">
-            {(['session', 'provider', 'cost', 'agents'] as const).map(
-              (view) => (
-                <MenuItem
-                  key={view}
-                  onClick={() => handleStatsViewChange(view)}
-                  className={cn(
-                    statsView === view && 'bg-amber-100 text-amber-800',
-                  )}
-                >
-                  <span className="flex-1">{STATS_VIEW_LABELS[view]}</span>
-                  {statsView === view && (
-                    <span className="text-amber-600">✓</span>
-                  )}
-                </MenuItem>
-              ),
-            )}
+            {(['cards', 'provider', 'cost', 'agents'] as const).map((view) => (
+              <MenuItem
+                key={view}
+                onClick={() => handleStatsViewChange(view)}
+                className={cn(
+                  statsView === view && 'bg-amber-100 text-amber-800',
+                )}
+              >
+                <span className="flex-1">{STATS_VIEW_LABELS[view]}</span>
+                {statsView === view && (
+                  <span className="text-amber-600">✓</span>
+                )}
+              </MenuItem>
+            ))}
             <div className="my-1 h-px bg-primary-100" />
             <MenuItem onClick={() => setOpen(true)}>View Details…</MenuItem>
           </MenuContent>

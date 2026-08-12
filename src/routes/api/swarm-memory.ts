@@ -8,8 +8,10 @@ import {
   validateMissionId,
   validateSwarmId,
   writeSwarmHandoff,
-  type SwarmMemoryEventType,
-  type SwarmMemoryKind,
+} from '../../server/swarm-memory'
+import type {
+  SwarmMemoryEventType,
+  SwarmMemoryKind,
 } from '../../server/swarm-memory'
 
 type SwarmMemoryPostBody = {

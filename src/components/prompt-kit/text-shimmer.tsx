@@ -1,14 +1,14 @@
 'use client'
 
-import { createElement, type HTMLAttributes, type ReactNode } from 'react'
+import { createElement } from 'react'
 import { cn } from '@/lib/utils'
 
 export type TextShimmerProps = {
   as?: string
   duration?: number
   spread?: number
-  children: ReactNode
-} & HTMLAttributes<HTMLElement>
+  children: React.ReactNode
+} & React.HTMLAttributes<HTMLElement>
 
 export function TextShimmer({
   as = 'span',
@@ -19,7 +19,6 @@ export function TextShimmer({
   ...props
 }: TextShimmerProps) {
   const dynamicSpread = Math.min(Math.max(spread, 5), 45)
-
   return createElement(
     as,
     {

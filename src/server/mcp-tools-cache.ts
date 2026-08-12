@@ -22,9 +22,9 @@ import {
   unlinkSync,
   writeSync,
 } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { getHermesHome } from './workspace-state-dir'
 
 export interface CachedProbe {
   status: 'connected' | 'failed' | 'unknown'
@@ -59,11 +59,7 @@ function getTtlMs(): number {
 }
 
 export function cacheFilePath(): string {
-  const hermesHome =
-    process.env.HERMES_HOME?.trim() ??
-    process.env.CLAUDE_HOME?.trim() ??
-    join(homedir(), '.hermes')
-  return resolve(join(hermesHome, 'cache', 'mcp-tools.json'))
+  return join(getHermesHome(), 'cache', 'mcp-tools.json')
 }
 
 // ---------------------------------------------------------------------------
@@ -76,16 +72,19 @@ function readDisk(): Record<string, CachedProbe> {
   try {
     const text = readFileSync(path, 'utf8')
     const parsed = JSON.parse(text) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+    const record = parsed as Record<string, unknown>
     if (
-      !parsed ||
-      typeof parsed !== 'object' ||
-      Array.isArray(parsed) ||
-      (parsed as DiskSchema).version !== 1 ||
-      typeof (parsed as DiskSchema).probes !== 'object'
+      record.version !== 1 ||
+      !record.probes ||
+      typeof record.probes !== 'object' ||
+      Array.isArray(record.probes)
     ) {
       return {}
     }
-    return (parsed as DiskSchema).probes as Record<string, CachedProbe>
+    return record.probes as Record<string, CachedProbe>
   } catch {
     // Corrupt or unreadable — start fresh
     return {}

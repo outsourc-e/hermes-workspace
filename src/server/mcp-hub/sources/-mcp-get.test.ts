@@ -3,7 +3,11 @@
  * Uses vi.mock for cache and undici-style fetch interceptor (vi.stubGlobal)
  * so no live network calls are made.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getCache, setCache, touchCache } from '../cache'
+import { fetchMcpGet } from './mcp-get'
+import type { CachePayload } from '../cache'
 
 // Mock cache module
 vi.mock('../cache', () => ({
@@ -11,10 +15,6 @@ vi.mock('../cache', () => ({
   setCache: vi.fn(),
   touchCache: vi.fn(),
 }))
-
-import { getCache, setCache, touchCache } from '../cache'
-import { fetchMcpGet } from './mcp-get'
-import type { CachePayload } from '../cache'
 
 const mockGetCache = vi.mocked(getCache)
 const mockSetCache = vi.mocked(setCache)
@@ -57,7 +57,7 @@ afterEach(() => {
 function makeFetchMock(
   status: number,
   body: unknown,
-  headers: Record<string, string> = {},
+  headers: Partial<Record<string, string>> = {},
 ): typeof fetch {
   return vi.fn().mockResolvedValue({
     status,
@@ -77,10 +77,10 @@ describe('fetchMcpGet — 200 OK', () => {
 
     const result = await fetchMcpGet()
     expect(result.entries).toHaveLength(2)
-    expect(result.entries[0].name).toBe('github-mcp')
-    expect(result.entries[0].source).toBe('mcp-get')
-    expect(result.entries[0].trust).toBe('community')
-    expect(result.entries[0].id).toBe('mcp-get:github-mcp')
+    expect(result.entries[0]?.name).toBe('github-mcp')
+    expect(result.entries[0]?.source).toBe('mcp-get')
+    expect(result.entries[0]?.trust).toBe('community')
+    expect(result.entries[0]?.id).toBe('mcp-get:github-mcp')
     expect(result.warnings).toBeUndefined()
   })
 

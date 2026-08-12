@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildDisplayEntries,
+  buildToolResultsByCallId,
   getTrailingToolOnlyTurnSummary,
+  shouldIncludeDisplayMessage,
 } from './chat-message-list'
 import type { ChatMessage } from '../types'
 
@@ -45,7 +47,70 @@ describe('buildDisplayEntries', () => {
 
     expect(entries).toHaveLength(2)
     expect(entries.map((entry) => entry.message.id)).toEqual(['u1', 'a1'])
-    expect(entries[1].attachedToolMessages).toHaveLength(0)
+    expect(entries[1]?.attachedToolMessages).toHaveLength(0)
+  })
+
+  it('keeps snake_case persisted results authoritative in the production pipeline', () => {
+    const toolCallId = 'pipeline-tool'
+    const messages: Array<ChatMessage> = [
+      {
+        id: 'persisted-call',
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: toolCallId,
+            name: 'read_file',
+            arguments: { path: '/tmp/example.txt' },
+          },
+        ],
+        timestamp: 1,
+      } as ChatMessage,
+      {
+        id: 'persisted-result',
+        role: 'tool',
+        tool_call_id: toolCallId,
+        tool_name: 'read_file',
+        content: [],
+        isError: false,
+        timestamp: 2,
+      } as ChatMessage,
+      {
+        id: 'final-assistant',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Finished.' }],
+        __streamToolCalls: [
+          {
+            id: toolCallId,
+            name: 'read_file',
+            phase: 'error',
+            result: 'stale stream failure',
+          },
+        ],
+        timestamp: 3,
+      } as ChatMessage,
+    ]
+
+    const displayMessages = messages.filter((message) =>
+      shouldIncludeDisplayMessage(message),
+    )
+    expect(displayMessages.map((message) => message.role)).toEqual([
+      'assistant',
+      'tool',
+      'assistant',
+    ])
+    const entries = buildDisplayEntries(displayMessages)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.message.id).toBe('final-assistant')
+    expect(entries[0]?.attachedToolMessages.map((message) => message.role)).toEqual(
+      ['assistant', 'tool'],
+    )
+    expect(buildToolResultsByCallId(messages).get(toolCallId)).toMatchObject({
+      role: 'tool',
+      tool_call_id: toolCallId,
+      isError: false,
+      content: [],
+    })
   })
 })
 
@@ -78,6 +143,16 @@ describe('getTrailingToolOnlyTurnSummary', () => {
       textMessage('u1', 'user', 'show issues'),
       toolOnlyAssistant('a2'),
       textMessage('a1', 'assistant', 'Done.'),
+    ])
+
+    expect(summary).toBeNull()
+  })
+
+  it('returns null when a subsequent user message follows the final assistant response', () => {
+    const summary = getTrailingToolOnlyTurnSummary([
+      textMessage('u1', 'user', 'show issues'),
+      textMessage('a1', 'assistant', 'Open issues: 2'),
+      textMessage('u2', 'user', 'thanks'),
     ])
 
     expect(summary).toBeNull()

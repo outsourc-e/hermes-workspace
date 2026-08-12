@@ -21,10 +21,8 @@ import {
   dashboardFetch,
   gatewayFetch,
 } from '../../../server/gateway-capabilities'
-import {
-  buildDashboardOverview,
-  type DashboardFetcher,
-} from '../../../server/dashboard-aggregator'
+import { buildDashboardOverview } from '../../../server/dashboard-aggregator'
+import type { DashboardFetcher } from '../../../server/dashboard-aggregator'
 
 const overviewFetcher: DashboardFetcher = (path) => dashboardFetch(path)
 // Gateway fetcher hits the gateway URL (8645/8642), which is where
@@ -42,7 +40,8 @@ export const Route = createFileRoute('/api/dashboard/overview')({
         try {
           const url = new URL(request.url)
           const days = Number(url.searchParams.get('days') ?? '30')
-          const limit = Number(url.searchParams.get('achievements') ?? '3')
+          const achievements = url.searchParams.get('achievements')
+          const limit = Number(achievements ?? '3')
           const logsLimit = Number(url.searchParams.get('logs') ?? '24')
           const overview = await buildDashboardOverview({
             fetcher: overviewFetcher,
@@ -50,6 +49,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
             analyticsWindowDays: Number.isFinite(days) && days > 0 ? days : 30,
             achievementsLimit:
               Number.isFinite(limit) && limit > 0 ? Math.min(limit, 12) : 3,
+            includeAchievements: achievements !== null,
             logsLimit:
               Number.isFinite(logsLimit) && logsLimit > 0
                 ? Math.min(logsLimit, 100)

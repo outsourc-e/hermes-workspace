@@ -1,16 +1,20 @@
 import {
-  randomUUID,
-  generateKeyPairSync,
+  createHash,
   createPrivateKey,
   createPublicKey,
-  createHash,
   sign as cryptoSign,
+  generateKeyPairSync,
+  randomUUID,
 } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import WebSocket from 'ws'
 import type { RawData } from 'ws'
+import type {
+  ConnectionErrorKind,
+  classifyConnectionError,
+} from '../lib/connection-errors'
 
 export type GatewayFrame =
   | { type: 'req'; id: string; method: string; params?: unknown }
@@ -174,7 +178,7 @@ export function getGatewayConfig() {
     browserUrl ||
     process.env.CLAUDE_GATEWAY_URL?.trim() ||
     'ws://127.0.0.1:18789'
-  let token = process.env.CLAUDE_GATEWAY_TOKEN?.trim() || ''
+  const token = process.env.CLAUDE_GATEWAY_TOKEN?.trim() || ''
   const password = process.env.CLAUDE_GATEWAY_PASSWORD?.trim() || ''
 
   // Allow connecting without shared auth — device identity signature handles authentication.
@@ -246,9 +250,7 @@ class GatewayClient {
   private reconnectAttempts = 0
   private authenticated = false
   private destroyed = false
-  private _lastErrorKind:
-    | import('../lib/connection-errors').ConnectionErrorKind
-    | null = null
+  private _lastErrorKind: ConnectionErrorKind | null = null
 
   // Circuit breaker: prevent request floods when gateway is unreachable
   private circuitFailures = 0
@@ -273,7 +275,7 @@ class GatewayClient {
   getConnectionSnapshot(): {
     readyState: number
     authenticated: boolean
-    errorKind: import('../lib/connection-errors').ConnectionErrorKind | null
+    errorKind: ConnectionErrorKind | null
   } {
     return {
       readyState: this.ws?.readyState ?? WebSocket.CLOSED,
@@ -536,9 +538,11 @@ class GatewayClient {
         lastError = error instanceof Error ? error : new Error(String(error))
         // Classify the error for UI display
         try {
-          const { classifyConnectionError } =
-            require('../lib/connection-errors') as typeof import('../lib/connection-errors')
-          this._lastErrorKind = classifyConnectionError(lastError)
+          const connectionErrors = require('../lib/connection-errors') as {
+            classifyConnectionError: typeof classifyConnectionError
+          }
+          this._lastErrorKind =
+            connectionErrors.classifyConnectionError(lastError)
         } catch {
           /* module may not be available in all contexts */
         }
@@ -566,7 +570,7 @@ class GatewayClient {
     })
 
     ws.on('close', (code: number, reason: Buffer) => {
-      const reasonText = reason?.toString() || 'n/a'
+      const reasonText = reason.toString() || 'n/a'
       this.handleDisconnect(
         new Error(
           `Gateway connection closed (code=${code}, reason=${reasonText})`,
@@ -831,13 +835,15 @@ class GatewayClient {
   }
 }
 
-function nextReconnectDelayMs(attempt: number) {
-  if (attempt < RECONNECT_DELAYS_MS.length) {
-    return RECONNECT_DELAYS_MS[attempt]
+function nextReconnectDelayMs(attempt: number): number {
+  const scheduledDelay = RECONNECT_DELAYS_MS[attempt]
+  if (scheduledDelay !== undefined) {
+    return scheduledDelay
   }
 
-  const doubled =
-    RECONNECT_DELAYS_MS[RECONNECT_DELAYS_MS.length - 1] * 2 ** (attempt - 2)
+  const lastScheduledDelay =
+    RECONNECT_DELAYS_MS.at(-1) ?? MAX_RECONNECT_DELAY_MS
+  const doubled = lastScheduledDelay * 2 ** (attempt - 2)
   return Math.min(doubled, MAX_RECONNECT_DELAY_MS)
 }
 
@@ -851,9 +857,8 @@ function rawDataToString(data: RawData): string {
 const GW_KEY = '__clawsuite_gateway_client__' as const
 const ACTIVE_SEND_RUNS_KEY = '__clawsuite_active_send_stream_runs__' as const
 declare global {
-  // eslint-disable-next-line no-var
   var __clawsuite_gateway_client__: GatewayClient | undefined
-  // eslint-disable-next-line no-var
+
   var __clawsuite_active_send_stream_runs__: Set<string> | undefined
 }
 const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined

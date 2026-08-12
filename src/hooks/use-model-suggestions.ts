@@ -41,8 +41,8 @@ type Message = {
   [key: string]: unknown
 }
 
-type SessionDismissal = {
-  sessionKey: string
+type CardDismissal = {
+  cardId: string
   timestamp: number
 }
 
@@ -80,7 +80,7 @@ function findModelInTier(
   const providerTiers = MODEL_TIERS[provider]
   if (!providerTiers) return null
 
-  const candidates = providerTiers[tier] || []
+  const candidates = providerTiers[tier]
   for (const candidate of candidates) {
     const match = availableModels.find((m) =>
       m.toLowerCase().includes(candidate.toLowerCase()),
@@ -131,21 +131,22 @@ function setLastShownTimestamp() {
   }
 }
 
-function getSessionDismissals(): Array<SessionDismissal> {
+function getCardDismissals(): Array<CardDismissal> {
   try {
-    const stored = localStorage.getItem('modelSuggestionSessionDismissals')
+    localStorage.removeItem('modelSuggestionSessionDismissals')
+    const stored = localStorage.getItem('modelSuggestionCardDismissals')
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
 }
 
-function addSessionDismissal(sessionKey: string) {
+function addCardDismissal(cardId: string) {
   try {
-    const dismissals = getSessionDismissals()
-    dismissals.push({ sessionKey, timestamp: Date.now() })
+    const dismissals = getCardDismissals()
+    dismissals.push({ cardId, timestamp: Date.now() })
     localStorage.setItem(
-      'modelSuggestionSessionDismissals',
+      'modelSuggestionCardDismissals',
       JSON.stringify(dismissals),
     )
   } catch {
@@ -153,14 +154,14 @@ function addSessionDismissal(sessionKey: string) {
   }
 }
 
-function isSessionDismissed(sessionKey: string): boolean {
-  const dismissals = getSessionDismissals()
-  return dismissals.some((d) => d.sessionKey === sessionKey)
+function isCardDismissed(cardId: string): boolean {
+  const dismissals = getCardDismissals()
+  return dismissals.some((d) => d.cardId === cardId)
 }
 
 export function useModelSuggestions(_opts: {
   currentModel: string
-  sessionKey: string
+  cardId: string
   messages: Array<Message>
   availableModels: Array<string>
 }) {
@@ -177,12 +178,12 @@ export function useModelSuggestions(_opts: {
 
 function _useModelSuggestionsDisabled({
   currentModel,
-  sessionKey,
+  cardId,
   messages,
   availableModels,
 }: {
   currentModel: string
-  sessionKey: string
+  cardId: string
   messages: Array<Message>
   availableModels: Array<string>
 }) {
@@ -209,7 +210,7 @@ function _useModelSuggestionsDisabled({
     }
 
     // Session dismissed
-    if (isSessionDismissed(sessionKey)) {
+    if (isCardDismissed(cardId)) {
       return
     }
 
@@ -257,7 +258,7 @@ function _useModelSuggestionsDisabled({
     // Check for upgrade opportunity (complex task on weak model)
     // Phase 4.2: Skip if "Only suggest cheaper" is enabled
     if (!settings.onlySuggestCheaper) {
-      const lastMessage = messages[messages.length - 1]
+      const lastMessage = messages.at(-1)
       if (lastMessage && isComplexTask(lastMessage)) {
         let targetTier: ModelTier | null = null
 
@@ -293,10 +294,10 @@ function _useModelSuggestionsDisabled({
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- messages.length as stable proxy
+    // Hook dependencies are intentionally constrained to the explicit array below. -- messages.length as stable proxy
   }, [
     currentModel,
-    sessionKey,
+    cardId,
     messages.length,
     availableModels.length,
     settings.smartSuggestionsEnabled,
@@ -310,7 +311,7 @@ function _useModelSuggestionsDisabled({
   }
 
   const dismissForSession = () => {
-    addSessionDismissal(sessionKey)
+    addCardDismissal(cardId)
     setSuggestion(null)
   }
 

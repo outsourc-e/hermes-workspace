@@ -1,15 +1,75 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChatAttachment, ChatMessage } from '../types'
-import { readResolvedSessionHeaders } from '@/lib/send-stream-session-headers'
+import { isValidSessionCardHandoffTransition } from '../chat-queries'
+import type {
+  SessionCardHandoffAuthority,
+  SessionCardHandoffTransition,
+} from '../chat-queries'
+import type { ChatAttachment, ChatMessage, SessionCard } from '../types'
+import type {
+  StreamingState as ChatStoreStreamingState,
+  ChatStreamEvent,
+} from '@/stores/chat-store'
 import { useChatStore } from '@/stores/chat-store'
 import { pushActivity } from '@/components/inspector/activity-store'
 
+const SESSION_BOOTSTRAP_KEYS = new Set(['main', 'new'])
+
+type StreamToolCallSummary = ChatStoreStreamingState['toolCalls'][number]
+
+function mergeStreamToolCallSummary(
+  current: Array<StreamToolCallSummary>,
+  event: Extract<ChatStreamEvent, { type: 'tool' }>,
+  fallbackIdentity: string,
+): Array<StreamToolCallSummary> {
+  const id =
+    (typeof event.toolCallId === 'string' && event.toolCallId.trim()) ||
+    `${event.name || 'tool'}-${event.runId || fallbackIdentity}-${current.length}`
+  const existingIndex = current.findIndex((toolCall) => toolCall.id === id)
+  const existing = current[existingIndex]
+  const next: StreamToolCallSummary = existing
+    ? {
+        ...existing,
+        phase: event.phase,
+        args: event.args ?? existing.args,
+        preview: event.preview ?? existing.preview,
+        result: event.result ?? existing.result,
+      }
+    : {
+        id,
+        name: event.name,
+        phase: event.phase,
+        args: event.args,
+        preview: event.preview,
+        result: event.result,
+      }
+
+  if (existingIndex < 0) return [...current, next]
+  const merged = [...current]
+  merged[existingIndex] = next
+  return merged
+}
+
+function isExactNonblankIdentity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.trim() === value
+}
+
+function sourceQualifiedIdentitySource(
+  value: unknown,
+): 'local' | 'remote' | null {
+  if (!isExactNonblankIdentity(value)) return null
+  if (value.startsWith('local:') && value.length > 'local:'.length) {
+    return 'local'
+  }
+  if (value.startsWith('remote:') && value.length > 'remote:'.length) {
+    return 'remote'
+  }
+  return null
+}
+
 /**
- * Determine whether a stream-resolved session key change should trigger
- * onSessionResolved (which navigates the route). Only bootstrap keys
- * ("new", "main") should promote a backend-returned session ID to the
- * Workspace route identity. Concrete sessions must never be overridden
- * by a backend-derived api-* ID — that causes session splits (#297).
+ * Determine whether authoritative stream session data should trigger a route
+ * handoff. Portable `main` remains pinned, but remote concrete sessions may
+ * legitimately continue under a successor session identifier.
  */
 export function shouldResolveStreamSession({
   requestedSessionKey,
@@ -29,8 +89,178 @@ export function shouldResolveStreamSession({
   // "main" only stays pinned when the current route is intentionally bound to
   // the portable Workspace session in zero-fork mode.
   if (requestedSessionKey === 'main') return !pinMainSession
-  // Concrete session → never promote a different backend ID
-  return false
+  // Concrete remote sessions hand off when the stream names a successor.
+  return true
+}
+
+export function resolveAuthoritativeSessionHandoffEvent(
+  event: string,
+  data: unknown,
+): {
+  fromSessionKey: string
+  sessionKey: string
+  friendlyId: string
+  runId: string | null
+  verifiedCardAuthority?: SessionCardHandoffAuthority
+} | null {
+  if (event !== 'session_handoff' || !data || typeof data !== 'object') {
+    return null
+  }
+  const payload = data as Record<string, unknown>
+  const fromSessionKey =
+    typeof payload.fromSessionKey === 'string'
+      ? payload.fromSessionKey.trim()
+      : ''
+  const sessionKey =
+    typeof payload.sessionKey === 'string' ? payload.sessionKey.trim() : ''
+  if (
+    !fromSessionKey ||
+    !sessionKey ||
+    SESSION_BOOTSTRAP_KEYS.has(sessionKey) ||
+    fromSessionKey === sessionKey
+  )
+    return null
+  const friendlyId =
+    typeof payload.friendlyId === 'string' && payload.friendlyId.trim()
+      ? payload.friendlyId.trim()
+      : sessionKey
+  const runId =
+    typeof payload.runId === 'string' && payload.runId.trim()
+      ? payload.runId.trim()
+      : null
+  let verifiedCardAuthority: SessionCardHandoffAuthority | undefined
+  if (payload.verifiedCardAuthority !== undefined) {
+    if (
+      !payload.verifiedCardAuthority ||
+      typeof payload.verifiedCardAuthority !== 'object' ||
+      Array.isArray(payload.verifiedCardAuthority)
+    ) {
+      return null
+    }
+    const authority = payload.verifiedCardAuthority as Record<string, unknown>
+    const authorityCardId = authority.cardId
+    const authorityCanonicalSegmentKey = authority.canonicalSegmentKey
+    const authoritySource = sourceQualifiedIdentitySource(authorityCardId)
+    const authoritySegments = authority.continuationSegmentKeys
+    if (
+      !isExactNonblankIdentity(authorityCardId) ||
+      !authoritySource ||
+      authority.cardId !== friendlyId ||
+      authority.canonicalSource !== authoritySource ||
+      !isExactNonblankIdentity(authorityCanonicalSegmentKey) ||
+      authorityCanonicalSegmentKey !== sessionKey ||
+      sourceQualifiedIdentitySource(authorityCanonicalSegmentKey) !==
+        authoritySource ||
+      authority.relationshipKind !== 'root' ||
+      !Array.isArray(authoritySegments) ||
+      authoritySegments.length === 0 ||
+      new Set(authoritySegments).size !== authoritySegments.length ||
+      authoritySegments.at(-1) !== sessionKey ||
+      !authoritySegments.every(
+        (segmentKey) =>
+          isExactNonblankIdentity(segmentKey) &&
+          sourceQualifiedIdentitySource(segmentKey) === authoritySource,
+      )
+    ) {
+      return null
+    }
+    verifiedCardAuthority = {
+      cardId: authorityCardId,
+      canonicalSource: authoritySource,
+      canonicalSegmentKey: authorityCanonicalSegmentKey,
+      continuationSegmentKeys: [...authoritySegments],
+      relationshipKind: 'root',
+      childNodes: [],
+    }
+  }
+  return {
+    fromSessionKey,
+    sessionKey,
+    friendlyId,
+    runId,
+    ...(verifiedCardAuthority ? { verifiedCardAuthority } : {}),
+  }
+}
+
+export function resolveAuthoritativeCardHandoffEvent(
+  event: string,
+  data: unknown,
+): SessionCardHandoffTransition | null {
+  if (event !== 'card_handoff' || !data || typeof data !== 'object') {
+    return null
+  }
+  const payload = data as Record<string, unknown>
+  const { cardId, fromSegmentKey, canonicalSegmentKey } = payload
+  const cardSource = sourceQualifiedIdentitySource(cardId)
+  const fromSource = sourceQualifiedIdentitySource(fromSegmentKey)
+  const canonicalSource = sourceQualifiedIdentitySource(canonicalSegmentKey)
+  if (
+    !isExactNonblankIdentity(cardId) ||
+    !isExactNonblankIdentity(fromSegmentKey) ||
+    !isExactNonblankIdentity(canonicalSegmentKey) ||
+    !cardSource ||
+    fromSource !== cardSource ||
+    canonicalSource !== cardSource ||
+    SESSION_BOOTSTRAP_KEYS.has(canonicalSegmentKey) ||
+    fromSegmentKey === canonicalSegmentKey ||
+    !isExactNonblankIdentity(payload.runId)
+  ) {
+    return null
+  }
+  const runId = payload.runId
+  if (
+    !Array.isArray(payload.verifiedContinuationSegmentKeys) ||
+    payload.verifiedContinuationSegmentKeys.length < 2 ||
+    !payload.verifiedContinuationSegmentKeys.every(isExactNonblankIdentity)
+  ) {
+    return null
+  }
+  return {
+    cardId,
+    fromSegmentKey,
+    canonicalSegmentKey,
+    runId,
+    verifiedContinuationSegmentKeys: [
+      ...payload.verifiedContinuationSegmentKeys,
+    ],
+  }
+}
+
+export type AuthoritativeCardHandoff = NonNullable<
+  ReturnType<typeof resolveAuthoritativeCardHandoffEvent>
+>
+
+export function shouldApplyCardHandoff({
+  handoff,
+  activeCard,
+  sessionCards,
+  currentSegmentKey,
+  activeRunId,
+}: {
+  handoff: AuthoritativeCardHandoff
+  activeCard?: Pick<
+    SessionCard,
+    | 'cardId'
+    | 'canonicalSource'
+    | 'canonicalSegmentKey'
+    | 'continuationSegmentKeys'
+    | 'relationshipKind'
+    | 'childNodes'
+  >
+  sessionCards?: ReadonlyArray<SessionCard>
+  currentSegmentKey: string
+  activeRunId: string | null
+}): boolean {
+  return (
+    Boolean(activeRunId) &&
+    handoff.runId === activeRunId &&
+    isValidSessionCardHandoffTransition({
+      handoff,
+      activeCard,
+      currentSegmentKey,
+      sessionCards,
+    })
+  )
 }
 
 type StreamingState = {
@@ -72,10 +302,11 @@ type PortableHistoryMessage = {
 
 type UseStreamingMessageOptions = {
   pinMainSession?: boolean
-  onStarted?: (payload: { runId: string | null }) => void
+  onStarted?: (payload: { runId: string | null }) => void | Promise<void>
   onChunk?: (text: string, fullText: string) => void
-  onComplete?: (message: ChatMessage) => void
-  onError?: (error: string) => void
+  onComplete?: (message: ChatMessage) => void | Promise<void>
+  onInterrupted?: (message: ChatMessage) => void | Promise<void>
+  onError?: (error: string) => void | Promise<void>
   onThinking?: (thinking: string) => void
   onTool?: (tool: unknown) => void
   onMessageAccepted?: (
@@ -83,11 +314,21 @@ type UseStreamingMessageOptions = {
     friendlyId: string,
     clientId: string,
   ) => void
-  onAbort?: () => void
+  /** Called only once a successful response has yielded an actual SSE reader. */
+  onReaderOpened?: (sessionKey: string) => void
+  onAbort?: (sessionKey: string) => void
   onSessionResolved?: (payload: {
+    fromSessionKey: string
     sessionKey: string
     friendlyId: string
-  }) => void
+    reason: 'bootstrap' | 'stream-handoff'
+  }) => void | Promise<void>
+  activeCard?: SessionCard
+  sessionCards?: ReadonlyArray<SessionCard>
+  onCardHandoff?: (
+    payload: AuthoritativeCardHandoff,
+    authority: SessionCardHandoffAuthority,
+  ) => boolean
   acceptedTimeoutMs?: number
   handoffTimeoutMs?: number
 }
@@ -98,12 +339,17 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     onStarted,
     onChunk,
     onComplete,
+    onInterrupted,
     onError,
     onThinking,
     onTool,
     onMessageAccepted,
+    onReaderOpened,
     onAbort,
     onSessionResolved,
+    activeCard,
+    sessionCards,
+    onCardHandoff,
     acceptedTimeoutMs,
     handoffTimeoutMs,
   } = options
@@ -122,11 +368,22 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const frameRef = useRef<number | null>(null)
   const finishedRef = useRef(false)
   const thinkingRef = useRef<string>('')
+  const terminalToolCallsRef = useRef<Array<StreamToolCallSummary>>([])
   const activeRunIdRef = useRef<string | null>(null)
+  const recoveryIdRef = useRef<string>('')
   const delayedUnregisterTimerRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null)
   const activeSessionKeyRef = useRef<string>('main')
+  // Browser ownership is Card-only once an authoritative Card is known. Raw
+  // segment keys remain confined to the request and SSE transport boundary.
+  const activeCardIdRef = useRef<string | null>(null)
+  // Stream-owned Card authority. Unlike the render-captured active Card, this
+  // advances synchronously while a coalesced SSE batch is being processed.
+  // That lets a bootstrap handoff establish Card ownership before a chained
+  // card_handoff in the same reader.read() result, without weakening the exact
+  // Card/segment checks for unrelated events.
+  const activeStreamCardRef = useRef<SessionCardHandoffAuthority | null>(null)
   // Monotonically increasing token. Each call to startStreaming bumps this so
   // any in-flight processStream loop (or pending microtask processing chunks
   // it has already read into the SSE buffer) can detect that it's stale and
@@ -149,7 +406,35 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   const registerSendStreamRun = useChatStore((s) => s.registerSendStreamRun)
   const unregisterSendStreamRun = useChatStore((s) => s.unregisterSendStreamRun)
   const processStoreEvent = useChatStore((s) => s.processEvent)
+  const processCardEvent = useChatStore((s) => s.processCardEvent)
+  const handoffSession = useChatStore((s) => s.handoffSession)
   const clearStreamingSession = useChatStore((s) => s.clearStreamingSession)
+  const clearCardStreaming = useChatStore((s) => s.clearCardStreaming)
+  const claimSessionStateForCard = useChatStore(
+    (s) => s.claimSessionStateForCard,
+  )
+
+  const processBrowserEvent = useCallback(
+    (event: Parameters<typeof processStoreEvent>[0]) => {
+      if (event.type === 'tool') {
+        terminalToolCallsRef.current = mergeStreamToolCallSummary(
+          terminalToolCallsRef.current,
+          event,
+          activeRunIdRef.current || activeSessionKeyRef.current,
+        )
+      }
+      const cardId = activeCardIdRef.current
+      if (cardId) processCardEvent(cardId, event)
+      else processStoreEvent(event)
+    },
+    [processCardEvent, processStoreEvent],
+  )
+
+  const clearBrowserStreaming = useCallback(() => {
+    const cardId = activeCardIdRef.current
+    if (cardId) clearCardStreaming(cardId)
+    else clearStreamingSession(activeSessionKeyRef.current)
+  }, [clearCardStreaming, clearStreamingSession])
 
   const ACCEPTED_NO_ACTIVITY_TIMEOUT_MS = acceptedTimeoutMs ?? 120_000
   const HANDOFF_NO_ACTIVITY_TIMEOUT_MS = handoffTimeoutMs ?? 300_000
@@ -185,7 +470,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         clearTimeout(delayedUnregisterTimerRef.current)
         delayedUnregisterTimerRef.current = null
       }
-      clearStreamingSession(activeSessionKeyRef.current)
+      clearBrowserStreaming()
+      activeCardIdRef.current = null
+      activeStreamCardRef.current = null
+      recoveryIdRef.current = ''
       if (nextSessionKey) {
         activeSessionKeyRef.current = nextSessionKey
       }
@@ -193,6 +481,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       renderedTextRef.current = ''
       targetTextRef.current = ''
       thinkingRef.current = ''
+      terminalToolCallsRef.current = []
       stepUsageRef.current = {}
       lifecyclePhaseRef.current = 'idle'
       acceptedAtRef.current = null
@@ -204,7 +493,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         error: null,
       })
     },
-    [clearHandoffTimer, clearSendStreamRun, clearStreamingSession, stopFrame],
+    [clearBrowserStreaming, clearHandoffTimer, clearSendStreamRun, stopFrame],
   )
 
   const markActivity = useCallback(() => {
@@ -225,29 +514,88 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
     lifecyclePhaseRef.current = 'accepted'
   }, [])
 
+  const sealInterruptedStream =
+    useCallback(async (): Promise<ChatMessage | null> => {
+      const partialText = fullTextRef.current
+      if (!partialText || finishedRef.current) return null
+      const runId = activeRunIdRef.current
+      const terminalToolCalls = terminalToolCallsRef.current
+      const interruptedMessage: ChatMessage = {
+        role: 'assistant',
+        content: [
+          ...(thinkingRef.current
+            ? [
+                {
+                  type: 'thinking' as const,
+                  thinking: thinkingRef.current,
+                },
+              ]
+            : []),
+          { type: 'text' as const, text: partialText },
+        ],
+        timestamp: Date.now(),
+        __streamingStatus: 'interrupted',
+        recoveryId: recoveryIdRef.current,
+        ...stepUsageRef.current,
+        ...(terminalToolCalls.length > 0
+          ? { __streamToolCalls: terminalToolCalls }
+          : {}),
+        ...(runId ? { runId, stableId: `stream-run:${runId}` } : {}),
+      }
+
+      // Replace the live stream synchronously so persistence latency cannot keep
+      // a duplicate streaming row visible beside the interrupted response.
+      processBrowserEvent({
+        type: 'done',
+        state: 'interrupted',
+        message: interruptedMessage as Record<string, unknown>,
+        runId: runId ?? undefined,
+        sessionKey: activeSessionKeyRef.current,
+        transport: 'send-stream',
+      })
+      // Interrupted output is persisted once, at the lifecycle boundary. Healthy
+      // streams never checkpoint growing prefixes to IndexedDB.
+      await onInterrupted?.(interruptedMessage)
+      return interruptedMessage
+    }, [onInterrupted, processBrowserEvent])
+
   const markFailed = useCallback(
-    (message: string) => {
+    async (message: string) => {
       if (finishedRef.current) return
+      let visibleMessage = message
+      try {
+        await sealInterruptedStream()
+      } catch {
+        visibleMessage =
+          'Response stopped because recovery storage is unavailable'
+      }
       finishedRef.current = true
+      eventSourceRef.current?.abort()
       eventSourceRef.current = null
       stopFrame()
       lifecyclePhaseRef.current = 'error'
       clearHandoffTimer()
       clearSendStreamRun()
-      clearStreamingSession(activeSessionKeyRef.current)
+      clearBrowserStreaming()
       setState((prev) => ({
         ...prev,
         isStreaming: false,
-        error: message,
+        error: visibleMessage,
       }))
-      onError?.(message)
+      try {
+        await onError?.(visibleMessage)
+      } catch {
+        // The stream is already terminal. Preserve the safe local error rather
+        // than converting a recovery-status write failure into transport state.
+      }
       useChatStore.getState().setHeartbeatActivity(null)
     },
     [
+      clearBrowserStreaming,
       clearHandoffTimer,
       clearSendStreamRun,
-      clearStreamingSession,
       onError,
+      sealInterruptedStream,
       stopFrame,
     ],
   )
@@ -270,7 +618,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (reason === 'handoff') {
           const store = useChatStore.getState()
           const streamingState =
-            store.streamingState.get(activeSessionKeyRef.current) ?? null
+            store.streamingState.get(
+              activeCardIdRef.current ?? activeSessionKeyRef.current,
+            ) ?? null
           const lastEventTimestamp = store.lastEventAt
           if (
             streamingState !== null ||
@@ -287,7 +637,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           schedulePostAcceptanceTimeout(reason)
           return
         }
-        markFailed(
+        void markFailed(
           reason === 'handoff'
             ? 'Run stalled after handoff'
             : 'No activity received after message was accepted',
@@ -384,7 +734,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
   )
 
   const finishStream = useCallback(
-    (payload?: unknown) => {
+    async (payload?: unknown) => {
       if (finishedRef.current) return
       finishedRef.current = true
       eventSourceRef.current = null
@@ -408,6 +758,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       const finalText = fullTextRef.current
       const thinking = thinkingRef.current
+      const terminalToolCalls = terminalToolCallsRef.current
       renderedTextRef.current = finalText
       targetTextRef.current = finalText
 
@@ -425,18 +776,121 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         ],
         timestamp: Date.now(),
         __streamingStatus: 'complete',
+        recoveryId: recoveryIdRef.current,
         ...stepUsageRef.current,
         ...(payload as Record<string, unknown>),
+        ...(terminalToolCalls.length > 0
+          ? { __streamToolCalls: terminalToolCalls }
+          : {}),
+        ...(completedRunId
+          ? {
+              runId: completedRunId,
+              stableId: `stream-run:${completedRunId}`,
+            }
+          : {}),
       }
 
-      onComplete?.(message)
+      // Atomically replace the live stream in the synchronous store before any
+      // terminal IndexedDB work. The completed message can render immediately,
+      // and the streaming placeholder cannot lag behind it.
+      processBrowserEvent({
+        type: 'done',
+        state:
+          typeof (payload as Record<string, unknown> | undefined)?.state ===
+          'string'
+            ? ((payload as Record<string, unknown>).state as string)
+            : 'complete',
+        message:
+          finalText || thinking
+            ? (message as Record<string, unknown>)
+            : ((payload as Record<string, unknown> | undefined)?.message as
+                | Record<string, unknown>
+                | undefined),
+        runId:
+          completedRunId ??
+          (typeof (payload as Record<string, unknown> | undefined)?.runId ===
+          'string'
+            ? ((payload as Record<string, unknown>).runId as string)
+            : undefined),
+        sessionKey: activeSessionKeyRef.current,
+        transport: 'send-stream',
+      })
+
+      try {
+        await onComplete?.(message)
+      } catch {
+        setState((prev) => ({
+          ...prev,
+          error: 'Response completed, but recovery storage is unavailable',
+        }))
+      }
       useChatStore.getState().setHeartbeatActivity(null)
     },
-    [clearHandoffTimer, onComplete, stopFrame, unregisterSendStreamRun],
+    [
+      clearHandoffTimer,
+      onComplete,
+      processBrowserEvent,
+      stopFrame,
+      unregisterSendStreamRun,
+    ],
+  )
+
+  const applySessionHandoff = useCallback(
+    async (
+      fromSessionKey: string,
+      resolvedSessionKey: string,
+      resolvedFriendlyId: string,
+      verifiedCardAuthority?: SessionCardHandoffAuthority,
+    ) => {
+      const currentSessionKey = activeSessionKeyRef.current
+      if (fromSessionKey !== currentSessionKey) return
+      if (
+        !shouldResolveStreamSession({
+          requestedSessionKey: requestedSessionKeyRef.current,
+          currentSessionKey,
+          resolvedSessionKey,
+          pinMainSession,
+        })
+      ) {
+        return
+      }
+
+      const hasVerifiedCardAuthority =
+        SESSION_BOOTSTRAP_KEYS.has(fromSessionKey) &&
+        verifiedCardAuthority &&
+        verifiedCardAuthority.cardId === resolvedFriendlyId &&
+        verifiedCardAuthority.canonicalSegmentKey === resolvedSessionKey
+      await onSessionResolved?.({
+        fromSessionKey,
+        sessionKey: resolvedSessionKey,
+        friendlyId: resolvedFriendlyId || resolvedSessionKey,
+        reason: SESSION_BOOTSTRAP_KEYS.has(fromSessionKey)
+          ? 'bootstrap'
+          : 'stream-handoff',
+      })
+      if (
+        SESSION_BOOTSTRAP_KEYS.has(requestedSessionKeyRef.current) &&
+        !SESSION_BOOTSTRAP_KEYS.has(fromSessionKey)
+      ) {
+        handoffSession(fromSessionKey, resolvedSessionKey)
+      }
+      if (hasVerifiedCardAuthority) {
+        claimSessionStateForCard(fromSessionKey, verifiedCardAuthority.cardId)
+        activeCardIdRef.current = verifiedCardAuthority.cardId
+        activeStreamCardRef.current = verifiedCardAuthority
+      }
+      activeSessionKeyRef.current = resolvedSessionKey
+    },
+    [
+      claimSessionStateForCard,
+      handoffSession,
+      onSessionResolved,
+      pinMainSession,
+    ],
   )
 
   const processEvent = useCallback(
-    (event: string, data: unknown) => {
+    async (event: string, data: unknown) => {
       const payload = data as Record<string, unknown>
 
       // [DEBUG TUI] Log every SSE event so we can see whether tool.* events arrive
@@ -444,13 +898,13 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       // localStorage.removeItem('hermes:debug:sse')
       if (
         typeof window !== 'undefined' &&
-        window.localStorage?.getItem('hermes:debug:sse') === '1'
+        window.localStorage.getItem('hermes:debug:sse') === '1'
       ) {
         console.log(
           '[hermes-sse]',
           event,
-          (payload?.name as string) || '',
-          (payload?.phase as string) || '',
+          (payload.name as string) || '',
+          (payload.phase as string) || '',
           payload,
         )
       }
@@ -469,31 +923,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
 
       switch (event) {
         case 'started': {
-          const resolvedSessionKey =
-            typeof payload.sessionKey === 'string' && payload.sessionKey.trim()
-              ? payload.sessionKey.trim()
-              : activeSessionKeyRef.current
-          const resolvedFriendlyId =
-            typeof payload.friendlyId === 'string' && payload.friendlyId.trim()
-              ? payload.friendlyId.trim()
-              : resolvedSessionKey
-          if (resolvedSessionKey !== activeSessionKeyRef.current) {
-            // Guard: only promote backend session IDs for bootstrap keys.
-            // Concrete Workspace sessions must never be overridden (#297).
-            if (
-              shouldResolveStreamSession({
-                requestedSessionKey: requestedSessionKeyRef.current,
-                currentSessionKey: activeSessionKeyRef.current,
-                resolvedSessionKey,
-              })
-            ) {
-              activeSessionKeyRef.current = resolvedSessionKey
-              onSessionResolved?.({
-                sessionKey: resolvedSessionKey,
-                friendlyId: resolvedFriendlyId,
-              })
-            }
-          }
           // Register runId so chat-events skips duplicate chunks for this run
           const runId = payload.runId as string | undefined
           if (runId) {
@@ -506,21 +935,86 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             time: new Date().toLocaleTimeString(),
             text: 'Assistant started',
           })
-          processStoreEvent({
+          processBrowserEvent({
             type: 'chunk',
             text: '',
             runId: runId ?? undefined,
             sessionKey: activeSessionKeyRef.current,
             transport: 'send-stream',
           })
-          onStarted?.({ runId: runId ?? null })
+          await onStarted?.({ runId: runId ?? null })
+          break
+        }
+        case 'card_handoff': {
+          const handoff = resolveAuthoritativeCardHandoffEvent(event, data)
+          const streamCard = activeStreamCardRef.current
+          const projectedCard = activeCard
+          const renderCard =
+            projectedCard &&
+            projectedCard.cardId === streamCard?.cardId &&
+            projectedCard.continuationSegmentKeys.includes(
+              activeSessionKeyRef.current,
+            )
+              ? projectedCard
+              : (streamCard ?? undefined)
+          if (
+            !handoff ||
+            !shouldApplyCardHandoff({
+              handoff,
+              activeCard: renderCard,
+              sessionCards,
+              currentSegmentKey: activeSessionKeyRef.current,
+              activeRunId: activeRunIdRef.current,
+            })
+          ) {
+            break
+          }
+          const targetCardAuthority: SessionCardHandoffAuthority = {
+            ...renderCard!,
+            canonicalSegmentKey: handoff.canonicalSegmentKey,
+            continuationSegmentKeys: [
+              ...handoff.verifiedContinuationSegmentKeys,
+            ],
+          }
+          // The Card cache/recovery move must agree before the live store and
+          // stream baseline advance. A missing consumer fails closed.
+          if (onCardHandoff?.(handoff, targetCardAuthority) !== true) break
+          await onSessionResolved?.({
+            fromSessionKey: handoff.fromSegmentKey,
+            sessionKey: handoff.canonicalSegmentKey,
+            friendlyId: handoff.cardId,
+            reason: 'stream-handoff',
+          })
+          activeRunIdRef.current = handoff.runId
+          registerSendStreamRun(handoff.runId)
+          // Same-Card continuation: only the ephemeral transport segment moves.
+          // Browser live state remains under the single stable Card owner.
+          activeSessionKeyRef.current = handoff.canonicalSegmentKey
+          activeCardIdRef.current = handoff.cardId
+          activeStreamCardRef.current = targetCardAuthority
+          break
+        }
+        case 'session_handoff': {
+          if (activeStreamCardRef.current) break
+          const handoff = resolveAuthoritativeSessionHandoffEvent(event, data)
+          if (!handoff) break
+          if (handoff.runId) {
+            activeRunIdRef.current = handoff.runId
+            registerSendStreamRun(handoff.runId)
+          }
+          await applySessionHandoff(
+            handoff.fromSessionKey,
+            handoff.sessionKey,
+            handoff.friendlyId,
+            handoff.verifiedCardAuthority,
+          )
           break
         }
         case 'assistant': {
           const text = (payload as { text?: string }).text ?? ''
           if (text) {
             markActivity()
-            processStoreEvent({
+            processBrowserEvent({
               type: 'chunk',
               text,
               runId: activeRunIdRef.current ?? undefined,
@@ -538,12 +1032,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           const newText =
             chunk.delta ?? chunk.text ?? chunk.content ?? chunk.chunk ?? ''
           if (newText) {
-            markActivity()
             const accumulated = fullReplace
               ? newText
               : fullTextRef.current + newText
+            markActivity()
             pushTargetText(accumulated)
-            processStoreEvent({
+            processBrowserEvent({
               type: 'chunk',
               text: accumulated,
               fullReplace: true,
@@ -564,12 +1058,12 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           // model thinking and would otherwise pollute the TUI activity card.
           const isKeepalivePlaceholder =
             typeof thinking === 'string' &&
-            /^still\s+working[\.\u2026]*\s*$/i.test(thinking.trim())
+            /^still\s+working[.\u2026]*\s*$/i.test(thinking.trim())
           if (isKeepalivePlaceholder) break
           if (thinking) {
             markActivity()
             thinkingRef.current = thinking
-            processStoreEvent({
+            processBrowserEvent({
               type: 'thinking',
               text: thinking,
               runId: activeRunIdRef.current ?? undefined,
@@ -609,7 +1103,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
               text: `${toolName} (${phase})`,
             })
           }
-          processStoreEvent({
+          processBrowserEvent({
             type: 'tool',
             phase:
               typeof payload.phase === 'string' ? payload.phase : 'calling',
@@ -649,7 +1143,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             time: new Date().toLocaleTimeString(),
             text: path ? `${title} — ${path}` : title,
           })
-          processStoreEvent({
+          processBrowserEvent({
             type: 'tool',
             phase: 'complete',
             name: `artifact:${kind}`,
@@ -711,24 +1205,15 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             time: new Date().toLocaleTimeString(),
             text: doneState === 'error' ? `Error: ${errorMessage}` : 'Complete',
           })
-          processStoreEvent({
-            type: 'done',
-            state: doneState ?? 'final',
-            errorMessage,
-            message: payload.message as Record<string, unknown> | undefined,
-            runId: activeRunIdRef.current ?? undefined,
-            sessionKey: activeSessionKeyRef.current,
-            transport: 'send-stream',
-          })
-          if (doneState === 'error' && errorMessage) {
-            markFailed(errorMessage)
+          if (doneState === 'error') {
+            await markFailed(errorMessage ?? 'Stream error')
             break
           }
-          finishStream(payload)
+          await finishStream(payload)
           break
         }
         case 'complete': {
-          finishStream(payload)
+          await finishStream(payload)
           break
         }
         case 'error': {
@@ -743,7 +1228,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           }
           const errorMessage =
             (payload as { message?: string }).message ?? 'Stream error'
-          markFailed(errorMessage)
+          await markFailed(errorMessage)
           break
         }
         case 'timeout': {
@@ -754,7 +1239,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Request timed out')
+            await markFailed('Request timed out')
           }
           break
         }
@@ -767,7 +1252,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         }
         case 'close': {
           if (fullTextRef.current) {
-            finishStream()
+            await finishStream()
           } else if (
             lifecyclePhaseRef.current === 'accepted' ||
             lifecyclePhaseRef.current === 'active' ||
@@ -775,31 +1260,42 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Hermes Agent connection closed')
+            await markFailed('Hermes Agent connection closed')
           }
           break
         }
       }
     },
     [
+      activeCard,
+      applySessionHandoff,
       finishStream,
       markFailed,
-      onStarted,
+      onCardHandoff,
       onSessionResolved,
+      onStarted,
       onThinking,
       onTool,
       markActivity,
-      processStoreEvent,
+      processBrowserEvent,
       pushTargetText,
       registerSendStreamRun,
+      sessionCards,
       transitionToHandoff,
     ],
   )
+
+  // A stream reader can outlive the render that started it. Dispatch through
+  // the latest callback so a bootstrap route rerender can supply its accepted
+  // Card identity before a later card_handoff arrives on the same reader.
+  const processEventRef = useRef(processEvent)
+  processEventRef.current = processEvent
 
   const startStreaming = useCallback(
     async (params: {
       sessionKey: string
       friendlyId: string
+      cardId?: string
       message: string
       history?: Array<PortableHistoryMessage>
       thinking?: string
@@ -809,31 +1305,9 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       model?: string
     }) => {
       if (eventSourceRef.current) {
-        // Preserve in-progress response as a partial message before aborting
-        // so it doesn't vanish from the UI when the user interrupts
-        if (fullTextRef.current && !finishedRef.current) {
-          processStoreEvent({
-            type: 'done',
-            state: 'interrupted',
-            sessionKey: activeSessionKeyRef.current,
-            transport: 'send-stream',
-            message: {
-              role: 'assistant',
-              content: [
-                ...(thinkingRef.current
-                  ? [
-                      {
-                        type: 'thinking' as const,
-                        thinking: thinkingRef.current,
-                      },
-                    ]
-                  : []),
-                { type: 'text' as const, text: fullTextRef.current },
-              ],
-              __streamingStatus: 'interrupted',
-            } as any,
-          })
-        }
+        // Seal in-progress response before aborting so recovery survives the
+        // old reader being superseded by a new send.
+        await sealInterruptedStream()
         eventSourceRef.current.abort()
       }
 
@@ -841,6 +1315,14 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       eventSourceRef.current = abortController
       finishedRef.current = false
       resetActiveStreamState(params.sessionKey)
+      activeCardIdRef.current = params.cardId ?? null
+      const selectedCard = activeCard
+      activeStreamCardRef.current =
+        selectedCard &&
+        selectedCard.cardId === params.cardId &&
+        selectedCard.continuationSegmentKeys.includes(params.sessionKey)
+          ? selectedCard
+          : null
       lifecyclePhaseRef.current = 'requesting'
       requestedSessionKeyRef.current = params.sessionKey
 
@@ -853,6 +1335,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       const mySessionKey = params.sessionKey
 
       const messageId = `streaming-${Date.now()}`
+      recoveryIdRef.current = messageId
 
       setState({
         isStreaming: true,
@@ -869,6 +1352,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           body: JSON.stringify({
             sessionKey: params.sessionKey,
             friendlyId: params.friendlyId,
+            cardId: params.cardId,
             message: params.message,
             history: params.history,
             thinking: params.thinking,
@@ -889,32 +1373,6 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           throw new Error(errorText || 'Stream request failed')
         }
 
-        const resolvedHeaders = readResolvedSessionHeaders(response.headers, {
-          sessionKey: params.sessionKey,
-          friendlyId: params.friendlyId || params.sessionKey,
-        })
-        const resolvedSessionKey = resolvedHeaders.sessionKey
-        const resolvedFriendlyId = resolvedHeaders.friendlyId
-        if (resolvedSessionKey !== activeSessionKeyRef.current) {
-          // Only promote a backend-returned session ID when the original
-          // request was a bootstrap key ("new"/"main"). Concrete Workspace
-          // sessions must never be overridden — that causes splits (#297).
-          if (
-            shouldResolveStreamSession({
-              requestedSessionKey: params.sessionKey,
-              currentSessionKey: activeSessionKeyRef.current,
-              resolvedSessionKey,
-              pinMainSession,
-            })
-          ) {
-            activeSessionKeyRef.current = resolvedSessionKey
-            onSessionResolved?.({
-              sessionKey: resolvedSessionKey,
-              friendlyId: resolvedFriendlyId,
-            })
-          }
-        }
-
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
@@ -924,7 +1382,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (params.idempotencyKey && onMessageAccepted) {
           onMessageAccepted(
             activeSessionKeyRef.current,
-            resolvedFriendlyId,
+            params.friendlyId || activeSessionKeyRef.current,
             params.idempotencyKey,
           )
         }
@@ -933,6 +1391,10 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         if (!reader) {
           throw new Error('No response body')
         }
+        // Do not report local ownership until the response has produced a real
+        // SSE reader. A hanging request or body-less success must remain subject
+        // to normal active-run/history fail-closed recovery.
+        onReaderOpened?.(mySessionKey)
 
         const decoder = new TextDecoder()
         let buffer = ''
@@ -983,16 +1445,27 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             }
 
             if (!currentEvent || !currentData) continue
+            let parsedData: unknown
             try {
-              processEvent(currentEvent, JSON.parse(currentData))
+              parsedData = JSON.parse(currentData)
             } catch {
               // Ignore invalid SSE data.
+              continue
+            }
+            try {
+              await processEventRef.current(currentEvent, parsedData)
+            } catch {
+              await markFailed(
+                'Response stopped because recovery storage is unavailable',
+              )
+              break
             }
           }
         }
 
         const lifecyclePhase = lifecyclePhaseRef.current as StreamLifecyclePhase
-        if (!finishedRef.current && lifecyclePhase !== 'handoff') {
+        const streamFinished = () => finishedRef.current
+        if (!streamFinished() && lifecyclePhase !== 'handoff') {
           // If the stream ended cleanly (no 'done' event) but we never received
           // any response text, treat it as a failure rather than a successful
           // empty completion. This happens when a proxy (e.g., Tailscale Serve)
@@ -1002,11 +1475,11 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             !fullTextRef.current &&
             (lifecyclePhase === 'accepted' || lifecyclePhase === 'active')
           ) {
-            markFailed(
+            await markFailed(
               'Connection closed before response was received. The backend may still be processing — check server logs or retry.',
             )
           } else {
-            finishStream()
+            await finishStream()
           }
         }
       } catch (err) {
@@ -1023,47 +1496,40 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             schedulePostAcceptanceTimeout('handoff')
             return
           }
-          onAbort?.()
+          onAbort?.(mySessionKey)
           return
         }
         const errorMessage = err instanceof Error ? err.message : String(err)
-        markFailed(errorMessage)
+        await markFailed(errorMessage)
       }
     },
     [
+      activeCard,
+      applySessionHandoff,
       finishStream,
       markAccepted,
       markFailed,
       onAbort,
       onMessageAccepted,
-      onSessionResolved,
-      pinMainSession,
-      processEvent,
+      onReaderOpened,
       resetActiveStreamState,
       schedulePostAcceptanceTimeout,
+      sealInterruptedStream,
     ],
   )
 
-  const cancelStreaming = useCallback(() => {
-    if (
-      lifecyclePhaseRef.current === 'accepted' ||
-      lifecyclePhaseRef.current === 'active' ||
-      lifecyclePhaseRef.current === 'handoff'
-    ) {
-      transitionToHandoff()
-    }
+  const cancelStreaming = useCallback(async () => {
+    await sealInterruptedStream()
     if (eventSourceRef.current) {
       eventSourceRef.current.abort()
       eventSourceRef.current = null
     }
-    finishedRef.current = lifecyclePhaseRef.current !== 'handoff'
-    if (lifecyclePhaseRef.current !== 'handoff') {
-      resetActiveStreamState()
-    }
-  }, [resetActiveStreamState, transitionToHandoff])
+    finishedRef.current = true
+    resetActiveStreamState()
+  }, [resetActiveStreamState, sealInterruptedStream])
 
-  const resetStreaming = useCallback(() => {
-    cancelStreaming()
+  const resetStreaming = useCallback(async () => {
+    await cancelStreaming()
     setState({
       isStreaming: false,
       streamingMessageId: null,

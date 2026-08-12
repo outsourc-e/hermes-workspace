@@ -81,11 +81,11 @@ function parseContextPercent(payload: unknown): number {
     (root.totals as Record<string, unknown> | undefined) ??
     root
   return readPercent(
-    (usage as Record<string, unknown>)?.contextPercent ??
-      (usage as Record<string, unknown>)?.context_percent ??
-      (usage as Record<string, unknown>)?.context ??
-      root?.contextPercent ??
-      root?.context_percent,
+    usage.contextPercent ??
+      usage.context_percent ??
+      usage.context ??
+      root.contextPercent ??
+      root.context_percent,
   )
 }
 
@@ -126,12 +126,14 @@ type UsageRow = {
 
 export function UsageMeterCompact() {
   const [contextPct, setContextPct] = useState<number | null>(null)
-  const [progressRows, setProgressRows] = useState<UsageRow[]>([])
+  const [progressRows, setProgressRows] = useState<Array<UsageRow>>([])
   const [providerLabel, setProviderLabel] = useState<string | null>(null)
   const [preferredProvider, setPreferredProvider] = useState<string | null>(
     getStoredPreferredProvider,
   )
-  const [allProviders, setAllProviders] = useState<ProviderUsageEntry[]>([])
+  const [allProviders, setAllProviders] = useState<Array<ProviderUsageEntry>>(
+    [],
+  )
   const [expanded, setExpanded] = useState(true)
   // Flash state: animate provider name on change
   const [providerFlash, setProviderFlash] = useState(false)
@@ -140,7 +142,7 @@ export function UsageMeterCompact() {
   // ── Derived primary provider ─────────────────────────────────────────────
 
   const getPrimary = useCallback(
-    (providers: ProviderUsageEntry[], preferred: string | null) => {
+    (providers: Array<ProviderUsageEntry>, preferred: string | null) => {
       if (preferred) {
         const match = providers.find(
           (p) =>
@@ -166,7 +168,7 @@ export function UsageMeterCompact() {
       (p) => p.provider === preferredProvider,
     )
     const nextIdx = (currentIdx + 1) % okProviders.length
-    const next = okProviders[nextIdx]
+    const next = okProviders.at(nextIdx)
     if (!next) return
     setPreferredProvider(next.provider)
     setStoredPreferredProvider(next.provider)
@@ -180,11 +182,11 @@ export function UsageMeterCompact() {
   // ── Update display rows when provider changes ────────────────────────────
 
   const updateDisplayFromProviders = useCallback(
-    (providers: ProviderUsageEntry[], preferred: string | null) => {
+    (providers: Array<ProviderUsageEntry>, preferred: string | null) => {
       const primary = getPrimary(providers, preferred)
       if (!primary) return
 
-      const rows: UsageRow[] = primary.lines
+      const rows: Array<UsageRow> = primary.lines
         .filter((l) => l.type === 'progress' && l.used !== undefined)
         .slice(0, 2)
         .map((l) => ({
@@ -194,7 +196,7 @@ export function UsageMeterCompact() {
         }))
       setProgressRows(rows)
 
-      const name = primary.displayName.split(' ')[0]
+      const name = primary.displayName.split(' ')[0] ?? primary.displayName
       const label = primary.plan ? `${name} ${primary.plan}` : name
       setProviderLabel(label.length > 14 ? name : label)
     },
@@ -260,7 +262,7 @@ export function UsageMeterCompact() {
       POLL_INTERVAL_MS,
     )
     return () => window.clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [fetchProvider])
 
   // Cleanup flash timer on unmount
@@ -276,7 +278,8 @@ export function UsageMeterCompact() {
 
   // Build the rows to display: session context row + all provider progress rows
   const ctxRow: UsageRow = { label: 'Ctx', pct: contextPct, resetHint: null }
-  const allRows: UsageRow[] = progressRows.length > 0 ? progressRows : [ctxRow]
+  const allRows: Array<UsageRow> =
+    progressRows.length > 0 ? progressRows : [ctxRow]
 
   const headerLabel = providerLabel ? `Usage · ${providerLabel}` : 'Usage'
   const canCycle =

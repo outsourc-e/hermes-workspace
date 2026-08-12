@@ -24,9 +24,8 @@ const AGENT_BUS_SCRIPT =
   process.env.AGENT_BUS_SCRIPT ||
   '/opt/central-inteligencia/services/hermes-agent-bus/agent_bus.py'
 
-const HANDOFF_CONTRACTS: Record<
-  string,
-  { businessScope: string; reason: string }
+const HANDOFF_CONTRACTS: Partial<
+  Record<string, { businessScope: string; reason: string }>
 > = {
   'dona-helena->larissinha': {
     businessScope: 'DES',

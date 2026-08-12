@@ -13,9 +13,10 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { AgentProgress } from './agent-progress'
-import type { AgentProgressStatus } from './agent-progress'
 import { KillConfirmDialog } from './kill-confirm-dialog'
 import { SteerModal } from './steer-modal'
+import type { AgentProgressStatus } from './agent-progress'
+import type { GatewayAgentCardBinding } from '@/lib/gateway-api'
 import { Button } from '@/components/ui/button'
 import { AgentAvatar } from '@/components/agent-avatar'
 import {
@@ -66,6 +67,9 @@ export type AgentNode = {
   statusBubble?: AgentStatusBubble
   isMain?: boolean
   sessionKey?: string
+  cardBinding?: GatewayAgentCardBinding
+  cardId?: string
+  parentCardId?: string | null
 }
 
 type AgentCardProps = {
@@ -179,8 +183,12 @@ export function AgentCard({
   const showActions = !node.isMain
   const isCompact = viewMode === 'compact'
   const isQueued = node.status === 'queued'
-  const sessionKey = (node.sessionKey || node.id || '').trim()
-  const canWardenControl = showActions && !isQueued && sessionKey.length > 0
+  // Raw transport keys never authorize steer/kill. Controls require the exact
+  // source-qualified Card operation capability projected by the caller.
+  const cardBinding = node.cardBinding
+  const canWardenControl = showActions && !isQueued && Boolean(cardBinding)
+  const cardId = (node.cardId || '').trim()
+  const canPauseControl = showActions && !isQueued && cardId.length > 0
   const [showDetail, setShowDetail] = useState(false)
   const [steerOpen, setSteerOpen] = useState(false)
   const [killConfirmOpen, setKillConfirmOpen] = useState(false)
@@ -209,12 +217,15 @@ export function AgentCard({
   }
 
   async function handleTogglePause() {
-    if (!canWardenControl || isPausePending) return
+    if (!canPauseControl || isPausePending) return
     const nextPaused = !isPaused
 
     setIsPausePending(true)
     try {
-      const payload = await toggleAgentPause(sessionKey, nextPaused)
+      const payload = await toggleAgentPause(
+        { cardId, parentCardId: node.parentCardId },
+        nextPaused,
+      )
       const paused =
         typeof payload.paused === 'boolean' ? payload.paused : nextPaused
       setPausedOverride(paused)
@@ -264,7 +275,7 @@ export function AgentCard({
             onClick={function onClickPauseToggle() {
               void handleTogglePause()
             }}
-            disabled={isPausePending}
+            disabled={isPausePending || !canPauseControl}
             className="data-disabled:pointer-events-none data-disabled:opacity-50"
           >
             <HugeiconsIcon
@@ -294,23 +305,24 @@ export function AgentCard({
     )
   }
 
-  const wardenDialogs = canWardenControl ? (
-    <>
-      <SteerModal
-        open={steerOpen}
-        onOpenChange={setSteerOpen}
-        agentName={node.name}
-        sessionKey={sessionKey}
-      />
-      <KillConfirmDialog
-        open={killConfirmOpen}
-        onOpenChange={setKillConfirmOpen}
-        agentName={node.name}
-        sessionKey={sessionKey}
-        onKilled={handleKillComplete}
-      />
-    </>
-  ) : null
+  const wardenDialogs =
+    canWardenControl && cardBinding ? (
+      <>
+        <SteerModal
+          open={steerOpen}
+          onOpenChange={setSteerOpen}
+          agentName={node.name}
+          cardBinding={cardBinding}
+        />
+        <KillConfirmDialog
+          open={killConfirmOpen}
+          onOpenChange={setKillConfirmOpen}
+          agentName={node.name}
+          cardBinding={cardBinding}
+          onKilled={handleKillComplete}
+        />
+      </>
+    ) : null
 
   const compactModelLabel =
     node.model.length > 20 ? `${node.model.slice(0, 19)}…` : node.model

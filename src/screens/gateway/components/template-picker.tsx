@@ -1,17 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { deleteTemplate, getAllTemplates } from '../lib/workflow-templates'
+import type { WorkflowTemplate } from '../lib/workflow-templates'
 import { cn } from '@/lib/utils'
-import {
-  type WorkflowTemplate,
-  getAllTemplates,
-  deleteTemplate,
-} from '../lib/workflow-templates'
 
 type TemplatePickerProps = {
   onSelect: (template: WorkflowTemplate) => void
   onClose: () => void
 }
 
-const DEMO_TEMPLATES: WorkflowTemplate[] = [
+const DEMO_TEMPLATES: Array<WorkflowTemplate> = [
   {
     id: 'tpl-code-review',
     name: 'Code Review',

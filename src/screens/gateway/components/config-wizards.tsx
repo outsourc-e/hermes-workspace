@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
-import type { TeamMember, TeamTemplateId } from './team-panel'
 import { TEAM_TEMPLATES } from './team-panel'
+import type { TeamMember, TeamTemplateId } from './team-panel'
+import { cn } from '@/lib/utils'
 
 // ─── Provider metadata ────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ const SIMPLEICONS_SLUGS: Record<string, string> = {
 }
 
 /** Branded hex color per provider (passed to simpleicons CDN for colored SVGs). */
-const PROVIDER_HEX: Record<string, string> = {
+const PROVIDER_HEX: Partial<Record<string, string>> = {
   anthropic: 'D97757',
   openai: '000000', // OpenAI brand is now black/white
   'openai-codex': '000000',
@@ -311,7 +311,7 @@ export function ProviderLogo({
 
   // Fallback: branded letter abbreviation — prefer display label over raw provider string
   const labelSource =
-    meta.label?.length > 1 ? meta.label : provider.replace(/[-_.]/g, ' ').trim()
+    meta.label.length > 1 ? meta.label : provider.replace(/[-_.]/g, ' ').trim()
   const letters = labelSource.replace(/\s+/g, '').slice(0, 2).toUpperCase()
   return (
     <span
@@ -568,8 +568,7 @@ export function AgentWizardModal({
   const isCustomPrompt =
     member.backstory.trim() !== '' &&
     !systemPromptTemplates.some((t) => t.prompt === member.backstory)
-  const headerSubtitle =
-    member.roleDescription?.trim() || 'Configure your agent'
+  const headerSubtitle = member.roleDescription.trim() || 'Configure your agent'
   const systemPromptRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-resize textarea whenever backstory changes (e.g. template selected)
@@ -1129,7 +1128,7 @@ export function TeamWizardModal({
                   className="flex items-center gap-2.5 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2.5"
                 >
                   <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30 text-[11px] font-bold text-accent-600 dark:text-accent-400">
-                    {member.name[0]?.toUpperCase() ?? '?'}
+                    {member.name.at(0)?.toUpperCase() ?? '?'}
                   </div>
                   <p className="min-w-0 flex-1 text-xs font-semibold text-neutral-900 dark:text-white truncate">
                     {member.name}
@@ -1177,7 +1176,7 @@ export function TeamWizardModal({
                   className="flex items-center gap-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/30 dark:bg-emerald-900/10 px-3 py-2.5 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
                 >
                   <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                    {agent.name[0]?.toUpperCase() ?? '?'}
+                    {agent.name.at(0)?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-neutral-700 dark:text-neutral-200 font-medium">
@@ -1279,26 +1278,26 @@ type AddTeamModalProps = {
     label: string
     description: string
     tier: string
-    agents: string[]
+    agents: Array<string>
     templateId?: string
   }>
   /** Icons already in use by existing teams — new team will get a different one */
-  existingIcons?: string[]
+  existingIcons?: Array<string>
   /** Called with team name, icon, and the IDs of agents to include */
   onSaveCurrentAs: (
     name: string,
     icon: string,
-    selectedAgentIds: string[],
+    selectedAgentIds: Array<string>,
   ) => void
   onApplyTemplate: (templateId: TeamTemplateId) => void
   onClose: () => void
 }
 
-function pickUniqueTeamIcon(existing: string[]): string {
+function pickUniqueTeamIcon(existing: Array<string>): string {
   const usedSet = new Set(existing)
   const available = INLINE_TEAM_ICONS.filter((ic) => !usedSet.has(ic))
   const pool = available.length > 0 ? available : INLINE_TEAM_ICONS
-  return pool[Math.floor(Math.random() * pool.length)]
+  return pool[Math.floor(Math.random() * pool.length)] ?? '👥'
 }
 
 export function AddTeamModal({

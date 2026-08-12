@@ -30,6 +30,14 @@ const ACTIVE_STATUSES: ReadonlySet<string> = new Set([
 
 const ACTIVE_RUN_CHECK_TIMEOUT_MS = 2000
 
+export function activeRunCheckUrl(sessionKey: string, cardId?: string): string {
+  const path = `/api/sessions/${encodeURIComponent(sessionKey)}/active-run`
+  const normalizedCardId = cardId?.trim()
+  return normalizedCardId
+    ? `${path}?cardId=${encodeURIComponent(normalizedCardId)}`
+    : path
+}
+
 /**
  * On mount, checks whether the server has an active run for this session.
  * If so, marks the session as waiting in the persistent Zustand store.
@@ -45,18 +53,32 @@ const ACTIVE_RUN_CHECK_TIMEOUT_MS = 2000
  */
 export function useActiveRunCheck({
   sessionKey,
+  cardId,
   enabled,
+  shouldApplyResult,
   onCheckComplete,
 }: {
   sessionKey: string
+  cardId?: string
   enabled: boolean
-  onCheckComplete?: () => void
+  /**
+   * Lets a caller reject a recovery result that became stale while its request
+   * was in flight (for example, when this session gains a local SSE reader).
+   */
+  shouldApplyResult?: (sessionKey: string) => boolean
+  onCheckComplete?: (sessionKey: string) => void
 }): void {
   const hasCheckedRef = useRef(false)
-  const sessionKeyRef = useRef(sessionKey)
-  sessionKeyRef.current = sessionKey
+  const shouldApplyResultRef = useRef(shouldApplyResult)
+  shouldApplyResultRef.current = shouldApplyResult
   const onCompleteRef = useRef(onCheckComplete)
   onCompleteRef.current = onCheckComplete
+
+  // Reset before the check effect runs when a Card advances to a new canonical
+  // segment. The Card identity stays stable, but its recovery target changes.
+  useEffect(() => {
+    hasCheckedRef.current = false
+  }, [sessionKey, cardId])
 
   useEffect(() => {
     if (!enabled || !sessionKey || sessionKey === 'new') return
@@ -69,7 +91,7 @@ export function useActiveRunCheck({
     const settle = () => {
       if (settled) return
       settled = true
-      onCompleteRef.current?.()
+      onCompleteRef.current?.(sessionKey)
     }
 
     // Timeout: if the API check doesn't complete in time, assume the run is dead
@@ -81,28 +103,36 @@ export function useActiveRunCheck({
       } catch {
         /* ignore */
       }
-      // Clear stale waiting state — the run is almost certainly dead
+      // Clear stale waiting state — the run is almost certainly dead.
+      // Do not publish a recovery result over an open local stream that began
+      // after this check was dispatched.
+      if (shouldApplyResultRef.current?.(sessionKey) === false) return
       const store = useChatStore.getState()
-      if (store.isSessionWaiting(sessionKeyRef.current)) {
-        store.clearSessionWaiting(sessionKeyRef.current)
+      if (cardId) {
+        if (store.isCardWaiting(cardId)) store.clearCardWaiting(cardId)
+      } else if (store.isSessionWaiting(sessionKey)) {
+        store.clearSessionWaiting(sessionKey)
       }
     }, ACTIVE_RUN_CHECK_TIMEOUT_MS)
 
     async function check() {
       try {
-        const response = await fetch(
-          `/api/sessions/${encodeURIComponent(sessionKey)}/active-run`,
-          { signal: controller.signal },
-        )
+        const response = await fetch(activeRunCheckUrl(sessionKey, cardId), {
+          signal: controller.signal,
+        })
         if (!response.ok) return finishCheck()
 
         const data = (await response.json()) as ActiveRunResponse
         if (!data.ok) return finishCheck()
+        if (shouldApplyResultRef.current?.(sessionKey) === false) return
 
         const store = useChatStore.getState()
         if (data.run && ACTIVE_STATUSES.has(data.run.status)) {
-          store.setSessionWaiting(sessionKey, data.run.runId)
-        } else if (store.isSessionWaiting(sessionKey)) {
+          if (cardId) store.setCardWaiting(cardId, data.run.runId)
+          else store.setSessionWaiting(sessionKey, data.run.runId)
+        } else if (cardId && store.isCardWaiting(cardId)) {
+          store.clearCardWaiting(cardId)
+        } else if (!cardId && store.isSessionWaiting(sessionKey)) {
           // Server says run is done but we still have stale waiting state
           store.clearSessionWaiting(sessionKey)
         }
@@ -124,10 +154,5 @@ export function useActiveRunCheck({
       window.clearTimeout(timeoutId)
       controller.abort()
     }
-  }, [sessionKey, enabled])
-
-  // Reset check flag when session changes
-  useEffect(() => {
-    hasCheckedRef.current = false
-  }, [sessionKey])
+  }, [sessionKey, cardId, enabled])
 }

@@ -39,6 +39,11 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.doMock('../../server/gateway-capabilities', () => ({
+    ensureGatewayProbed: vi.fn(),
+    getCapabilities: () => ({ config: true }),
+  }))
+  vi.resetModules()
   for (const [key, value] of Object.entries(originalEnv)) {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
@@ -49,7 +54,7 @@ afterEach(() => {
 
 async function loadHandlers(modulePath: string) {
   const mod = await import(modulePath)
-  return (mod as any).Route.server.handlers
+  return mod.Route.server.handlers
 }
 
 describe('canonical /api/hermes-config route', () => {

@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 export type AgentAvatarPreference = 'lobster' | 'logo'
 export type AgentAvatarSize = 'sm' | 'md' | 'lg'
@@ -141,9 +142,7 @@ function AgentAvatar({
               🦞
             </span>
           ) : (
-            <img
-              src="/claude-avatar.webp"
-              alt="Hermes Agent"
+            <AgentIdentityAvatar
               className={cn(
                 getLogoSizeClassName(size),
                 iconClassName,

@@ -15,7 +15,7 @@ export type MissionReportEntry = {
 }
 
 export type CostAnalyticsDashboardProps = {
-  missionReports: MissionReportEntry[]
+  missionReports: Array<MissionReportEntry>
   compact?: boolean
 }
 
@@ -49,7 +49,7 @@ function CSSBarChart({
   unit = '',
   color = 'bg-accent-500',
 }: {
-  entries: BarEntry[]
+  entries: Array<BarEntry>
   unit?: string
   color?: string
 }) {
@@ -98,12 +98,12 @@ export function CostAnalyticsDashboard({
 
     const byAgent: Record<string, { tokens: number; cost: number }> = {}
     const byModel: Record<string, { tokens: number; cost: number }> = {}
-    const byDay: Record<string, { tokens: number; cost: number }> = {}
+    const byDay = new Map<string, { tokens: number; cost: number }>()
 
     for (const r of missionReports) {
-      const tokens = r.tokenCount ?? 0
-      const cost = r.costEstimate ?? estimateCost(tokens)
-      const ts = r.completedAt ?? 0
+      const tokens = r.tokenCount
+      const cost = r.costEstimate
+      const ts = r.completedAt
       const tsNum = typeof ts === 'string' ? new Date(ts).getTime() : ts
       const day = dayKey(ts)
 
@@ -120,7 +120,7 @@ export function CostAnalyticsDashboard({
       }
 
       // By agent
-      if (r.agents && r.agents.length > 0) {
+      if (r.agents.length > 0) {
         const perAgentTokens = tokens / r.agents.length
         const perAgentCost = cost / r.agents.length
         for (const m of r.agents) {
@@ -141,9 +141,10 @@ export function CostAnalyticsDashboard({
       }
 
       // By day
-      byDay[day] = byDay[day] ?? { tokens: 0, cost: 0 }
-      byDay[day].tokens += tokens
-      byDay[day].cost += cost
+      const dayStats = byDay.get(day) ?? { tokens: 0, cost: 0 }
+      dayStats.tokens += tokens
+      dayStats.cost += cost
+      byDay.set(day, dayStats)
     }
 
     const avgCost =
@@ -154,7 +155,7 @@ export function CostAnalyticsDashboard({
       ...Object.values(byAgent).map((a) => a.cost),
       0.0001,
     )
-    const agentBars: BarEntry[] = Object.entries(byAgent)
+    const agentBars: Array<BarEntry> = Object.entries(byAgent)
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
       .map(([label, v]) => ({
@@ -167,7 +168,7 @@ export function CostAnalyticsDashboard({
       ...Object.values(byModel).map((m) => m.cost),
       0.0001,
     )
-    const modelBars: BarEntry[] = Object.entries(byModel)
+    const modelBars: Array<BarEntry> = Object.entries(byModel)
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
       .map(([label, v]) => ({
@@ -177,16 +178,22 @@ export function CostAnalyticsDashboard({
       }))
 
     // Last 7 days
-    const days: string[] = []
+    const days: Array<string> = []
     for (let i = 6; i >= 0; i--) {
       days.push(new Date(now - i * 86400000).toISOString().slice(0, 10))
     }
-    const maxDayCost = Math.max(...days.map((d) => byDay[d]?.cost ?? 0), 0.0001)
-    const dayBars: BarEntry[] = days.map((d) => ({
-      label: relativeDay(d),
-      value: byDay[d]?.cost ?? 0,
-      pct: ((byDay[d]?.cost ?? 0) / maxDayCost) * 100,
-    }))
+    const maxDayCost = Math.max(
+      ...days.map((d) => byDay.get(d)?.cost ?? 0),
+      0.0001,
+    )
+    const dayBars: Array<BarEntry> = days.map((d) => {
+      const cost = byDay.get(d)?.cost ?? 0
+      return {
+        label: relativeDay(d),
+        value: cost,
+        pct: (cost / maxDayCost) * 100,
+      }
+    })
 
     return {
       totalTokens,

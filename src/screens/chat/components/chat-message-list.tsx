@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   ArrowExpand01Icon,
   ArrowUp01Icon,
@@ -10,7 +18,7 @@ import {
   getToolCallsFromMessage,
   textFromMessage,
 } from '../utils'
-import { MessageItem } from './message-item'
+import { MessageItem, toolResultCallId } from './message-item'
 import { TuiActivityCard } from './tui-activity-card'
 import { ScrollToBottomButton } from './scroll-to-bottom-button'
 import { ResearchCard } from './research-card'
@@ -539,7 +547,7 @@ export function buildDisplayEntries(
     }
 
     if (message.role === 'tool' || message.role === 'toolResult') {
-      const previousEntry = entries[entries.length - 1]
+      const previousEntry = entries.at(-1)
       if (previousEntry?.message.role === 'assistant') {
         previousEntry.attachedToolMessages.push(message)
       } else if (pendingAssistantToolMessages.length > 0) {
@@ -565,85 +573,76 @@ export function buildDisplayEntries(
     entries.push(entry)
   })
 
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
-    }
-  }
-
-  // Detach a trailing tool-only turn from the last assistant text reply so
-  // the UI can render it as a separate pending/muted row instead of making
-  // the final assistant bubble look like it is still running tools.
-  const trailing = getTrailingToolOnlyTurnSummary(displayMessages)
-  if (trailing?.count) {
-    const lastAssistant = entries.findLast(
-      (entry) => entry.message.role === 'assistant',
-    )
-    if (lastAssistant) {
-      lastAssistant.attachedToolMessages = lastAssistant.attachedToolMessages.slice(
-        0,
-        Math.max(0, lastAssistant.attachedToolMessages.length - trailing.count),
-      )
-    }
-  }
-
   return entries
 }
 
-export function getTrailingToolOnlyTurnSummary(
+export function buildToolResultsByCallId(
   messages: Array<ChatMessage>,
-): { count: number; toolNames: Array<string>; hasFinalAssistantText: boolean } | null {
-  if (messages.length === 0) return null
+): Map<string, ChatMessage> {
+  const results = new Map<string, ChatMessage>()
+  for (const message of messages) {
+    if (message.role !== 'tool' && message.role !== 'toolResult') continue
+    const toolCallId = toolResultCallId(message)
+    if (toolCallId) results.set(toolCallId, message)
+  }
+  return results
+}
 
-  let turnStart = messages.length - 1
-  while (turnStart >= 0) {
-    const message = messages[turnStart]
-    const isToolMessage =
-      message.role === 'tool' || message.role === 'toolResult'
-    if (isToolMessage) {
-      turnStart -= 1
-      continue
-    }
+export function getTrailingToolOnlyTurnSummary(messages: Array<ChatMessage>): {
+  count: number
+  toolNames: Array<string>
+  hasFinalAssistantText: boolean
+} | null {
+  let lastAssistantTextIndex = -1
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (!message) continue
     if (
       message.role === 'assistant' &&
-      isAssistantToolCallOnlyMessage(message)
+      textFromMessage(message).trim().length > 0
     ) {
-      turnStart -= 1
-      continue
-    }
-    break
-  }
-
-  const turnLength = messages.length - 1 - turnStart
-  if (turnLength === 0) return null
-
-  const turnMessages = messages.slice(turnStart + 1)
-  const toolNamesSet = new Set<string>()
-  for (const message of turnMessages) {
-    if (message.role === 'tool' || message.role === 'toolResult') {
-      if (message.toolName) toolNamesSet.add(message.toolName)
-      continue
-    }
-    if (message.role === 'assistant') {
-      for (const toolCall of getToolCallsFromMessage(message)) {
-        if (toolCall.name) toolNamesSet.add(toolCall.name)
-      }
+      lastAssistantTextIndex = index
+      break
     }
   }
 
-  const hasFinalAssistantText = messages
-    .slice(0, turnStart + 1)
-    .some(
+  if (
+    lastAssistantTextIndex === -1 ||
+    lastAssistantTextIndex === messages.length - 1
+  ) {
+    return null
+  }
+
+  const trailingMessages = messages.slice(lastAssistantTextIndex + 1)
+  if (
+    !trailingMessages.every(
       (message) =>
-        message.role === 'assistant' &&
-        textFromMessage(message).trim().length > 0,
+        isAssistantToolCallOnlyMessage(message) ||
+        message.role === 'tool' ||
+        message.role === 'toolResult',
     )
+  ) {
+    return null
+  }
+
+  const toolNames = [
+    ...new Set(
+      trailingMessages.flatMap((message) => [
+        ...getToolCallsFromMessage(message)
+          .map((toolCall) => toolCall.name)
+          .filter((name): name is string => Boolean(name)),
+        ...((message.role === 'tool' || message.role === 'toolResult') &&
+        message.toolName
+          ? [message.toolName]
+          : []),
+      ]),
+    ),
+  ]
 
   return {
-    count: turnLength,
-    toolNames: Array.from(toolNamesSet),
-    hasFinalAssistantText,
+    count: trailingMessages.length,
+    toolNames,
+    hasFinalAssistantText: true,
   }
 }
 
@@ -653,6 +652,65 @@ function escapeAttributeSelector(value: string): string {
   }
 
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+export function shouldIncludeDisplayMessage(
+  message: ChatMessage,
+  hideSystemMessages = false,
+): boolean {
+  const cleanedText = textFromMessage(message).trim()
+
+  if (message.role === 'assistant') {
+    if (cleanedText === 'HEARTBEAT_OK') return false
+    if (cleanedText === 'NO_REPLY') return false
+    if (/^NO_?(?:REPLY)?$/i.test(cleanedText)) return false
+    return true
+  }
+
+  if (message.role === 'user') {
+    const rawText = (Array.isArray(message.content) ? message.content : [])
+      .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
+      .join('')
+      .trim()
+    const hasAttachments =
+      Array.isArray((message as any).attachments) &&
+      (message as any).attachments.length > 0
+    const hasInlineImages =
+      Array.isArray((message as any).inlineImages) &&
+      (message as any).inlineImages.length > 0
+    const isPendingOptimisticUserMessage =
+      typeof (message as any).__optimisticId === 'string' ||
+      message.status === 'sending' ||
+      message.status === 'queued'
+
+    if (cleanedText.length === 0 && !hasAttachments && !hasInlineImages) {
+      if (!isPendingOptimisticUserMessage) return false
+    }
+
+    const isSystemPrefixed = /^System:/i.test(rawText)
+    if (hideSystemMessages && isSystemPrefixed) return false
+    if (
+      hideSystemMessages &&
+      shouldHideSystemInjectedUserMessage(cleanedText)
+    ) {
+      return false
+    }
+    if (!isSystemPrefixed) return true
+
+    const normalizedText = cleanedText.toLowerCase()
+    const containsSystemFailure =
+      normalizedText.includes('exec failed') ||
+      normalizedText.includes('serverrestart') ||
+      normalizedText.includes('signal sigkill')
+    const matchesHeartbeatPrompt =
+      /read heartbeat\.md if it exists.*?reply heartbeat_ok\./is.test(
+        cleanedText,
+      )
+
+    if (containsSystemFailure || matchesHeartbeatPrompt) return false
+  }
+
+  return true
 }
 
 type ChatMessageListProps = {
@@ -691,6 +749,12 @@ type ChatMessageListProps = {
    *  can confirm the server received it). Keeps the thinking indicator visible
    *  during the very first render after the user submits. */
   sending?: boolean
+  /** True when the Card query has another verified older continuation window. */
+  hasOlderHistory?: boolean
+  /** Parent-query request state; an internal guard also closes event races. */
+  loadingOlderHistory?: boolean
+  /** Load and merge exactly one older continuation window. */
+  onLoadOlderHistory?: () => Promise<unknown>
 }
 
 function ChatMessageListComponent({
@@ -720,6 +784,9 @@ function ChatMessageListComponent({
   hideSystemMessages = false,
   isCompacting = false,
   sending = false,
+  hasOlderHistory = false,
+  loadingOlderHistory = false,
+  onLoadOlderHistory,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const lastUserRef = useRef<HTMLDivElement | null>(null)
@@ -732,7 +799,19 @@ function ChatMessageListComponent({
   const [streamingCleared, setStreamingCleared] = useState(0)
   streamingTargetsClearRef.current = () => setStreamingCleared((c) => c + 1)
   const lastScrollTopRef = useRef(0)
+  const olderHistoryLoadInFlightRef = useRef(false)
+  const olderHistoryRequestIdRef = useRef(0)
+  const prependAnchorRef = useRef<{
+    requestId: number
+    viewport: HTMLElement
+    scrollHeight: number
+    scrollTop: number
+    visibleMessage: HTMLElement | null
+    visibleMessageOffset: number | null
+  } | null>(null)
   const isNearBottomRef = useRef(true)
+  const [pendingPrependAnchorRequestId, setPendingPrependAnchorRequestId] =
+    useState<number | null>(null)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const [expandAllToolSections, setExpandAllToolSections] = useState(false)
@@ -792,30 +871,115 @@ function ChatMessageListComponent({
     }
   }, [contentStyle, isMobileViewport])
 
-  // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
-  const handleUserScroll = useCallback(function handleUserScroll(metrics: {
-    scrollTop: number
-    scrollHeight: number
-    clientHeight: number
-  }) {
-    const distanceFromBottom =
-      metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight
-    const nearBottom = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD
-    const wasScrollingUp = metrics.scrollTop < lastScrollTopRef.current - 5
-    lastScrollTopRef.current = metrics.scrollTop
+  const restorePrependAnchor = useCallback((requestId: number) => {
+    const anchor = prependAnchorRef.current
+    if (!anchor || anchor.requestId !== requestId) return
+    prependAnchorRef.current = null
+    if (!anchor.viewport.isConnected) return
+    const viewportTop = anchor.viewport.getBoundingClientRect().top
+    const visibleMessageTop = anchor.visibleMessage?.isConnected
+      ? anchor.visibleMessage.getBoundingClientRect().top
+      : undefined
+    const visibleMessageOffset =
+      visibleMessageTop === undefined || anchor.visibleMessageOffset === null
+        ? undefined
+        : visibleMessageTop - viewportTop
+    const heightDelta = anchor.viewport.scrollHeight - anchor.scrollHeight
+    const scrollDelta =
+      visibleMessageOffset === undefined || anchor.visibleMessageOffset === null
+        ? heightDelta
+        : visibleMessageOffset - anchor.visibleMessageOffset
+    anchor.viewport.scrollTop = Math.max(0, anchor.scrollTop + scrollDelta)
+    lastScrollTopRef.current = anchor.viewport.scrollTop
+    stickToBottomRef.current = false
+    isNearBottomRef.current = false
+    setIsNearBottom(false)
+  }, [])
 
-    // Bug #552: any user-initiated upward scroll releases stick-to-bottom
-    // (previously required >200px from bottom, which let streaming yank the
-    // viewport back down during near-bottom reading). Re-stick only when the
-    // user lands back at the bottom.
-    if (wasScrollingUp) {
+  // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
+  const handleUserScroll = useCallback(
+    function handleUserScroll(metrics: {
+      scrollTop: number
+      scrollHeight: number
+      clientHeight: number
+    }) {
+      const distanceFromBottom =
+        metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight
+      const nearBottom = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD
+      const wasScrollingUp = metrics.scrollTop < lastScrollTopRef.current - 5
+      lastScrollTopRef.current = metrics.scrollTop
+
+      // Bug #552: any user-initiated upward scroll releases stick-to-bottom
+      // (previously required >200px from bottom, which let streaming yank the
+      // viewport back down during near-bottom reading). Re-stick only when the
+      // user lands back at the bottom.
+      if (wasScrollingUp) {
+        stickToBottomRef.current = false
+        isNearBottomRef.current = false
+      } else if (nearBottom) {
+        stickToBottomRef.current = true
+        isNearBottomRef.current = true
+      }
+
+      if (
+        metrics.scrollTop > 16 ||
+        !hasOlderHistory ||
+        loadingOlderHistory ||
+        olderHistoryLoadInFlightRef.current ||
+        !onLoadOlderHistory
+      ) {
+        return
+      }
+
+      const viewport = anchorRef.current?.closest('[data-chat-scroll-viewport]')
+      if (!(viewport instanceof HTMLElement)) return
+      const requestId = ++olderHistoryRequestIdRef.current
+      const viewportTop = viewport.getBoundingClientRect().top
+      const viewportBottom = viewport.getBoundingClientRect().bottom
+      const visibleMessage = Array.from(
+        viewport.querySelectorAll<HTMLElement>('[data-chat-message-id]'),
+      ).find((message) => {
+        const rect = message.getBoundingClientRect()
+        return rect.bottom > viewportTop && rect.top < viewportBottom
+      })
+      const visibleMessageOffset = visibleMessage
+        ? visibleMessage.getBoundingClientRect().top - viewportTop
+        : null
+      prependAnchorRef.current = {
+        requestId,
+        viewport,
+        scrollHeight: metrics.scrollHeight,
+        scrollTop: metrics.scrollTop,
+        visibleMessage: visibleMessage ?? null,
+        visibleMessageOffset,
+      }
+      olderHistoryLoadInFlightRef.current = true
       stickToBottomRef.current = false
       isNearBottomRef.current = false
-    } else if (nearBottom) {
-      stickToBottomRef.current = true
-      isNearBottomRef.current = true
-    }
-  }, [])
+      void onLoadOlderHistory()
+        .then((didPrepend) => {
+          if (didPrepend === true) {
+            setPendingPrependAnchorRequestId(requestId)
+          } else if (prependAnchorRef.current?.requestId === requestId) {
+            prependAnchorRef.current = null
+          }
+        })
+        .catch(() => {
+          if (prependAnchorRef.current?.requestId === requestId) {
+            prependAnchorRef.current = null
+          }
+        })
+        .finally(() => {
+          olderHistoryLoadInFlightRef.current = false
+        })
+    },
+    [
+      hasOlderHistory,
+      loadingOlderHistory,
+      onLoadOlderHistory,
+      restorePrependAnchor,
+    ],
+  )
 
   // Simple scroll to bottom — find viewport and scroll
   const scrollToBottom = useCallback(function scrollToBottom(
@@ -829,70 +993,11 @@ function ChatMessageListComponent({
     }
   }, [])
 
-  // Filter messages — toolResult handled by grouping into assistant bubble below
+  // Filter messages — tool results are preserved for grouping into assistant bubbles.
   const displayMessages = useMemo(() => {
-    const filteredMessages = messages.filter((msg) => {
-      // Hide tool messages — rendered as pills on the assistant message instead
-      if (msg.role === 'tool') return false
-
-      const cleanedText = textFromMessage(msg).trim()
-
-      if (msg.role === 'assistant') {
-        if (cleanedText === 'HEARTBEAT_OK') return false
-        // Hide NO_REPLY messages (agent had nothing to say, or used message tool instead)
-        if (cleanedText === 'NO_REPLY') return false
-        // Hide truncated NO_REPLY variants (e.g. "NO_" or "NO")
-        if (/^NO_?(?:REPLY)?$/i.test(cleanedText)) return false
-        return true
-      }
-
-      if (msg.role === 'user') {
-        const rawText = (Array.isArray(msg.content) ? msg.content : [])
-          .map((part) => (part.type === 'text' ? String(part.text ?? '') : ''))
-          .join('')
-          .trim()
-        const hasAttachments =
-          Array.isArray((msg as any).attachments) &&
-          (msg as any).attachments.length > 0
-        const hasInlineImages =
-          Array.isArray((msg as any).inlineImages) &&
-          (msg as any).inlineImages.length > 0
-        const isPendingOptimisticUserMessage =
-          typeof (msg as any).__optimisticId === 'string' ||
-          msg.status === 'sending' ||
-          msg.status === 'queued'
-
-        // Keep optimistic/pending user messages visible for the whole response cycle,
-        // even if the server hasn't echoed normalized text content back yet.
-        if (cleanedText.length === 0 && !hasAttachments && !hasInlineImages) {
-          if (!isPendingOptimisticUserMessage) return false
-        }
-
-        const isSystemPrefixed = /^System:/i.test(rawText)
-        if (hideSystemMessages && isSystemPrefixed) return false
-        if (
-          hideSystemMessages &&
-          shouldHideSystemInjectedUserMessage(cleanedText)
-        ) {
-          return false
-        }
-        if (!isSystemPrefixed) return true
-
-        const normalizedText = cleanedText.toLowerCase()
-        const containsSystemFailure =
-          normalizedText.includes('exec failed') ||
-          normalizedText.includes('serverrestart') ||
-          normalizedText.includes('signal sigkill')
-        const matchesHeartbeatPrompt =
-          /read heartbeat\.md if it exists.*?reply heartbeat_ok\./is.test(
-            cleanedText,
-          )
-
-        if (containsSystemFailure || matchesHeartbeatPrompt) return false
-      }
-
-      return true
-    })
+    const filteredMessages = messages.filter((message) =>
+      shouldIncludeDisplayMessage(message, hideSystemMessages),
+    )
 
     const seenMessageIds = new Set<string>()
     const deduped = filteredMessages.filter((message) => {
@@ -918,6 +1023,16 @@ function ChatMessageListComponent({
     () => buildDisplayEntries(displayMessages),
     [displayMessages],
   )
+
+  useLayoutEffect(() => {
+    if (pendingPrependAnchorRequestId === null) return
+    restorePrependAnchor(pendingPrependAnchorRequestId)
+    setPendingPrependAnchorRequestId(null)
+  }, [
+    displayEntries.length,
+    pendingPrependAnchorRequestId,
+    restorePrependAnchor,
+  ])
 
   // Bug 2 fix: grace-period effects — placed after displayMessages so they can
   // reference it safely.
@@ -977,7 +1092,7 @@ function ChatMessageListComponent({
         clearTimeout(thinkingGraceTimerRef.current)
       }
     }
-  }, [displayEntries, waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayEntries, waitingForResponse])
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -1019,7 +1134,8 @@ function ChatMessageListComponent({
     [messageSearchMatches],
   )
 
-  const activeSearchMatch = messageSearchMatches[activeSearchMatchIndex] ?? null
+  const activeSearchMatch =
+    messageSearchMatches.at(activeSearchMatchIndex) ?? null
 
   const focusSearchInput = useCallback(function focusSearchInput() {
     window.requestAnimationFrame(function focusSearchInputField() {
@@ -1088,15 +1204,7 @@ function ChatMessageListComponent({
   }, [])
 
   const toolResultsByCallId = useMemo(() => {
-    const map = new Map<string, ChatMessage>()
-    for (const message of messages) {
-      if (message.role !== 'toolResult') continue
-      const toolCallId = message.toolCallId
-      if (typeof toolCallId === 'string' && toolCallId.trim().length > 0) {
-        map.set(toolCallId, message)
-      }
-    }
-    return map
+    return buildToolResultsByCallId(messages)
   }, [messages])
 
   const hasUserVisibleTextMessages = useMemo(() => {
@@ -1136,8 +1244,8 @@ function ChatMessageListComponent({
         count += 1
       }
 
-      if (message.role !== 'toolResult') continue
-      const toolCallId = (message.toolCallId || '').trim()
+      if (message.role !== 'tool' && message.role !== 'toolResult') continue
+      const toolCallId = toolResultCallId(message)
       if (toolCallId.length > 0 && seenToolCallIds.has(toolCallId)) continue
       if (toolCallId.length > 0) {
         seenToolCallIds.add(toolCallId)
@@ -1185,7 +1293,7 @@ function ChatMessageListComponent({
       streamingTargets: new Set<string>(),
       signatureById: nextSignatures,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [displayEntries, streamingCleared])
 
   const lastAssistantIndex = visibleEntries
@@ -1227,7 +1335,7 @@ function ChatMessageListComponent({
     if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator — response is rendering
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    const lastEntry = visibleEntries[visibleEntries.length - 1]
+    const lastEntry = visibleEntries.at(-1)
     const lastMessage = lastEntry?.message
     if (lastMessage && lastMessage.role === 'assistant') {
       const lastId = getStableMessageId(lastMessage, lastEntry.sourceIndex)
@@ -1348,39 +1456,11 @@ function ChatMessageListComponent({
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
   const hasGroup = pinToTop && groupStartIndex >= 0
-  const shouldVirtualize = false // Disabled — causes scroll glitches
-
-  const virtualRange = useMemo(() => {
-    if (!shouldVirtualize || scrollMetrics.clientHeight <= 0) {
-      return {
-        startIndex: 0,
-        endIndex: visibleEntries.length,
-        topSpacerHeight: 0,
-        bottomSpacerHeight: 0,
-      }
-    }
-
-    const startIndex = Math.max(
-      0,
-      Math.floor(scrollMetrics.scrollTop / VIRTUAL_ROW_HEIGHT) -
-        VIRTUAL_OVERSCAN,
-    )
-    const visibleCount = Math.ceil(
-      scrollMetrics.clientHeight / VIRTUAL_ROW_HEIGHT,
-    )
-    const endIndex = Math.min(
-      visibleEntries.length,
-      startIndex + visibleCount + VIRTUAL_OVERSCAN * 2,
-    )
-
-    return {
-      startIndex,
-      endIndex,
-      topSpacerHeight: startIndex * VIRTUAL_ROW_HEIGHT,
-      bottomSpacerHeight:
-        (visibleEntries.length - endIndex) * VIRTUAL_ROW_HEIGHT,
-    }
-  }, [scrollMetrics, shouldVirtualize, visibleEntries.length])
+  // Virtualization is intentionally disabled because it causes scroll glitches.
+  const virtualRange = {
+    startIndex: 0,
+    endIndex: visibleEntries.length,
+  }
 
   function isMessageStreaming(message: ChatMessage, index: number) {
     if (!isStreaming || !streamingMessageId) return false
@@ -1464,15 +1544,11 @@ function ChatMessageListComponent({
                   ? 'bg-amber-50/30'
                   : undefined
             }
-            toolCalls={
-              messageIsStreaming ? normalizedStreamingToolCalls : undefined
-            }
+            toolCalls={normalizedStreamingToolCalls}
             isStreaming={messageIsStreaming}
             streamingText={streamingText}
-            streamingThinking={
-              messageIsStreaming ? streamingThinking : undefined
-            }
-            lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
+            streamingThinking={streamingThinking}
+            lifecycleEvents={lifecycleEvents}
             simulateStreaming={simulateStreaming}
             streamingKey={signature}
             expandAllToolSections={expandAllToolSections}
@@ -1498,13 +1574,11 @@ function ChatMessageListComponent({
               ? 'bg-amber-50/30'
               : undefined
         }
-        toolCalls={
-          messageIsStreaming ? normalizedStreamingToolCalls : undefined
-        }
+        toolCalls={undefined}
         isStreaming={messageIsStreaming}
-        streamingText={messageIsStreaming ? streamingText : undefined}
-        streamingThinking={messageIsStreaming ? streamingThinking : undefined}
-        lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
+        streamingText={undefined}
+        streamingThinking={undefined}
+        lifecycleEvents={undefined}
         simulateStreaming={simulateStreaming}
         streamingKey={signature}
         expandAllToolSections={expandAllToolSections}
@@ -1543,8 +1617,7 @@ function ChatMessageListComponent({
     if (isNearBottomRef.current) {
       // Use smooth scroll only when user is near bottom (<200px) and new messages arrive;
       // use instant scroll during streaming to avoid choppiness.
-      const behavior: ScrollBehavior =
-        isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
+      const behavior: ScrollBehavior = !isStreaming ? 'smooth' : 'auto'
       frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
     }
 
@@ -1961,23 +2034,11 @@ function ChatMessageListComponent({
               </>
             ) : (
               <>
-                {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{ height: `${virtualRange.topSpacerHeight}px` }}
-                  />
-                ) : null}
                 {visibleEntries
                   .slice(virtualRange.startIndex, virtualRange.endIndex)
                   .map((entry, index) =>
                     renderMessage(entry, virtualRange.startIndex + index),
                   )}
-                {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
-                  />
-                ) : null}
               </>
             )}
             {/* Bottom shimmer + branch TUI card. Hide as soon as the
@@ -2106,7 +2167,7 @@ function getToolGroupClass(
   messages: Array<ChatMessage>,
   index: number,
 ): string {
-  const message = messages[index]
+  const message = (messages as Array<ChatMessage | undefined>)[index]
   if (!message || message.role !== 'assistant') return ''
   const hasToolCalls = getToolCallsFromMessage(message).length > 0
   if (!hasToolCalls) return ''
@@ -2213,7 +2274,10 @@ function areChatMessageListEqual(
     prev.liveToolActivity === next.liveToolActivity &&
     prev.researchCard === next.researchCard &&
     prev.hideSystemMessages === next.hideSystemMessages &&
-    prev.sending === next.sending
+    prev.sending === next.sending &&
+    prev.hasOlderHistory === next.hasOlderHistory &&
+    prev.loadingOlderHistory === next.loadingOlderHistory &&
+    prev.onLoadOlderHistory === next.onLoadOlderHistory
   )
 }
 

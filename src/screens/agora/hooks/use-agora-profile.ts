@@ -5,11 +5,11 @@
  * the WebSocket server on `join`.
  */
 import { useCallback, useEffect, useState } from 'react'
-import {
-  AGORA_PROFILE_STORAGE_KEY,
-  type AgoraAvatarId,
-  type AgoraProfile,
-  type AgoraStatus,
+import { AGORA_PROFILE_STORAGE_KEY } from '../lib/agora-types'
+import type {
+  AgoraAvatarId,
+  AgoraProfile,
+  AgoraStatus,
 } from '../lib/agora-types'
 
 const FUNNY_ANIMALS = [
@@ -29,7 +29,8 @@ function generateInitialProfile(): AgoraProfile {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `agora-${Math.random().toString(36).slice(2, 10)}`
-  const animal = FUNNY_ANIMALS[Math.floor(Math.random() * FUNNY_ANIMALS.length)]
+  const animal =
+    FUNNY_ANIMALS[Math.floor(Math.random() * FUNNY_ANIMALS.length)] ?? 'Owl'
   const num = Math.floor(Math.random() * 9000) + 1000
   const handle = `${animal.toLowerCase()}${num}`
   return {
@@ -54,7 +55,7 @@ function loadProfile(): AgoraProfile {
       )
       return initial
     }
-    const parsed = JSON.parse(raw) as AgoraProfile
+    const parsed = JSON.parse(raw) as Partial<AgoraProfile>
     if (
       !parsed.id ||
       !parsed.handle ||
@@ -63,7 +64,14 @@ function loadProfile(): AgoraProfile {
     ) {
       return generateInitialProfile()
     }
-    return parsed
+    return {
+      id: parsed.id,
+      handle: parsed.handle,
+      displayName: parsed.displayName,
+      avatarId: parsed.avatarId,
+      bio: parsed.bio ?? '',
+      status: parsed.status ?? 'online',
+    }
   } catch {
     return generateInitialProfile()
   }

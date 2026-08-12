@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   existsSync,
@@ -94,7 +94,7 @@ describe('local-provider-discovery', () => {
     // first call should log
     mod.ensureProviderInConfig('ollama')
     expect(logSpy).toHaveBeenCalledTimes(1)
-    expect(logSpy.mock.calls[0][0]).toContain('Gateway restart needed')
+    expect(logSpy.mock.calls[0]?.[0]).toContain('Gateway restart needed')
 
     // second call should NOT log (rate limited by Set)
     logSpy.mockClear()

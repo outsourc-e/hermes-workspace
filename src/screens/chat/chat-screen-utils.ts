@@ -17,6 +17,46 @@ export function isTerminalActiveRunStatus(status: unknown): boolean {
   )
 }
 
+export function isNonRemoteSessionSource(source: unknown): boolean {
+  if (typeof source !== 'string') return false
+  const normalized = source.trim().toLowerCase()
+  return normalized === 'local' || normalized === 'portable'
+}
+
+export type ChatSessionSourceState = 'unknown' | 'local' | 'remote'
+
+export function getChatSessionSourceState({
+  embedded,
+  sessionsStatus,
+  source,
+}: {
+  embedded: boolean
+  sessionsStatus: 'pending' | 'success' | 'error'
+  source: unknown
+}): ChatSessionSourceState {
+  if (embedded || isNonRemoteSessionSource(source)) return 'local'
+  if (sessionsStatus === 'pending' && source == null) return 'unknown'
+  return 'remote'
+}
+
+export function shouldPinMainSession({
+  activeFriendlyId,
+  resolvedSessionKey,
+  portableMode,
+  sessionSource,
+}: {
+  activeFriendlyId: string
+  resolvedSessionKey: string | undefined
+  portableMode: boolean
+  sessionSource: ChatSessionSourceState
+}): boolean {
+  return (
+    activeFriendlyId === 'main' &&
+    (resolvedSessionKey || activeFriendlyId) === 'main' &&
+    (portableMode || sessionSource === 'local')
+  )
+}
+
 function assistantMessageIdentity(message: ChatMessage): string {
   return String(
     message.__optimisticId ??
@@ -30,7 +70,7 @@ function assistantMessageIdentity(message: ChatMessage): string {
 export function createResponseWaitSnapshot(
   messages: Array<ChatMessage>,
 ): ResponseWaitSnapshot {
-  const last = messages[messages.length - 1]
+  const last = messages.at(-1)
   return {
     messageCount: messages.length,
     lastAssistantId:
@@ -42,7 +82,7 @@ export function shouldClearWaitingForAssistantMessage(
   messages: Array<ChatMessage>,
   snapshot: ResponseWaitSnapshot,
 ): boolean {
-  const last = messages[messages.length - 1]
+  const last = messages.at(-1)
   if (!last || last.role !== 'assistant') return false
   if (last.__streamingStatus === 'streaming') return false
 

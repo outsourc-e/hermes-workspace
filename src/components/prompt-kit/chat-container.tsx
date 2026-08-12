@@ -38,6 +38,7 @@ function ChatContainerRoot({
   const scrollRef = React.useRef<HTMLDivElement | null>(null)
   const stickToBottomRef = React.useRef(stickToBottom)
   const lastScrollTopRef = React.useRef(0)
+  const touchStartYRef = React.useRef<number | null>(null)
 
   React.useLayoutEffect(() => {
     stickToBottomRef.current = stickToBottom
@@ -75,8 +76,45 @@ function ChatContainerRoot({
       })
     }
 
+    const reportTopScrollAttempt = () => {
+      if (element.scrollTop > 16) return
+      onUserScroll?.({
+        scrollTop: element.scrollTop,
+        scrollHeight: element.scrollHeight,
+        clientHeight: element.clientHeight,
+      })
+    }
+
+    // A short recent-history window can fit entirely inside a tall viewport.
+    // In that state browser scroll position cannot change, so a normal scroll
+    // event never occurs even though the reader is already at the top. Forward
+    // upward wheel/pull attempts so consumers can page older content.
+    const handleWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) reportTopScrollAttempt()
+    }
+    const handleTouchStart = (event: TouchEvent) => {
+      touchStartYRef.current = event.touches[0]?.clientY ?? null
+    }
+    const handleTouchMove = (event: TouchEvent) => {
+      const startY = touchStartYRef.current
+      const currentY = event.touches[0]?.clientY
+      if (startY === null || currentY === undefined) return
+      if (currentY > startY + 8) {
+        touchStartYRef.current = null
+        reportTopScrollAttempt()
+      }
+    }
+
     element.addEventListener('scroll', handleScroll, { passive: true })
-    return () => element.removeEventListener('scroll', handleScroll)
+    element.addEventListener('wheel', handleWheel, { passive: true })
+    element.addEventListener('touchstart', handleTouchStart, { passive: true })
+    element.addEventListener('touchmove', handleTouchMove, { passive: true })
+    return () => {
+      element.removeEventListener('scroll', handleScroll)
+      element.removeEventListener('wheel', handleWheel)
+      element.removeEventListener('touchstart', handleTouchStart)
+      element.removeEventListener('touchmove', handleTouchMove)
+    }
   }, [onUserScroll])
 
   // ResizeObserver: re-anchor to bottom when content expands
@@ -97,7 +135,7 @@ function ChatContainerRoot({
       let previousHeight = content.getBoundingClientRect().height
 
       resizeObserver = new ResizeObserver((entries) => {
-        const entry = entries[0]
+        const entry = entries.at(0)
         if (!entry) return
         const nextHeight = entry.contentRect.height
         const heightDelta = nextHeight - previousHeight

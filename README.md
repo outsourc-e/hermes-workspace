@@ -61,20 +61,20 @@ Start here: [docs/swarm/](./docs/swarm/)
 
 ## 📸 Screenshots
 
-|                 Chat                 |                   Conductor                    |
-| :----------------------------------: | :--------------------------------------------: |
+|                 Chat                 |                  Conductor                   |
+| :----------------------------------: | :------------------------------------------: |
 | ![Chat](./docs/screenshots/chat.png) | ![Conductor](./docs/screenshots/conductor.png) |
 
-|                   Dashboard                    |                  Memory                  |
-| :--------------------------------------------: | :--------------------------------------: |
+|                   Dashboard                  |                  Memory                  |
+| :------------------------------------------: | :--------------------------------------: |
 | ![Dashboard](./docs/screenshots/dashboard.png) | ![Memory](./docs/screenshots/memory.png) |
 
 |                   Terminal                   |                   Settings                   |
 | :------------------------------------------: | :------------------------------------------: |
 | ![Terminal](./docs/screenshots/terminal.png) | ![Settings](./docs/screenshots/settings.png) |
 
-|                 Tasks                  |                 Jobs                 |
-| :------------------------------------: | :----------------------------------: |
+|                  Tasks                  |                 Jobs                 |
+| :--------------------------------------: | :----------------------------------: |
 | ![Tasks](./docs/screenshots/tasks.png) | ![Jobs](./docs/screenshots/jobs.png) |
 
 ---
@@ -83,11 +83,11 @@ Start here: [docs/swarm/](./docs/swarm/)
 
 Three paths — pick the one that matches you:
 
-| Path                                         | Best for                                         | Time   |
-| -------------------------------------------- | ------------------------------------------------ | ------ |
+| Path | Best for | Time |
+|---|---|---|
 | **🐳 [Docker Compose](#-docker-quickstart)** | Self-hosters, home labs, "give me a compose gig" | ~2 min |
-| **🌐 One-line install**                      | Local dev on macOS/Linux                         | ~3 min |
-| **🔌 Attach to existing `hermes-agent`**     | You already run Hermes Agent                     | ~1 min |
+| **🌐 One-line install** | Local dev on macOS/Linux | ~3 min |
+| **🔌 Attach to existing `hermes-agent`** | You already run Hermes Agent | ~1 min |
 
 ### One-line install
 
@@ -366,7 +366,6 @@ To force a clean relaunch of the tmux session:
 ```
 
 Optional parameters:
-
 - `-Distro <name>` to target a non-default WSL distro
 - `-WorkspacePath </path/in/wsl>` if your clone is not at `~/hermes-workspace`
 - `-SessionName <name>` to use a custom tmux session name
@@ -398,12 +397,12 @@ HERMES_DASHBOARD_URL=http://127.0.0.1:9119
 
 ### Common pairing scenarios
 
-| Scenario                                               | Set this                                                                                                                             |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Workspace + gateway on the same machine                | `HERMES_API_URL=http://127.0.0.1:8642`, `HERMES_DASHBOARD_URL=http://127.0.0.1:9119`                                                 |
-| Gateway on a remote server (Tailscale / VPN)           | Set both URLs to the reachable IP (e.g. `http://100.x.y.z:8642`) and add `API_SERVER_HOST=0.0.0.0` to the gateway's `~/.hermes/.env` |
-| Already-running `hermes-agent` from upstream installer | Just set `HERMES_API_URL` + `HERMES_DASHBOARD_URL` and skip the one-liner installer                                                  |
-| Multiple agent profiles                                | Profiles live under `~/.hermes/profiles/<name>` — the dashboard switches between them at runtime; workspace follows automatically    |
+| Scenario | Set this |
+|---|---|
+| Workspace + gateway on the same machine | `HERMES_API_URL=http://127.0.0.1:8642`, `HERMES_DASHBOARD_URL=http://127.0.0.1:9119` |
+| Gateway on a remote server (Tailscale / VPN) | Set both URLs to the reachable IP (e.g. `http://100.x.y.z:8642`) and add `API_SERVER_HOST=0.0.0.0` to the gateway's `~/.hermes/.env` |
+| Already-running `hermes-agent` from upstream installer | Just set `HERMES_API_URL` + `HERMES_DASHBOARD_URL` and skip the one-liner installer |
+| Multiple agent profiles | Profiles live under `~/.hermes/profiles/<name>` — the dashboard switches between them at runtime; workspace follows automatically |
 
 ### Live re-pairing (no restart)
 
@@ -440,9 +439,18 @@ cd hermes-workspace
 cp .env.example .env
 ```
 
-Edit `.env` and add **at least one** LLM provider key — whichever provider you want hermes-agent to use:
+Generate a unique token for the private session-topology adapter:
+
+```bash
+openssl rand -hex 32
+```
+
+Edit `.env`, set `SESSION_TOPOLOGY_ADAPTER_TOKEN` to that generated value, and
+add **at least one** LLM provider key — whichever provider you want hermes-agent to use:
 
 ```env
+SESSION_TOPOLOGY_ADAPTER_TOKEN=<paste-the-generated-value-here>
+
 # Pick one (or more). You do NOT need all of these.
 # OPENAI_API_KEY=sk-...                # GPT / o-series / OpenAI-compatible
 # OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (free models available)
@@ -456,17 +464,30 @@ Using **Ollama, LM Studio, or another local server**? No key needed — just poi
 ### Step 2: Start the Services
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-This pulls two pre-built images and starts them:
+This pulls the reviewed Hermes Agent image, builds the Workspace candidate and
+small standard-library adapter from this checkout, and starts all three services:
 
-- **hermes-agent** → `nousresearch/hermes-agent:latest` on port **8642**
-- **hermes-workspace** → `ghcr.io/outsourc-e/hermes-workspace:latest` on port **3000**
+- **hermes-agent** → `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56` on port **8642**
+- **session-topology-adapter** → private-network-only, logically read-only live topology projection
+- **hermes-workspace** → locally built `hermes-workspace:reviewed-candidate` on port **3000**
 
-No local build. First run takes a minute to pull; subsequent starts are instant.
+The adapter's local build is intentionally minimal and installs no dependencies. Its
+`hermes-agent-data:/data` mount is writable only so SQLite can coordinate live
+WAL/SHM state; database connections use URI `mode=ro`, enforce
+`PRAGMA query_only=ON`, and execute only bounded read/schema operations. The
+container itself runs as non-root with a read-only root filesystem, no Linux
+capabilities, no new privileges, no host port, and an internal-only network.
+The producer pin is Hermes Agent **v0.19.0**, upstream revision
+`fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`. CI extracts its persistence
+source directly from that immutable image and verifies schema version 23 and
+the adapter's required session columns; do not replace the digest with a
+mutable tag without updating that compatibility gate.
+The first source build takes a minute; subsequent builds reuse Docker's cache.
 Agent state (config, sessions, skills, memory, credentials) persists in the
-legacy-named `claude-data` Docker volume, so containers can be recreated without data loss.
+`hermes-agent-data` Docker volume, so containers can be recreated without data loss.
 
 ### Step 3: Access the Workspace
 
@@ -516,62 +537,58 @@ docker compose down && docker compose up -d
 
 ### Troubleshooting Docker
 
-| Symptom                                                                      | Fix                                                                |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `[workspace] refusing to start — HERMES_PASSWORD is unset`                   | Add `HERMES_PASSWORD=<secret>` to `.env`                           |
-| Login silently fails (no error, page reloads)                                | Add `COOKIE_SECURE=0` for HTTP, or `COOKIE_SECURE=1` + HTTPS       |
-| `[Api_Server] Refusing to start: binding to 0.0.0.0 requires API_SERVER_KEY` | Add `API_SERVER_KEY=*** to `.env`                                  |
-| `No user allowlists configured. All unauthorized users will be denied.`      | Add `GATEWAY_ALLOW_ALL_USERS=true` to `.env`                       |
-| `CLAUDE_DASHBOARD_TOKEN is not set` warning                                  | Set `CLAUDE_DASHBOARD_TOKEN` to the same value as `API_SERVER_KEY` |
-| 500 Internal Server Error on login after setting all the above               | Clear browser cookies for the workspace domain, then retry         |
+| Symptom | Fix |
+|---|---|
+| `[workspace] refusing to start — HERMES_PASSWORD is unset` | Add `HERMES_PASSWORD=<secret>` to `.env` |
+| Login silently fails (no error, page reloads) | Add `COOKIE_SECURE=0` for HTTP, or `COOKIE_SECURE=1` + HTTPS |
+| `[Api_Server] Refusing to start: binding to 0.0.0.0 requires API_SERVER_KEY` | Add `API_SERVER_KEY=*** to `.env` |
+| `No user allowlists configured. All unauthorized users will be denied.` | Add `GATEWAY_ALLOW_ALL_USERS=true` to `.env` |
+| `CLAUDE_DASHBOARD_TOKEN is not set` warning | Set `CLAUDE_DASHBOARD_TOKEN` to the same value as `API_SERVER_KEY` |
+| 500 Internal Server Error on login after setting all the above | Clear browser cookies for the workspace domain, then retry |
 
-### Building from source
+### Development build tag
 
-Want to hack on the workspace and have local changes hot-built into the
-container? Use the dev overlay:
+The default quickstart already builds Workspace from the checked-out source. To
+use a separate `hermes-workspace:development` tag while iterating, add the dev
+overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-The base `docker-compose.yml` stays untouched — the overlay adds a `build:`
-block for the `hermes-workspace` service so the local repo is compiled
-instead of pulled. The Hermes Agent service still uses the canonical
-`nousresearch/hermes-agent:latest` image; if you need a custom agent
+The Hermes Agent service still uses the compatible v0.19.0
+image at upstream revision `fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`, pinned as
+`nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`;
+if you need a custom agent
 build, tag it locally and override `image:` in your own
 `compose.override.yml`.
 
-### Using a Pre-Built Image (Coolify / Easypanel / Dokploy / Unraid)
+### PaaS / home-lab source builds (Coolify / Easypanel / Dokploy / Unraid)
 
-Deploying Hermes Workspace to a PaaS or home-lab stack? Pull the image
-directly from GitHub Container Registry:
+No GHCR digest has been published for this reviewed candidate. Do not substitute
+an older registry image: configure the platform to build this checkout's
+`Dockerfile`, or build and publish the candidate under an identity you control.
+The resulting local Compose image name is:
 
 ```
-ghcr.io/outsourc-e/hermes-workspace:latest
+hermes-workspace:reviewed-candidate
 ```
 
-Available tags:
-
-| Tag          | What it is                                 |
-| ------------ | ------------------------------------------ |
-| `latest`     | Latest `main` commit (stable; recommended) |
-| `v2.0.0`     | Pinned semver tag                          |
-| `main-<sha>` | Specific commit                            |
-
-Minimal Coolify / Easypanel config:
+Minimal config after the platform has built/tagged this checkout:
 
 ```yaml
 service: hermes-workspace
-image: ghcr.io/outsourc-e/hermes-workspace:latest
+image: hermes-workspace:reviewed-candidate
 port: 3000
 env:
-  HERMES_API_URL: http://hermes-agent:8642 # point at your gateway
-  HERMES_API_TOKEN: ${API_SERVER_KEY} # if gateway auth is enabled
+  HERMES_API_URL: http://hermes-agent:8642   # point at your gateway
+  HERMES_API_TOKEN: ${API_SERVER_KEY}        # if gateway auth is enabled
 ```
 
-The image is built for `linux/amd64` and `linux/arm64`. Pair it with either
-a `nousresearch/hermes-agent:latest` container (what our `docker-compose.yml`
-does by default) or an existing gateway on another host.
+Pair it with the compatible Hermes Agent v0.19.0 producer at revision
+`fa7b0fcf5d6e3576a59514ef1e281cd1e0872b8b`, pinned by `docker-compose.yml` as
+`nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`,
+or an existing gateway on another host.
 
 ---
 
@@ -808,34 +825,34 @@ The Docker setup runs both automatically — no action needed if using `docker c
 
 ### Shipped ✅
 
-| Feature                  | What it does                                                                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Chat + SSE streaming     | Live agent output with tool call rendering                                                                               |
-| Files + Terminal         | Full workspace file browser + cross-platform PTY                                                                         |
-| Memory + Skills browsers | Edit memory, browse 2,000+ skills with marketplace                                                                       |
-| Dashboard                | Sessions, model mix, cost ledger, attention card                                                                         |
-| Operations               | Multi-agent management with preset personas                                                                              |
-| Agent View               | Live agent panel in chat                                                                                                 |
-| Swarm Mode               | Persistent tmux-backed worker pool with role dispatch                                                                    |
-| MCP page                 | Full catalog + marketplace + sources                                                                                     |
-| Mobile PWA + Tailscale   | Install as native-feeling app on any device                                                                              |
-| Themes                   | Hermes / Nous / Bronze / Slate / Mono (light + dark)                                                                     |
-| Capability gates         | Graceful 'upstream not ready' placeholders                                                                               |
-| Multi-provider           | OpenAI/OpenAI-compatible, OpenRouter, Google, Ollama, LM Studio, vLLM, Atomic Chat, and other Hermes-supported providers |
+| Feature | What it does |
+|---|---|
+| Chat + SSE streaming | Live agent output with tool call rendering |
+| Files + Terminal | Full workspace file browser + cross-platform PTY |
+| Memory + Skills browsers | Edit memory, browse 2,000+ skills with marketplace |
+| Dashboard | Sessions, model mix, cost ledger, attention card |
+| Operations | Multi-agent management with preset personas |
+| Agent View | Live agent panel in chat |
+| Swarm Mode | Persistent tmux-backed worker pool with role dispatch |
+| MCP page | Full catalog + marketplace + sources |
+| Mobile PWA + Tailscale | Install as native-feeling app on any device |
+| Themes | Hermes / Nous / Bronze / Slate / Mono (light + dark) |
+| Capability gates | Graceful 'upstream not ready' placeholders |
+| Multi-provider | OpenAI/OpenAI-compatible, OpenRouter, Google, Ollama, LM Studio, vLLM, Atomic Chat, and other Hermes-supported providers |
 
 ### In progress 🔨
 
-| Feature                       | Status                                                                                                                                                                                   |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Conductor missions            | Workspace UI is shipped; uses dashboard mission API when available and Workspace-native Swarm fallback otherwise (see [#262](https://github.com/outsourc-e/hermes-workspace/issues/262)) |
-| Native Desktop App (Electron) | Spec'd; PWA install path works today                                                                                                                                                     |
+| Feature | Status |
+|---|---|
+| Conductor missions | Workspace UI is shipped; uses dashboard mission API when available and Workspace-native Swarm fallback otherwise (see [#262](https://github.com/outsourc-e/hermes-workspace/issues/262)) |
+| Native Desktop App (Electron) | Spec'd; PWA install path works today |
 
 ### Coming 🔜
 
-| Feature                | Status                            |
-| ---------------------- | --------------------------------- |
-| Cloud / Hosted version | Pending infra                     |
-| Team collaboration     | Pending cloud + multi-tenant work |
+| Feature | Status |
+|---|---|
+| Cloud / Hosted version | Pending infra |
+| Team collaboration | Pending cloud + multi-tenant work |
 
 ---
 

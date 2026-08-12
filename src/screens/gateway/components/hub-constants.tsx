@@ -1,12 +1,8 @@
+import { MODEL_PRESETS, TEAM_TEMPLATES } from './team-panel'
+import type { ModelPresetId, TeamMember, TeamTemplateId } from './team-panel'
 import type { MissionArtifact } from '@/stores/mission-store'
 import type { HubTask } from './task-board'
-import {
-  MODEL_PRESETS,
-  TEAM_TEMPLATES,
-  type ModelPresetId,
-  type TeamMember,
-  type TeamTemplateId,
-} from './team-panel'
+
 export { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
 
 export type AgentHubLayoutProps = {
@@ -37,7 +33,7 @@ export type SavedTeamConfig = {
   description?: string
   createdAt: number
   updatedAt: number
-  team: TeamMember[]
+  team: Array<TeamMember>
 }
 
 export const TEMPLATE_MODEL_SUGGESTIONS: Record<
@@ -67,7 +63,7 @@ export type GatewayModelEntry = {
 
 export type GatewayModelsResponse = {
   ok?: boolean
-  models?: GatewayModelEntry[]
+  models?: Array<GatewayModelEntry>
 }
 
 export type DetectedGatewayAgent = {
@@ -94,7 +90,7 @@ export type MissionAgentSummary = {
   agentId: string
   agentName: string
   modelId: string
-  lines: string[]
+  lines: Array<string>
   transcript?: Array<{ role: string; text: string }>
   transcriptSummary?: string
 }
@@ -106,11 +102,11 @@ export type MissionReportPayload = {
   teamName: string
   startedAt: number
   completedAt: number
-  team: TeamMember[]
-  tasks: HubTask[]
-  artifacts: MissionArtifact[]
+  team: Array<TeamMember>
+  tasks: Array<HubTask>
+  artifacts: Array<MissionArtifact>
   tokenCount: number
-  agentSummaries: MissionAgentSummary[]
+  agentSummaries: Array<MissionAgentSummary>
   needsEnrichment: boolean
 }
 
@@ -125,7 +121,7 @@ export type StoredMissionReport = {
   duration: number
   tokenCount: number
   costEstimate: number
-  artifacts: MissionArtifact[]
+  artifacts: Array<MissionArtifact>
   report: string
   completedAt: number
 }
@@ -201,7 +197,7 @@ export const HUB_FILTER_PILL_CLASS =
 export const HUB_FILTER_PILL_ACTIVE_CLASS =
   'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
 
-export const WIZARD_STEP_ORDER: WizardStep[] = [
+export const WIZARD_STEP_ORDER: Array<WizardStep> = [
   'gateway',
   'team',
   'goal',
@@ -215,7 +211,7 @@ export const TEAM_QUICK_TEMPLATES: Array<{
   description: string
   templateId: string
   tier: 'budget' | 'balanced' | 'max'
-  agents: string[]
+  agents: Array<string>
 }> = [
   {
     id: 'research-budget',

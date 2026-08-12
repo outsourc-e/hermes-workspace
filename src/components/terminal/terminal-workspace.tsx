@@ -387,6 +387,9 @@ export function TerminalWorkspace({
         }
         if (!flushTimer) flushTimer = setTimeout(flushWrites, FLUSH_MS)
       }
+      function clearPendingFlush(timer: ReturnType<typeof setTimeout> | null) {
+        if (timer !== null) clearTimeout(timer)
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
       while (true) {
@@ -406,6 +409,7 @@ export function TerminalWorkspace({
           if (_bi > 0 && _bi % 10 === 0)
             await new Promise((r) => setTimeout(r, 0))
           const block = blocks[_bi]
+          if (!block) continue
           if (!block.trim()) continue
           const lines = block.split('\n')
           let eventName = ''
@@ -461,7 +465,7 @@ export function TerminalWorkspace({
       }
 
       // Flush any remaining buffered writes
-      clearTimeout(flushTimer ?? undefined)
+      clearPendingFlush(flushTimer)
       flushWrites()
 
       const latestTab = useTerminalPanelStore
@@ -611,7 +615,8 @@ export function TerminalWorkspace({
         return
       }
       if (!activeTabId) {
-        setActiveTab(tabs[0].id)
+        const firstTab = tabs[0]
+        if (firstTab) setActiveTab(firstTab.id)
       }
     },
     [activeTabId, createTab, setActiveTab, tabs],

@@ -4,28 +4,27 @@
 // duplicated as local functions inside agent-hub-layout.tsx.
 // To activate: replace local function definitions in agent-hub-layout.tsx with
 // imports from this file. Run `npx tsc --noEmit` after to verify no type drift.
-import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
-import { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
-import type { MissionCheckpoint } from '../lib/mission-checkpoint'
 import {
-  MODEL_PRESET_MAP,
-  MODEL_PRESETS,
   MAX_MISSION_REPORTS,
   MISSION_REPORTS_STORAGE_KEY,
+  MODEL_PRESETS,
+  MODEL_PRESET_MAP,
   TEMPLATE_DISPLAY_NAMES,
   TEMPLATE_MODEL_SUGGESTIONS,
-  type MissionAgentSummary,
-  type MissionReportPayload,
-  type MissionTaskStats,
-  type SavedTeamConfig,
-  type StoredMissionReport,
 } from './hub-constants'
-import {
-  type TeamMember,
-  type TeamTemplateId,
-  TEAM_TEMPLATES,
-} from './team-panel'
+import { TEAM_TEMPLATES } from './team-panel'
+import type {
+  MissionAgentSummary,
+  MissionReportPayload,
+  MissionTaskStats,
+  SavedTeamConfig,
+  StoredMissionReport,
+} from './hub-constants'
+import type { TeamMember, TeamTemplateId } from './team-panel'
+import type { MissionCheckpoint } from '../lib/mission-checkpoint'
+import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
 import type { HubTask } from './task-board'
+import { ROUGH_COST_PER_1K_TOKENS_USD } from '@/lib/config/costs'
 
 export function readGatewayModelId(entry: GatewayModelCatalogEntry): string {
   if (typeof entry === 'string') return entry.trim()
@@ -138,7 +137,7 @@ function cleanMissionSegment(value: string): string {
   return capitalizeFirst(normalized)
 }
 
-function extractMissionItems(goal: string): string[] {
+function extractMissionItems(goal: string): Array<string> {
   const rawSegments = goal
     .replace(/\r/g, '\n')
     .replace(/[•●▪◦]/g, '\n')
@@ -150,7 +149,7 @@ function extractMissionItems(goal: string): string[] {
     .map(cleanMissionSegment)
     .filter((segment) => segment.length > 0 && wordCount(segment) >= 3)
 
-  const uniqueSegments: string[] = []
+  const uniqueSegments: Array<string> = []
   const seen = new Set<string>()
   rawSegments.forEach((segment) => {
     const key = segment.toLowerCase()
@@ -163,16 +162,16 @@ function extractMissionItems(goal: string): string[] {
 
 export function parseMissionGoal(
   goal: string,
-  teamMembers: TeamMember[],
+  teamMembers: Array<TeamMember>,
   missionId?: string,
-): HubTask[] {
+): Array<HubTask> {
   const trimmedGoal = goal.trim()
   if (!trimmedGoal) return []
   const now = Date.now()
   const segments = extractMissionItems(trimmedGoal)
   const normalizedGoal = cleanMissionSegment(trimmedGoal)
 
-  let missionItems: string[]
+  let missionItems: Array<string>
   if (segments.length >= 2) {
     const withoutFullGoal = segments.filter(
       (segment) => segment !== normalizedGoal,
@@ -209,7 +208,7 @@ export function truncateMissionGoal(goal: string, max = 110): string {
 
 export function buildTeamFromTemplate(
   templateId: TeamTemplateId,
-): TeamMember[] {
+): Array<TeamMember> {
   const template = TEAM_TEMPLATES.find((entry) => entry.id === templateId)
   if (!template) return []
 
@@ -229,7 +228,7 @@ export function buildTeamFromTemplate(
 
 export function buildTeamFromRuntime(
   agents: Array<{ id: string; name: string; role: string; status: string }>,
-): TeamMember[] {
+): Array<TeamMember> {
   return agents.slice(0, 5).map((agent, index) => ({
     id: agent.id,
     name: agent.name,
@@ -303,7 +302,7 @@ export function toSavedTeamConfig(value: unknown): SavedTeamConfig | null {
 
 export function suggestTemplate(goal: string): TeamTemplateId {
   const normalized = goal.toLowerCase()
-  const hasAny = (keywords: string[]) =>
+  const hasAny = (keywords: Array<string>) =>
     keywords.some((keyword) => normalized.includes(keyword))
 
   if (
@@ -332,7 +331,7 @@ export function suggestTemplate(goal: string): TeamTemplateId {
 }
 
 export function resolveActiveTemplate(
-  team: TeamMember[],
+  team: Array<TeamMember>,
 ): TeamTemplateId | undefined {
   return TEAM_TEMPLATES.find((template) => {
     if (team.length !== template.agents.length) return false
@@ -346,7 +345,9 @@ export function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-export function computeMissionTaskStats(tasks: HubTask[]): MissionTaskStats {
+export function computeMissionTaskStats(
+  tasks: Array<HubTask>,
+): MissionTaskStats {
   const total = tasks.length
   const completed = tasks.filter(
     (task) => task.status === 'done' || (task.status as string) === 'completed',
@@ -371,15 +372,17 @@ export function formatDuration(ms: number): string {
   return `${seconds}s`
 }
 
-function cleanAgentOutputLines(lines: string[]): string[] {
+function cleanAgentOutputLines(lines: Array<string>): Array<string> {
   return lines.filter((line) => line.trim().length > 0)
 }
 
-function getAgentOutputMarkdown(lines: string[]): string {
+function getAgentOutputMarkdown(lines: Array<string>): string {
   return cleanAgentOutputLines(lines).join('\n').trim()
 }
 
-function getLongestAgentOutput(agentSummaries: MissionAgentSummary[]): string {
+function getLongestAgentOutput(
+  agentSummaries: Array<MissionAgentSummary>,
+): string {
   const outputs = agentSummaries
     .map((summary) => getAgentOutputMarkdown(summary.lines))
     .filter((output) => output.length > 0)
@@ -390,7 +393,7 @@ function getLongestAgentOutput(agentSummaries: MissionAgentSummary[]): string {
 }
 
 function extractExecutiveSummary(
-  agentSummaries: MissionAgentSummary[],
+  agentSummaries: Array<MissionAgentSummary>,
 ): string {
   const longestOutput = getLongestAgentOutput(agentSummaries)
   if (!longestOutput) return ''
@@ -399,8 +402,10 @@ function extractExecutiveSummary(
     : longestOutput
 }
 
-function extractKeyFindings(agentSummaries: MissionAgentSummary[]): string[] {
-  const findings: string[] = []
+function extractKeyFindings(
+  agentSummaries: Array<MissionAgentSummary>,
+): Array<string> {
+  const findings: Array<string> = []
   const seen = new Set<string>()
 
   for (const summary of agentSummaries) {
@@ -420,7 +425,7 @@ function extractKeyFindings(agentSummaries: MissionAgentSummary[]): string[] {
 
 function determineMissionOutcome(
   taskStats: MissionTaskStats,
-  agentSummaries: MissionAgentSummary[],
+  agentSummaries: Array<MissionAgentSummary>,
 ): string {
   const hasOutput = agentSummaries.some(
     (summary) => cleanAgentOutputLines(summary.lines).length > 0,
@@ -429,7 +434,7 @@ function determineMissionOutcome(
   if (taskStats.failed > 0) return '**Outcome:** ⚠️ Partial'
   if (taskStats.total > 0 && taskStats.completed >= taskStats.total)
     return '**Outcome:** ✅ Complete'
-  if (taskStats.total === 0 && hasOutput) return '**Outcome:** ✅ Complete'
+  if (taskStats.total === 0) return '**Outcome:** ✅ Complete'
   return '**Outcome:** ⚠️ Partial'
 }
 
@@ -437,7 +442,7 @@ export function generateMissionReport(payload: MissionReportPayload): string {
   const durationMs = Math.max(0, payload.completedAt - payload.startedAt)
   const taskStats = computeMissionTaskStats(payload.tasks)
   const costEstimate = estimateMissionCost(payload.tokenCount)
-  const lines: string[] = []
+  const lines: Array<string> = []
   const rawGoal = payload.goal || 'Untitled mission'
   const cleanGoal = rawGoal.replace(/^Mission\s+/i, '').trim() || rawGoal
 
@@ -563,7 +568,7 @@ export function buildStoredMissionReportFromCheckpoint(
   }
 }
 
-export function loadStoredMissionReports(): StoredMissionReport[] {
+export function loadStoredMissionReports(): Array<StoredMissionReport> {
   if (typeof window === 'undefined') return []
   try {
     const raw = window.localStorage.getItem(MISSION_REPORTS_STORAGE_KEY)
@@ -583,7 +588,7 @@ export function loadStoredMissionReports(): StoredMissionReport[] {
 
 export function saveStoredMissionReport(
   entry: StoredMissionReport,
-): StoredMissionReport[] {
+): Array<StoredMissionReport> {
   if (typeof window === 'undefined') return [entry]
   const entryMissionId = getStoredMissionReportMissionId(entry)
   const next = [

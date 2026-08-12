@@ -3,17 +3,17 @@
 // ApprovalsPanel is a sidebar-style panel variant — consider wiring it to replace
 // or complement ApprovalsBell for a richer approvals experience.
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ApprovalRequest } from '../lib/approvals-store'
+import type { GatewayApprovalEntry } from '@/lib/gateway-api'
 import {
   fetchGatewayApprovals,
   resolveGatewayApproval,
-  type GatewayApprovalEntry,
 } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
-import type { ApprovalRequest } from '../lib/approvals-store'
 
 type ApprovalsPanelProps = {
   visible: boolean
-  fallbackApprovals?: ApprovalRequest[]
+  fallbackApprovals?: Array<ApprovalRequest>
   onPendingCountChange?: (count: number) => void
 }
 
@@ -45,7 +45,10 @@ function agentBadgeClass(agentName: string): string {
   for (let i = 0; i < agentName.length; i++) {
     hash = (hash * 31 + agentName.charCodeAt(i)) | 0
   }
-  return AGENT_BADGE_COLORS[Math.abs(hash) % AGENT_BADGE_COLORS.length]!
+  return (
+    AGENT_BADGE_COLORS[Math.abs(hash) % AGENT_BADGE_COLORS.length] ??
+    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+  )
 }
 
 function approvalActionText(approval: GatewayApprovalEntry): string {
@@ -98,8 +101,8 @@ export function ApprovalsPanel({
   fallbackApprovals = [],
   onPendingCountChange,
 }: ApprovalsPanelProps) {
-  const [pending, setPending] = useState<GatewayApprovalEntry[]>([])
-  const [history, setHistory] = useState<GatewayApprovalEntry[]>([])
+  const [pending, setPending] = useState<Array<GatewayApprovalEntry>>([])
+  const [history, setHistory] = useState<Array<GatewayApprovalEntry>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [resolvingIds, setResolvingIds] = useState<Record<string, boolean>>({})
@@ -143,7 +146,7 @@ export function ApprovalsPanel({
     return () => window.clearInterval(interval)
   }, [refreshAll, refreshPending, visible])
 
-  const localHistory = useMemo<HistoryEntry[]>(() => {
+  const localHistory = useMemo<Array<HistoryEntry>>(() => {
     return fallbackApprovals
       .filter((entry) => entry.status !== 'pending')
       .map((entry) => ({
@@ -155,8 +158,8 @@ export function ApprovalsPanel({
       }))
   }, [fallbackApprovals])
 
-  const mergedHistory = useMemo<HistoryEntry[]>(() => {
-    const remote: HistoryEntry[] = history.map((entry) => ({
+  const mergedHistory = useMemo<Array<HistoryEntry>>(() => {
+    const remote: Array<HistoryEntry> = history.map((entry) => ({
       id: entry.id,
       agentName: entry.agentName ?? entry.sessionKey ?? 'Gateway',
       action: approvalActionText(entry),

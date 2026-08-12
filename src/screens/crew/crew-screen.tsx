@@ -10,44 +10,9 @@ import {
   Wifi01Icon,
   WifiOffIcon,
 } from '@hugeicons/core-free-icons'
+import type { CrewMember, CrewOnlineStatus } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
-import {
-  useCrewStatus,
-  getOnlineStatus,
-  type CrewMember,
-  type CrewOnlineStatus,
-} from '@/hooks/use-crew-status'
-
-// ── Helpers ─────────────────────────────────────────────────────────
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
-  return String(n)
-}
-
-function formatCost(n: number | null): string {
-  if (n === null) return '—'
-  return `$${n.toFixed(2)}`
-}
-
-function formatRelativeTime(unixSeconds: number | null): string {
-  if (!unixSeconds) return 'Never'
-  const diffMs = Date.now() - unixSeconds * 1000
-  const diffMins = Math.floor(diffMs / 60_000)
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d ago`
-}
+import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
 
 function formatUpdatedAgo(fetchedAt: number | null): string {
   if (!fetchedAt) return ''
@@ -96,14 +61,6 @@ function SkeletonCard() {
         </div>
         <div className="h-7 bg-[var(--theme-hover)] rounded w-28 mb-1" />
         <div className="h-3 bg-[var(--theme-hover)] rounded w-36 mb-4" />
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] h-14"
-            />
-          ))}
-        </div>
         <div className="flex justify-between">
           <div className="h-3 bg-[var(--theme-hover)] rounded w-20" />
           <div className="h-3 bg-[var(--theme-hover)] rounded w-20" />
@@ -118,7 +75,9 @@ function SkeletonCard() {
 function AgentCard({ member }: { member: CrewMember }) {
   const navigate = useNavigate()
   const status = getOnlineStatus(member)
-  const telegramPlatform = member.platforms.telegram
+  const telegramPlatform = (
+    member.platforms as Partial<CrewMember['platforms']>
+  ).telegram
 
   const borderColor =
     status === 'online'
@@ -185,58 +144,6 @@ function AgentCard({ member }: { member: CrewMember }) {
               </span>
             </div>
           )}
-        </div>
-
-        {/* Last active */}
-        <div>
-          <p className="text-[11px] text-[var(--theme-muted)]">
-            Last active:{' '}
-            <span className="text-[var(--theme-text)]">
-              {formatRelativeTime(member.lastSessionAt)}
-            </span>
-          </p>
-          {member.lastSessionTitle && (
-            <p className="text-[11px] text-[var(--theme-muted)] italic truncate mt-0.5">
-              "{member.lastSessionTitle}"
-            </p>
-          )}
-        </div>
-
-        {/* Stats grid */}
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: 'Sessions', value: formatNumber(member.sessionCount) },
-            { label: 'Messages', value: formatNumber(member.messageCount) },
-            { label: 'Tools', value: formatNumber(member.toolCallCount) },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-2 text-center"
-            >
-              <div className="text-sm font-bold" style={{ color: '#f59e0b' }}>
-                {value}
-              </div>
-              <div className="text-[9px] text-[var(--theme-muted)] uppercase tracking-widest mt-0.5">
-                {label}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Tokens + cost */}
-        <div className="flex justify-between text-[11px]">
-          <span className="text-[var(--theme-muted)]">
-            Tokens:{' '}
-            <span className="text-[var(--theme-text)]">
-              {formatTokens(member.totalTokens)}
-            </span>
-          </span>
-          <span className="text-[var(--theme-muted)]">
-            Est. cost:{' '}
-            <span className="text-[var(--theme-text)]">
-              {formatCost(member.estimatedCostUsd)}
-            </span>
-          </span>
         </div>
 
         {/* Cron + tasks */}
@@ -352,8 +259,8 @@ export function CrewScreen() {
                 Crew Status
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-muted)]">
-                Live agent health across profiles, recent session activity,
-                assigned tasks, and cron coverage.
+                Live agent health across profiles, assigned tasks, and cron
+                coverage.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.18em]">

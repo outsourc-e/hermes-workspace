@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   ArrowDown01Icon,
   ArrowRight01Icon,
@@ -21,11 +22,10 @@ import type {
   AgentStatusBubble,
 } from './agent-card'
 import type { ActiveAgent } from '@/hooks/use-agent-view'
-import { AgentChatModal } from '@/components/agent-chat/AgentChatModal'
-import {
-  AgentCard as MiniAgentCard,
-  type AgentCardStatus,
-} from '@/components/agent-card'
+import type { AgentCardStatus } from '@/components/agent-card'
+import type { SessionCard } from '@/screens/chat/types'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import { AgentCard as MiniAgentCard } from '@/components/agent-card'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -44,12 +44,13 @@ import { useCliAgents } from '@/hooks/use-cli-agents'
 import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
-import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { cn } from '@/lib/utils'
 import {
   InspectorPanel,
   InspectorToggleButton,
 } from '@/components/inspector/inspector-panel'
+import { buildAgentSessionCardRoute } from '@/components/agent-view/agent-session-card-navigation'
+import { hasExactCompleteSessionCardProjection } from '@/screens/chat/chat-queries'
 
 function getLastUserMessageBubbleElement(): HTMLElement | null {
   const nodes = document.querySelectorAll<HTMLElement>(
@@ -94,18 +95,6 @@ function getMiniAgentCardStatus(status: string): AgentCardStatus {
   if (status === 'complete' || status === 'finished') return 'completed'
   if (status === 'failed') return 'failed'
   return 'running'
-}
-
-const AGENT_NAME_KEY = 'hermes-workspace-agent-name'
-
-function getStoredAgentName(): string {
-  try {
-    const v = localStorage.getItem(AGENT_NAME_KEY)
-    if (v && v.trim()) return v.trim()
-  } catch {
-    /* noop */
-  }
-  return ''
 }
 
 const STATE_GLOW: Record<string, string> = {
@@ -169,39 +158,40 @@ function ocTextColor(pct: number): string {
   return 'text-emerald-600'
 }
 
-function ocReadNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const p = Number(value)
-    if (Number.isFinite(p)) return p
+type OcCardStatus = {
+  model: string
+  contextPercent: number
+}
+
+function ocParseCardStatus(
+  payload: unknown,
+  cardId: string,
+): OcCardStatus | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
   }
-  return 0
-}
-
-function ocReadPercent(value: unknown): number {
-  const n = ocReadNumber(value)
-  if (n <= 1 && n > 0) return n * 100
-  return n
-}
-
-function ocParseContextPct(payload: unknown): number {
-  const root =
-    payload && typeof payload === 'object'
-      ? (payload as Record<string, unknown>)
-      : {}
-  const usage =
-    (root.today as Record<string, unknown> | undefined) ??
-    (root.usage as Record<string, unknown> | undefined) ??
-    (root.summary as Record<string, unknown> | undefined) ??
-    (root.totals as Record<string, unknown> | undefined) ??
-    root
-  return ocReadPercent(
-    (usage as Record<string, unknown>)?.contextPercent ??
-      (usage as Record<string, unknown>)?.context_percent ??
-      (usage as Record<string, unknown>)?.context ??
-      root?.contextPercent ??
-      root?.context_percent,
+  const cards = (payload as Record<string, unknown>).cards
+  if (!Array.isArray(cards)) return null
+  const matches = cards.filter(
+    (card): card is Record<string, unknown> =>
+      Boolean(card) &&
+      typeof card === 'object' &&
+      !Array.isArray(card) &&
+      (card as Record<string, unknown>).cardId === cardId,
   )
+  if (matches.length !== 1) return null
+  const usage = matches[0]!.usage
+  if (!usage || typeof usage !== 'object' || Array.isArray(usage)) return null
+  const record = usage as Record<string, unknown>
+  const contextPercent =
+    typeof record.contextPercent === 'number' &&
+    Number.isFinite(record.contextPercent)
+      ? record.contextPercent
+      : 0
+  return {
+    model: typeof record.model === 'string' ? record.model : '',
+    contextPercent: Math.min(100, Math.max(0, Math.round(contextPercent))),
+  }
 }
 
 // ── OrchestratorCard ────────────────────────────────────────────────────────
@@ -209,25 +199,26 @@ function ocParseContextPct(payload: unknown): number {
 function OrchestratorCard({
   compact = false,
   cardRef,
+  activityAvailable,
+  cardId,
+  displayTitle,
 }: {
   compact?: boolean
   cardRef?: (element: HTMLElement | null) => void
+  activityAvailable: boolean
+  cardId?: string
+  displayTitle?: string
 }) {
-  const { state, label } = useOrchestratorState()
-  const glowClass = STATE_GLOW[state] ?? STATE_GLOW.idle
+  const { state, label: activityLabel } = useOrchestratorState()
+  const visibleState = activityAvailable ? state : 'idle'
+  const glowClass = STATE_GLOW[visibleState] ?? STATE_GLOW.idle
 
-  const [agentName, setAgentName] = useState(getStoredAgentName)
-  const [sessionName, setSessionName] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  // Fetch model from gateway
+  // Fetch Card-scoped model usage from the canonical projection.
   const [model, setModel] = useState('')
 
   // Usage state
   const [contextPct, setContextPct] = useState<number | null>(null)
-  const [usageRows, setUsageRows] = useState<OcUsageRow[]>([])
+  const [usageRows, setUsageRows] = useState<Array<OcUsageRow>>([])
   const [providerLabel, setProviderLabel] = useState<string | null>(null)
   const [usageExpanded, setUsageExpanded] = useState(true)
   const [preferredProvider, setPreferredProvider] = useState<string | null>(
@@ -240,12 +231,14 @@ function OrchestratorCard({
       }
     },
   )
-  const [allOcProviders, setAllOcProviders] = useState<OcProviderEntry[]>([])
+  const [allOcProviders, setAllOcProviders] = useState<Array<OcProviderEntry>>(
+    [],
+  )
   const [providerFlash, setProviderFlash] = useState(false)
   const flashTimerRefOc = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function getPrimaryProvider(
-    all: OcProviderEntry[],
+    all: Array<OcProviderEntry>,
     preferred: string | null,
   ) {
     if (preferred) {
@@ -259,12 +252,12 @@ function OrchestratorCard({
   }
 
   function updateUsageRowsFromProviders(
-    providers: OcProviderEntry[],
+    providers: Array<OcProviderEntry>,
     preferred: string | null,
   ) {
     const primary = getPrimaryProvider(providers, preferred)
     if (!primary) return
-    const rows: OcUsageRow[] = primary.lines
+    const rows: Array<OcUsageRow> = primary.lines
       .filter((l) => l.type === 'progress' && l.used !== undefined)
       .slice(0, 2)
       .map((l) => ({
@@ -273,7 +266,7 @@ function OrchestratorCard({
         resetHint: ocFormatResetHint(l.resetsAt),
       }))
     setUsageRows(rows)
-    const name = primary.displayName.split(' ')[0]
+    const name = primary.displayName.split(' ')[0] ?? primary.displayName
     const lbl = primary.plan ? `${name} ${primary.plan}` : name
     setProviderLabel(lbl.length > 14 ? name : lbl)
   }
@@ -286,7 +279,7 @@ function OrchestratorCard({
     const currentIdx = okProviders.findIndex(
       (p) => p.provider === preferredProvider,
     )
-    const next = okProviders[(currentIdx + 1) % okProviders.length]
+    const next = okProviders.at((currentIdx + 1) % okProviders.length)
     if (!next) return
     setPreferredProvider(next.provider)
     try {
@@ -302,27 +295,30 @@ function OrchestratorCard({
 
   useEffect(() => {
     let cancelled = false
+    const isCancelled = () => cancelled
     async function fetchAll() {
-      try {
-        // session-status: model + context pct
-        const res = await fetch('/api/session-status')
-        if (!res.ok) return
-        const data = await res.json()
-        const payload = data.payload ?? data
-        const m = payload.model ?? payload.currentModel ?? ''
-        if (!cancelled && m) setModel(String(m))
-        const sn = String(
-          payload.sessionLabel ??
-            payload.sessionName ??
-            payload.name ??
-            payload.label ??
-            '',
-        )
-        if (!cancelled && sn) setSessionName(sn)
-        const pct = ocParseContextPct(payload)
-        if (!cancelled) setContextPct(Math.min(100, Math.round(pct)))
-      } catch {
-        /* noop */
+      if (cardId) {
+        try {
+          const res = await fetch(
+            `/api/session-status?cardId=${encodeURIComponent(cardId)}`,
+          )
+          if (res.ok) {
+            const data = (await res.json()) as { payload?: unknown }
+            const status = ocParseCardStatus(data.payload, cardId)
+            if (!cancelled) {
+              setModel(status?.model ?? '')
+              setContextPct(status?.contextPercent ?? null)
+            }
+          }
+        } catch {
+          if (!cancelled) {
+            setModel('')
+            setContextPct(null)
+          }
+        }
+      } else if (!cancelled) {
+        setModel('')
+        setContextPct(null)
       }
 
       try {
@@ -333,12 +329,10 @@ function OrchestratorCard({
           ok?: boolean
           providers?: Array<OcProviderEntry>
         } | null
-        if (!data2?.providers || cancelled) return
+        if (!data2?.providers || isCancelled()) return
 
-        if (!cancelled) {
-          setAllOcProviders(data2.providers)
-          updateUsageRowsFromProviders(data2.providers, preferredProvider)
-        }
+        setAllOcProviders(data2.providers)
+        updateUsageRowsFromProviders(data2.providers, preferredProvider)
       } catch {
         /* noop */
       }
@@ -351,27 +345,10 @@ function OrchestratorCard({
       clearInterval(timer)
       if (flashTimerRefOc.current) clearTimeout(flashTimerRefOc.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preferredProvider])
+    // Hook dependencies are intentionally constrained to the explicit array below.
+  }, [cardId, preferredProvider])
 
-  const displayName = agentName || sessionName || 'Agent'
-
-  function startEdit() {
-    setEditValue(agentName)
-    setIsEditing(true)
-    setTimeout(() => inputRef.current?.focus(), 50)
-  }
-
-  function commitEdit() {
-    const trimmed = editValue.trim()
-    setAgentName(trimmed)
-    setIsEditing(false)
-    try {
-      localStorage.setItem(AGENT_NAME_KEY, trimmed)
-    } catch {
-      /* noop */
-    }
-  }
+  const displayName = displayTitle?.trim() || 'Agent'
 
   // Build usage rows: provider rows if available, else synthetic context row
   const ctxRow: OcUsageRow = {
@@ -379,7 +356,7 @@ function OrchestratorCard({
     pct: contextPct ?? 0,
     resetHint: null,
   }
-  const displayRows: OcUsageRow[] =
+  const displayRows: Array<OcUsageRow> =
     usageRows.length > 0 ? usageRows : contextPct !== null ? [ctxRow] : []
   const usageHeader = providerLabel ?? 'Usage'
 
@@ -421,7 +398,7 @@ function OrchestratorCard({
         glowClass,
       )}
     >
-      {state !== 'idle' && (
+      {activityAvailable && state !== 'idle' && (
         <div className="pointer-events-none absolute inset-0 animate-pulse rounded-2xl bg-gradient-to-br from-accent-500/[0.03] to-transparent" />
       )}
 
@@ -432,7 +409,10 @@ function OrchestratorCard({
         )}
       >
         <div className="flex flex-col items-center gap-0.5">
-          <OrchestratorAvatar size={compact ? 40 : 88} />
+          <OrchestratorAvatar
+            size={compact ? 40 : 88}
+            activityVisible={activityAvailable}
+          />
           {!compact ? (
             <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-700">
               Main Agent
@@ -447,67 +427,50 @@ function OrchestratorCard({
               !compact && 'justify-center',
             )}
           >
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitEdit()
-                  if (e.key === 'Escape') setIsEditing(false)
-                }}
-                placeholder="Agent name..."
-                className="w-24 rounded border border-primary-200/25 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-accent-400"
-                maxLength={20}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={startEdit}
-                className={cn(
-                  'font-semibold text-primary-900 transition-colors hover:text-accent-600',
-                  compact ? 'text-sm' : 'text-base',
-                )}
-                title="Click to rename"
-              >
-                {displayName}
-              </button>
-            )}
-          </div>
-          {/* State indicator — dot + label */}
-          <div
-            className={cn(
-              'flex items-center gap-1.5 mt-0.5',
-              !compact && 'justify-center',
-            )}
-          >
-            <span
-              className={cn(
-                'inline-block h-1.5 w-1.5 rounded-full shrink-0',
-                state === 'idle'
-                  ? 'bg-primary-400'
-                  : state === 'thinking'
-                    ? 'bg-yellow-400 animate-pulse'
-                    : state === 'tool-use'
-                      ? 'bg-violet-400 animate-pulse'
-                      : state === 'responding'
-                        ? 'bg-emerald-400 animate-pulse'
-                        : state === 'reading'
-                          ? 'bg-blue-400 animate-pulse'
-                          : 'bg-accent-400 animate-pulse',
-              )}
-            />
             <p
               className={cn(
-                'text-primary-600',
-                compact ? 'text-[9px]' : 'text-[10px]',
-                state !== 'idle' && 'font-medium text-primary-700',
+                'font-semibold text-primary-900',
+                compact ? 'text-sm' : 'text-base',
               )}
             >
-              {label}
+              {displayName}
             </p>
           </div>
+          {/* Activity is shown only for the complete Card owning this chat. */}
+          {activityAvailable ? (
+            <div
+              className={cn(
+                'flex items-center gap-1.5 mt-0.5',
+                !compact && 'justify-center',
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-block h-1.5 w-1.5 rounded-full shrink-0',
+                  state === 'idle'
+                    ? 'bg-primary-400'
+                    : state === 'thinking'
+                      ? 'bg-yellow-400 animate-pulse'
+                      : state === 'tool-use'
+                        ? 'bg-violet-400 animate-pulse'
+                        : state === 'responding'
+                          ? 'bg-emerald-400 animate-pulse'
+                          : state === 'reading'
+                            ? 'bg-blue-400 animate-pulse'
+                            : 'bg-accent-400 animate-pulse',
+                )}
+              />
+              <p
+                className={cn(
+                  'text-primary-600',
+                  compact ? 'text-[9px]' : 'text-[10px]',
+                  state !== 'idle' && 'font-medium text-primary-700',
+                )}
+              >
+                {activityLabel}
+              </p>
+            </div>
+          ) : null}
           {!compact && model ? (
             <p className="mt-0.5 truncate text-[9px] font-mono text-primary-400 text-center">
               {model}
@@ -657,17 +620,26 @@ function getStatusBubble(
   return { type: 'checkpoint', text: `${clampedProgress}% complete` }
 }
 
-export function AgentViewPanel() {
+export type AgentViewPanelProps = {
+  activeCard?: SessionCard
+  sessionCardList?: SessionCardListWire
+}
+
+export function AgentViewPanel({
+  activeCard,
+  sessionCardList,
+}: AgentViewPanelProps) {
+  const navigate = useNavigate()
   // Sound notifications for agent events
   useSounds({ autoPlay: true })
 
-  // Start gateway polling for orchestrator state (detects activity from Telegram/other channels)
-  const startGatewayPoll = useChatActivityStore((s) => s.startGatewayPoll)
-  const stopGatewayPoll = useChatActivityStore((s) => s.stopGatewayPoll)
-  useEffect(() => {
-    startGatewayPoll()
-    return () => stopGatewayPoll()
-  }, [startGatewayPoll, stopGatewayPoll])
+  const resolvedActiveCard =
+    activeCard &&
+    sessionCardList &&
+    hasExactCompleteSessionCardProjection(sessionCardList, activeCard.cardId)
+      ? sessionCardList.cards.find((card) => card.cardId === activeCard.cardId)
+      : undefined
+  const activeCardActivityAvailable = Boolean(resolvedActiveCard)
 
   const {
     isOpen,
@@ -690,17 +662,9 @@ export function AgentViewPanel() {
     errorMessage,
     setOpen,
     setHistoryOpen,
-    killAgent,
-    cancelQueueTask,
     activeCount,
-  } = useAgentView()
+  } = useAgentView(sessionCardList)
 
-  // Transcript modal removed — View button now navigates to /agent-swarm
-  const [selectedAgentChat, setSelectedAgentChat] = useState<{
-    sessionKey: string
-    agentName: string
-    statusLabel: string
-  } | null>(null)
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
@@ -775,7 +739,6 @@ export function AgentViewPanel() {
             status,
             isLive: agent.isLive,
             statusBubble: getStatusBubble(status, agent.progress),
-            sessionKey: agent.id, // Use agent id as session key
           } satisfies AgentNode
         })
         .sort(function sortByProgressDesc(left, right) {
@@ -821,7 +784,7 @@ export function AgentViewPanel() {
   const activeNodeIds = useMemo(
     () => activeNodes.map((node) => node.id),
     // Stabilize: only recompute when the sorted id string changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
     [activeNodes.map((n) => n.id).join(',')],
   )
   const agentSpawn = useAgentSpawn(activeNodeIds)
@@ -895,28 +858,22 @@ export function AgentViewPanel() {
   // View functionality is now handled inline within AgentCard via useInlineDetail
 
   function handleChatByNodeId(nodeId: string) {
-    const activeNode = activeNodes.find(function matchActiveNode(node) {
-      return node.id === nodeId
+    const activeAgent = activeAgents.find(function matchActiveAgent(agent) {
+      return agent.id === nodeId
     })
-    if (activeNode) {
-      setSelectedAgentChat({
-        sessionKey: activeNode.id,
-        agentName: activeNode.name,
-        statusLabel: getStatusLabel(activeNode.status),
-      })
+    if (activeAgent) {
+      setOpen(false)
+      void navigate(buildAgentSessionCardRoute(activeAgent.chatNavigation))
       return
     }
 
-    const queuedNode = queuedNodes.find(function matchQueuedNode(node) {
-      return node.id === nodeId
+    const queuedAgent = queuedAgents.find(function matchQueuedAgent(agent) {
+      return agent.id === nodeId
     })
-    if (!queuedNode) return
+    if (!queuedAgent) return
 
-    setSelectedAgentChat({
-      sessionKey: queuedNode.id,
-      agentName: queuedNode.name,
-      statusLabel: getStatusLabel(queuedNode.status),
-    })
+    setOpen(false)
+    void navigate(buildAgentSessionCardRoute(queuedAgent.chatNavigation))
   }
 
   return (
@@ -1007,7 +964,27 @@ export function AgentViewPanel() {
                 <InspectorPanel embedded />
 
                 {/* Main Agent Card (includes usage section) */}
-                <OrchestratorCard compact={false} />
+                <OrchestratorCard
+                  compact={false}
+                  activityAvailable={activeCardActivityAvailable}
+                  cardId={resolvedActiveCard?.cardId}
+                  displayTitle={resolvedActiveCard?.title}
+                />
+
+                {errorMessage &&
+                activeCount === 0 &&
+                queuedAgents.length === 0 &&
+                historyAgents.length === 0 ? (
+                  <section className="rounded-xl border border-amber-300/50 bg-amber-100/30 p-3">
+                    <p className="text-xs font-semibold text-amber-800">
+                      Card activity unavailable
+                    </p>
+                    <p className="mt-1 text-[11px] text-amber-700">
+                      Agent activity is hidden until it maps through a complete
+                      validated Session Card projection.
+                    </p>
+                  </section>
+                ) : null}
 
                 {/* Agents — agent cards — only show when there's something */}
                 {(activeCount > 0 ||
@@ -1177,7 +1154,6 @@ export function AgentViewPanel() {
                                           )}
                                           viewMode={viewMode}
                                           onChat={handleChatByNodeId}
-                                          onKill={killAgent}
                                           useInlineDetail
                                           className={cn(
                                             agentSpawn.isSpawning(node.id)
@@ -1216,7 +1192,6 @@ export function AgentViewPanel() {
                                           )}
                                           viewMode={viewMode}
                                           onChat={handleChatByNodeId}
-                                          onCancel={cancelQueueTask}
                                           useInlineDetail
                                         />
                                       </div>
@@ -1239,7 +1214,7 @@ export function AgentViewPanel() {
                   </section>
                 )}
 
-                <BackgroundRunsSection />
+                <BackgroundRunsSection sessionCardList={sessionCardList} />
 
                 {cliAgentsQuery.isLoading || visibleCliAgents.length > 0 ? (
                   <section className="rounded-2xl bg-primary-200/15 p-2">
@@ -1427,7 +1402,12 @@ export function AgentViewPanel() {
                 </div>
                 {/* Content — same as desktop sidebar */}
                 <div className="space-y-3 p-3">
-                  <OrchestratorCard compact={false} />
+                  <OrchestratorCard
+                    compact={false}
+                    activityAvailable={activeCardActivityAvailable}
+                    cardId={resolvedActiveCard?.cardId}
+                    displayTitle={resolvedActiveCard?.title}
+                  />
 
                   <section className="rounded-2xl bg-primary-200/15 p-1">
                     <div className="mb-1 flex justify-center">
@@ -1475,13 +1455,9 @@ export function AgentViewPanel() {
                                 ) : (
                                   <span />
                                 )}
-                                <button
-                                  type="button"
-                                  onClick={() => killAgent(node.id)}
-                                  className="text-[10px] text-red-500 hover:text-red-700 font-medium"
-                                >
-                                  Kill
-                                </button>
+                                <span className="text-[10px] text-primary-500">
+                                  Controls unavailable
+                                </span>
                               </div>
                             }
                           />
@@ -1505,19 +1481,20 @@ export function AgentViewPanel() {
                             <MiniAgentCard
                               key={agent.id}
                               sessionLabel={agent.name}
-                              model={agent.status || 'unknown'}
+                              model={agent.status}
                               status={getMiniAgentCardStatus(agent.status)}
                               footer={
                                 <div className="flex justify-end">
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setSelectedAgentChat({
-                                        sessionKey: agent.id,
-                                        agentName: agent.name,
-                                        statusLabel: agent.status,
-                                      })
-                                    }
+                                    onClick={() => {
+                                      setOpen(false)
+                                      void navigate(
+                                        buildAgentSessionCardRoute(
+                                          agent.chatNavigation,
+                                        ),
+                                      )
+                                    }}
                                     className="text-[10px] text-accent-600 hover:text-accent-800 font-medium"
                                   >
                                     View
@@ -1575,18 +1552,6 @@ export function AgentViewPanel() {
           </motion.button>
         ) : null}
       </AnimatePresence>
-
-      <AgentChatModal
-        open={selectedAgentChat !== null}
-        sessionKey={selectedAgentChat?.sessionKey ?? ''}
-        agentName={selectedAgentChat?.agentName ?? 'Agent'}
-        statusLabel={selectedAgentChat?.statusLabel ?? 'running'}
-        onOpenChange={function handleAgentChatOpenChange(nextOpen) {
-          if (!nextOpen) {
-            setSelectedAgentChat(null)
-          }
-        }}
-      />
     </>
   )
 }

@@ -1,10 +1,12 @@
 'use client'
 
-import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
-import { memo, useMemo } from 'react'
-import { SessionItem } from './session-item'
-import type { SessionMeta } from '../../types'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { memo, useMemo, useState } from 'react'
+import { SessionTreeRow } from './session-tree-row'
+import type { SessionCardTreeRow } from './session-tree-row'
+import type { SessionCardListWire } from '../../chat-queries'
+import type { SessionCard, SessionCardChild } from '../../types'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -17,51 +19,256 @@ import {
   ScrollAreaViewport,
 } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
-import { usePinnedSessions } from '@/hooks/use-pinned-sessions'
 
 type SidebarSessionsProps = {
-  sessions: Array<SessionMeta>
-  activeFriendlyId: string
+  /** Authoritative, server-backed logical conversations. */
+  sessionCards: Array<SessionCard>
+  cardResolutions: SessionCardListWire['cardResolutions']
+  completeness: SessionCardListWire['completeness']
+  activeCardId: string
+  inspectedChildCardId?: string
   defaultOpen?: boolean
   onSelect?: () => void
-  onRename: (session: SessionMeta) => void
-  onDelete: (session: SessionMeta) => void
+  attentionCardIds?: ReadonlySet<string>
+  onViewCard?: (cardId: string) => void
+  onTogglePin: (card: SessionCard) => void
+  onRename: (card: SessionCard) => void
+  onArchive: (card: SessionCard) => void
+  onBranch: (card: SessionCard) => void
+  pendingCardIds?: ReadonlySet<string>
+  sessionForkAvailable: boolean
   loading: boolean
   fetching: boolean
   error: string | null
   onRetry: () => void
+  hasMoreOlderSessions?: boolean
+  loadingOlderSessions?: boolean
+  olderSessionsError?: string | null
+  onLoadOlderSessions?: () => void
+}
+
+type CardRowChild = SessionCardChild & {
+  childNodes?: Array<CardRowChild>
+}
+
+type CardRowNode = Pick<
+  SessionCard,
+  | 'cardId'
+  | 'title'
+  | 'updatedAt'
+  | 'relationshipKind'
+  | 'continuationCount'
+  | 'activity'
+> & {
+  childNodes: Array<CardRowChild>
+  status?: SessionCardChild['status']
+}
+
+const REMOTE_CRON_CARD_PREFIX = 'remote:cron'
+
+function isRemoteCronCard(cardId: string): boolean {
+  return cardId.startsWith(REMOTE_CRON_CARD_PREFIX)
 }
 
 export const SidebarSessions = memo(function SidebarSessions({
-  sessions,
-  activeFriendlyId,
+  sessionCards,
+  cardResolutions,
+  completeness,
+  activeCardId,
+  inspectedChildCardId,
   defaultOpen = true,
   onSelect,
+  attentionCardIds = new Set<string>(),
+  onViewCard,
+  onTogglePin,
   onRename,
-  onDelete,
+  onArchive,
+  onBranch,
+  pendingCardIds = new Set<string>(),
+  sessionForkAvailable,
   loading,
   fetching,
   error,
   onRetry,
+  hasMoreOlderSessions = false,
+  loadingOlderSessions = false,
+  olderSessionsError = null,
+  onLoadOlderSessions = () => undefined,
 }: SidebarSessionsProps) {
-  const { pinnedSessionKeys, togglePinnedSession } = usePinnedSessions()
+  const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(
+    () => new Set(),
+  )
 
-  const [pinnedSessions, unpinnedSessions] = useMemo(() => {
-    const pinnedKeys = new Set(pinnedSessionKeys)
-    const pinned: Array<SessionMeta> = []
-    const unpinned: Array<SessionMeta> = []
-    for (const session of sessions) {
-      if (pinnedKeys.has(session.key)) {
-        pinned.push(session)
-      } else {
-        unpinned.push(session)
+  const resolutionByCardId = useMemo(
+    () =>
+      new Map(
+        cardResolutions.map((resolution) => [resolution.cardId, resolution]),
+      ),
+    [cardResolutions],
+  )
+  const completeCards = useMemo(
+    () =>
+      sessionCards.filter(
+        (card) =>
+          resolutionByCardId.get(card.cardId)?.completeness === 'complete',
+      ),
+    [resolutionByCardId, sessionCards],
+  )
+  const visibleCompleteCards = useMemo(
+    () => completeCards.filter((card) => !isRemoteCronCard(card.cardId)),
+    [completeCards],
+  )
+  const roots = useMemo(
+    () =>
+      visibleCompleteCards
+        .filter((card) => card.parentCardId === undefined)
+        .sort((left, right) => {
+          if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
+          if (left.pinned && right.pinned) {
+            const pinDifference = (left.pinnedAt ?? 0) - (right.pinnedAt ?? 0)
+            if (pinDifference !== 0) return pinDifference
+          }
+          const activityDifference = right.updatedAt - left.updatedAt
+          if (activityDifference !== 0) return activityDifference
+          return left.cardId.localeCompare(right.cardId)
+        }),
+    [visibleCompleteCards],
+  )
+  const pinnedRoots = useMemo(
+    () => roots.filter((card) => card.pinned),
+    [roots],
+  )
+  const visibleRoots = roots
+  const inventoryIncomplete =
+    completeness !== 'complete' || completeCards.length !== sessionCards.length
+  const cardsById = useMemo(
+    () => new Map(visibleCompleteCards.map((card) => [card.cardId, card])),
+    [visibleCompleteCards],
+  )
+
+  const pinnedCardIds = useMemo(
+    () => new Set(pinnedRoots.map((card) => card.cardId)),
+    [pinnedRoots],
+  )
+
+  const cardRows = useMemo(() => {
+    const childrenByParent = new Map<string, Array<SessionCardTreeRow>>()
+
+    const buildRow = (
+      node: CardRowNode,
+      depth: number,
+      ancestorCardIds: ReadonlySet<string>,
+      parentKey?: string,
+    ): { row: SessionCardTreeRow; containsInspectedChild: boolean } => {
+      const nextAncestorCardIds = new Set(ancestorCardIds)
+      nextAncestorCardIds.add(node.cardId)
+      const childResults = node.childNodes.flatMap((child) => {
+        if (isRemoteCronCard(child.cardId)) return []
+        if (nextAncestorCardIds.has(child.cardId)) return []
+        const nestedCard = cardsById.get(child.cardId)
+        const nestedChildNodes =
+          nestedCard?.parentCardId === node.cardId
+            ? nestedCard.childNodes
+            : (child.childNodes ?? [])
+        return [
+          buildRow(
+            {
+              cardId: child.cardId,
+              title: child.title,
+              updatedAt: child.updatedAt,
+              relationshipKind: child.relationshipKind,
+              continuationCount: child.continuationCount,
+              childNodes: nestedChildNodes,
+              status: child.status,
+            },
+            depth + 1,
+            nextAncestorCardIds,
+            node.cardId,
+          ),
+        ]
+      })
+      const childRows = childResults.map((result) => result.row)
+      const hasInspectedDescendant = childResults.some(
+        (result) => result.containsInspectedChild,
+      )
+      const isExpanded =
+        childRows.length > 0 &&
+        (expandedCardIds.has(node.cardId) || hasInspectedDescendant)
+      const row: SessionCardTreeRow = {
+        key: node.cardId,
+        title: node.title,
+        updatedAt: node.updatedAt,
+        relationshipKind: node.relationshipKind,
+        status: node.status,
+        depth,
+        isExpandable: childRows.length > 0,
+        isExpanded,
+        childCount: childRows.length,
+        continuationCount: node.continuationCount,
+        ...(parentKey ? { parentKey } : {}),
+        isOrphan: node.relationshipKind === 'orphan',
+        ...(depth === 0 && node.activity ? { activity: node.activity } : {}),
+        ...(depth === 0 && attentionCardIds.has(node.cardId)
+          ? { hasAttention: true }
+          : {}),
+      }
+      if (childRows.length > 0) childrenByParent.set(node.cardId, childRows)
+      return {
+        row,
+        containsInspectedChild:
+          node.cardId === inspectedChildCardId || hasInspectedDescendant,
       }
     }
-    return [pinned, unpinned] as const
-  }, [pinnedSessionKeys, sessions])
 
-  function handleTogglePin(session: SessionMeta) {
-    togglePinnedSession(session.key)
+    const rootRows = visibleRoots.map(
+      (card) => buildRow(card, 0, new Set<string>()).row,
+    )
+    return { rootRows, childrenByParent }
+  }, [
+    attentionCardIds,
+    cardsById,
+    expandedCardIds,
+    inspectedChildCardId,
+    visibleRoots,
+  ])
+
+  const pinnedRows = cardRows.rootRows.filter((row) =>
+    pinnedCardIds.has(row.key),
+  )
+  const unpinnedRows = cardRows.rootRows.filter(
+    (row) => !pinnedCardIds.has(row.key),
+  )
+
+  function handleToggleExpanded(cardId: string, expanded: boolean) {
+    setExpandedCardIds((current) => {
+      const next = new Set(current)
+      if (expanded) next.add(cardId)
+      else next.delete(cardId)
+      return next
+    })
+  }
+
+  function renderRoots(rows: Array<SessionCardTreeRow>) {
+    return rows.map((row) => (
+      <SessionTreeRow
+        key={row.key}
+        row={row}
+        childrenByParent={cardRows.childrenByParent}
+        activeCardId={activeCardId}
+        inspectedChildCardId={inspectedChildCardId}
+        pinnedSessionKeys={pinnedCardIds}
+        cardsById={cardsById}
+        pendingCardIds={pendingCardIds}
+        sessionForkAvailable={sessionForkAvailable}
+        onToggleExpanded={handleToggleExpanded}
+        onSelect={onSelect}
+        onViewCard={onViewCard}
+        onTogglePin={onTogglePin}
+        onBranch={onBranch}
+        onRename={onRename}
+        onArchive={onArchive}
+      />
+    ))
   }
 
   return (
@@ -81,27 +288,18 @@ export const SidebarSessions = memo(function SidebarSessions({
         </span>
       </CollapsibleTrigger>
 
-      {/* Pinned sessions — always visible (outside collapsible panel) */}
-      {pinnedSessions.length > 0 ? (
-        <div className="flex shrink-0 flex-col gap-px pl-3 pr-2 pt-1">
-          {pinnedSessions.map((session) => (
-            <SessionItem
-              key={session.key}
-              session={session}
-              active={session.friendlyId === activeFriendlyId}
-              isPinned
-              onSelect={onSelect}
-              onTogglePin={handleTogglePin}
-              onRename={onRename}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
+      {pinnedRows.length > 0 ? (
+        <section
+          aria-label="Pinned sessions"
+          className="flex shrink-0 flex-col gap-px pl-3 pr-2 pt-1"
+        >
+          {renderRoots(pinnedRows)}
+        </section>
       ) : null}
 
       <CollapsiblePanel
-        className="w-full min-h-0"
-        contentClassName="flex flex-col overflow-y-auto max-h-[calc(100vh-300px)]"
+        className="w-full min-h-0 flex-1"
+        contentClassName="flex min-h-0 flex-1 flex-col overflow-y-auto"
       >
         <ScrollAreaRoot className="flex-1 min-h-0">
           <ScrollAreaViewport className="min-h-0">
@@ -124,32 +322,80 @@ export const SidebarSessions = memo(function SidebarSessions({
                     Retry
                   </Button>
                 </div>
-              ) : unpinnedSessions.length > 0 ? (
-                <>
-                  {pinnedSessions.length > 0 ? (
-                    <div className="my-1 border-t border-primary-200/80" />
-                  ) : null}
-                  {unpinnedSessions.map((session) => (
-                    <SessionItem
-                      key={session.key}
-                      session={session}
-                      active={session.friendlyId === activeFriendlyId}
-                      isPinned={false}
-                      onSelect={onSelect}
-                      onTogglePin={handleTogglePin}
-                      onRename={onRename}
-                      onDelete={onDelete}
-                    />
-                  ))}
-                </>
               ) : (
-                <div className="px-2 py-2 text-xs text-primary-500">
-                  {pinnedSessions.length > 0
-                    ? 'All sessions are pinned.'
-                    : 'No sessions yet. Start a conversation →'}
-                </div>
+                <>
+                  {inventoryIncomplete ? (
+                    <div
+                      role="status"
+                      className="px-2 py-2 text-xs text-primary-500"
+                    >
+                      <div>Some sessions are temporarily unavailable.</div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="mt-2"
+                        disabled={fetching}
+                        aria-label="Retry sessions"
+                        onClick={onRetry}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : null}
+                  {unpinnedRows.length > 0 ? (
+                    <>
+                      {pinnedRows.length > 0 ? (
+                        <div className="my-1 border-t border-primary-200/80" />
+                      ) : null}
+                      <section aria-label="Sessions">
+                        {renderRoots(unpinnedRows)}
+                      </section>
+                    </>
+                  ) : pinnedRows.length > 0 ? (
+                    inventoryIncomplete ? null : hasMoreOlderSessions ? (
+                      <div className="px-2 py-2 text-xs text-primary-500">
+                        No sessions active in the last 2 days.
+                      </div>
+                    ) : (
+                      <div className="px-2 py-2 text-xs text-primary-500">
+                        All sessions are pinned.
+                      </div>
+                    )
+                  ) : inventoryIncomplete ? null : hasMoreOlderSessions ? (
+                    <div className="px-2 py-2 text-xs text-primary-500">
+                      No sessions active in the last 2 days.
+                    </div>
+                  ) : (
+                    <div className="px-2 py-2 text-xs text-primary-500">
+                      No sessions yet. Start a conversation →
+                    </div>
+                  )}
+                  {hasMoreOlderSessions ? (
+                    <div className="px-2 py-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={loadingOlderSessions}
+                        onClick={onLoadOlderSessions}
+                      >
+                        {loadingOlderSessions
+                          ? 'Loading…'
+                          : olderSessionsError
+                            ? 'Retry older sessions'
+                            : 'More Sessions…'}
+                      </Button>
+                      {olderSessionsError ? (
+                        <div className="mt-1 text-[11px] text-primary-500">
+                          Older sessions could not be loaded.
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
               )}
-              {fetching && !loading && !error && sessions.length > 0 ? (
+              {fetching && !loading && !error && roots.length > 0 ? (
                 <div className="px-2 py-1 text-[11px] text-primary-400">
                   Updating…
                 </div>
@@ -169,29 +415,28 @@ function areSidebarSessionsEqual(
   prev: SidebarSessionsProps,
   next: SidebarSessionsProps,
 ) {
-  if (prev.activeFriendlyId !== next.activeFriendlyId) return false
+  if (prev.sessionCards !== next.sessionCards) return false
+  if (prev.cardResolutions !== next.cardResolutions) return false
+  if (prev.completeness !== next.completeness) return false
+  if (prev.activeCardId !== next.activeCardId) return false
+  if (prev.inspectedChildCardId !== next.inspectedChildCardId) return false
   if (prev.defaultOpen !== next.defaultOpen) return false
   if (prev.onSelect !== next.onSelect) return false
+  if (prev.attentionCardIds !== next.attentionCardIds) return false
+  if (prev.onViewCard !== next.onViewCard) return false
   if (prev.onRename !== next.onRename) return false
-  if (prev.onDelete !== next.onDelete) return false
+  if (prev.onTogglePin !== next.onTogglePin) return false
+  if (prev.onArchive !== next.onArchive) return false
+  if (prev.onBranch !== next.onBranch) return false
+  if (prev.pendingCardIds !== next.pendingCardIds) return false
+  if (prev.sessionForkAvailable !== next.sessionForkAvailable) return false
   if (prev.loading !== next.loading) return false
   if (prev.fetching !== next.fetching) return false
   if (prev.error !== next.error) return false
   if (prev.onRetry !== next.onRetry) return false
-  if (prev.sessions === next.sessions) return true
-  if (prev.sessions.length !== next.sessions.length) return false
-  for (let i = 0; i < prev.sessions.length; i += 1) {
-    const prevSession = prev.sessions[i]
-    const nextSession = next.sessions[i]
-    if (prevSession.key !== nextSession.key) return false
-    if (prevSession.friendlyId !== nextSession.friendlyId) return false
-    if (prevSession.label !== nextSession.label) return false
-    if (prevSession.title !== nextSession.title) return false
-    if (prevSession.derivedTitle !== nextSession.derivedTitle) return false
-    if (prevSession.updatedAt !== nextSession.updatedAt) return false
-    if (prevSession.titleStatus !== nextSession.titleStatus) return false
-    if (prevSession.titleSource !== nextSession.titleSource) return false
-    if (prevSession.titleError !== nextSession.titleError) return false
-  }
+  if (prev.hasMoreOlderSessions !== next.hasMoreOlderSessions) return false
+  if (prev.loadingOlderSessions !== next.loadingOlderSessions) return false
+  if (prev.olderSessionsError !== next.olderSessionsError) return false
+  if (prev.onLoadOlderSessions !== next.onLoadOlderSessions) return false
   return true
 }

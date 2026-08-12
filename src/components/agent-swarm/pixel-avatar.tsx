@@ -3,8 +3,8 @@
  * Each persona gets a unique color scheme. Animated based on status + behavior state.
  */
 import { motion } from 'motion/react'
-import { cn } from '@/lib/utils'
 import type { Expression } from './agent-behaviors'
+import { cn } from '@/lib/utils'
 
 type PixelAvatarProps = {
   color: string

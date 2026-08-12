@@ -1,12 +1,14 @@
+import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 import type {
   ChatMessage,
+  SessionLineage,
   SessionMeta,
+  SessionRelationshipKind,
   SessionSummary,
   SessionTitleSource,
   SessionTitleStatus,
   ToolCallContent,
 } from './types'
-import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 
 export function deriveFriendlyIdFromKey(key: string | undefined): string {
   if (!key) return 'main'
@@ -38,7 +40,8 @@ const KNOWN_CHANNELS = [
 function stripChannelPrefix(text: string): string {
   const match = text.match(CHANNEL_PREFIX_REGEX)
   if (!match) return text
-  const bracket = match[1] ?? ''
+  const bracket = match[1]
+  if (!bracket) return text
   // Strip if it contains a timestamp or known channel name
   const hasTimestamp =
     /\d{4}-\d{2}-\d{2}/.test(bracket) || /\d{2}:\d{2}/.test(bracket)
@@ -82,7 +85,7 @@ function cleanUserText(raw: string): string {
     /\[(?:Telegram|Signal|Discord|WhatsApp|iMessage|Slack|GoogleChat)\s[^\]]*\]\s*([\s\S]*)/i,
   )
   if (channelHeaderMatch) {
-    text = channelHeaderMatch[1]
+    text = channelHeaderMatch[1] ?? text
   }
 
   // Remove <media:audio> / <media:image> / <media:video> tags
@@ -206,15 +209,96 @@ function deriveTitleSource(
   return undefined
 }
 
+const RELATIONSHIP_KINDS = new Set<SessionRelationshipKind>([
+  'root',
+  'continuation',
+  'branch',
+  'child',
+  'orphan',
+])
+
+function normalizedOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+function normalizeSessionLineage(
+  value: unknown,
+  source: unknown,
+): SessionLineage | undefined {
+  const raw =
+    value !== null && typeof value === 'object'
+      ? (value as Record<string, unknown>)
+      : {}
+  const relationshipKindCandidate = normalizedOptionalString(
+    raw.relationshipKind,
+  )
+  const relationshipKind =
+    relationshipKindCandidate &&
+    RELATIONSHIP_KINDS.has(relationshipKindCandidate as SessionRelationshipKind)
+      ? (relationshipKindCandidate as SessionRelationshipKind)
+      : undefined
+  const compressionSegmentCount =
+    typeof raw.compressionSegmentCount === 'number' &&
+    Number.isFinite(raw.compressionSegmentCount) &&
+    raw.compressionSegmentCount > 0
+      ? Math.floor(raw.compressionSegmentCount)
+      : undefined
+  const startedAt = normalizeTimestamp(raw.startedAt)
+  const endedAt = normalizeTimestamp(raw.endedAt)
+
+  const parentSessionId = normalizedOptionalString(raw.parentSessionId)
+  const relationshipType = normalizedOptionalString(raw.relationshipType)
+  const parentTitle = normalizedOptionalString(raw.parentTitle)
+  const parentSource = normalizedOptionalString(raw.parentSource)
+  const sessionSource = normalizedOptionalString(raw.sessionSource)
+  const lineageRootId = normalizedOptionalString(raw.lineageRootId)
+  const lineageTipId = normalizedOptionalString(raw.lineageTipId)
+  const parentLineageRootId = normalizedOptionalString(raw.parentLineageRootId)
+  const parentLineageTipId = normalizedOptionalString(raw.parentLineageTipId)
+  const normalizedLineageSource =
+    normalizedOptionalString(raw.source) ?? normalizedOptionalString(source)
+  const endReason = normalizedOptionalString(raw.endReason)
+
+  const lineage: SessionLineage = {
+    ...(parentSessionId ? { parentSessionId } : {}),
+    ...(relationshipType ? { relationshipType } : {}),
+    ...(relationshipKind ? { relationshipKind } : {}),
+    ...(parentTitle ? { parentTitle } : {}),
+    ...(parentSource ? { parentSource } : {}),
+    ...(sessionSource ? { sessionSource } : {}),
+    ...(lineageRootId ? { lineageRootId } : {}),
+    ...(lineageTipId ? { lineageTipId } : {}),
+    ...(compressionSegmentCount ? { compressionSegmentCount } : {}),
+    ...(parentLineageRootId ? { parentLineageRootId } : {}),
+    ...(parentLineageTipId ? { parentLineageTipId } : {}),
+    ...(typeof raw.isCrossSurfaceChild === 'boolean'
+      ? { isCrossSurfaceChild: raw.isCrossSurfaceChild }
+      : {}),
+    ...(typeof raw.isPreCompressionSnapshot === 'boolean'
+      ? { isPreCompressionSnapshot: raw.isPreCompressionSnapshot }
+      : {}),
+    ...(normalizedLineageSource ? { source: normalizedLineageSource } : {}),
+    ...(endReason ? { endReason } : {}),
+    ...(startedAt !== null ? { startedAt } : {}),
+    ...(endedAt !== null ? { endedAt } : {}),
+  }
+
+  return Object.keys(lineage).length > 0 ? lineage : undefined
+}
+
 export function normalizeSessions(
   rows: Array<SessionSummary> | undefined,
 ): Array<SessionMeta> {
   if (!Array.isArray(rows)) return []
   return rows.map((session) => {
-    const key =
+    const backendKey =
       typeof session.key === 'string' && session.key.trim().length > 0
         ? session.key.trim()
-        : deriveFriendlyIdFromKey(session.friendlyId ?? session.key)
+        : undefined
+    const key =
+      backendKey ?? deriveFriendlyIdFromKey(session.friendlyId ?? session.key)
     const friendlyIdCandidate =
       typeof session.friendlyId === 'string' &&
       session.friendlyId.trim().length > 0
@@ -250,9 +334,11 @@ export function normalizeSessions(
       derivedTitle,
       session.titleSource,
     )
+    const lineage = normalizeSessionLineage(session.lineage, session.source)
 
     return {
       key,
+      ...(backendKey ? { backendKey } : {}),
       friendlyId: friendlyIdCandidate,
       title: explicitTitle,
       derivedTitle,
@@ -266,7 +352,8 @@ export function normalizeSessions(
       preview:
         typeof session.preview === 'string'
           ? cleanUserText(session.preview) || session.preview.trim() || null
-          : (session.preview ?? null),
+          : null,
+      ...(lineage ? { lineage } : {}),
     }
   })
 }

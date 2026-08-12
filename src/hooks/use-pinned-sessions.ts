@@ -5,6 +5,7 @@ type PinnedSessionsState = {
   pinnedSessionKeys: Array<string>
   pinSession: (key: string) => void
   unpinSession: (key: string) => void
+  migratePinnedSession: (fromKey: string, toKey: string) => void
   togglePinnedSession: (key: string) => void
   isSessionPinned: (key: string) => boolean
 }
@@ -24,6 +25,21 @@ export const usePinnedSessionsStore = create<PinnedSessionsState>()(
             (pinnedKey) => pinnedKey !== key,
           ),
         })),
+      migratePinnedSession: (fromKey, toKey) =>
+        set((state) => {
+          if (fromKey === toKey || !state.pinnedSessionKeys.includes(fromKey)) {
+            return state
+          }
+          return {
+            pinnedSessionKeys: [
+              ...new Set(
+                state.pinnedSessionKeys.map((key) =>
+                  key === fromKey ? toKey : key,
+                ),
+              ),
+            ],
+          }
+        }),
       togglePinnedSession: (key) => {
         if (get().isSessionPinned(key)) {
           get().unpinSession(key)
@@ -42,5 +58,8 @@ export function usePinnedSessions() {
   const togglePinnedSession = usePinnedSessionsStore(
     (s) => s.togglePinnedSession,
   )
-  return { pinnedSessionKeys, togglePinnedSession }
+  const migratePinnedSession = usePinnedSessionsStore(
+    (s) => s.migratePinnedSession,
+  )
+  return { pinnedSessionKeys, togglePinnedSession, migratePinnedSession }
 }

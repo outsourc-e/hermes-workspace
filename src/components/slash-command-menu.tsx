@@ -160,7 +160,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
       },
       selectActive() {
         if (!open || filteredCommands.length === 0) return false
-        const selected = filteredCommands[activeIndex]
+        const selected = filteredCommands.at(activeIndex)
         if (!selected) return false
         onSelect(selected)
         return true

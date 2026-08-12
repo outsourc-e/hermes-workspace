@@ -25,11 +25,11 @@
 ### 1.1 Chat Screen (`/chat`, `/chat/$sessionKey`)
 
 - **Real-time SSE streaming** with tool call rendering
-- **Multi-session management** — create, rename, delete, fork sessions
+- **Session Card management** — create, rename, archive, and branch stable Cards while backend continuation segments remain internal
 - **Dual chat backend modes:**
   - **Enhanced Claude** — full session API with persistent history via Hermes Agent gateway
   - **Portable** — OpenAI-compatible `/v1/chat/completions` (works with Ollama, LM Studio, vLLM, etc.)
-- **Chat sidebar** — session list with search, pin, rename, delete dialogs
+- **Chat sidebar** — Session Card list with search, pin, rename, and archive dialogs
 - **Message rendering:**
   - Markdown with GFM support (`react-markdown` + `remark-gfm` + `remark-breaks`)
   - Syntax highlighting via Shiki
@@ -42,13 +42,13 @@
   - File attachment support (images via base64, multimodal content)
   - Voice input (Web Speech API)
   - Context meter showing token usage percentage
-- **Session management features:**
-  - Auto-generated session titles
-  - Session forking
-  - Session search across history
-  - Pinned sessions
-  - Session tombstones for deleted session cleanup
-- **Inspector panel** — sidebar showing session activity, memory, and skills
+- **Session Card management features:**
+  - Auto-generated Card titles
+  - Card branching
+  - Card search across history
+  - Pinned Cards
+  - Card archive metadata
+- **Inspector panel** — sidebar showing Card activity, memory, and skills
 - **Research card** — embedded research display
 - **Connection status messaging** — real-time gateway connectivity indicators
 - **Scroll-to-bottom button** for long conversations
@@ -136,17 +136,17 @@
 | `/api/events`        | GET    | Global SSE event bus (keepalive, real-time updates)                              |
 | `/api/history`       | GET    | Chat history retrieval                                                           |
 
-### 2.2 Sessions
+### 2.2 Session Cards and internal session controls
 
-| Endpoint                               | Method | Description                           |
-| -------------------------------------- | ------ | ------------------------------------- |
-| `/api/sessions`                        | GET    | List all sessions (paginated, max 50) |
-| `/api/sessions`                        | POST   | Create new session                    |
-| `/api/sessions`                        | PATCH  | Update session (rename)               |
-| `/api/sessions`                        | DELETE | Delete session                        |
-| `/api/sessions/$sessionKey/status`     | GET    | Session status                        |
-| `/api/sessions/$sessionKey/active-run` | GET    | Active run for session                |
-| `/api/session-status`                  | GET    | Session connection status             |
+| Endpoint                               | Method | Description                                                         |
+| -------------------------------------- | ------ | ------------------------------------------------------------------- |
+| `/api/sessions`                        | GET    | List all sessions (paginated, max 50)                               |
+| `/api/sessions`                        | POST   | Create new session                                                  |
+| `/api/sessions`                        | PATCH  | Update session (rename)                                             |
+| `/api/sessions`                        | DELETE | Delete session                                                      |
+| `/api/sessions/$sessionKey/status`     | GET    | Session status                                                      |
+| `/api/sessions/$sessionKey/active-run` | GET    | Active run for session                                              |
+| `/api/session-status?cardId=...`       | GET    | Validated Card-scoped state and usage projection in `payload.cards` |
 
 ### 2.3 Files
 
@@ -293,7 +293,7 @@
 
 - **mobile-tab-bar** — bottom navigation for mobile
 - **mobile-hamburger-menu** — hamburger menu for mobile
-- **mobile-sessions-panel** — mobile session browser
+- **mobile-sessions-panel** — mobile Session Card browser
 - **mobile-page-header** — mobile header bar
 - **mobile-prompt** — MobileSetupModal, MobilePromptTrigger
 
@@ -538,7 +538,7 @@ Web Audio API synthesized sounds (no audio files):
 - **⌘K** — Command palette
 - **Global shortcuts** via `global-shortcut-listener`
 - **Terminal shortcuts** via `terminal-shortcut-listener`
-- **Session shortcuts** — navigate between sessions
+- **Session Card shortcuts** — switch between Cards
 - **Keyboard shortcuts modal** — discoverable reference
 
 ### 7.3 Voice Input
@@ -558,7 +558,7 @@ Web Audio API synthesized sounds (no audio files):
 - **Global search modal** with quick actions
 - **Search input** with keyboard navigation
 - **Search results** with highlighted matches
-- **Session search** across all chat history
+- **Session Card search** across Card-owned chat history
 
 ### 7.6 Onboarding
 
@@ -571,13 +571,13 @@ Web Audio API synthesized sounds (no audio files):
 
 - Export conversations as Markdown, JSON, or Plain Text
 
-### 7.8 Auto-Generated Session Titles
+### 7.8 Auto-Generated Session Card Titles
 
-- Automatic title generation from conversation content
+- Automatic Card title generation from Card-owned conversation content
 
-### 7.9 Pinned Sessions & Models
+### 7.9 Pinned Session Cards & Models
 
-- Pin frequently used sessions for quick access
+- Pin frequently used Cards for quick access
 - Pin preferred models
 
 ### 7.10 Smart Model Suggestions
@@ -640,7 +640,7 @@ Web Audio API synthesized sounds (no audio files):
 
 - Mobile tab bar (bottom navigation)
 - Mobile hamburger menu
-- Mobile sessions panel
+- Mobile Session Card panel
 - Mobile page header
 - Mobile terminal input
 - Mobile setup modal & prompt trigger

@@ -262,7 +262,9 @@ export function updateSwarmKanbanCard(
   const file = readKanbanFile()
   const index = file.cards.findIndex((card) => card.id === cardId)
   if (index === -1) return null
-  const current = normalizeCard(file.cards[index])
+  const storedCard = file.cards[index]
+  if (!storedCard) return null
+  const current = normalizeCard(storedCard)
   const next = normalizeCard({
     ...current,
     ...updates,

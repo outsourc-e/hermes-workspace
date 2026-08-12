@@ -25,6 +25,7 @@ function isPrivateIPv4(addr: string): boolean {
     return true // malformed — treat as unsafe
   }
   const [a, b] = parts
+  if (a === undefined || b === undefined) return true
 
   // 127.0.0.0/8 — loopback
   if (a === 127) return true
@@ -121,7 +122,7 @@ export async function assertNotPrivate(url: string): Promise<void> {
     lookup(hostname, { all: true, family: 6 }),
   ])
 
-  const addresses: string[] = []
+  const addresses: Array<string> = []
   for (const r of results) {
     if (r.status === 'fulfilled') {
       for (const entry of r.value) {

@@ -6,10 +6,11 @@ import {
   PlusSignIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Button } from '@/components/ui/button'
-import { fetchModels, type GatewayModelCatalogEntry } from '@/lib/gateway-api'
-import { cn } from '@/lib/utils'
 import { AGENT_PRESETS } from '../agent-presets'
+import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
+import { Button } from '@/components/ui/button'
+import { fetchModels } from '@/lib/gateway-api'
+import { cn } from '@/lib/utils'
 
 type PresetOption = {
   id: string
@@ -19,7 +20,7 @@ type PresetOption = {
   systemPrompt: string
 }
 
-const PRESET_OPTIONS: PresetOption[] = [
+const PRESET_OPTIONS: Array<PresetOption> = [
   {
     id: 'blank',
     name: 'Blank',
@@ -79,7 +80,7 @@ function ModelSelector({
 }: {
   value: string
   onChange: (nextValue: string) => void
-  models: AvailableModel[]
+  models: Array<AvailableModel>
 }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)

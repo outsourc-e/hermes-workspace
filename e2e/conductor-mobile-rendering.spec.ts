@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 const BASE = process.env.HERMES_WORKSPACE_URL || 'http://localhost:3000'
 
@@ -83,8 +83,9 @@ test.describe('Conductor mobile rendering', () => {
     const bottomPadding = await page.evaluate(() => {
       const mains = document.querySelectorAll('main')
       if (mains.length === 0) return -1
-      // Get computed padding-bottom from the last main (the conductor one)
-      const style = window.getComputedStyle(mains[mains.length - 1])
+      const main = Array.from(mains).at(-1)
+      if (!main) return -1
+      const style = window.getComputedStyle(main)
       return parseInt(style.paddingBottom, 10) || 0
     })
     // Bottom padding must exist (not 0) to prevent content from being flush with tab bar
@@ -109,7 +110,7 @@ test.describe('Conductor mobile rendering', () => {
     // The last visible element on the page should have bottom >= 0
     const lastElBottom = await page.evaluate(() => {
       const all = document.querySelectorAll('main > div, main > section')
-      const last = all[all.length - 1]
+      const last = all[all.length - 1] as Element | undefined
       if (!last) return -1
       const rect = last.getBoundingClientRect()
       return rect.bottom

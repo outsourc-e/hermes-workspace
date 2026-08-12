@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CronJob } from '@/components/cron-manager/cron-types'
+import type { SessionCardProducerNavigation } from '@/routes/chat/-session-route-state'
+import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import type { SessionCard } from '@/screens/chat/types'
 import { toast } from '@/components/ui/toast'
 import { fetchCronJobs } from '@/lib/cron-api'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
+import {
+  fetchSessionCards,
+  sessionCardQueryKeys,
+} from '@/screens/chat/chat-queries'
+import { resolveAgentSessionCardNavigation } from '@/components/agent-view/agent-session-card-navigation'
 import {
   formatModelName,
   formatRelativeTime,
@@ -55,26 +62,39 @@ export type OperationsAgentStatus = 'active' | 'idle' | 'error'
 
 export type OperationsOutputItem = {
   id: string
-  agentId: string
   summary: string
   timestamp: number
-  source: 'session' | 'cron'
+  status: 'idle' | 'running' | 'complete' | 'error'
+  relationship: 'root' | 'child'
+  navigation: SessionCardProducerNavigation
 }
+
+export type OperationsChatTarget = {
+  status: 'ready'
+  card: SessionCard
+  cardList: SessionCardListWire
+  inspectedChildCardId?: string
+}
+
+export type OperationsChatResolution =
+  | OperationsChatTarget
+  | { status: 'absent'; cardList: SessionCardListWire }
+  | { status: 'unavailable' }
 
 export type OperationsAgent = GatewayConfigAgent & {
   meta: OperationsAgentMeta
   shortModel: string
   status: OperationsAgentStatus
+  /** Internal control-plane identity. Never render or use for chat history. */
   sessionKey: string
-  sessions: GatewaySession[]
-  latestSession: GatewaySession | null
-  jobs: CronJob[]
+  chat: OperationsChatResolution
+  jobs: Array<CronJob>
   nextRunAt: number | null
   lastActivityAt: number | null
   activityLabel: string
   progressValue: number
   progressStatus: 'running' | 'queued' | 'failed' | 'complete' | 'thinking'
-  recentOutputs: OperationsOutputItem[]
+  recentOutputs: Array<OperationsOutputItem>
   /**
    * True when the agent's profile has no model configured (blank model in
    * config.yaml). Dispatching into an unconfigured agent hangs because
@@ -90,7 +110,7 @@ type ConfigPayload = {
   payload?: {
     parsed?: {
       agents?: {
-        list?: unknown[]
+        list?: Array<unknown>
       }
       defaultModel?: string
       [key: string]: unknown
@@ -100,7 +120,7 @@ type ConfigPayload = {
   }
   parsed?: {
     agents?: {
-      list?: unknown[]
+      list?: Array<unknown>
     }
     defaultModel?: string
     [key: string]: unknown
@@ -165,40 +185,10 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function extractSessionText(session: GatewaySession): string {
-  const lastMessage = session.lastMessage
-  if (lastMessage) {
-    if (typeof lastMessage.text === 'string' && lastMessage.text.trim()) {
-      return lastMessage.text.trim()
-    }
-    if (Array.isArray(lastMessage.content)) {
-      const text = lastMessage.content
-        .filter((part) => !part.type || part.type === 'text')
-        .map((part) => part.text ?? '')
-        .join('\n')
-        .trim()
-      if (text) return text
-    }
-  }
-
-  return (
-    readString(session.derivedTitle) ||
-    readString(session.title) ||
-    readString(session.task) ||
-    readString(session.initialMessage)
-  )
-}
-
-function truncate(text: string, maxLength = 120): string {
-  const normalized = text.replace(/\s+/g, ' ').trim()
-  if (normalized.length <= maxLength) return normalized
-  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
-}
-
-function normalizeAgentList(input: unknown): GatewayConfigAgent[] {
+function normalizeAgentList(input: unknown): Array<GatewayConfigAgent> {
   if (!Array.isArray(input)) return []
 
-  const agents: GatewayConfigAgent[] = []
+  const agents: Array<GatewayConfigAgent> = []
 
   for (const entry of input) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
@@ -230,14 +220,14 @@ function parseConfigPayload(payload: ConfigPayload): ConfigPayload {
   return payload
 }
 
-async function fetchClaudeProfiles(): Promise<ClaudeProfileSummary[]> {
+async function fetchClaudeProfiles(): Promise<Array<ClaudeProfileSummary>> {
   const response = await fetch('/api/profiles/list')
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('json')) {
     throw new Error('/api/profiles/list returned non-JSON')
   }
   const payload = (await response.json().catch(() => ({}))) as {
-    profiles?: ClaudeProfileSummary[]
+    profiles?: Array<ClaudeProfileSummary>
     error?: string
   }
   if (!response.ok || payload.error) {
@@ -422,67 +412,8 @@ function persistSettings(settings: OperationsSettings) {
   window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
 }
 
-function getAgentJobs(agentId: string, jobs: CronJob[]): CronJob[] {
-  return jobs.filter((job) => job.name?.startsWith(`ops:${agentId}:`))
-}
-
-function getAgentSessions(
-  agentId: string,
-  sessions: GatewaySession[],
-): GatewaySession[] {
-  return [...sessions]
-    .filter((session) => {
-      const label = readString(session.label)
-      const key = readString(session.key)
-      return label.includes(agentId) || key.includes(agentId)
-    })
-    .sort((left, right) => {
-      const leftTs = readTimestamp(left.updatedAt) ?? 0
-      const rightTs = readTimestamp(right.updatedAt) ?? 0
-      return rightTs - leftTs
-    })
-}
-
-function getAgentStatus(
-  latestSession: GatewaySession | null,
-): OperationsAgentStatus {
-  if (!latestSession) return 'idle'
-
-  const status = readString(latestSession.status).toLowerCase()
-  if (status.includes('fail') || status.includes('error')) return 'error'
-
-  const updatedAt = readTimestamp(latestSession.updatedAt)
-  if (updatedAt && Date.now() - updatedAt < 120_000) return 'active'
-
-  return 'idle'
-}
-
-function getProgressStatus(
-  status: OperationsAgentStatus,
-  latestSession: GatewaySession | null,
-): OperationsAgent['progressStatus'] {
-  if (status === 'error') return 'failed'
-  if (status === 'active') return 'running'
-
-  const sessionStatus = readString(latestSession?.status).toLowerCase()
-  if (sessionStatus.includes('complete') || sessionStatus.includes('done')) {
-    return 'complete'
-  }
-  return latestSession ? 'thinking' : 'queued'
-}
-
-function getProgressValue(
-  status: OperationsAgentStatus,
-  latestSession: GatewaySession | null,
-): number {
-  const rawProgress = latestSession?.progress
-  if (typeof rawProgress === 'number' && Number.isFinite(rawProgress)) {
-    return Math.max(5, Math.min(100, rawProgress))
-  }
-  if (status === 'active') return 72
-  if (status === 'error') return 100
-  if (latestSession) return 100
-  return 18
+function getAgentJobs(agentId: string, jobs: Array<CronJob>): Array<CronJob> {
+  return jobs.filter((job) => job.name.startsWith(`ops:${agentId}:`))
 }
 
 function formatUpcomingTime(timestamp: number): string {
@@ -503,44 +434,134 @@ function slugifyJobLabel(value: string): string {
   return normalizeAgentId(value) || 'scheduled-run'
 }
 
-function buildCronOutput(
-  job: CronJob,
-  agentId: string,
-): OperationsOutputItem | null {
-  const startedAt = readTimestamp(job.lastRun?.startedAt)
-  const summary = truncate(
-    readString(job.lastRun?.deliverySummary) ||
-      readString(job.description) ||
-      readString(job.name).replace(`ops:${agentId}:`, '').replace(/-/g, ' '),
+/**
+ * Project only exact, complete Card-owned activity. The producer resolver also
+ * rejects unqualified identities, so Operations never guesses a local/remote
+ * source for an operational identifier.
+ */
+export function projectOperationsSessionCardActivity(
+  response: Awaited<ReturnType<typeof fetchSessionCards>> | undefined,
+): Array<OperationsOutputItem> {
+  if (!response) return []
+
+  return response.cards
+    .flatMap((card): Array<OperationsOutputItem> => {
+      const rootNavigation = resolveAgentSessionCardNavigation(response, {
+        key: card.cardId,
+      })
+      if (!rootNavigation || rootNavigation.inspectedChildCardId) return []
+
+      const rootStatus = card.childNodes.some(
+        (child) => child.status === 'running',
+      )
+        ? 'running'
+        : 'idle'
+      const root: OperationsOutputItem = {
+        id: card.cardId,
+        summary: card.title,
+        timestamp: card.updatedAt,
+        status: rootStatus,
+        relationship: 'root',
+        navigation: rootNavigation,
+      }
+      const children = card.childNodes.flatMap(
+        (child): Array<OperationsOutputItem> => {
+          const navigation = resolveAgentSessionCardNavigation(response, {
+            key: child.cardId,
+          })
+          if (!navigation?.inspectedChildCardId) return []
+          return [
+            {
+              id: child.cardId,
+              summary: child.title,
+              timestamp: child.updatedAt,
+              status: child.status,
+              relationship: 'child',
+              navigation,
+            },
+          ]
+        },
+      )
+      return [root, ...children]
+    })
+    .sort((left, right) => right.timestamp - left.timestamp)
+}
+
+function resolveQualifiedOperationsChatTarget(
+  response: SessionCardListWire | undefined,
+  identities: ReadonlyArray<string>,
+): OperationsChatTarget | undefined {
+  if (!response) return undefined
+  const navigations = identities
+    .map((key) => resolveAgentSessionCardNavigation(response, { key }))
+    .filter((navigation): navigation is SessionCardProducerNavigation =>
+      Boolean(navigation),
+    )
+  const uniqueNavigations = new Map(
+    navigations.map((navigation) => [
+      `${navigation.cardId}\u0000${navigation.inspectedChildCardId ?? ''}`,
+      navigation,
+    ]),
   )
-
-  if (!startedAt || !summary) return null
-
+  if (uniqueNavigations.size !== 1) return undefined
+  const navigation = [...uniqueNavigations.values()][0]!
+  const cards = response.cards.filter(
+    (card) => card.cardId === navigation.cardId,
+  )
+  if (cards.length !== 1) return undefined
   return {
-    id: `cron-${job.id}`,
-    agentId,
-    summary,
-    timestamp: startedAt,
-    source: 'cron',
+    status: 'ready',
+    card: cards[0]!,
+    cardList: response,
+    ...(navigation.inspectedChildCardId
+      ? { inspectedChildCardId: navigation.inspectedChildCardId }
+      : {}),
   }
 }
 
-function buildSessionOutput(
-  session: GatewaySession,
-  agentId: string,
-): OperationsOutputItem | null {
-  const timestamp =
-    readTimestamp(session.updatedAt) ?? readTimestamp(session.createdAt)
-  const summary = truncate(extractSessionText(session))
-  if (!timestamp || !summary) return null
+/**
+ * Resolve an internal Operations identity without choosing its source. Both
+ * server-defined qualifications are considered and exactly one complete Card
+ * must own the identity.
+ */
+export function resolveOperationsChat(
+  response: SessionCardListWire | undefined,
+  upstreamSessionKey: string,
+): OperationsChatResolution {
+  const normalized = upstreamSessionKey.trim()
+  if (!response || !normalized) return { status: 'unavailable' }
+  const encoded = encodeURIComponent(normalized)
+  const identities = [`local:${encoded}`, `remote:${encoded}`]
+  const target = resolveQualifiedOperationsChatTarget(response, identities)
+  if (target) return target
+  const hasProjectedIdentity = response.cards.some(
+    (card) =>
+      identities.some(
+        (identity) =>
+          identity === card.cardId ||
+          identity === card.canonicalSegmentKey ||
+          card.continuationSegmentKeys.includes(identity),
+      ) ||
+      card.childNodes.some((child) =>
+        identities.some(
+          (identity) =>
+            identity === child.cardId ||
+            identity === child.sessionKey ||
+            child.continuationSegmentKeys.includes(identity),
+        ),
+      ),
+  )
+  if (hasProjectedIdentity) return { status: 'unavailable' }
+  return response.completeness === 'complete' && response.retryable === false
+    ? { status: 'absent', cardList: response }
+    : { status: 'unavailable' }
+}
 
-  return {
-    id: `session-${readString(session.key) || timestamp}`,
-    agentId,
-    summary,
-    timestamp,
-    source: 'session',
-  }
+export function resolveOperationsChatCardId(
+  response: SessionCardListWire | undefined,
+  cardId: string,
+): OperationsChatTarget | undefined {
+  return resolveQualifiedOperationsChatTarget(response, [cardId])
 }
 
 export function getOperationsSessionKey(agentId: string): string {
@@ -561,12 +582,9 @@ export function useOperations() {
     refetchInterval: 30_000,
   })
 
-  const sessionsQuery = useQuery({
-    queryKey: ['operations', 'sessions'],
-    queryFn: async () => {
-      const response = await fetchSessions()
-      return Array.isArray(response.sessions) ? response.sessions : []
-    },
+  const sessionCardsQuery = useQuery({
+    queryKey: sessionCardQueryKeys.list(false),
+    queryFn: () => fetchSessionCards(),
     refetchInterval: 15_000,
   })
 
@@ -587,7 +605,6 @@ export function useOperations() {
       'pc1-critic',
     ])
     const configAgents = allAgents.filter((a) => !HIDDEN_AGENTS.has(a.id))
-    const sessions = sessionsQuery.data ?? []
     const cronJobs = cronJobsQuery.data ?? []
 
     return configAgents.map((agent) => {
@@ -595,8 +612,6 @@ export function useOperations() {
         description: agent.description,
         systemPrompt: agent.systemPrompt,
       })
-      const agentSessions = getAgentSessions(agent.id, sessions)
-      const latestSession = agentSessions[0] ?? null
       const jobs = getAgentJobs(agent.id, cronJobs)
       const nextRunAt =
         jobs
@@ -605,22 +620,11 @@ export function useOperations() {
           .filter((value): value is number => value !== null)
           .sort((left, right) => left - right)[0] ?? null
       const lastActivityAt =
-        readTimestamp(latestSession?.updatedAt) ??
         jobs
           .map((job) => readTimestamp(job.lastRun?.startedAt))
           .filter((value): value is number => value !== null)
-          .sort((left, right) => right - left)[0] ??
-        null
-      const status = getAgentStatus(latestSession)
-      const recentOutputs = [
-        ...agentSessions.map((session) =>
-          buildSessionOutput(session, agent.id),
-        ),
-        ...jobs.map((job) => buildCronOutput(job, agent.id)),
-      ]
-        .filter((item): item is OperationsOutputItem => Boolean(item))
-        .sort((left, right) => right.timestamp - left.timestamp)
-        .slice(0, 5)
+          .sort((left, right) => right - left)
+          .at(0) ?? null
 
       const needsSetup = !agent.model || agent.model.trim().length === 0
 
@@ -628,10 +632,12 @@ export function useOperations() {
         ...agent,
         meta,
         shortModel: formatModelName(agent.model || 'Custom'),
-        status,
+        status: 'idle',
         sessionKey: getOperationsSessionKey(agent.id),
-        sessions: agentSessions,
-        latestSession,
+        chat: resolveOperationsChat(
+          sessionCardsQuery.data,
+          getOperationsSessionKey(agent.id),
+        ),
         jobs,
         nextRunAt,
         lastActivityAt,
@@ -640,23 +646,28 @@ export function useOperations() {
           : lastActivityAt
             ? `Last ${formatRelativeTime(lastActivityAt)}`
             : 'No activity yet',
-        progressValue: getProgressValue(status, latestSession),
-        progressStatus: getProgressStatus(status, latestSession),
-        recentOutputs,
+        progressValue: 18,
+        progressStatus: 'queued',
+        recentOutputs: [],
         needsSetup,
       } satisfies OperationsAgent
     })
-  }, [configQuery.data, sessionsQuery.data, cronJobsQuery.data, metaVersion])
+  }, [
+    configQuery.data,
+    cronJobsQuery.data,
+    metaVersion,
+    sessionCardsQuery.data,
+  ])
 
   const selectedAgent =
     agents.find((agent) => agent.id === selectedAgentId) ?? null
 
   const recentActivity = useMemo(() => {
-    return agents
-      .flatMap((agent) => agent.recentOutputs)
-      .sort((left, right) => right.timestamp - left.timestamp)
-      .slice(0, settings.activityFeedLength)
-  }, [agents, settings.activityFeedLength])
+    return projectOperationsSessionCardActivity(sessionCardsQuery.data).slice(
+      0,
+      settings.activityFeedLength,
+    )
+  }, [sessionCardsQuery.data, settings.activityFeedLength])
 
   const createAgentMutation = useMutation({
     mutationFn: async (input: {
@@ -766,7 +777,7 @@ export function useOperations() {
         queryKey: ['operations', 'config'],
       })
       await queryClient.invalidateQueries({
-        queryKey: ['operations', 'sessions'],
+        queryKey: sessionCardQueryKeys.list(false),
       })
       toast('Agent deleted', { type: 'success' })
     },
@@ -794,11 +805,12 @@ export function useOperations() {
 
   return {
     agents,
+    orchestratorChat: resolveOperationsChat(sessionCardsQuery.data, 'main'),
     selectedAgent,
     selectedAgentId,
     setSelectedAgent: setSelectedAgentId,
     configQuery,
-    sessionsQuery,
+    sessionCardsQuery,
     cronJobsQuery,
     recentActivity,
     settings,
@@ -816,7 +828,9 @@ export function useOperations() {
     refreshAll: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['operations', 'config'] }),
-        queryClient.invalidateQueries({ queryKey: ['operations', 'sessions'] }),
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        }),
         queryClient.invalidateQueries({ queryKey: ['operations', 'cron'] }),
       ])
     },

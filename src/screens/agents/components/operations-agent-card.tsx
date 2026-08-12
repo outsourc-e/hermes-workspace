@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight01Icon,
@@ -9,18 +9,77 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AnimatePresence, motion } from 'motion/react'
+import { useAgentChat } from '../hooks/use-agent-chat'
+import type { OperationsChatMessage } from '../hooks/use-agent-chat'
+import type { OperationsAgent } from '../hooks/use-operations'
 import { Button } from '@/components/ui/button'
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { runCronJob, toggleCronJob } from '@/lib/cron-api'
+import { sessionCardQueryKeys } from '@/screens/chat/chat-queries'
 import { cn } from '@/lib/utils'
-import {
-  useAgentChat,
-  type OperationsChatMessage,
-} from '../hooks/use-agent-chat'
-import type { OperationsAgent } from '../hooks/use-operations'
+
+type OperationsRunCardOwner = {
+  kind: 'session-card-owner'
+  cardId: string
+  parentCardId: null
+}
+
+async function runOperationsCardNow(
+  target: OperationsAgent['chat'],
+): Promise<OperationsRunCardOwner> {
+  if (
+    target.status !== 'ready' ||
+    target.inspectedChildCardId ||
+    target.card.parentCardId !== undefined ||
+    (target.card.relationshipKind !== 'root' &&
+      target.card.relationshipKind !== 'orphan') ||
+    target.card.canonicalSource !== 'remote' ||
+    target.card.canonicalTransport !== 'gateway'
+  ) {
+    throw new Error('Run now requires a complete gateway Session Card')
+  }
+
+  const expectedOwner: OperationsRunCardOwner = {
+    kind: 'session-card-owner',
+    cardId: target.card.cardId,
+    parentCardId: null,
+  }
+  const response = await fetch('/api/session-send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      message: 'Run your primary task now',
+      cardBinding: {
+        ...expectedOwner,
+        canonicalSource: target.card.canonicalSource,
+        canonicalSegmentKey: target.card.canonicalSegmentKey,
+        canonicalTransport: target.card.canonicalTransport,
+      },
+    }),
+  })
+  const payload = (await response.json().catch(() => ({}))) as {
+    ok?: unknown
+    error?: unknown
+    cardOwner?: Partial<OperationsRunCardOwner>
+  }
+  if (
+    !response.ok ||
+    payload.ok !== true ||
+    payload.cardOwner?.kind !== expectedOwner.kind ||
+    payload.cardOwner.cardId !== expectedOwner.cardId ||
+    payload.cardOwner.parentCardId !== null
+  ) {
+    throw new Error(
+      typeof payload.error === 'string' && payload.error.trim()
+        ? payload.error
+        : 'Failed to run agent',
+    )
+  }
+  return expectedOwner
+}
 
 function getStatusStyles(status: OperationsAgent['status']) {
   if (status === 'error') {
@@ -71,30 +130,40 @@ export function OperationsInlineChat({
   agentName,
   messages,
   sendMessage,
+  canSend,
   isSending,
   error,
+  durabilityWarning,
+  canRetryHistory,
+  onRetryHistory,
 }: {
   agentName: string
-  messages: OperationsChatMessage[]
+  messages: Array<OperationsChatMessage>
   sendMessage: (message: string) => Promise<unknown>
+  canSend: boolean
   isSending: boolean
   error: string | null
+  durabilityWarning: string | null
+  canRetryHistory: boolean
+  onRetryHistory: () => void
 }) {
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  const renderedMessages = useMemo(() => messages.slice(-50), [messages])
-
   useEffect(() => {
     if (!scrollRef.current) return
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [renderedMessages])
+  }, [messages])
 
   async function handleSend() {
     const message = draft.trim()
-    if (!message || isSending) return
-    await sendMessage(message)
-    setDraft('')
+    if (!message || isSending || !canSend) return
+    try {
+      await sendMessage(message)
+      setDraft('')
+    } catch {
+      // The mutation exposes a safe inline error and the unsent draft remains.
+    }
   }
 
   return (
@@ -103,9 +172,9 @@ export function OperationsInlineChat({
         ref={scrollRef}
         className="flex min-h-[100px] max-h-[160px] flex-1 flex-col justify-center overflow-y-auto px-3 py-3"
       >
-        {renderedMessages.length > 0 ? (
+        {messages.length > 0 ? (
           <div className="space-y-2">
-            {renderedMessages.map((message) => {
+            {messages.map((message) => {
               const isUser = message.role === 'user'
 
               return (
@@ -142,7 +211,30 @@ export function OperationsInlineChat({
       </div>
 
       <div className="border-t border-[var(--theme-border)] px-3 py-3">
-        {error ? <p className="mb-2 text-xs text-red-600">{error}</p> : null}
+        {error ? (
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs text-red-600">
+            <p>{error}</p>
+            {canRetryHistory ? (
+              <button
+                type="button"
+                className="shrink-0 rounded-md border border-red-300 px-2 py-1 font-semibold"
+                aria-label="Retry Card history"
+                onClick={onRetryHistory}
+              >
+                Retry history
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {durabilityWarning ? (
+          <p
+            className="mb-2 rounded-md border border-amber-300/60 bg-amber-300/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-200"
+            role="alert"
+            aria-live="assertive"
+          >
+            {durabilityWarning}
+          </p>
+        ) : null}
         <div className="flex items-center gap-2 rounded-[1rem] border border-[var(--theme-border)] bg-[var(--theme-bg)] p-2">
           <input
             type="text"
@@ -158,14 +250,19 @@ export function OperationsInlineChat({
                 void handleSend()
               }
             }}
-            placeholder={`Message ${stripEmojiPrefix(agentName)}...`}
+            placeholder={
+              canSend
+                ? `Message ${stripEmojiPrefix(agentName)}...`
+                : 'Session Card chat unavailable'
+            }
+            disabled={!canSend}
             className="h-8 flex-1 bg-transparent px-1.5 text-xs text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]"
           />
           <Button
             size="icon-sm"
             className="rounded-lg bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
             onClick={() => void handleSend()}
-            disabled={!draft.trim() || isSending}
+            disabled={!canSend || !draft.trim() || isSending}
             aria-label={isSending ? 'Sending message' : 'Send message'}
           >
             <HugeiconsIcon
@@ -192,11 +289,50 @@ export function OperationsAgentCard({
   const displayName = stripEmojiPrefix(agent.name)
   const [showCronPanel, setShowCronPanel] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
-  const { messages, sendMessage, isSending, error } = useAgentChat(
-    agent.sessionKey,
-  )
+  const chatTarget = agent.chat.status === 'ready' ? agent.chat : undefined
+  const {
+    messages,
+    sendMessage,
+    canSend,
+    isSending,
+    error,
+    durabilityWarning,
+    canRetryHistory,
+    refresh,
+  } = useAgentChat(chatTarget)
   const cronJobCount = agent.jobs.length
   const isActive = agent.status === 'active' && !isPaused
+  const canRunNow = Boolean(
+    chatTarget &&
+    !chatTarget.inspectedChildCardId &&
+    chatTarget.card.parentCardId === undefined &&
+    (chatTarget.card.relationshipKind === 'root' ||
+      chatTarget.card.relationshipKind === 'orphan') &&
+    chatTarget.card.canonicalSource === 'remote' &&
+    chatTarget.card.canonicalTransport === 'gateway',
+  )
+
+  const controlMutation = useMutation({
+    mutationFn: async () => runOperationsCardNow(agent.chat),
+    onSuccess: async (owner) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.history(owner.cardId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: sessionCardQueryKeys.list(false),
+        }),
+      ])
+    },
+    onError: (mutationError) => {
+      toast(
+        mutationError instanceof Error
+          ? mutationError.message
+          : 'Failed to run agent',
+        { type: 'error' },
+      )
+    },
+  })
 
   const toggleMutation = useMutation({
     mutationFn: async (payload: { jobId: string; enabled: boolean }) =>
@@ -237,7 +373,7 @@ export function OperationsAgentCard({
     }
 
     setIsPaused(false)
-    await sendMessage('Run your primary task now')
+    await controlMutation.mutateAsync()
   }
 
   return (
@@ -300,7 +436,10 @@ export function OperationsAgentCard({
               }
               void handlePlayPause()
             }}
-            disabled={isSending && !isActive}
+            disabled={
+              (controlMutation.isPending && !isActive) ||
+              (!isActive && !agent.needsSetup && !canRunNow)
+            }
             title={
               agent.needsSetup
                 ? 'No model configured — open settings to set one up'
@@ -472,8 +611,12 @@ export function OperationsAgentCard({
           agentName={agent.name}
           messages={messages}
           sendMessage={sendMessage}
+          canSend={canSend}
           isSending={isSending}
           error={error}
+          durabilityWarning={durabilityWarning}
+          canRetryHistory={canRetryHistory}
+          onRetryHistory={() => void refresh()}
         />
       </div>
     </article>

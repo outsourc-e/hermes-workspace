@@ -461,7 +461,9 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
                   placeholder="Search output"
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
-                      handleSearch(activeTab.id, event.currentTarget.value)
+                      if (activeTab) {
+                        handleSearch(activeTab.id, event.currentTarget.value)
+                      }
                     }
                   }}
                 />

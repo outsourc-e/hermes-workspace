@@ -32,9 +32,17 @@ async function* streamClaudeChat(
   }
 
   const queue: Array<string> = []
-  let done = false
-  let failure: Error | null = null
+  const state: { done: boolean; failure: Error | null } = {
+    done: false,
+    failure: null,
+  }
+  let receivedAssistantContent = false
   let notify: (() => void) | null = null
+  const wake = () => {
+    const waiting = notify
+    notify = null
+    waiting?.()
+  }
 
   void streamChat(
     options.sessionId,
@@ -52,37 +60,35 @@ async function* streamClaudeChat(
           typeof data.delta === 'string' &&
           data.delta
         ) {
+          receivedAssistantContent = true
           queue.push(data.delta)
-          notify?.()
-          notify = null
+          wake()
         }
         if (
           event === 'assistant.completed' &&
           typeof data.content === 'string' &&
           data.content &&
-          queue.length === 0
+          !receivedAssistantContent
         ) {
+          receivedAssistantContent = true
           queue.push(data.content)
-          notify?.()
-          notify = null
+          wake()
         }
       },
     },
   ).then(
     () => {
-      done = true
-      notify?.()
-      notify = null
+      state.done = true
+      wake()
     },
     (error: unknown) => {
-      failure = error instanceof Error ? error : new Error(String(error))
-      done = true
-      notify?.()
-      notify = null
+      state.failure = error instanceof Error ? error : new Error(String(error))
+      state.done = true
+      wake()
     },
   )
 
-  while (!done || queue.length > 0) {
+  while (!state.done || queue.length > 0) {
     if (queue.length > 0) {
       yield queue.shift() as string
       continue
@@ -90,10 +96,14 @@ async function* streamClaudeChat(
 
     await new Promise<void>((resolve) => {
       notify = resolve
+      // Re-check after registering the waiter so an update that arrived at the
+      // wait boundary cannot leave the generator asleep. The outer loop remains
+      // the predicate guard for harmless/spurious wakeups.
+      if (queue.length > 0 || state.done) wake()
     })
   }
 
-  if (failure) throw failure
+  if (state.failure) throw state.failure
 }
 
 export async function sendChatUnified(

@@ -4,6 +4,18 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# Stable launches are reserved for the persistent integration checkout. A linked
+# worktree uses a .git file, and any other branch could serve unreviewed code.
+if [[ ! -d "$ROOT/.git" ]]; then
+  echo "[stable] refusing non-canonical Workspace checkout: $ROOT" >&2
+  exit 1
+fi
+BRANCH="$(git -C "$ROOT" branch --show-current 2>/dev/null || true)"
+if [[ "$BRANCH" != "picknik-fixes" ]]; then
+  echo "[stable] refusing Workspace branch ${BRANCH:-detached-or-unknown}; expected picknik-fixes" >&2
+  exit 1
+fi
+
 # Load workspace configuration before deriving runtime settings or building.
 # Services and non-interactive shells often do not export the .env values, which
 # can leave the stable launcher without Hermes API/dashboard tokens or URLs.
@@ -12,6 +24,16 @@ if [[ -f "$ROOT/.env" ]]; then
   # shellcheck disable=SC1091
   source "$ROOT/.env"
   set +a
+fi
+
+# Compose injects the adapter's private service URL, but a direct stable launch
+# only receives the shared `.env` token. Reuse a healthy loopback adapter when
+# it is already supervised locally; otherwise leave the optional enrichment
+# disabled so Session Cards remain available without topology data.
+if [[ -z "${SESSION_TOPOLOGY_ADAPTER_URL:-}" ]] && \
+  [[ -n "${SESSION_TOPOLOGY_ADAPTER_TOKEN:-}" ]] && \
+  curl -fsS --max-time 2 http://127.0.0.1:8080/ready >/dev/null 2>&1; then
+  export SESSION_TOPOLOGY_ADAPTER_URL="http://127.0.0.1:8080"
 fi
 
 PORT="${PORT:-3002}"

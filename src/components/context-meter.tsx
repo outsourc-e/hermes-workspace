@@ -5,6 +5,10 @@ import { cn } from '@/lib/utils'
 
 const POLL_MS = 15_000
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 function readPercent(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string') {
@@ -38,16 +42,14 @@ export function ContextMeter({
 
   useEffect(() => {
     let cancelled = false
+    const isCancelled = () => cancelled
 
     async function poll() {
       try {
         const res = await fetch('/api/context-usage')
         if (!res.ok || cancelled) return
-        const data = (await res.json()) as {
-          ok?: boolean
-          contextPercent?: unknown
-        }
-        if (!data?.ok || cancelled) return
+        const data: unknown = await res.json()
+        if (!isRecord(data) || data.ok !== true || isCancelled()) return
         const next = readPercent(data.contextPercent)
         prevPctRef.current = next
         setPct(next)

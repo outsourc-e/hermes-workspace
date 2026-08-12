@@ -2,6 +2,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { BrainIcon, CodeIcon, PuzzleIcon } from '@hugeicons/core-free-icons'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
+import { AgentIdentityAvatar } from '@/components/avatars'
 
 type ProfileSummary = {
   name: string
@@ -71,9 +72,7 @@ export function ChatEmptyState({
       <div className="flex max-w-xl flex-col items-center text-center">
         {/* Avatar in editorial frame, no glow — architectural restraint */}
         <div className="relative mb-6">
-          <img
-            src="/claude-avatar.webp"
-            alt="Hermes Agent"
+          <AgentIdentityAvatar
             className="relative size-20 rounded-md"
             style={{
               border: '1px solid var(--theme-border)',

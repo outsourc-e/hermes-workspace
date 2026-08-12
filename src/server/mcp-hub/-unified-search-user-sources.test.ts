@@ -1,7 +1,15 @@
 /**
  * Tests for unifiedSearch with user-defined sources — Phase 3.2.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { readHubSources } from '../mcp-hub-sources-store'
+import { getConfig } from '../claude-dashboard-api'
+import { fetchLocalFile } from './sources/local-file'
+import { fetchMcpGet } from './sources/mcp-get'
+import { fetchGenericJson } from './sources/generic-json'
+import { unifiedSearch } from './index'
+import type { HubMcpEntry } from './types'
 
 vi.mock('./sources/local-file', () => ({
   fetchLocalFile: vi.fn(),
@@ -18,14 +26,6 @@ vi.mock('../mcp-hub-sources-store', () => ({
 vi.mock('../claude-dashboard-api', () => ({
   getConfig: vi.fn(),
 }))
-
-import { fetchLocalFile } from './sources/local-file'
-import { fetchMcpGet } from './sources/mcp-get'
-import { fetchGenericJson } from './sources/generic-json'
-import { readHubSources } from '../mcp-hub-sources-store'
-import { getConfig } from '../claude-dashboard-api'
-import { unifiedSearch } from './index'
-import type { HubMcpEntry } from './types'
 
 const mockFetchLocalFile = vi.mocked(fetchLocalFile)
 const mockFetchMcpGet = vi.mocked(fetchMcpGet)

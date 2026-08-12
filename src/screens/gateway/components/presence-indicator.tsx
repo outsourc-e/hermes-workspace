@@ -47,13 +47,13 @@ function getPresenceColor(id: string): string {
   let hash = 0
   for (let i = 0; i < id.length; i++)
     hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0
-  return PRESENCE_COLORS[Math.abs(hash) % PRESENCE_COLORS.length]
+  return PRESENCE_COLORS[Math.abs(hash) % PRESENCE_COLORS.length] ?? '#f43f5e'
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PresenceIndicator({ currentTab }: { currentTab: string }) {
-  const [peers, setPeers] = useState<PresenceUser[]>([])
+  const [peers, setPeers] = useState<Array<PresenceUser>>([])
   const myId = useRef(getPresenceId())
   const channelRef = useRef<BroadcastChannel | null>(null)
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -160,7 +160,7 @@ export function PresenceIndicator({ currentTab }: { currentTab: string }) {
         )}
       >
         {peers.length === 1
-          ? `${peers[0].name} is here`
+          ? `${peers.at(0)?.name ?? 'Someone'} is here`
           : `${peers.length} others online`}
       </span>
     </div>

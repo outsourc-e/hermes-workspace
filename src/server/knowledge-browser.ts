@@ -2,10 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
-import {
-  readKnowledgeBaseConfig,
-  type KnowledgeBaseSource,
-} from './knowledge-config'
+import { readKnowledgeBaseConfig } from './knowledge-config'
+import type { KnowledgeBaseSource } from './knowledge-config'
 
 export type WikiPageMeta = {
   path: string
@@ -96,7 +94,7 @@ function parseFrontmatter(raw: string): {
   }
 
   try {
-    const parsed = YAML.parse(match[1])
+    const parsed = YAML.parse(match[1] ?? '')
     return {
       data:
         parsed && typeof parsed === 'object' ? (parsed as FrontmatterData) : {},

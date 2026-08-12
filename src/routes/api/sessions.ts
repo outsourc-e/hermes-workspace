@@ -13,13 +13,14 @@ import {
   toSessionSummary,
   updateSession,
 } from '../../server/claude-api'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import {
   deleteLocalSession,
   getLocalSession,
   listLocalSessions,
   updateLocalSessionTitle,
 } from '../../server/local-session-store'
+import { projectSessionListLineage } from '../../server/session-list-projection'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -46,7 +47,7 @@ export const Route = createFileRoute('/api/sessions')({
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
           const localSessions = listLocalSessions()
           const gatewayIds = new Set(
-            gatewaySessions.map((s: any) => s.key || s.id),
+            gatewaySessions.map((session) => session.key),
           )
           for (const ls of localSessions) {
             if (!gatewayIds.has(ls.id)) {
@@ -62,11 +63,14 @@ export const Route = createFileRoute('/api/sessions')({
                 message_count: ls.messageCount,
                 model: ls.model,
                 source: 'local',
-              } as any)
+                lineage: { source: 'local' },
+              })
             }
           }
 
-          return json({ sessions: gatewaySessions })
+          return json({
+            sessions: projectSessionListLineage(gatewaySessions),
+          })
         } catch (err) {
           return json(
             {

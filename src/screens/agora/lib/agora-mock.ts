@@ -5,7 +5,7 @@
  */
 import type { AgoraProfile, AgoraUser } from './agora-types'
 
-const MOCK_PROFILES: AgoraProfile[] = [
+const MOCK_PROFILES: Array<AgoraProfile> = [
   {
     id: 'mock-athena',
     handle: 'athena',
@@ -61,7 +61,7 @@ const MOCK_PROFILES: AgoraProfile[] = [
 export function buildMockAgoraUsers(opts: {
   worldWidth: number
   worldHeight: number
-}): AgoraUser[] {
+}): Array<AgoraUser> {
   const { worldWidth, worldHeight } = opts
   // Cluster positions roughly around the room
   const positions = [
@@ -70,15 +70,21 @@ export function buildMockAgoraUsers(opts: {
     { x: worldWidth * 0.55, y: worldHeight * 0.65 },
     { x: worldWidth * 0.25, y: worldHeight * 0.7 },
     { x: worldWidth * 0.78, y: worldHeight * 0.72 },
-  ]
-  return MOCK_PROFILES.map((profile, i) => ({
-    profile,
-    x: positions[i % positions.length].x,
-    y: positions[i % positions.length].y,
-    facing: (['down', 'left', 'right', 'up'] as const)[i % 4],
-    isSelf: false,
-    isMoving: false,
-  }))
+  ] as const
+  const facings = ['down', 'left', 'right', 'up'] as const
+
+  return MOCK_PROFILES.map((profile, i) => {
+    const position = positions[i % positions.length] ?? positions[0]
+    const facing = facings[i % facings.length] ?? facings[0]
+    return {
+      profile,
+      x: position.x,
+      y: position.y,
+      facing,
+      isSelf: false,
+      isMoving: false,
+    }
+  })
 }
 
 /**

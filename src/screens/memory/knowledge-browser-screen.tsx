@@ -694,11 +694,6 @@ export function KnowledgeBrowserScreen() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (
-                            !settingsSource ||
-                            settingsSource.type !== 'github'
-                          )
-                            return
                           setSyncing(true)
                           setSyncError(null)
                           try {

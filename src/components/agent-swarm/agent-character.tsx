@@ -3,8 +3,8 @@
  * Displays persona emoji, name, role, and animated status indicators.
  */
 import { motion } from 'motion/react'
-import { cn } from '@/lib/utils'
 import type { AgentPersona } from '@/lib/agent-personas'
+import { cn } from '@/lib/utils'
 
 type AgentStatus =
   | 'running'

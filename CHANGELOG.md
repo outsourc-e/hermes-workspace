@@ -6,15 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
-
-- **`docker compose up` now pulls pre-built images by default** (#82) — `nousresearch/hermes-agent:latest` for the gateway and `ghcr.io/outsourc-e/hermes-workspace:latest` for the UI. Agent state persists in the `claude-data` named volume. Adds `docker-compose.dev.yml` overlay for building from source.
+- **`docker compose up --build` runs the reviewed source candidate by default** (#82) — the gateway uses immutable compatible Hermes Agent v0.19.0 image `nousresearch/hermes-agent@sha256:606a3b445ed7b963d63b1d96283e97c43c350eebf4f69abfb7fdfc3e2d7b7f56`, while Workspace builds from the checked-out source as `hermes-workspace:reviewed-candidate`. Agent state persists in the `hermes-agent-data` named volume. `docker-compose.dev.yml` provides a distinct development tag.
 
 ## [2.0.0] — 2026-04-20
 
 **Zero-fork release.** Clone, don't fork. Hermes Workspace now runs on vanilla `pip install hermes-agent` with no patches, no drift, no custom gateway required.
 
 ### Added
-
 - **Zero-fork architecture** — dual gateway/dashboard routing; workspace talks directly to vanilla `hermes-agent` 0.10.0+ via standard endpoints (`/v1/models`, `/api/sessions`, `/api/skills`, `/api/config`, `/api/jobs`)
 - **One-liner curl installer** — `curl -fsSL … | bash` provisions workspace + gateway + defaults
 - **Claude-Nous theme** — dark + light editorial variants with cobalt/paper surface pass, thin 1px architectural borders, editorial type accents
@@ -28,7 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Splash + screenshots refresh** — Conductor, Dashboard, Tasks, Jobs captured in new editorial theme
 
 ### Changed
-
 - **Model picker** — fetches from gateway (`~/.hermes/models.json` for user-configured models), matches OCPlatform behavior; shows only configured providers instead of all upstream
 - **`enhanced-fork` mode label** no longer implies a fork is required; it indicates streaming route availability on vanilla gateway
 - **Dashboard + enhanced-chat capabilities** marked optional; missing endpoints no longer trigger warnings
@@ -37,7 +34,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Session pill** — solid dark-mode background, matches model selector
 
 ### Fixed
-
 - Duplicate responses and disappearing history on interrupt (#62)
 - Portable-mode double user message, uncleaned timeouts, orphaned unregister callbacks
 - Local model selection actually propagates to chat (no silent fallback)
@@ -49,7 +45,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Installer output uses defined escape vars (removed undefined BOLD/RESET)
 
 ### Removed
-
 - All references to the legacy "enhanced fork" as a requirement
 - Stale fork-era gateway instructions and feature-gate copy
 

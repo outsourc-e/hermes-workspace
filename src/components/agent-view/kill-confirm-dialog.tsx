@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { GatewayAgentCardBinding } from '@/lib/gateway-api'
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -12,7 +13,7 @@ import { killAgentSession } from '@/lib/gateway-api'
 type KillConfirmDialogProps = {
   open: boolean
   agentName: string
-  sessionKey?: string
+  cardBinding: GatewayAgentCardBinding
   onOpenChange: (open: boolean) => void
   onKilled?: () => void
 }
@@ -20,19 +21,18 @@ type KillConfirmDialogProps = {
 export function KillConfirmDialog({
   open,
   agentName,
-  sessionKey,
+  cardBinding,
   onOpenChange,
   onKilled,
 }: KillConfirmDialogProps) {
   const [pending, setPending] = useState(false)
 
   async function handleConfirmKill() {
-    const normalizedSessionKey = sessionKey?.trim() ?? ''
-    if (!normalizedSessionKey || pending) return
+    if (pending) return
 
     setPending(true)
     try {
-      await killAgentSession(normalizedSessionKey)
+      await killAgentSession(cardBinding)
       toast(`${agentName} terminated`, { type: 'success' })
       onOpenChange(false)
       onKilled?.()
@@ -76,7 +76,7 @@ export function KillConfirmDialog({
             <Button
               variant="destructive"
               size="sm"
-              disabled={pending || !sessionKey}
+              disabled={pending}
               onClick={function onClickConfirm() {
                 void handleConfirmKill()
               }}

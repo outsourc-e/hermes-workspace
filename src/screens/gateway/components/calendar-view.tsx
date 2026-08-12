@@ -34,7 +34,7 @@ type ParsedCronSchedule = {
   kind: 'daily' | 'weekly' | 'monthly'
   hour: number
   minute: number
-  weekdays: number[]
+  weekdays: Array<number>
   monthDay: number
 }
 
@@ -100,8 +100,8 @@ function parseHourMinute(
   const match = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/)
   if (match) {
     let hour = Number(match[1])
-    const minute = Number(match[2] ?? '0')
-    const meridiem = match[3]
+    const minute = Number(match.at(2) ?? '0')
+    const meridiem = match.at(3)
     if (meridiem === 'pm' && hour < 12) hour += 12
     if (meridiem === 'am' && hour === 12) hour = 0
     return {
@@ -113,7 +113,7 @@ function parseHourMinute(
   return { hour: fallbackDate.getHours(), minute: fallbackDate.getMinutes() }
 }
 
-function parseCronWeekdays(value: string): number[] {
+function parseCronWeekdays(value: string): Array<number> {
   const parts = value
     .split(',')
     .map((part) => part.trim())
@@ -137,7 +137,8 @@ function parseCronWeekdays(value: string): number[] {
       fri: 5,
       sat: 6,
     }
-    if (lowered in map) weekdays.add(map[lowered])
+    const weekday = map[lowered]
+    if (weekday !== undefined) weekdays.add(weekday)
   }
 
   return [...weekdays]
@@ -152,12 +153,14 @@ function parseSchedule(
 
   const parts = schedule.trim().split(/\s+/)
   if (parts.length >= 5) {
-    const minute = /^\d+$/.test(parts[0])
-      ? Number(parts[0])
+    const minutePart = parts.at(0) ?? ''
+    const hourPart = parts.at(1) ?? ''
+    const dayOfMonth = parts.at(2) ?? '*'
+    const dayOfWeek = parts.at(4) ?? '*'
+    const minute = /^\d+$/.test(minutePart)
+      ? Number(minutePart)
       : fallbackTime.minute
-    const hour = /^\d+$/.test(parts[1]) ? Number(parts[1]) : fallbackTime.hour
-    const dayOfMonth = parts[2]
-    const dayOfWeek = parts[4]
+    const hour = /^\d+$/.test(hourPart) ? Number(hourPart) : fallbackTime.hour
 
     if (dayOfWeek !== '*' && dayOfWeek !== '?') {
       const weekdays = parseCronWeekdays(dayOfWeek)
@@ -248,7 +251,7 @@ function parseSchedule(
 function getMonthGrid(referenceDate: Date): {
   gridStart: Date
   gridEnd: Date
-  days: Date[]
+  days: Array<Date>
 } {
   const monthStart = new Date(
     referenceDate.getFullYear(),
@@ -323,7 +326,7 @@ export function CalendarView({
     const rangeStart = startOfDay(activeRange.start)
     const rangeEnd = addDays(startOfDay(activeRange.end), 1)
 
-    const output: CalendarEvent[] = []
+    const output: Array<CalendarEvent> = []
 
     for (const job of cronJobs) {
       if (!job.enabled) continue
@@ -375,7 +378,7 @@ export function CalendarView({
   }, [activeRange.end, activeRange.start, cronJobs, missionRuns])
 
   const eventsByDay = useMemo(() => {
-    const grouped = new Map<string, CalendarEvent[]>()
+    const grouped = new Map<string, Array<CalendarEvent>>()
     for (const event of events) {
       const key = getDayKey(event.date)
       const list = grouped.get(key)

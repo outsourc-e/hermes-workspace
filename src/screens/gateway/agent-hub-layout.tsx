@@ -1,10 +1,12 @@
-import { useMemo, type CSSProperties } from 'react'
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
-import type { AgentWorkingRow } from './components/agents-working-panel'
 import { OfficeView } from './components/office-view'
+import type { CSSProperties } from 'react'
+import type { AgentWorkingRow } from './components/agents-working-panel'
 import type { AgentHubLayoutProps } from './components/hub-constants'
+import type { GatewaySession } from '@/lib/gateway-api'
+import { fetchSessions } from '@/lib/gateway-api'
 
 export { AgentAvatar } from './components/agent-avatar'
 
@@ -44,8 +46,8 @@ function getSessionLabel(session: GatewaySession): string {
 
 function deriveAgentRows(
   agents: AgentHubLayoutProps['agents'],
-  sessions: GatewaySession[],
-): AgentWorkingRow[] {
+  sessions: Array<GatewaySession>,
+): Array<AgentWorkingRow> {
   if (agents.length > 0) {
     return agents.map((agent) => {
       const session = sessions.find((s) => {
@@ -134,7 +136,7 @@ function deriveAgentRows(
 
     return {
       id: readText(session.key) || `session-${i}`,
-      name: NAMES[i % NAMES.length],
+      name: NAMES[i % NAMES.length] ?? `Agent ${i + 1}`,
       modelId: readText(session.model) || 'auto',
       status,
       lastLine: readText(session.task) || getSessionLabel(session),

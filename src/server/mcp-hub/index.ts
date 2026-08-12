@@ -40,10 +40,7 @@ async function getInstalledNames(): Promise<Set<string>> {
     const config = await getConfig()
 
     // Config may be wrapped in { config: {...} } shape
-    const root =
-      config && typeof config === 'object' && 'config' in config
-        ? config.config
-        : config
+    const root: unknown = 'config' in config ? config.config : config
 
     const mcp =
       root && typeof root === 'object'
@@ -189,8 +186,7 @@ export async function unifiedSearch(
   const allEntries: Array<HubMcpEntry> = []
   let anyRemoteSucceeded = false
 
-  for (let i = 0; i < settledResults.length; i++) {
-    const settled = settledResults[i]
+  for (const [i, settled] of settledResults.entries()) {
     const sourceId = allSourceLabels[i]
 
     if (settled.status === 'rejected') {

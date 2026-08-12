@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { AgentAvatar, getAgentAccentColor } from './agent-avatar'
 import type {
   AgentWorkingRow,
   AgentWorkingStatus,
 } from './agents-working-panel'
 import type { ModelPresetId } from './team-panel'
-import { AGENT_ACCENT_COLORS, AgentAvatar } from './agent-avatar'
+import { cn } from '@/lib/utils'
 
 export type RemoteSession = {
   sessionKey: string
@@ -19,7 +19,7 @@ export type RemoteSession = {
 }
 
 export type OfficeViewProps = {
-  agentRows: AgentWorkingRow[]
+  agentRows: Array<AgentWorkingRow>
   missionRunning: boolean
   onViewOutput: (agentId: string) => void
   onNewMission?: () => void
@@ -28,7 +28,7 @@ export type OfficeViewProps = {
   processType: 'sequential' | 'hierarchical' | 'parallel'
   companyName?: string
   agentTasks?: Record<string, string>
-  remoteSessions?: RemoteSession[]
+  remoteSessions?: Array<RemoteSession>
   onViewRemoteOutput?: (sessionKey: string, label: string) => void
   /** Fixed pixel height for the office container (compact mode) */
   containerHeight?: number
@@ -36,7 +36,7 @@ export type OfficeViewProps = {
   hideHeader?: boolean
 }
 
-export const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
+export const OFFICE_MODEL_BADGE: Partial<Record<ModelPresetId, string>> = {
   auto: 'rounded-full border border-neutral-200 bg-neutral-100 text-neutral-600',
   opus: 'border border-orange-200 bg-orange-50 text-orange-700',
   sonnet: 'border border-blue-200 bg-blue-50 text-blue-700',
@@ -48,7 +48,7 @@ export const OFFICE_MODEL_BADGE: Record<ModelPresetId, string> = {
   'pc1-critic': 'border border-purple-200 bg-purple-50 text-purple-700',
 }
 
-export const OFFICE_MODEL_LABEL: Record<ModelPresetId, string> = {
+export const OFFICE_MODEL_LABEL: Partial<Record<ModelPresetId, string>> = {
   auto: 'Auto',
   opus: 'Opus',
   sonnet: 'Sonnet',
@@ -65,6 +65,13 @@ const DEFAULT_OFFICE_MODEL_BADGE =
 type OfficeLayoutTemplate = 'grid' | 'roundtable' | 'warroom'
 type SocialSpotType = 'coffee' | 'water' | 'plant' | 'snack'
 type SocialSpot = { x: number; y: number; type: SocialSpotType }
+const DEFAULT_DESK_POSITION = { x: 450, y: 320 }
+const DEFAULT_SOCIAL_SPOT: SocialSpot = { x: 450, y: 320, type: 'plant' }
+const DEFAULT_AGENT_POSITION = {
+  ...DEFAULT_DESK_POSITION,
+  atDesk: true,
+  stationary: true,
+}
 
 export function getOfficeModelBadge(modelId: string): string {
   return (
@@ -76,7 +83,7 @@ export function getOfficeModelLabel(modelId: string): string {
   if (!modelId) return 'Unknown'
   return (
     OFFICE_MODEL_LABEL[modelId as ModelPresetId] ??
-    modelId.split('/')[1] ??
+    modelId.split('/').at(1) ??
     modelId
   )
 }
@@ -177,21 +184,21 @@ const WARROOM_DESK_POSITIONS = [
   { x: 780, y: 420 },
 ]
 
-const GRID_SOCIAL_SPOTS: SocialSpot[] = [
+const GRID_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 840, y: 140, type: 'coffee' as const },
   { x: 840, y: 300, type: 'water' as const },
   { x: 60, y: 440, type: 'plant' as const },
   { x: 840, y: 460, type: 'snack' as const },
 ]
 
-const ROUNDTABLE_SOCIAL_SPOTS: SocialSpot[] = [
+const ROUNDTABLE_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 450, y: 320, type: 'plant' },
   { x: 510, y: 320, type: 'snack' },
   { x: 870, y: 120, type: 'coffee' },
   { x: 870, y: 480, type: 'water' },
 ]
 
-const WARROOM_SOCIAL_SPOTS: SocialSpot[] = [
+const WARROOM_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 56, y: 300, type: 'coffee' },
   { x: 56, y: 350, type: 'water' },
   { x: 904, y: 300, type: 'snack' },
@@ -207,7 +214,10 @@ const DESK_POSITIONS_BY_TEMPLATE: Record<
   warroom: WARROOM_DESK_POSITIONS,
 }
 
-const SOCIAL_SPOTS_BY_TEMPLATE: Record<OfficeLayoutTemplate, SocialSpot[]> = {
+const SOCIAL_SPOTS_BY_TEMPLATE: Record<
+  OfficeLayoutTemplate,
+  Array<SocialSpot>
+> = {
   grid: GRID_SOCIAL_SPOTS,
   roundtable: ROUNDTABLE_SOCIAL_SPOTS,
   warroom: WARROOM_SOCIAL_SPOTS,
@@ -246,7 +256,7 @@ function getSpeechLine(agent: AgentWorkingRow, phase: number): string {
     'Getting water 💧',
   ]
   if (agent.status === 'idle' || agent.status === 'ready') {
-    return socialLines[Math.floor(phase / 4) % socialLines.length]
+    return socialLines[Math.floor(phase / 4) % socialLines.length] ?? ''
   }
   return ''
 }
@@ -717,7 +727,8 @@ export function OfficeView({
 
   // Assign agents to desks, idle agents wander to social spots
   const agentPositions = agentRows.map((agent, index) => {
-    const desk = deskPositions[index % deskPositions.length]
+    const desk =
+      deskPositions[index % deskPositions.length] ?? DEFAULT_DESK_POSITION
     const isIdle = agent.status === 'idle' || agent.status === 'ready'
     const isPaused = agent.status === 'paused'
 
@@ -725,7 +736,8 @@ export function OfficeView({
     if (isIdle || isPaused) {
       const wanderCycle = Math.floor((tick + index * 17) / 25) % 4 // 0=desk, 1=walking, 2=social, 3=walking back
       const socialSpot =
-        socialSpots[(index + Math.floor(tick / 60)) % socialSpots.length]
+        socialSpots[(index + Math.floor(tick / 60)) % socialSpots.length] ??
+        DEFAULT_SOCIAL_SPOT
       const t = ((tick + index * 17) % 25) / 25
 
       if (wanderCycle === 0) {
@@ -750,11 +762,9 @@ export function OfficeView({
         }
       } else {
         // Walking back
-        const socialSpotBack =
-          socialSpots[(index + Math.floor(tick / 60)) % socialSpots.length]
         return {
-          x: socialSpotBack.x + (desk.x - socialSpotBack.x) * t,
-          y: socialSpotBack.y + (desk.y - 20 - socialSpotBack.y) * t,
+          x: socialSpot.x + (desk.x - socialSpot.x) * t,
+          y: socialSpot.y + (desk.y - 20 - socialSpot.y) * t,
           atDesk: false,
           stationary: false,
         }
@@ -818,8 +828,7 @@ export function OfficeView({
       <div className="flex-1 overflow-y-auto p-3 md:hidden">
         <div className="space-y-2">
           {agentRows.map((agent, index) => {
-            const accent =
-              AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
+            const accent = getAgentAccentColor(index)
             const statusMeta = getAgentStatusMeta(agent.status)
             const emoji = getAgentEmoji(agent)
             return (
@@ -1018,9 +1027,7 @@ export function OfficeView({
           {/* All desks (empty ones too) */}
           {deskPositions.map((desk, i) => {
             const occupied = i < agentRows.length
-            const accent = occupied
-              ? AGENT_ACCENT_COLORS[i % AGENT_ACCENT_COLORS.length]
-              : undefined
+            const accent = occupied ? getAgentAccentColor(i) : undefined
             const agent = occupied ? agentRows[i] : undefined
             const monitorText = agent
               ? getDeskMonitorText(agent, agentTasks[agent.id])
@@ -1065,8 +1072,8 @@ export function OfficeView({
             Position scaling: SVG uses viewBox 0 0 sceneW sceneH and scales to fit container,
             so we express positions as percentages of the scene to match the SVG's scale. */}
         {agentRows.map((agent, index) => {
-          const accent = AGENT_ACCENT_COLORS[index % AGENT_ACCENT_COLORS.length]
-          const pos = agentPositions[index]
+          const accent = getAgentAccentColor(index)
+          const pos = agentPositions[index] ?? DEFAULT_AGENT_POSITION
           const emoji = getAgentEmoji(agent)
           const isSelected = agent.id === selectedOutputAgentId
           const isActive = agent.status === 'active'

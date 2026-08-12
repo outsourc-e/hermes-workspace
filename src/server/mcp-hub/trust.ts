@@ -12,6 +12,7 @@ import type { HubTrust } from './types'
 const SHELL_METACHAR_RE = /[;|&$`<>]/
 
 // Control characters (including NUL) that must not appear in command or args
+// eslint-disable-next-line no-control-regex -- This validation boundary intentionally rejects C0 controls.
 const CONTROL_CHAR_RE = /[\x00-\x1F\x7F]/
 
 // Env key must be SCREAMING_SNAKE_CASE (same rule as mcp-input-validate.ts)

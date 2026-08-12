@@ -1,6 +1,15 @@
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
+/** Resolve the Hermes home directory without adding workspace-specific state. */
+export function getHermesHome(): string {
+  return resolve(
+    process.env.HERMES_HOME?.trim() ||
+      process.env.CLAUDE_HOME?.trim() ||
+      join(homedir(), '.hermes'),
+  )
+}
+
 /**
  * Resolve the Hermes workspace state directory.
  *
@@ -16,10 +25,5 @@ export function getStateDir(): string {
   const explicit = process.env.HERMES_WORKSPACE_STATE_DIR?.trim()
   if (explicit) return resolve(explicit)
 
-  const hermesHome =
-    process.env.HERMES_HOME?.trim() ??
-    process.env.CLAUDE_HOME?.trim() ??
-    join(homedir(), '.hermes')
-
-  return resolve(join(hermesHome, 'workspace'))
+  return join(getHermesHome(), 'workspace')
 }

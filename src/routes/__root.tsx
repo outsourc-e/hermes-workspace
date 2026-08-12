@@ -3,7 +3,6 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
-  useRouterState,
 } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
@@ -34,6 +33,7 @@ import {
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
+import { initializeWorkspaceChatIndexedDb } from '@/screens/chat/card-transcript-indexeddb'
 
 // Content Security Policy used to be emitted here as a `<meta http-equiv>`
 // tag. That made the workspace unusable when the Cloudflare JS Challenge
@@ -229,12 +229,31 @@ type ServiceWorkerLike = {
   register: (
     scriptURL: string,
     options?: RegistrationOptions,
-  ) => Promise<{ update?: () => Promise<unknown> } | undefined>
+  ) => Promise<unknown>
 }
 
 type CachesLike = {
   keys: () => Promise<Array<string>>
   delete: (name: string) => Promise<boolean> | boolean
+}
+
+type WorkspaceChatStorageInitializer = () => Promise<Pick<IDBDatabase, 'close'>>
+
+let workspaceChatStorageInitialization: Promise<void> | undefined
+
+export function initializeWorkspaceChatStorageOnStartup(
+  initialize: WorkspaceChatStorageInitializer = initializeWorkspaceChatIndexedDb,
+): void {
+  if (workspaceChatStorageInitialization) return
+
+  workspaceChatStorageInitialization = initialize()
+    .then((database) => database.close())
+    .catch((error: unknown) => {
+      console.warn(
+        'Workspace chat browser storage initialization failed',
+        error,
+      )
+    })
 }
 
 export async function registerAppServiceWorker({
@@ -253,7 +272,6 @@ export async function registerAppServiceWorker({
 
   await serviceWorker
     ?.register('/sw.js', { scope: '/' })
-    .then((registration) => registration?.update?.())
     .catch((error: unknown) => {
       console.warn('PWA service worker registration failed', error)
     })
@@ -261,18 +279,6 @@ export async function registerAppServiceWorker({
 
 function RootLayout() {
   const { settings } = useSettings()
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  })
-  const isHermesWorldLandingRoute =
-    pathname === '/hermes-world' ||
-    pathname.startsWith('/hermes-world/') ||
-    pathname === '/world' ||
-    pathname.startsWith('/world/')
-  const isGameSurfaceRoute =
-    isHermesWorldLandingRoute ||
-    pathname === '/playground' ||
-    pathname.startsWith('/playground/')
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
@@ -300,6 +306,7 @@ function RootLayout() {
       return undefined
     }
 
+    initializeWorkspaceChatStorageOnStartup()
     syncOnboardingCompletion()
 
     void fetch('/api/connection-status')
@@ -312,7 +319,7 @@ function RootLayout() {
             modelConfigured?: boolean
           } | null,
         ) => {
-          if (status && (status.ok || (status.chatReady && status.modelConfigured))) {
+          if (status?.ok || (status?.chatReady && status.modelConfigured)) {
             localStorage.setItem(ONBOARDING_KEY, 'true')
             syncOnboardingCompletion()
           }
@@ -387,15 +394,12 @@ function RootLayout() {
               <Outlet />
             </ErrorBoundary>
           </WorkspaceShell>
-          {!isHermesWorldLandingRoute ? <SearchModal /> : null}
+          <SearchModal />
           {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
-          {!isGameSurfaceRoute ? (
-            <UsageMeter visible={settings.showUsageMeter} />
-          ) : null}
-          {!isHermesWorldLandingRoute ? <KeyboardShortcutsModal /> : null}
-          {!isHermesWorldLandingRoute ? <UpdateCenterNotifier /> : null}
-          {rootSurfaceState.showPostOnboardingOverlays &&
-          !isGameSurfaceRoute ? (
+          <UsageMeter visible={settings.showUsageMeter} />
+          <KeyboardShortcutsModal />
+          <UpdateCenterNotifier />
+          {rootSurfaceState.showPostOnboardingOverlays ? (
             <>
               <MobilePromptTrigger />
               <OnboardingTour />
@@ -454,7 +458,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           dangerouslySetInnerHTML={{
             __html: wrapInlineScript(`
           (function(){
-            if (location.pathname === '/hermes-world' || location.pathname.indexOf('/hermes-world/') === 0 || location.pathname === '/world' || location.pathname.indexOf('/world/') === 0) return;
             var d = document.getElementById('splash-screen');
             if (!d) return;
             var bg = '#031A1A', txt = '#F8F1E3', muted = '#9CB2AE', accent = '#FFAC02';
@@ -499,11 +502,23 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             } catch(e){}
 
             var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light'].includes(theme);
+            var agentName = 'Hermes Agent';
+            var agentAvatar = '/claude-avatar.webp';
+            try {
+              var persistedChatSettings = JSON.parse(localStorage.getItem('chat-settings') || '{}');
+              var persistedIdentity = persistedChatSettings && persistedChatSettings.state && persistedChatSettings.state.settings;
+              if (persistedIdentity && typeof persistedIdentity.agentDisplayName === 'string' && persistedIdentity.agentDisplayName.trim()) {
+                agentName = persistedIdentity.agentDisplayName.trim();
+              }
+              if (persistedIdentity && typeof persistedIdentity.agentAvatarDataUrl === 'string' && new RegExp('^data:image/(png|jpeg|webp);base64,').test(persistedIdentity.agentAvatarDataUrl)) {
+                agentAvatar = persistedIdentity.agentAvatarDataUrl;
+              }
+            } catch(e) {}
             var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning your agent...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
             var quip = quips[Math.floor(Math.random() * quips.length)];
 
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
-            d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
+            d.innerHTML = '<img src="'+agentAvatar+'" alt="'+agentName.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')+'" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
               + '<img src="'+(isDark ? '/claude-banner.png' : '/claude-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
               + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
               + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';

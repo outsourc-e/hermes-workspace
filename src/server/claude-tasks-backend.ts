@@ -1,10 +1,10 @@
 import {
   createKanbanCard,
-  listKanbanCards,
-  type KanbanBackendMeta,
   getKanbanBackendMeta,
+  listKanbanCards,
   updateKanbanCard,
 } from './kanban-backend'
+import type { KanbanBackendMeta } from './kanban-backend'
 
 export type TaskColumn =
   | 'backlog'
@@ -22,7 +22,7 @@ export type ClaudeTaskRecord = {
   column: TaskColumn
   priority: TaskPriority
   assignee: string | null
-  tags: string[]
+  tags: Array<string>
   due_date: string | null
   position: number
   created_by: string
@@ -43,7 +43,7 @@ type CreateTaskInput = {
   column?: TaskColumn
   priority?: TaskPriority
   assignee?: string | null
-  tags?: string[]
+  tags?: Array<string>
   due_date?: string | null
   created_by?: string
 }
@@ -124,7 +124,7 @@ export function getClaudeTasksBackendMeta(): KanbanBackendMeta {
 
 export async function listClaudeTasks(
   filters: TaskFilters = {},
-): Promise<ClaudeTaskRecord[]> {
+): Promise<Array<ClaudeTaskRecord>> {
   let tasks = (await listKanbanCards()).map(mapCardToTask)
   if (!filters.includeDone) {
     tasks = tasks.filter((task) => task.column !== 'done')

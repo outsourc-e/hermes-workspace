@@ -1,12 +1,12 @@
 import {
   Fragment,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { usePageTitle } from '@/hooks/use-page-title'
 import {
@@ -191,11 +191,14 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
     new Array(n + 1).fill(0),
   )
   for (let i = 1; i <= m; i++) {
+    const row = dp[i]
+    const previousRow = dp[i - 1]
+    if (!row || !previousRow) continue
     for (let j = 1; j <= n; j++) {
       if (aLines[i - 1] === bLines[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1
+        row[j] = (previousRow[j - 1] ?? 0) + 1
       } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
+        row[j] = Math.max(previousRow[j] ?? 0, row[j - 1] ?? 0)
       }
     }
   }
@@ -205,31 +208,38 @@ function computeDiff(original: string, updated: string): Array<DiffLine> {
   let i = m
   let j = n
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && aLines[i - 1] === bLines[j - 1]) {
+    const aLine = i > 0 ? aLines[i - 1] : undefined
+    const bLine = j > 0 ? bLines[j - 1] : undefined
+    if (aLine !== undefined && bLine !== undefined && aLine === bLine) {
       result.push({
         kind: 'unchanged',
-        text: aLines[i - 1],
+        text: aLine,
         leftNum: i,
         rightNum: j,
       })
       i--
       j--
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+    } else if (
+      bLine !== undefined &&
+      (i === 0 || (dp[i]?.[j - 1] ?? 0) >= (dp[i - 1]?.[j] ?? 0))
+    ) {
       result.push({
         kind: 'added',
-        text: bLines[j - 1],
+        text: bLine,
         leftNum: null,
         rightNum: j,
       })
       j--
-    } else {
+    } else if (aLine !== undefined) {
       result.push({
         kind: 'removed',
-        text: aLines[i - 1],
+        text: aLine,
         leftNum: i,
         rightNum: null,
       })
       i--
+    } else {
+      break
     }
   }
   return result.reverse()
@@ -322,7 +332,7 @@ function tokenizeJson(code: string): Array<HighlightToken> {
   let lastIndex = 0
 
   for (const match of code.matchAll(pattern)) {
-    const index = match.index ?? 0
+    const index = match.index
     pushHighlightToken(tokens, code.slice(lastIndex, index))
 
     const [value, stringValue, colon] = match
@@ -349,7 +359,7 @@ function tokenizeCode(code: string): Array<HighlightToken> {
   let lastIndex = 0
 
   for (const match of code.matchAll(pattern)) {
-    const index = match.index ?? 0
+    const index = match.index
     const value = match[0]
     pushHighlightToken(tokens, code.slice(lastIndex, index))
 

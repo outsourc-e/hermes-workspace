@@ -121,7 +121,18 @@ export async function* streamResponses(
   if (req.conversationHistory)
     body.conversation_history = req.conversationHistory
   if (req.instructions) body.instructions = req.instructions
-  if (req.model) body.model = req.model
+  // Gateway's advertised `hermes-agent` is a virtual default, not a provider
+  // model. A persisted Workspace picker value must therefore be omitted so the
+  // Gateway, rather than Codex OAuth, resolves the configured primary model.
+  const requestedModel = req.model?.trim()
+  const normalizedModel = requestedModel?.toLowerCase()
+  if (
+    requestedModel &&
+    normalizedModel !== 'default' &&
+    normalizedModel !== 'hermes-agent'
+  ) {
+    body.model = requestedModel
+  }
   if (req.sessionId) body.session_id = req.sessionId
 
   const res = await fetch(`${CLAUDE_API}/v1/responses`, {
@@ -144,7 +155,7 @@ export async function* streamResponses(
   // events that only carry the item, not the call_id.
   const itemIdToCallId = new Map<string, string>()
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
     buffer += decoder.decode(value, { stream: true })
@@ -171,8 +182,7 @@ export async function* streamResponses(
         } catch {
           continue
         }
-        const eventType =
-          typeof parsed.type === 'string' ? (parsed.type as string) : ''
+        const eventType = typeof parsed.type === 'string' ? parsed.type : ''
 
         if (eventType === 'response.output_text.delta') {
           const delta = typeof parsed.delta === 'string' ? parsed.delta : ''
@@ -236,9 +246,7 @@ export async function* streamResponses(
         }
         if (eventType === 'response.failed') {
           const err =
-            typeof parsed.error === 'string'
-              ? (parsed.error as string)
-              : 'Response failed'
+            typeof parsed.error === 'string' ? parsed.error : 'Response failed'
           yield { kind: 'failed', error: err }
           continue
         }

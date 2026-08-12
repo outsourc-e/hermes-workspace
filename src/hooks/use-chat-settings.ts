@@ -13,6 +13,10 @@ export type LoaderStyle =
   | 'lobster'
   | 'logo'
 export const DEFAULT_CHAT_DISPLAY_NAME = 'User'
+export const DEFAULT_AGENT_DISPLAY_NAME = 'Hermes Agent'
+export const DEFAULT_DESKTOP_SIDEBAR_WIDTH = 300
+export const MIN_DESKTOP_SIDEBAR_WIDTH = 240
+export const MAX_DESKTOP_SIDEBAR_WIDTH = 600
 
 export type EnterBehavior = 'send' | 'newline'
 export type ChatWidth = 'comfortable' | 'wide' | 'full'
@@ -24,6 +28,8 @@ export type ChatSettings = {
   loaderStyle: LoaderStyle
   displayName: string
   avatarDataUrl: string | null
+  agentDisplayName: string
+  agentAvatarDataUrl: string | null
   /**
    * Controls how Enter behaves in the chat composer.
    *  - 'send'    — Enter sends, Shift+Enter / Cmd+Enter inserts a newline (default)
@@ -47,6 +53,8 @@ export type ChatSettings = {
    *  - true            — rail expands on hover, re-collapses on leave
    */
   sidebarHoverExpand: boolean
+  /** Width in pixels of the expanded desktop sessions sidebar. */
+  desktopSidebarWidth: number
   /**
    * Play a short notification sound in the browser when the agent finishes
    * responding in the main chat. Off by default so existing users don't get
@@ -68,11 +76,24 @@ function defaultChatSettings(): ChatSettings {
     loaderStyle: 'dots',
     displayName: DEFAULT_CHAT_DISPLAY_NAME,
     avatarDataUrl: null,
+    agentDisplayName: DEFAULT_AGENT_DISPLAY_NAME,
+    agentAvatarDataUrl: null,
     enterBehavior: 'send',
     chatWidth: 'comfortable',
     sidebarHoverExpand: false,
+    desktopSidebarWidth: DEFAULT_DESKTOP_SIDEBAR_WIDTH,
     soundOnChatComplete: false,
   }
+}
+
+export function normalizeDesktopSidebarWidth(width: unknown): number {
+  if (typeof width !== 'number' || !Number.isFinite(width)) {
+    return DEFAULT_DESKTOP_SIDEBAR_WIDTH
+  }
+  return Math.min(
+    MAX_DESKTOP_SIDEBAR_WIDTH,
+    Math.max(MIN_DESKTOP_SIDEBAR_WIDTH, Math.round(width)),
+  )
 }
 
 function mergePersistedSettings(
@@ -88,12 +109,23 @@ function mergePersistedSettings(
   }
 
   const state = persistedState as Partial<ChatSettingsState>
+  const persistedSettings =
+    state.settings && typeof state.settings === 'object' ? state.settings : {}
+  const persistedDesktopSidebarWidth = Object.prototype.hasOwnProperty.call(
+    persistedSettings,
+    'desktopSidebarWidth',
+  )
+    ? (persistedSettings as Partial<ChatSettings>).desktopSidebarWidth
+    : currentState.settings.desktopSidebarWidth
   return {
     ...currentState,
     ...state,
     settings: {
       ...currentState.settings,
-      ...(state.settings || {}),
+      ...persistedSettings,
+      desktopSidebarWidth: normalizeDesktopSidebarWidth(
+        persistedDesktopSidebarWidth,
+      ),
     },
   }
 }
@@ -105,8 +137,19 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
         settings: defaultChatSettings(),
         updateSettings: function updateSettings(updates) {
           set(function applyUpdates(state) {
+            const normalizedUpdates = Object.prototype.hasOwnProperty.call(
+              updates,
+              'desktopSidebarWidth',
+            )
+              ? {
+                  ...updates,
+                  desktopSidebarWidth: normalizeDesktopSidebarWidth(
+                    updates.desktopSidebarWidth,
+                  ),
+                }
+              : updates
             return {
-              settings: { ...state.settings, ...updates },
+              settings: { ...state.settings, ...normalizedUpdates },
             }
           })
         },
@@ -126,6 +169,11 @@ export function getChatProfileDisplayName(displayName: string): string {
   return trimmed.length > 0 ? trimmed : DEFAULT_CHAT_DISPLAY_NAME
 }
 
+export function getAgentDisplayName(displayName: string): string {
+  const trimmed = displayName.trim()
+  return trimmed.length > 0 ? trimmed : DEFAULT_AGENT_DISPLAY_NAME
+}
+
 export function selectChatProfileDisplayName(state: ChatSettingsState): string {
   return getChatProfileDisplayName(state.settings.displayName)
 }
@@ -134,6 +182,16 @@ export function selectChatProfileAvatarDataUrl(
   state: ChatSettingsState,
 ): string | null {
   return state.settings.avatarDataUrl
+}
+
+export function selectAgentDisplayName(state: ChatSettingsState): string {
+  return getAgentDisplayName(state.settings.agentDisplayName)
+}
+
+export function selectAgentAvatarDataUrl(
+  state: ChatSettingsState,
+): string | null {
+  return state.settings.agentAvatarDataUrl
 }
 
 export function selectEnterBehavior(state: ChatSettingsState): EnterBehavior {
@@ -146,6 +204,10 @@ export function selectChatWidth(state: ChatSettingsState): ChatWidth {
 
 export function selectSidebarHoverExpand(state: ChatSettingsState): boolean {
   return state.settings.sidebarHoverExpand
+}
+
+export function selectDesktopSidebarWidth(state: ChatSettingsState): number {
+  return normalizeDesktopSidebarWidth(state.settings.desktopSidebarWidth)
 }
 
 /**

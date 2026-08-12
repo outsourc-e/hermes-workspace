@@ -90,7 +90,7 @@ export function Swarm2Wires({
 
   useLayoutEffect(() => {
     schedule()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [workers.length])
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export function Swarm2Wires({
       window.removeEventListener('scroll', schedule, true)
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Hook dependencies are intentionally constrained to the explicit array below.
   }, [workers.length])
 
   if (geom.width === 0 || !geom.origin) return null

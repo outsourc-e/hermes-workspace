@@ -54,8 +54,12 @@ winget install SQLite.SQLite --accept-package-agreements --accept-source-agreeme
 # 2. Claude CLI (for Claude Tasks / Conductor)
 npm install -g @anthropic-ai/claude-code
 
-# 3. pnpm (if not installed)
-npm install -g pnpm
+# 3. pnpm (pin the version declared by package.json)
+npm install -g pnpm@10.15.0
+
+# 4. Workspace dependencies (from the repository root)
+cd C:\Users\<you>\hermes-workspace
+pnpm install --frozen-lockfile
 ```
 
 ## Start sequence

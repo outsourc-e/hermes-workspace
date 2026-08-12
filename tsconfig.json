@@ -2,6 +2,9 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "public/sw.js",
+    "scripts/generate-pwa-icons.js",
+    "server-entry.js",
     "eslint.config.js",
     "prettier.config.js",
     "vite.config.ts"
@@ -17,18 +20,18 @@
     "lib": ["ES2022", "ES2023.Array", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "three"],
 
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
+    "allowJs": true,
     "noEmit": true,
 
-    /* Linting */
     "skipLibCheck": true,
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"]

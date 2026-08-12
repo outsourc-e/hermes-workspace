@@ -20,8 +20,8 @@ import { assertNotPrivate } from '../lib/ssrf-guard'
 import type { HubMcpEntry, HubTrust } from '../types'
 
 export interface GenericJsonResult {
-  entries: HubMcpEntry[]
-  warnings?: string[]
+  entries: Array<HubMcpEntry>
+  warnings?: Array<string>
   /** True when adapter had a soft failure and may be returning stale/empty data. */
   degraded?: boolean
 }
@@ -47,7 +47,7 @@ interface RawItem {
 /** Maximum allowed response body size (5 MB). */
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
-function extractItems(data: unknown): unknown[] {
+function extractItems(data: unknown): Array<unknown> {
   if (Array.isArray(data)) return data
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
@@ -64,11 +64,11 @@ function extractItems(data: unknown): unknown[] {
 }
 
 function parseItems(
-  items: unknown[],
+  items: Array<unknown>,
   sourceId: string,
   defaultTrust: HubTrust,
-): HubMcpEntry[] {
-  const entries: HubMcpEntry[] = []
+): Array<HubMcpEntry> {
+  const entries: Array<HubMcpEntry> = []
 
   for (const item of items) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue
@@ -91,7 +91,7 @@ function parseItems(
         ? raw.homepage
         : null
 
-    const tags: string[] = Array.isArray(raw.tags)
+    const tags: Array<string> = Array.isArray(raw.tags)
       ? raw.tags.filter((t): t is string => typeof t === 'string')
       : []
 
@@ -166,23 +166,21 @@ async function readBodyWithLimit(
   }
 
   const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
+  const chunks: Array<Uint8Array> = []
   let totalBytes = 0
   let truncated = false
 
   try {
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      if (value) {
-        totalBytes += value.byteLength
-        if (totalBytes > MAX_RESPONSE_BYTES) {
-          truncated = true
-          reader.cancel().catch(() => undefined)
-          break
-        }
-        chunks.push(value)
+      totalBytes += value.byteLength
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        truncated = true
+        reader.cancel().catch(() => undefined)
+        break
       }
+      chunks.push(value)
     }
   } finally {
     reader.releaseLock()
@@ -218,7 +216,7 @@ export async function fetchGenericJson(
   // MEDIUM-2: Cache key includes URL so a URL change auto-invalidates.
   const cacheKey = `${sourceId}:${url}`
   const cached = getCache(cacheKey)
-  const warnings: string[] = []
+  const warnings: Array<string> = []
 
   // HIGH-1: SSRF guard — validate hostname resolves to a public address.
   try {
@@ -248,7 +246,7 @@ export async function fetchGenericJson(
     warnings.push(`${sourceId}: network error: ${msg}`)
     if (cached) {
       return {
-        entries: cached.payload as HubMcpEntry[],
+        entries: cached.payload as Array<HubMcpEntry>,
         warnings,
         degraded: true,
       }
@@ -259,7 +257,7 @@ export async function fetchGenericJson(
   // 304 Not Modified
   if (response.status === 304) {
     touchCache(cacheKey)
-    const payload = cached ? (cached.payload as HubMcpEntry[]) : []
+    const payload = cached ? (cached.payload as Array<HubMcpEntry>) : []
     return { entries: payload, ...(warnings.length > 0 ? { warnings } : {}) }
   }
 
@@ -284,7 +282,7 @@ export async function fetchGenericJson(
         ...(resetAtNum !== undefined ? { rateLimitResetAt: resetAtNum } : {}),
       })
       return {
-        entries: cached.payload as HubMcpEntry[],
+        entries: cached.payload as Array<HubMcpEntry>,
         warnings,
         degraded: true,
       }
@@ -296,7 +294,7 @@ export async function fetchGenericJson(
     warnings.push(`${sourceId}: unexpected status ${response.status}`)
     if (cached) {
       return {
-        entries: cached.payload as HubMcpEntry[],
+        entries: cached.payload as Array<HubMcpEntry>,
         warnings,
         degraded: true,
       }
@@ -310,7 +308,7 @@ export async function fetchGenericJson(
     warnings.push(`${sourceId}: Response too large (>5MB)`)
     if (cached) {
       return {
-        entries: cached.payload as HubMcpEntry[],
+        entries: cached.payload as Array<HubMcpEntry>,
         warnings,
         degraded: true,
       }
@@ -327,7 +325,7 @@ export async function fetchGenericJson(
     warnings.push(`${sourceId}: failed to parse JSON: ${msg}`)
     if (cached) {
       return {
-        entries: cached.payload as HubMcpEntry[],
+        entries: cached.payload as Array<HubMcpEntry>,
         warnings,
         degraded: true,
       }
