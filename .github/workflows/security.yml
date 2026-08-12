@@ -23,6 +23,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Reject tracked secret and runtime artifacts
+        shell: bash
+        run: |
+          forbidden="$(
+            git ls-files |
+              grep -Ei '(^|/)(\.env\.(docker|bak(-.*)?)|\.data/|\.workspaces/)|\.(db|sqlite|sqlite3)(-(wal|shm|journal))?$' ||
+              true
+          )"
+          if [ -n "$forbidden" ]; then
+            echo "::error::Tracked secret or runtime artifacts detected."
+            printf '%s\n' "$forbidden"
+            exit 1
+          fi
+
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
