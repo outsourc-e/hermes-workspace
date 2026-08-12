@@ -9,16 +9,17 @@ import {
   Settings01Icon,
   ViewIcon,
 } from '@hugeicons/core-free-icons'
+import type { AgentWorkingRow } from '@/screens/gateway/components/agents-working-panel'
+import type { CrewMember } from '@/hooks/use-crew-status'
+import type {DispatchResponse} from '@/components/swarm/router-chat';
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { Button } from '@/components/ui/button'
 import {
-  RouterChat,
-  type DispatchResponse,
+  
+  RouterChat
 } from '@/components/swarm/router-chat'
 import { OfficeView } from '@/screens/gateway/components/office-view'
-import type { AgentWorkingRow } from '@/screens/gateway/components/agents-working-panel'
-import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 
 const ORCHESTRATOR_NAME_KEY = 'swarm2:orchestrator:name'
@@ -176,7 +177,7 @@ export function Swarm2OrchestratorCard({
     agentPage * AGENT_PAGE_SIZE,
     agentPage * AGENT_PAGE_SIZE + AGENT_PAGE_SIZE,
   )
-  const officeAgents = useMemo<AgentWorkingRow[]>(
+  const officeAgents = useMemo<Array<AgentWorkingRow>>(
     () =>
       activeAgents.map((agent) => ({
         id: agent.workerId,

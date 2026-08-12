@@ -25,7 +25,7 @@ export type CharacterArchetype = {
   notes: string
 }
 
-export const CHARACTER_ANIMATION_PRIORITY: CharacterAnimationClip[] = [
+export const CHARACTER_ANIMATION_PRIORITY: Array<CharacterAnimationClip> = [
   'idle',
   'walk',
   'run',
@@ -34,7 +34,7 @@ export const CHARACTER_ANIMATION_PRIORITY: CharacterAnimationClip[] = [
   'use',
 ]
 
-export const HERMESWORLD_CHARACTER_ARCHETYPES: CharacterArchetype[] = [
+export const HERMESWORLD_CHARACTER_ARCHETYPES: Array<CharacterArchetype> = [
   {
     id: 'player-adventurer',
     label: 'Player Adventurer',

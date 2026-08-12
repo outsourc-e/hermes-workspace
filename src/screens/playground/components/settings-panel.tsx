@@ -1,8 +1,9 @@
-import type { ChangeEvent, ReactNode } from 'react'
 import {
-  useHermesWorldSettings,
-  type HermesWorldSettings,
+  
+  useHermesWorldSettings
 } from './hermesworld-settings'
+import type {HermesWorldSettings} from './hermesworld-settings';
+import type { ChangeEvent, ReactNode } from 'react'
 
 type Props = {
   open: boolean
@@ -275,7 +276,7 @@ function Select({
 }: {
   label: string
   value: string
-  options: string[]
+  options: Array<string>
   onChange: (event: ChangeEvent<HTMLSelectElement>) => void
 }) {
   return (

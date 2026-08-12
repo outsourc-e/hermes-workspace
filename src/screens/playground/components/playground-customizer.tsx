@@ -4,17 +4,18 @@
  */
 import { useEffect, useState } from 'react'
 import {
-  AVATAR_PRESETS,
   ACCENT_COLORS,
+  AVATAR_PRESETS,
+  
   EYE_COLORS,
   HAIR_COLORS,
   OUTFIT_COLORS,
   PORTRAITS,
   SKIN_TONES,
   loadAvatarConfig,
-  saveAvatarConfig,
-  type AvatarConfig,
+  saveAvatarConfig
 } from '../lib/avatar-config'
+import type {AvatarConfig} from '../lib/avatar-config';
 
 type Props = {
   open: boolean
@@ -257,7 +258,7 @@ function Swatches({
   active,
   onPick,
 }: {
-  values: string[]
+  values: Array<string>
   active: string
   onPick: (v: string) => void
 }) {
@@ -288,7 +289,7 @@ function Toggles<T extends string>({
   active,
   onPick,
 }: {
-  values: T[]
+  values: Array<T>
   active: T
   onPick: (v: T) => void
 }) {

@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { AgentOutputPanel } from './agent-output-panel'
 import type { TeamMember } from './team-panel'
 import type { HubTask } from './task-board'
-import { AgentOutputPanel } from './agent-output-panel'
+import { cn } from '@/lib/utils'
 
 type MissionTimelineProps = {
-  tasks: HubTask[]
-  agentOutputs: Map<string, string[]>
+  tasks: Array<HubTask>
+  agentOutputs: Map<string, Array<string>>
   agentSessionMap?: Record<string, string>
   agentStatuses: Map<string, { status: string; lastSeen: number }>
   missionState: string
   missionGoal: string
-  teamMembers: TeamMember[]
+  teamMembers: Array<TeamMember>
   elapsedTime?: number
 }
 

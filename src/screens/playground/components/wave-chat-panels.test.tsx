@@ -81,7 +81,7 @@ describe('Wave chat RPG panels', () => {
       (
         screen.getByRole('button', {
           name: /claim founder vault/i,
-        }) as HTMLButtonElement
+        })
       ).disabled,
     ).toBe(false)
   })

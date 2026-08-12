@@ -8,10 +8,11 @@ import type {
   HubTask,
   TaskStatus,
 } from '@/screens/gateway/components/task-board'
+import type {MissionCheckpoint} from '@/screens/gateway/lib/mission-checkpoint';
 import {
+  
   archiveMissionToHistory,
-  loadMissionHistory,
-  type MissionCheckpoint,
+  loadMissionHistory
 } from '@/screens/gateway/lib/mission-checkpoint'
 
 export type MissionProcessType = 'sequential' | 'hierarchical' | 'parallel'
@@ -43,19 +44,19 @@ export type ActiveMission = {
     enabled: boolean
   }>
   state: MissionLifecycleState
-  team: TeamMember[]
-  tasks: HubTask[]
+  team: Array<TeamMember>
+  tasks: Array<HubTask>
   agentSessionMap: Record<string, string>
   agentSessionModelMap: Record<string, string>
   agentSessionStatus: Record<string, AgentSessionStatusEntry>
   processType: MissionProcessType
   budgetLimit: string
   startedAt: number
-  artifacts: MissionArtifact[]
+  artifacts: Array<MissionArtifact>
 }
 
 export type MissionHistory = {
-  reports: MissionCheckpoint[]
+  reports: Array<MissionCheckpoint>
 }
 
 type Updater<T> = T | ((previous: T) => T)
@@ -71,7 +72,7 @@ type StartMissionInput = Omit<
   agentSessionMap?: Record<string, string>
   agentSessionModelMap?: Record<string, string>
   agentSessionStatus?: Record<string, AgentSessionStatusEntry>
-  artifacts?: MissionArtifact[]
+  artifacts?: Array<MissionArtifact>
 }
 
 type MissionStore = {
@@ -81,13 +82,13 @@ type MissionStore = {
   activeMissionName: string
   activeMissionGoal: string
   missionState: 'running' | 'paused' | 'stopped'
-  missionTasks: HubTask[]
-  boardTasks: HubTask[]
-  dispatchedTaskIdsByAgent: Record<string, string[]>
+  missionTasks: Array<HubTask>
+  boardTasks: Array<HubTask>
+  dispatchedTaskIdsByAgent: Record<string, Array<string>>
   agentSessionMap: Record<string, string>
   agentSessionModelMap: Record<string, string>
   agentSessionStatus: Record<string, AgentSessionStatusEntry>
-  artifacts: MissionArtifact[]
+  artifacts: Array<MissionArtifact>
   restoreCheckpoint: MissionCheckpoint | null
   missionHistory: MissionHistory
   beforeUnloadRegistered: boolean
@@ -101,22 +102,22 @@ type MissionStore = {
     entry: AgentSessionStatusEntry | null,
     options?: { sessionKey?: string | null; model?: string | null },
   ) => void
-  addArtifact: (artifact: MissionArtifact | MissionArtifact[]) => void
+  addArtifact: (artifact: MissionArtifact | Array<MissionArtifact>) => void
   setMissionState: (state: Updater<MissionStore['missionState']>) => void
   restoreMission: (checkpoint: MissionCheckpoint) => void
   setMissionGoal: (goal: string) => void
   setRestoreCheckpoint: (checkpoint: MissionCheckpoint | null) => void
-  setBoardTasks: (tasks: Updater<HubTask[]>) => void
+  setBoardTasks: (tasks: Updater<Array<HubTask>>) => void
   setDispatchedTaskIdsByAgent: (
-    value: Updater<Record<string, string[]>>,
+    value: Updater<Record<string, Array<string>>>,
   ) => void
-  setMissionTasks: (tasks: Updater<HubTask[]>) => void
+  setMissionTasks: (tasks: Updater<Array<HubTask>>) => void
   setAgentSessionMap: (value: Updater<Record<string, string>>) => void
   setAgentSessionModelMap: (value: Updater<Record<string, string>>) => void
   setAgentSessionStatus: (
     value: Updater<Record<string, AgentSessionStatusEntry>>,
   ) => void
-  setArtifacts: (value: Updater<MissionArtifact[]>) => void
+  setArtifacts: (value: Updater<Array<MissionArtifact>>) => void
   setActiveMissionMeta: (value: { name?: string; goal?: string }) => void
   saveCheckpoint: () => void
   markBeforeUnloadRegistered: (registered: boolean) => void
@@ -128,7 +129,7 @@ function applyUpdater<T>(previous: T, next: Updater<T>): T {
   return typeof next === 'function' ? (next as (value: T) => T)(previous) : next
 }
 
-function clampHistory(reports: MissionCheckpoint[]): MissionCheckpoint[] {
+function clampHistory(reports: Array<MissionCheckpoint>): Array<MissionCheckpoint> {
   return reports.slice(0, MAX_HISTORY)
 }
 
@@ -484,7 +485,7 @@ export const useMissionStore = create<MissionStore>()(
       },
 
       restoreMission: (checkpoint) => {
-        const restoredTasks: HubTask[] = checkpoint.tasks.map((task) => ({
+        const restoredTasks: Array<HubTask> = checkpoint.tasks.map((task) => ({
           id: task.id,
           title: task.title,
           description: '',

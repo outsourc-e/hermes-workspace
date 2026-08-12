@@ -41,7 +41,7 @@ const STATE_MAP: Record<
 
 function normalizeLabel(value: string): Label | null {
   const upper = value.trim().toUpperCase().replace(/[ -]/g, '_')
-  return (LABELS as readonly string[]).includes(upper) ? (upper as Label) : null
+  return (LABELS as ReadonlyArray<string>).includes(upper) ? (upper as Label) : null
 }
 
 function clean(value: string | undefined): string | null {

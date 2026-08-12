@@ -60,7 +60,7 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
-    to: '/chat/main',
+    to: '/chat/new',
     match: (p) => p.startsWith('/chat') || p === '/new',
   },
   {

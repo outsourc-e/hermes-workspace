@@ -8,7 +8,7 @@ afterEach(() => {
 
 async function loadKanbanBackend(options?: {
   existsSync?: (path: string) => boolean
-  execFileSync?: (command: string, args?: string[]) => string
+  execFileSync?: (command: string, args?: Array<string>) => string
 }) {
   vi.doMock('./swarm-kanban-store', () => ({
     SWARM_KANBAN_FILE: '/tmp/swarm2-kanban.json',
@@ -66,7 +66,7 @@ async function loadKanbanBackend(options?: {
 
   vi.doMock('node:child_process', () => ({
     execFileSync: vi.fn(
-      (command: string, args?: string[]) =>
+      (command: string, args?: Array<string>) =>
         options?.execFileSync?.(command, args) ?? '',
     ),
   }))
@@ -78,7 +78,7 @@ describe('kanban-backend', () => {
   it('auto-detect prefers Hermes backend when Hermes CLI and canonical storage are present', async () => {
     vi.stubEnv('HERMES_HOME', '/Users/aurora/.claude/profiles/swarm2')
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
-    const sqliteCalls: Array<{ command: string; args?: string[] }> = []
+    const sqliteCalls: Array<{ command: string; args?: Array<string> }> = []
     const mod = await loadKanbanBackend({
       existsSync: (target) =>
         target === '/Users/aurora/.claude/kanban.db' ||
@@ -217,7 +217,7 @@ describe('kanban-backend', () => {
   it('creates and updates Hermes tasks through canonical kanban.db path', async () => {
     vi.stubEnv('HERMES_HOME', '/Users/aurora/.claude/profiles/swarm2')
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
-    const sqliteCalls: string[] = []
+    const sqliteCalls: Array<string> = []
     let readCount = 0
     const mod = await loadKanbanBackend({
       existsSync: (target) =>
@@ -348,7 +348,7 @@ describe('kanban-backend', () => {
     vi.stubEnv('HERMES_HOME', '/Users/aurora/.claude/profiles/swarm2')
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     vi.stubEnv('CLAUDE_KANBAN_BACKEND', 'claude')
-    const sqliteCalls: string[] = []
+    const sqliteCalls: Array<string> = []
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {

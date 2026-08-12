@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { itemById, PLAYGROUND_QUESTS } from '../lib/playground-rpg'
+import { PLAYGROUND_QUESTS, itemById } from '../lib/playground-rpg'
 import type { PlaygroundRpgState } from '../hooks/use-playground-rpg'
 
 export function PlaygroundJournal({

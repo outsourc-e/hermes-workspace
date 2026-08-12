@@ -3,8 +3,8 @@
 import { useMemo } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Activity01Icon } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
 import type { CrewMember } from '@/hooks/use-crew-status'
+import { cn } from '@/lib/utils'
 
 type RuntimeEntry = {
   workerId: string

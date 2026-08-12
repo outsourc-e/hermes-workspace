@@ -8,9 +8,10 @@ import {
   SentIcon,
 } from '@hugeicons/core-free-icons'
 import { useQueryClient } from '@tanstack/react-query'
+import type {SwarmChatMessage} from '@/hooks/use-swarm-chat';
 import { ChatComposer } from '@/screens/chat/components/chat-composer'
 import { cn } from '@/lib/utils'
-import { useSwarmChat, type SwarmChatMessage } from '@/hooks/use-swarm-chat'
+import {  useSwarmChat } from '@/hooks/use-swarm-chat'
 
 type Swarm2LiveChatProps = {
   workerId: string
@@ -47,7 +48,7 @@ function parseTodoSummary(content: string): {
 } | null {
   try {
     const parsed = JSON.parse(content) as {
-      todos?: unknown[]
+      todos?: Array<unknown>
       summary?: {
         total?: number
         pending?: number

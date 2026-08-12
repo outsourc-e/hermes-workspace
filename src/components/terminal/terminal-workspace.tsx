@@ -147,7 +147,7 @@ export function TerminalWorkspace({
 
   const activeTab = useMemo(
     function activeTabMemo() {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+       
       return tabs.find((tab) => tab.id === activeTabId) ?? tabs[0] ?? null
     },
     [activeTabId, tabs],
@@ -215,7 +215,7 @@ export function TerminalWorkspace({
 
   const handleAnalyzeDebug = useCallback(
     async function handleAnalyzeDebug() {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+       
       if (!activeTab) return
 
       setShowDebugPanel(true)
@@ -256,7 +256,7 @@ export function TerminalWorkspace({
 
   const handleRunDebugCommand = useCallback(
     function handleRunDebugCommand(command: string) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+       
       if (!activeTab) return
       void sendInput(activeTab.id, `${command}\r`)
     },
@@ -269,7 +269,7 @@ export function TerminalWorkspace({
 
   const focusActiveTerminal = useCallback(
     function focusActiveTerminal() {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+       
       if (!activeTab) return
       const terminal = terminalMapRef.current.get(activeTab.id)
       terminal?.focus()
@@ -728,7 +728,7 @@ export function TerminalWorkspace({
       <div className="flex h-8 items-center border-b border-primary-300 bg-primary-100 px-1">
         <div className="flex min-w-0 flex-1 items-center overflow-x-auto">
           {tabs.map(function renderTab(tab) {
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+             
             const isActive = tab.id === activeTab?.id
             return (
               <button
@@ -875,7 +875,7 @@ export function TerminalWorkspace({
         style={{ backgroundColor: TERMINAL_BG }}
       >
         {tabs.map(function renderTerminal(tab) {
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+           
           const isActive = tab.id === activeTab?.id
           return (
             <div

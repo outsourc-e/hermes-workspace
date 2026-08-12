@@ -72,7 +72,7 @@ async function sendDirectChat(
         'Direct chat did not reach worker',
     )
   }
-  return data as DirectChatResponse
+  return data
 }
 
 export type UseSwarmChatOptions = {

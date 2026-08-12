@@ -4,7 +4,9 @@ import { PlaygroundScreen } from './playground-screen'
 
 // Flag the standalone bundle as a public play surface BEFORE the screen mounts.
 // `playground-screen.tsx` reads this to force-disable any admin/owner UI.
-;(
+;
+
+(
   window as unknown as { __HERMES_PUBLIC_PLAY__?: boolean }
 ).__HERMES_PUBLIC_PLAY__ = true
 

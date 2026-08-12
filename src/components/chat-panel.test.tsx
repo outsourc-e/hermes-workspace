@@ -7,9 +7,9 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ChatPanel } from './chat-panel'
-import { resetWorkspaceChatIndexedDb } from '@/screens/chat/card-transcript-indexeddb'
 import type { SessionCard } from '@/screens/chat/types'
 import type { SessionCardListWire } from '@/screens/chat/chat-queries'
+import { resetWorkspaceChatIndexedDb } from '@/screens/chat/card-transcript-indexeddb'
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),

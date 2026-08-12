@@ -1,14 +1,15 @@
 import {
   Component,
+  
   Suspense,
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type ReactNode,
+  useState
 } from 'react'
 import { useGLTF } from '@react-three/drei'
-import * as THREE from 'three'
+import type {ReactNode} from 'react';
+import type * as THREE from 'three'
 
 class GlbErrorBoundary extends Component<
   { children: ReactNode; onError?: () => void },

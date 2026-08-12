@@ -20,8 +20,8 @@ import {
 } from './card-transcript-recovery'
 import { CHAT_SUBMIT_SELECTION_EVENT } from './chat-events'
 import {
-  resetWorkspaceChatIndexedDb,
   WORKSPACE_CHAT_STORE_NAMES,
+  resetWorkspaceChatIndexedDb,
 } from './card-transcript-indexeddb'
 import { chatQueryKeys, sessionCardQueryKeys } from './chat-queries'
 import { ChatScreen } from './chat-screen'

@@ -14,7 +14,7 @@ type MapPanelProps = {
   playerPosition?: { x: number; y: number }
 }
 
-const ZONES: MapZone[] = [
+const ZONES: Array<MapZone> = [
   {
     id: 'agora',
     name: 'Agora Commons',

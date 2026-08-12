@@ -1,15 +1,15 @@
 import {
   Component,
-  lazy,
+  
   Suspense,
+  lazy,
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type ReactNode,
+  useState
 } from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
-import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
+import {  PlaygroundChat } from './components/playground-chat'
 import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
 import { PlaygroundHud } from './components/playground-hud'
 import { PlaygroundMinimap } from './components/playground-minimap'
@@ -34,10 +34,13 @@ import {
 import { botsFor } from './lib/playground-bots'
 import {
   PLAYGROUND_WORLDS,
-  itemById,
-  type PlaygroundItemId,
-  type PlaygroundWorldId,
+  
+  
+  itemById
 } from './lib/playground-rpg'
+import type {ChatMessage} from './components/playground-chat';
+import type {ReactNode} from 'react';
+import type {PlaygroundItemId, PlaygroundWorldId} from './lib/playground-rpg';
 import type { RemotePlayer } from './hooks/use-playground-multiplayer'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 

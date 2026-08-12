@@ -14,7 +14,7 @@ import type { PlaygroundWorldId } from './playground-rpg'
 const STORAGE_KEY = 'hermes.playground.narration.played'
 const MUTE_KEY = 'hermes.playground.narration.muted'
 
-const NARRATION: Record<PlaygroundWorldId, { name: string; lines: string[] }> =
+const NARRATION: Record<PlaygroundWorldId, { name: string; lines: Array<string> }> =
   {
     training: {
       name: 'Training Grounds',
@@ -159,7 +159,7 @@ export function cancelNarration() {
 }
 
 export function speakLines(
-  lines: string[],
+  lines: Array<string>,
   opts: { rate?: number; pitch?: number; volume?: number } = {},
 ) {
   if (!state.enabled || state.muted) return
@@ -205,7 +205,7 @@ export function narrateWorldNow(world: PlaygroundWorldId) {
   speakLines(data.lines)
 }
 
-export function narrationLinesFor(world: PlaygroundWorldId): string[] {
+export function narrationLinesFor(world: PlaygroundWorldId): Array<string> {
   return NARRATION[world]?.lines ?? []
 }
 

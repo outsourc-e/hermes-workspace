@@ -1,10 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { killAgentSession, toggleAgentPause } from '@/lib/gateway-api'
-import {
-  useMissionStore,
-  type ActiveMission,
-  type MissionProcessType,
-} from '@/stores/mission-store'
 import { emitFeedEvent } from '../components/feed-event-bus'
 import { resolveGatewayModelId } from '../components/hub-utils'
 import type { HubTask, TaskStatus } from '../components/task-board'
@@ -12,11 +6,18 @@ import type {
   AgentSessionStatusEntry,
   TeamMember,
 } from '../components/team-panel'
+import type {ActiveMission, MissionProcessType} from '@/stores/mission-store';
+import {
+  
+  
+  useMissionStore
+} from '@/stores/mission-store'
+import { killAgentSession, toggleAgentPause } from '@/lib/gateway-api'
 
 type SessionRecord = Record<string, unknown>
 
 type RetryPayload = {
-  tasks: HubTask[]
+  tasks: Array<HubTask>
   messageText: string
 }
 
@@ -144,12 +145,12 @@ function getAgentContext(member: TeamMember): string {
 
 function buildDispatchMessage(params: {
   agentId: string
-  agentTasks: HubTask[]
+  agentTasks: Array<HubTask>
   member?: TeamMember
   missionGoal: string
   mode: MissionProcessType
   leadMember?: TeamMember
-  workerMembers?: TeamMember[]
+  workerMembers?: Array<TeamMember>
 }): string {
   const {
     agentId,
@@ -245,7 +246,7 @@ export function useMissionOrchestrator() {
 
   const updateTasksForAgent = useCallback(
     (agentId: string, status: TaskStatus) => {
-      let changedTasks: HubTask[] = []
+      const changedTasks: Array<HubTask> = []
 
       setMissionTasks((previous) =>
         previous.map((task) => {
@@ -541,7 +542,7 @@ export function useMissionOrchestrator() {
     async (params: {
       sessionKey: string
       agentId: string
-      agentTasks: HubTask[]
+      agentTasks: Array<HubTask>
       messageText: string
       member?: TeamMember
     }) => {
@@ -610,7 +611,7 @@ export function useMissionOrchestrator() {
   )
 
   const ensureAgentSessions = useCallback(
-    async (team: TeamMember[]) => {
+    async (team: Array<TeamMember>) => {
       const currentMap = { ...sessionMapRef.current }
       for (const member of team) {
         if (currentMap[member.id]) {
@@ -678,7 +679,7 @@ export function useMissionOrchestrator() {
         const sessionMap = await ensureAgentSessions(mission.team)
         if (dispatchTokenRef.current !== mission.id) return
 
-        const tasksByAgent = new Map<string, HubTask[]>()
+        const tasksByAgent = new Map<string, Array<HubTask>>()
         mission.tasks.forEach((task) => {
           if (!task.agentId) return
           const existing = tasksByAgent.get(task.agentId) ?? []
@@ -1097,7 +1098,7 @@ export function useMissionOrchestrator() {
         if (!response.ok || cancelled) return
 
         const payload = (await response.json().catch(() => ({}))) as {
-          sessions?: SessionRecord[]
+          sessions?: Array<SessionRecord>
         }
         const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
         const nextStatus: Record<string, AgentSessionStatusEntry> = {}

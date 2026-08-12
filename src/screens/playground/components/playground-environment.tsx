@@ -560,14 +560,14 @@ export function FlowerPatch({
 }: {
   position: [number, number, number]
   count?: number
-  palette?: string[]
+  palette?: Array<string>
   seed?: number
 }) {
   const items = useMemo(() => {
     const r = rng(
       seed * 17 + Math.floor(position[0] * 13) + Math.floor(position[2] * 7),
     )
-    const out: { pos: [number, number, number]; color: string }[] = []
+    const out: Array<{ pos: [number, number, number]; color: string }> = []
     for (let i = 0; i < count; i++) {
       const dx = (r() - 0.5) * 1.2
       const dz = (r() - 0.5) * 1.2
@@ -1055,7 +1055,7 @@ type SceneryInstance = {
   color?: string
   scale?: number
 }
-function InstancedRocks({ items }: { items: SceneryInstance[] }) {
+function InstancedRocks({ items }: { items: Array<SceneryInstance> }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const matrices = useMemo(() => {
     const dummy = new THREE.Object3D()
@@ -1085,7 +1085,7 @@ function InstancedRocks({ items }: { items: SceneryInstance[] }) {
     </instancedMesh>
   )
 }
-function InstancedGrassTufts({ items }: { items: SceneryInstance[] }) {
+function InstancedGrassTufts({ items }: { items: Array<SceneryInstance> }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const matrices = useMemo(() => {
     const dummy = new THREE.Object3D()
@@ -1126,13 +1126,13 @@ export function ScatteredScenery({
 }) {
   const items = useMemo(() => {
     const r = rng(seed * 100 + worldId.length)
-    const out: {
+    const out: Array<{
       type: string
       pos: [number, number, number]
       color?: string
       scale?: number
       glow?: string
-    }[] = []
+    }> = []
 
     function maybeOnEdge(): [number, number, number] {
       // Place on ring 14-22 from center
@@ -1180,7 +1180,7 @@ export function ScatteredScenery({
       out.push({ type: 'fountain', pos: [0, 0, 0], color: '#7dd3fc' })
 
       // Dirt paths radiating to NPC zones / portal / arch
-      const pathTargets: [number, number][] = [
+      const pathTargets: Array<[number, number]> = [
         [12, -6],
         [-12, -6],
         [12, 6],
@@ -1243,13 +1243,13 @@ export function ScatteredScenery({
       } as any)
 
       // Market street: stalls + merchants behind them
-      const stallSetup: {
+      const stallSetup: Array<{
         stall: [number, number, number]
         merchant: [number, number, number]
         mColor: string
         mRot: number
         awning: string
-      }[] = [
+      }> = [
         {
           stall: [-3, 0, 11],
           merchant: [-3, 0, 11.7],

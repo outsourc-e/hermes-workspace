@@ -4,11 +4,6 @@ import {
   mutatePendingSendAtomically,
   readPendingSend as readIndexedDbPendingSend,
 } from './card-transcript-indexeddb'
-import type {
-  PortableValue,
-  V4CardRecoveryRecord,
-  V4PendingSendRecord,
-} from './card-transcript-indexeddb'
 import {
   CARD_TRANSCRIPT_RECOVERY_MAX_MESSAGES,
   isCardTranscriptRecoveryMessagePortable,
@@ -16,6 +11,11 @@ import {
   readCardTranscriptRecovery,
   sanitizeCardOwnedMessage,
 } from './card-transcript-recovery'
+import type {
+  PortableValue,
+  V4CardRecoveryRecord,
+  V4PendingSendRecord,
+} from './card-transcript-indexeddb'
 import type {
   CardTranscriptRecoveryEnvelope,
   CardTranscriptRecoveryOwner,
@@ -245,7 +245,7 @@ function parsePendingRecord(
       ? { provisionalOwnerId: String(raw.provisionalOwnerId) }
       : {}),
     message: String(raw.message),
-    attachments: raw.attachments as Array<ChatAttachment>,
+    attachments: raw.attachments,
     optimisticMessage,
     recoveryMessages,
   }

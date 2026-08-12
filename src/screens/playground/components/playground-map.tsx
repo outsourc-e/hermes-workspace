@@ -1,13 +1,14 @@
 import {
-  PLAYGROUND_WORLDS,
-  type PlaygroundWorldId,
+  PLAYGROUND_WORLDS
+  
 } from '../lib/playground-rpg'
+import type {PlaygroundWorldId} from '../lib/playground-rpg';
 
 type Props = {
   open: boolean
   onClose: () => void
   currentWorld: PlaygroundWorldId
-  unlocked: PlaygroundWorldId[]
+  unlocked: Array<PlaygroundWorldId>
   onTravel: (id: PlaygroundWorldId) => void
 }
 

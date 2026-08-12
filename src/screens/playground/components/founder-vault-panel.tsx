@@ -7,11 +7,11 @@ type FounderReward = {
 
 type FounderVaultPanelProps = {
   eligible?: boolean
-  claimedRewardIds?: string[]
+  claimedRewardIds?: Array<string>
   onClaim?: () => void
 }
 
-const REWARDS: FounderReward[] = [
+const REWARDS: Array<FounderReward> = [
   {
     id: 'founder-cape',
     name: 'Founder Cape',

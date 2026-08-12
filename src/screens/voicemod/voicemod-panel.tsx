@@ -13,9 +13,10 @@
  * mitigation) — surfaced and labelled, not faked.
  */
 import { useEffect, useState } from 'react'
+import {  useVoiceMod } from './use-voicemod'
+import type {VoiceEngine} from './use-voicemod';
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useVoiceMod, type VoiceEngine } from './use-voicemod'
 
 interface VoiceModPanelProps {
   /** crew profile slug, e.g. "claudia" | "bash" | "zoe" | "steward" | "reviewer" */
@@ -43,7 +44,7 @@ export function VoiceModPanel({ profile, className }: VoiceModPanelProps) {
   // Seed local form from server state when it (re)loads.
   useEffect(() => {
     if (!state) return
-    const e = (state.overlay?.engine ?? 'cosy') as VoiceEngine
+    const e = (state.overlay?.engine ?? 'cosy')
     setEngine(e)
     setVoice(state.overlay?.voice ?? '')
     setFlair(state.overlay?.flair ?? state.flair ?? '')

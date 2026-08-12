@@ -147,7 +147,7 @@ export function useSessionTitles() {
 
 export function useSessionTitleInfo(friendlyId: string): SessionTitleInfo {
   const map = useSessionTitles()
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+   
   return friendlyId && map[friendlyId]
     ? map[friendlyId]
     : { status: 'idle', error: null }

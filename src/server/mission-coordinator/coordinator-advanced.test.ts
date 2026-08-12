@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { closeCoordinationDatabase, saveMission } from './coordination-db'
-import { claimReadyNodes, completeNode, createMission, getMissionSnapshot, retryMissionNode, getMissionMetrics } from './coordinator'
+import { claimReadyNodes, completeNode, createMission, getMissionMetrics, getMissionSnapshot, retryMissionNode } from './coordinator'
 
 const originalStateDir = process.env.HERMES_WORKSPACE_STATE_DIR
 let testStateDir: string

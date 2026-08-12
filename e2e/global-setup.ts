@@ -1,6 +1,6 @@
-import type { FullConfig } from '@playwright/test'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { FullConfig } from '@playwright/test'
 
 /**
  * Authenticate with the workspace before running e2e tests.

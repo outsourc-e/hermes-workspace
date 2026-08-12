@@ -19,13 +19,9 @@ import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-<<<<<<< HEAD
 import { AgentIdentityAvatar } from '@/components/avatars'
-||||||| parent of 0ea7b8c9 (carry: graft VoiceMod panel under SOUL in profiles-screen)
-=======
 // carry: fleet VoiceMod — per-agent voice identity, rendered under the SOUL/Description.
 import { VoiceModPanel } from '@/screens/voicemod'
->>>>>>> 0ea7b8c9 (carry: graft VoiceMod panel under SOUL in profiles-screen)
 
 type ProfileSummary = {
   name: string

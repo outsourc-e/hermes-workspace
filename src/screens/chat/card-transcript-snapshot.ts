@@ -95,5 +95,5 @@ export async function readCardTranscriptSnapshot(
   if (!validCardId(cardId)) return null
   const stored = await readLatestCardSnapshot<CardTranscriptSnapshotPayload>(cardId)
   if (!stored || stored.cardId !== cardId || !record(stored.payload)) return null
-  return snapshotEnvelope(cardId, stored.payload as CardTranscriptSnapshotPayload)
+  return snapshotEnvelope(cardId, stored.payload)
 }

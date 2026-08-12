@@ -11,7 +11,7 @@ type InventoryItem = {
 }
 
 type InventoryPanelProps = {
-  items?: InventoryItem[]
+  items?: Array<InventoryItem>
   onEquip?: (item: InventoryItem) => void
 }
 
@@ -51,7 +51,7 @@ const RARITY_STYLES: Record<
   },
 }
 
-const DEFAULT_ITEMS: InventoryItem[] = [
+const DEFAULT_ITEMS: Array<InventoryItem> = [
   {
     id: 'training-blade',
     name: 'Training Blade',
@@ -101,7 +101,7 @@ const DEFAULT_ITEMS: InventoryItem[] = [
   },
 ]
 
-function inventorySlots(items: InventoryItem[]): Array<InventoryItem | null> {
+function inventorySlots(items: Array<InventoryItem>): Array<InventoryItem | null> {
   return Array.from({ length: 24 }, (_, index) => items[index] ?? null)
 }
 

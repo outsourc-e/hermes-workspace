@@ -70,9 +70,9 @@ export type QuestObjective = {
 
 export type QuestReward = {
   xp: number
-  items?: PlaygroundItemId[]
+  items?: Array<PlaygroundItemId>
   skillXp?: Partial<Record<PlaygroundSkillId, number>>
-  unlockWorlds?: PlaygroundWorldId[]
+  unlockWorlds?: Array<PlaygroundWorldId>
   title?: string
 }
 
@@ -85,7 +85,7 @@ export type PlaygroundQuest = {
   lesson?: string
   /** Why the player should care, shown in the journal as practical payoff. */
   payoff?: string
-  objectives: QuestObjective[]
+  objectives: Array<QuestObjective>
   reward: QuestReward
   optional?: boolean
 }
@@ -121,7 +121,7 @@ export type PlaygroundItem = {
 export type EquippedItems = Record<EquipmentSlot, PlaygroundItemId | null>
 
 export type QuestProgressEntry = {
-  completedObjectives: string[]
+  completedObjectives: Array<string>
   completed: boolean
 }
 
@@ -129,15 +129,15 @@ export type PlayerProfile = {
   displayName: string
   avatarConfig: AvatarConfig
   equipped: EquippedItems
-  inventory: PlaygroundItemId[]
+  inventory: Array<PlaygroundItemId>
   questProgress: Record<string, QuestProgressEntry>
   level: number
   xp: number
-  titlesUnlocked: string[]
+  titlesUnlocked: Array<string>
   lastZone: PlaygroundWorldId
 }
 
-export const PLAYGROUND_WORLDS: PlaygroundWorld[] = [
+export const PLAYGROUND_WORLDS: Array<PlaygroundWorld> = [
   {
     id: 'training',
     name: 'Training Grounds',
@@ -191,7 +191,7 @@ export const PLAYGROUND_WORLDS: PlaygroundWorld[] = [
   },
 ]
 
-export const PLAYGROUND_SKILLS: PlaygroundSkill[] = [
+export const PLAYGROUND_SKILLS: Array<PlaygroundSkill> = [
   {
     id: 'promptcraft',
     name: 'Promptcraft',
@@ -235,7 +235,7 @@ export const PLAYGROUND_SKILLS: PlaygroundSkill[] = [
   },
 ]
 
-export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
+export const PLAYGROUND_ITEMS: Array<PlaygroundItem> = [
   {
     id: 'hermes-sigil',
     name: 'Hermes Sigil',
@@ -376,7 +376,7 @@ export const PLAYGROUND_ITEMS: PlaygroundItem[] = [
   },
 ]
 
-export const PLAYGROUND_QUESTS: PlaygroundQuest[] = [
+export const PLAYGROUND_QUESTS: Array<PlaygroundQuest> = [
   {
     id: 'training-q1',
     chapter: 'Training Grounds Tutorial',

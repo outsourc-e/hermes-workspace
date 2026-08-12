@@ -12,19 +12,20 @@ import {
   RefreshIcon,
   ViewIcon,
 } from '@hugeicons/core-free-icons'
+import { useQuery } from '@tanstack/react-query'
+import type {CrewMember} from '@/hooks/use-crew-status';
 import { cn } from '@/lib/utils'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import {
+  
   getOnlineStatus,
-  useCrewStatus,
-  type CrewMember,
+  useCrewStatus
 } from '@/hooks/use-crew-status'
 import { TopologyBand } from '@/components/swarm/topology-band'
 import { AgentCard } from '@/components/swarm/agent-card'
 import { WidgetRail } from '@/components/swarm/widget-rail'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
-import { useQuery } from '@tanstack/react-query'
 
 const SWARM_ROOM_STORAGE_KEY = 'claude-swarm-room-v1'
 const WORKER_ID_PATTERN = /^(swarm\d+|[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/i
@@ -33,11 +34,11 @@ const isWorkerId = (id: string) => WORKER_ID_PATTERN.test(id)
 type WorkerHealth = { workerId: string; recentAuthErrors: number }
 type HealthData = {
   workspaceModel: string | null
-  workers: WorkerHealth[]
+  workers: Array<WorkerHealth>
   summary: {
     totalWorkers: number
     totalAuthErrors24h: number
-    distinctProviders: string[]
+    distinctProviders: Array<string>
   }
 }
 type RuntimeEntry = {
@@ -61,7 +62,7 @@ async function fetchHealth(): Promise<HealthData> {
   return res.json()
 }
 
-async function fetchRuntime(): Promise<{ entries: RuntimeEntry[] }> {
+async function fetchRuntime(): Promise<{ entries: Array<RuntimeEntry> }> {
   const res = await fetch('/api/swarm-runtime')
   if (!res.ok) throw new Error(String(res.status))
   return res.json()
@@ -84,7 +85,7 @@ function useUpdatedAgo(fetchedAt: number | null): string {
   return label
 }
 
-function shellCommandForRuntime(runtime: RuntimeEntry | undefined): string[] {
+function shellCommandForRuntime(runtime: RuntimeEntry | undefined): Array<string> {
   if (runtime?.tmuxAttachable && runtime.tmuxSession) {
     return ['tmux', 'attach', '-t', runtime.tmuxSession]
   }
@@ -106,7 +107,7 @@ export function SwarmScreen() {
   const { crew, lastUpdated, isLoading, isFetching, refetch } = useCrewStatus()
   const updatedAgo = useUpdatedAgo(lastUpdated)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [roomIds, setRoomIds] = useState<string[]>(() => {
+  const [roomIds, setRoomIds] = useState<Array<string>>(() => {
     if (typeof window === 'undefined') return []
     try {
       const raw = window.localStorage.getItem(SWARM_ROOM_STORAGE_KEY)

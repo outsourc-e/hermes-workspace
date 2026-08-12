@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  
   PLAYGROUND_QUESTS,
   PLAYGROUND_SKILLS,
   PLAYGROUND_WORLDS,
-  itemById,
-  type EquipmentSlot,
-  type PlaygroundItemId,
-  type PlaygroundQuest,
-  type PlaygroundSkillId,
-  type PlaygroundWorldId,
-  type PlayerProfile,
-  type QuestProgressEntry,
+  
+  
+  
+  
+  
+  
+  itemById
 } from '../lib/playground-rpg'
 import {
   AVATAR_PRESETS,
-  saveAvatarConfig,
-  type AvatarConfig,
+  
+  saveAvatarConfig
 } from '../lib/avatar-config'
+import type {EquipmentSlot, PlayerProfile, PlaygroundItemId, PlaygroundQuest, PlaygroundSkillId, PlaygroundWorldId, QuestProgressEntry} from '../lib/playground-rpg';
+import type {AvatarConfig} from '../lib/avatar-config';
 
 export type PlaygroundRpg = ReturnType<typeof usePlaygroundRpg>
 
@@ -39,8 +41,8 @@ export type RewardToast = {
 export type PlaygroundRpgState = {
   playerProfile: PlayerProfile
   skillXp: Record<PlaygroundSkillId, number>
-  unlockedWorlds: PlaygroundWorldId[]
-  completedQuests: string[]
+  unlockedWorlds: Array<PlaygroundWorldId>
+  completedQuests: Array<string>
   hp: number
   hpMax: number
   mp: number
@@ -61,7 +63,7 @@ const EMPTY_EQUIPPED = {
   artifact: null,
 } satisfies PlayerProfile['equipped']
 
-const STARTER_INVENTORY: PlaygroundItemId[] = [
+const STARTER_INVENTORY: Array<PlaygroundItemId> = [
   'hermes-sigil',
   'training-blade',
   'novice-cloak',
@@ -144,7 +146,7 @@ function normalizeState(
     : []
   const legacy = raw as Partial<
     PlaygroundRpgState & {
-      inventory: PlaygroundItemId[]
+      inventory: Array<PlaygroundItemId>
       level: number
       xp: number
     }
@@ -279,7 +281,7 @@ function completeQuestState(prev: PlaygroundRpgState, quest: PlaygroundQuest) {
 
 export function usePlaygroundRpg() {
   const [state, setState] = useState<PlaygroundRpgState>(() => loadState())
-  const [toasts, setToasts] = useState<RewardToast[]>([])
+  const [toasts, setToasts] = useState<Array<RewardToast>>([])
 
   useEffect(() => {
     try {
@@ -435,7 +437,7 @@ export function usePlaygroundRpg() {
   )
 
   const grantItems = useCallback(
-    (items: PlaygroundItemId[]) => {
+    (items: Array<PlaygroundItemId>) => {
       if (!items?.length) return
       setState((prev) => ({
         ...prev,
