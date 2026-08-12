@@ -932,7 +932,7 @@ function ControlPlaneStage({
                           {cmd.kind === 'tmux' ? 'tmux' : cmd.kind === 'log-tail' ? 'logs' : 'shell'}
                         </span>
                       </div>
-                      <SwarmTerminal workerId={member.id} command={cmd.command} cwd={runtime?.cwd ?? undefined} height={420} active={viewMode === 'runtime'} />
+                      <SwarmTerminal workerId={member.id} command={cmd.command} cwd={runtime?.cwd ?? undefined} height={360} active={viewMode === 'runtime'} />
                     </div>
                   )
                 })

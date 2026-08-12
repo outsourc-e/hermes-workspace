@@ -238,8 +238,19 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         } catch {
           /* noop */
         }
+        // Keep the latest output in view when the terminal is resized.
+        try {
+          terminal.scrollToBottom()
+        } catch {
+          /* noop */
+        }
       }
       window.addEventListener('resize', handleResize)
+      // The runtime grid switches between 1 and 2 columns, which resizes the
+      // container without a window resize event. Observe the container so the
+      // terminal refits and stays scrolled to the newest output.
+      const resizeObserver = new ResizeObserver(() => handleResize())
+      resizeObserver.observe(containerRef.current)
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -268,7 +279,15 @@ export const SwarmTerminal = memo(function SwarmTerminal({
                 if (sessionId) sessionIdRef.current = sessionId
               } else if (event === 'data') {
                 const data = typeof parsed.data === 'string' ? parsed.data : ''
-                if (data) terminal.write(data)
+                if (data) {
+                  terminal.write(data)
+                  // Keep the newest output visible as data streams in.
+                  try {
+                    terminal.scrollToBottom()
+                  } catch {
+                    /* noop */
+                  }
+                }
               } else if (event === 'exit' || event === 'close') {
                 terminal.writeln('\r\n\x1b[33m[swarm] session ended\x1b[0m')
                 sessionIdRef.current = null
@@ -292,6 +311,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         dataDisposable.dispose()
         resizeDisposable.dispose()
         window.removeEventListener('resize', handleResize)
+        resizeObserver.disconnect()
         if (!cancelled) setState('closed')
       }
     }
@@ -435,7 +455,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
             ? 'border-[var(--theme-accent)] ring-1 ring-[var(--theme-accent-soft)]'
             : 'border-[var(--theme-border)]',
         )}
-        style={{ height }}
+        style={{ minHeight: height }}
       />
       {error ? (
         <div className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>
