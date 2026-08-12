@@ -5,6 +5,10 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  parseSessionCardOperationBinding,
+  resolveExactSessionCardOperationBinding,
+} from '../../server/session-card-operation-binding'
 
 /**
  * POST /api/swarm-tmux-scroll
@@ -20,6 +24,7 @@ type ScrollRequest = {
   session?: unknown
   direction?: unknown
   lines?: unknown
+  cardBinding?: unknown
 }
 
 const TMUX_BIN_CANDIDATES = [
@@ -53,7 +58,7 @@ function execFileAsync(
       if (error) {
         resolve({
           ok: false,
-          error: stderr?.toString().trim() || error.message,
+          error: stderr.toString().trim() || error.message,
         })
         return
       }
@@ -101,12 +106,38 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
           )
         }
 
+        const cardBinding = parseSessionCardOperationBinding(body.cardBinding, {
+          source: 'local',
+          transport: 'tmux',
+          canonicalSegmentKey: `local:${workerId}`,
+        })
+        if (!cardBinding) {
+          return json(
+            { error: 'Invalid Session Card scroll binding' },
+            { status: 400 },
+          )
+        }
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card scroll binding is unavailable' },
+            { status: 409 },
+          )
+        }
+
         const tmuxBin = resolveTmuxBin()
         if (!tmuxBin) {
           return json({ error: 'tmux not installed' }, { status: 503 })
         }
 
         const session = requestedSession || `swarm-${workerId}`
+
+        // Revalidate Card authority before each tmux mutation
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card scroll binding rolled over' },
+            { status: 409 },
+          )
+        }
 
         const enterCopy = await execFileAsync(tmuxBin, [
           'copy-mode',
@@ -115,6 +146,14 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
         ])
         if (!enterCopy.ok) {
           return json({ error: enterCopy.error }, { status: 500 })
+        }
+
+        // Revalidate Card authority before send-keys mutation
+        if (!(await resolveExactSessionCardOperationBinding(cardBinding))) {
+          return json(
+            { error: 'Session Card scroll binding rolled over' },
+            { status: 409 },
+          )
         }
 
         const cmd = direction === 'up' ? 'scroll-up' : 'scroll-down'

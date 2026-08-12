@@ -13,8 +13,18 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
+import { fetchExactSwarmWorkerCardBindings } from '@/lib/swarm-card-bindings'
 
 type Mode = 'auto' | 'manual' | 'broadcast'
+type OrchestrationMode = 'auto' | 'workflow'
+
+const WORKFLOW_OPTIONS = [
+  { value: 'rdi', label: 'RDI', description: 'Research → design → implement → review' },
+  { value: 'radw', label: 'RADW', description: 'Research → architect → developer or writer' },
+  { value: 'research_only', label: 'Research only', description: 'Adversarial research review loop' },
+  { value: 'design_implement', label: 'Design + implement', description: 'Skip research, design then build' },
+]
+const DEFAULT_WORKFLOW = 'rdi'
 
 type Assignment = {
   workerId: string
@@ -106,6 +116,8 @@ export function RouterChat({
   onResults,
 }: Props) {
   const [mode, setMode] = useState<Mode>('auto')
+  const [orchestrationMode, setOrchestrationMode] = useState<OrchestrationMode>('auto')
+  const [workflow, setWorkflow] = useState(DEFAULT_WORKFLOW)
   const [prompt, setPrompt] = useState('')
   const [decomposing, setDecomposing] = useState(false)
   const [decomposeError, setDecomposeError] = useState<string | null>(null)
@@ -221,6 +233,43 @@ export function RouterChat({
   }
 
   async function dispatch() {
+    // Workflow mode: use LangGraph orchestrator
+    if (orchestrationMode === 'workflow') {
+      try {
+        setDispatching(true)
+        setDispatchError(null)
+        setResults(null)
+        setFollowUp(null)
+
+        const res = await fetch('/api/swarm-langgraph/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            missionGoal: prompt.trim(),
+            workflowId: workflow,
+            maxIterations: 5,
+          }),
+          signal: AbortSignal.timeout(30_000),
+        })
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(text || `HTTP ${res.status}`)
+        }
+        const data = await res.json() as { ok: boolean; missionId: string; accepted: boolean; error?: string }
+        if (!data.ok) throw new Error(data.error || 'Workflow dispatch failed')
+
+        setDispatching(false)
+        onResults({ dispatchedAt: Date.now(), completedAt: Date.now(), results: [] } as DispatchResponse)
+        setPrompt('')
+        setAssignments([])
+        setUnassigned([])
+      } catch (err) {
+        setDispatching(false)
+        setDispatchError(err instanceof Error ? err.message : String(err))
+      }
+      return
+    }
+
     let plan: Array<Assignment> = []
     if (mode === 'auto') {
       if (assignments.length === 0) {
@@ -253,11 +302,16 @@ export function RouterChat({
     setResults(null)
     setFollowUp(null)
     try {
+      const workerIds = plan.map((a) => a.workerId).filter(Boolean)
+      const cardBindings = await fetchExactSwarmWorkerCardBindings(workerIds)
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          assignments: plan,
+          assignments: plan.map((assignment) => ({
+            ...assignment,
+            cardBinding: cardBindings.get(assignment.workerId),
+          })),
           timeoutSeconds: 300,
           waitForCheckpoint: false,
         }),
@@ -359,6 +413,7 @@ export function RouterChat({
           </div>
           <div className="flex items-center gap-2">
             {!embedded ? <ModeToggle mode={mode} setMode={setMode} /> : null}
+            {!embedded ? <OrchestrationModeToggle orchestrationMode={orchestrationMode} setOrchestrationMode={setOrchestrationMode} /> : null}
             {!embedded ? (
               <button
                 type="button"
@@ -380,6 +435,9 @@ export function RouterChat({
           )}
         >
           <div className="flex flex-col gap-2">
+            {orchestrationMode === 'workflow' ? (
+              <WorkflowSelector workflow={workflow} setWorkflow={setWorkflow} />
+            ) : null}
             <textarea
               rows={embedded ? 5 : 7}
               value={prompt}
@@ -419,10 +477,13 @@ export function RouterChat({
               {embedded ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <ModeToggle mode={mode} setMode={setMode} />
+                  <OrchestrationModeToggle orchestrationMode={orchestrationMode} setOrchestrationMode={setOrchestrationMode} />
                 </div>
               ) : (
                 <div className="text-[11px] text-[var(--theme-muted)]">
-                  {`${prompt.trim().length} chars · ${
+                  {orchestrationMode === 'workflow'
+                    ? `Workflow: ${WORKFLOW_OPTIONS.find((w) => w.value === workflow)?.label ?? workflow}`
+                    : `${prompt.trim().length} chars · ${
                     mode === 'auto'
                       ? 'auto-route by role'
                       : mode === 'manual'
@@ -720,6 +781,63 @@ function ModeToggle({
           )}
         >
           {m === 'manual' ? 'one agent' : m}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function OrchestrationModeToggle({
+  orchestrationMode,
+  setOrchestrationMode,
+}: {
+  orchestrationMode: OrchestrationMode
+  setOrchestrationMode: (m: OrchestrationMode) => void
+}) {
+  return (
+    <div className="flex rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+      {(['auto', 'workflow'] as Array<OrchestrationMode>).map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => setOrchestrationMode(m)}
+          className={cn(
+            'rounded-lg px-3 py-1 transition-colors',
+            orchestrationMode === m
+              ? 'bg-[var(--theme-accent)] text-primary-950'
+              : 'hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
+          )}
+        >
+          {m === 'workflow' ? 'LangGraph' : m}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function WorkflowSelector({
+  workflow,
+  setWorkflow,
+}: {
+  workflow: string
+  setWorkflow: (w: string) => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {WORKFLOW_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          title={opt.description}
+          onClick={() => setWorkflow(opt.value)}
+          className={cn(
+            'rounded-lg border px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider transition-colors',
+            workflow === opt.value
+              ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
+              : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:border-[var(--theme-muted)] hover:text-[var(--theme-text)]',
+          )}
+        >
+          {opt.label}
         </button>
       ))}
     </div>
