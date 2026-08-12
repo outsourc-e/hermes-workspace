@@ -1,12 +1,17 @@
 # Autoresearch Mode
 
+> **操作手册：** [AUTORESEARCH-GUIDE.md](./AUTORESEARCH-GUIDE.md)（流程、命令、demo、排错）  
+> 本文：契约字段、示例目标、反模式、exit report。
+
 Autoresearch is a bounded optimization harness for Hermes Agents. It is not the default research workflow.
 
 Use it only when the system can mechanically decide whether an iteration improved.
 
 ```text
-normal research     = gather evidence -> synthesize -> recommend
-autoresearch mode   = mutate one target -> verify metric -> keep/revert -> repeat
+normal research     = gather evidence -> synthesize facts (researcher:quick)
+autoresearch        = mutate one target -> verify metric -> keep/revert -> repeat
+orchestrator        = contract + greenlight + dispatch
+executor            = architect:autoresearch | developer:autoresearch
 ```
 
 ## Source pattern
@@ -36,7 +41,7 @@ Use normal researcher mode for:
 - tradeoff notes
 - recommendations where judgment matters
 
-`researcher:quick` may produce an autoresearch config, but it should not start the loop unless the contract below is filled.
+`researcher:quick` may supply facts or draft contract fields for orchestrator, but it must not start the loop.
 
 ## Autoresearch entry contract
 
@@ -56,9 +61,13 @@ time_budget: <optional wall-clock cap>
 results_log: autoresearch-results/results.tsv
 rollback: revert worse, crashing, unparsable, or guard-failing changes
 greenlight: required for destructive, public, credential, account, push, deploy, merge, or bulk edits
+executor: architect|developer
 ```
 
-Do not infer missing fields silently. If a field is unknown, run `autoresearch:plan` / planning mode first.
+- `executor: architect` — spec, skill, prompt, routing-hint, interface doc targets
+- `executor: developer` — application code, tests, build configs in repo
+
+Do not infer missing fields silently. If a field is unknown, run `orchestrator:autoresearch-dispatch` / `autoresearch-plan` first.
 
 ## Iteration discipline
 
@@ -94,12 +103,12 @@ Keep failures visible. Reverting a failed experiment is part of the evidence tra
 
 ## Role ownership
 
-- `orchestrator`: approves entering autoresearch, locks scope/eval/metric/budget, and decides whether the loop may run in durable/background mode.
-- `researcher:quick`: gathers external/internal evidence and may draft the contract.
-- `researcher:autoresearch`: runs the loop after the contract is complete.
-- `reviewer`: checks kept changes for metric hacking, overfitting, security regressions, and hidden scope expansion.
-- `qa`: replays final verification and any browser/API smoke.
-- `km-agent`: promotes durable lessons/results into RAZSOC/GBrain after review.
+- `orchestrator`: drafts/validates contract (`autoresearch-plan`), approves greenlight, dispatches executor, monitors TSV checkpoints.
+- `researcher:quick`: gathers evidence; may suggest contract fields — does **not** run the loop.
+- `architect:autoresearch`: runs loop when `executor: architect` (spec/skill/prompt targets).
+- `developer:autoresearch`: runs loop when `executor: developer` (code/test targets).
+- `architect` (design review): checks kept changes for metric hacking, scope creep, design drift after developer runs.
+- `learning`: promotes durable lessons into wiki after mission complete.
 
 ## Good targets for this stack
 
@@ -226,14 +235,16 @@ Common reward-hacking examples:
 
 Default wedge:
 
-1. Run `researcher:quick` to draft the contract.
-2. Run `reviewer` on the contract for metric-hacking risk.
-3. Run `researcher:autoresearch` for 3 iterations foreground/durable-session only.
-4. Run `reviewer` on kept diffs.
-5. Run `qa` or focused verification.
-6. Let `km-agent` capture only durable lessons.
+1. Run `researcher:quick` or `orchestrator:autoresearch-dispatch` to draft/validate the contract.
+2. Orchestrator greenlights and dispatches `architect:autoresearch` or `developer:autoresearch` for 3 iterations foreground only.
+3. Architect reviews kept diffs (if developer executed).
+4. Let `learning` capture durable lessons.
 
-Only after a clean pilot should an orchestrator approve a longer or background loop.
+Only after a clean pilot should orchestrator approve a longer or background loop.
+
+Install local wrappers: `bash scripts/sync-autoresearch-skills.sh`
+
+See [AUTORESEARCH-GUIDE.md](./AUTORESEARCH-GUIDE.md) for step-by-step usage.
 
 ## Exit report
 

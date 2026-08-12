@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Workspace Swarm 软件架构详解</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d2e;
+    --card2: #242840;
+    --border: #2d3154;
+    --text: #e4e6f0;
+    --muted: #8b8fa8;
+    --accent: #6366f1;
+    --accent-strong: #818cf8;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --violet: #a855f7;
+    --blue: #3b82f6;
+    --emerald: #10b981;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--accent-strong), var(--violet));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+    color: var(--accent-strong);
+  }
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+  }
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: var(--muted);
+  }
+  p { margin-bottom: 1rem; }
+  a { color: var(--accent-strong); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--card2);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    color: var(--emerald);
+  }
+  pre {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    margin-bottom: 1.25rem;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--text);
+    font-size: inherit;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.6rem 0.85rem;
+    text-align: left;
+  }
+  th {
+    background: var(--card2);
+    font-weight: 600;
+    color: var(--accent-strong);
+  }
+  td { background: var(--card); }
+  ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+  li { margin-bottom: 0.35rem; }
+  blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    background: var(--card);
+    border-radius: 0 8px 8px 0;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+  }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin-bottom: 0; }
+  .toc a { color: var(--text); }
+  .badge {
+    display: inline-block;
+    padding: 0.15em 0.6em;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .badge-green { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent); }
+  .badge-amber { background: color-mix(in srgb, var(--amber) 15%, transparent); color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent); }
+  .badge-red { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 30%, transparent); }
+  .badge-violet { background: color-mix(in srgb, var(--violet) 15%, transparent); color: var(--violet); border: 1px solid color-mix(in srgb, var(--violet) 30%, transparent); }
+  .badge-blue { background: color-mix(in srgb, var(--blue) 15%, transparent); color: var(--blue); border: 1px solid color-mix(in srgb, var(--blue) 30%, transparent); }
+  .highlight-box {
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .highlight-box strong { color: var(--accent-strong); }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+  .file-table td:first-child { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+  .file-table td:nth-child(2) { text-align: right; font-family: 'JetBrains Mono', monospace; color: var(--muted); }
+  @media (max-width: 640px) {
+    body { padding: 1rem; }
+    h1 { font-size: 1.6rem; }
+    pre { font-size: 0.75rem; padding: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Hermes Workspace Swarm 软件架构详解</h1>
+
+<p class="meta">
+  版本：基于 Hermes Workspace v2.3.0 &nbsp;|&nbsp; 最后更新：2026-06-08<br>
+  涵盖范围：整体架构、多 Agent 协同机制、Swarm Board 与 Hermes Kanban 关系
+</p>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">系统概览</a></li>
+  <li><a href="#s2">核心架构层</a></li>
+  <li><a href="#s3">多 Agent 协同机制</a></li>
+  <li><a href="#s4">派发流程详解</a></li>
+  <li><a href="#s5">Swarm Board 与 Hermes Kanban 的关系</a></li>
+  <li><a href="#s6">关键数据结构</a></li>
+  <li><a href="#s7">文件索引</a></li>
+</ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s1">1. 系统概览</h2>
+
+<p>Hermes Workspace Swarm 是一个<strong>持久化多 Agent 协同系统</strong>，构建在 <a href="https://github.com/NousResearch/hermes-agent">Hermes Agent</a> 之上。它将工作区转变为一个实时控制平面：多个 Hermes Agent 以持久 tmux 会话运行，由 Orchestrator 统一调度，通过结构化 checkpoint 进行通信。</p>
+
+<h3>核心设计原则</h3>
+<ul>
+  <li><strong>Profile 隔离</strong>：每个 Worker 是独立的 Hermes Agent Profile（<code>~/.hermes/profiles/&lt;worker-id&gt;/</code>）</li>
+  <li><strong>tmux 持久化</strong>：Worker 运行在 tmux 会话中，跨任务保持上下文</li>
+  <li><strong>Checkpoint 通信</strong>：Worker 通过结构化文本块报告状态，而非自由格式消息</li>
+  <li><strong>文件系统状态总线</strong>：<code>runtime.json</code> 记录每个 Worker 的运行时状态</li>
+  <li><strong>证据驱动</strong>：Checkpoint 必须包含可验证的证据（文件变更、命令输出），而非主观描述</li>
+</ul>
+
+<h3>技术栈</h3>
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│                    Hermes Workspace                       │
+│  React + TanStack Router + Vite + TypeScript (Web UI)    │
+│  Node.js 服务端 (API routes, tmux 管理, 通知路由)         │
+└──────────────────────┬───────────────────────────────────┘
+                       │ HTTP API
+┌──────────────────────▼───────────────────────────────────┐
+│                    Hermes Agent                           │
+│  Gateway (:8642) — chat, models, streaming, jobs         │
+│  Dashboard (:9119) — sessions, skills, config, MCP       │
+│  Kanban Plugin — SQLite 任务存储 + Dispatcher             │
+└──────────────────────────────────────────────────────────┘</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="s2">2. 核心架构层</h2>
+
+<h3>2.1 架构分层图</h3>
+
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                        用户交互层                                 │
+│  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌───────────────┐  │
+│  │  Chat    │  │  Swarm2   │  │  Tasks   │  │  Dashboard    │  │
+│  │  (对话)   │  │  (控制平面) │  │  (任务)   │  │  (总览)       │  │
+│  └──────────┘  └─────┬─────┘  └──────────┘  └───────────────┘  │
+├──────────────────────┼──────────────────────────────────────────┤
+│                  API 路由层 (:3000)                               │
+│  ┌──────────────────┼──────────────────────────────────────┐    │
+│  │ /api/swarm-dispatch    → 派发任务到 Worker               │    │
+│  │ /api/swarm-roster      → Worker 花名册                   │    │
+│  │ /api/swarm-runtime     → Worker 运行时状态               │    │
+│  │ /api/swarm-missions    → Mission 历史                    │    │
+│  │ /api/swarm-kanban      → 看板 CRUD                       │    │
+│  │ /api/swarm-direct-chat → 直接向 Worker 发送消息          │    │
+│  │ /api/conductor-spawn   → Conductor 任务启动              │    │
+│  │ /api/swarm-orchestrator-loop → 自动编排循环              │    │
+│  └──────────────────────────────────────────────────────────┘    │
+├──────────────────────────────────────────────────────────────────┤
+│                     服务端模块层                                  │
+│  ┌─────────────────────┐  ┌──────────────────────────────┐      │
+│  │ swarm-foundation.ts  │  │ swarm-notifications.ts       │      │
+│  │ (路径/profile管理)    │  │ (通知路由与发布)              │      │
+│  ├─────────────────────┤  ├──────────────────────────────┤      │
+│  │ swarm-roster.ts      │  │ swarm-checkpoints.ts         │      │
+│  │ (swarm.yaml 解析)    │  │ (Checkpoint 解析与契约)       │      │
+│  ├─────────────────────┤  ├──────────────────────────────┤      │
+│  │ swarm-missions.ts    │  │ swarm-mode.ts                │      │
+│  │ (Mission 持久化)      │  │ (auto/manual 控制模式)        │      │
+│  ├─────────────────────┤  ├──────────────────────────────┤      │
+│  │ kanban-backend.ts    │  │ swarm-kanban-store.ts        │      │
+│  │ (三层看板后端)         │  │ (本地 JSON 看板存储)          │      │
+│  └─────────────────────┘  └──────────────────────────────┘      │
+├──────────────────────────────────────────────────────────────────┤
+│                    基础设施层 (tmux + 文件系统)                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  tmux sessions: swarm-orchestrator, swarm-builder, ...   │   │
+│  │  runtime.json: ~/.hermes/profiles/&lt;worker&gt;/runtime.json  │   │
+│  │  swarm.yaml: /home/ramon.jing/hermes-workspace/swarm.yaml│   │
+│  │  kanban.db: ~/.hermes/kanban.db (SQLite)                 │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘</code></pre>
+
+<h3>2.2 Worker 定义 (swarm.yaml)</h3>
+
+<p><code>swarm.yaml</code> 是 Swarm 系统的配置中心，定义了所有 Worker 的身份和能力。当前配置了 10 个语义化 Worker：</p>
+
+<table>
+  <tr><th>Worker</th><th>Role</th><th>Wrapper</th><th>核心职责</th></tr>
+  <tr><td><code>orchestrator</code></td><td>编排器</td><td><code>orchestrator:plan</code></td><td>任务分解、路由、编排</td></tr>
+  <tr><td><code>builder</code></td><td>构建者</td><td><code>builder:task</code></td><td>代码实现、TDD</td></tr>
+  <tr><td><code>reviewer</code></td><td>审查者</td><td><code>reviewer:gate</code></td><td>代码审查、质量门控</td></tr>
+  <tr><td><code>qa</code></td><td>测试</td><td><code>qa:smoke</code></td><td>冒烟测试、行为验证</td></tr>
+  <tr><td><code>researcher</code></td><td>研究员</td><td><code>researcher:quick</code></td><td>文献检索、技术调研</td></tr>
+  <tr><td><code>ops-watch</code></td><td>运维</td><td><code>ops:health</code></td><td>健康监控、cron 管理</td></tr>
+  <tr><td><code>maintainer</code></td><td>维护者</td><td><code>maintainer:check</code></td><td>仓库管理、PR/Issue</td></tr>
+  <tr><td><code>strategist</code></td><td>策略师</td><td><code>strategist:review</code></td><td>战略分析、规划</td></tr>
+  <tr><td><code>inbox-triage</code></td><td>收件分拣</td><td><code>inbox:triage</code></td><td>信息分类、知识管理</td></tr>
+  <tr><td><code>km-agent</code></td><td>知识管理</td><td><code>km:health</code></td><td>Obsidian 笔记、知识图谱</td></tr>
+</table>
+
+<p>每个 Worker 对应独立的 Profile（<code>~/.hermes/profiles/&lt;worker-id&gt;/</code>）、Wrapper 启动脚本（<code>~/.local/bin/</code>）和专业技能集。</p>
+
+<h3>2.3 运行时状态 (runtime.json)</h3>
+
+<p>每个 Worker 的 <code>runtime.json</code> 是文件系统状态总线的核心，所有组件通过读写此文件同步状态：</p>
+
+<pre><code>{
+  "workerId": "builder",
+  "role": "builder",
+  "state": "running",
+  "phase": "executing",
+  "currentTask": "Implement rate limiter",
+  "checkpointStatus": null,
+  "lastSummary": "Shipped rate limiter — token bucket...",
+  "nextAction": "awaiting review",
+  "blockedReason": null
+}</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="s3">3. 多 Agent 协同机制</h2>
+
+<h3>3.1 协同架构图</h3>
+
+<pre><code>┌──────────────────────────────────────────────────────────────────────┐
+│                         用户 (Eric)                                   │
+│                            │                                         │
+│                    意图 / 审批 / 判断                                  │
+│                            ▼                                         │
+│  ┌──────────────────────────────────────────────────────┐            │
+│  │                   Aurora (主 Agent)                    │            │
+│  │         将意图翻译为 SwarmBrief / 任务分解              │            │
+│  └──────────────────────┬───────────────────────────────┘            │
+│                         │ SwarmBrief                                │
+│                         ▼                                           │
+│  ┌──────────────────────────────────────────────────────┐            │
+│  │               Orchestrator (编排器)                    │            │
+│  │   ┌─────────────────────────────────────────────┐    │            │
+│  │   │  • 接收 checkpoint 通知                       │    │            │
+│  │   │  • 决定下一步: continue / repair / review    │    │            │
+│  │   │  • 调用 POST /api/swarm-dispatch 派发        │    │            │
+│  │   │  • 自动编排循环 (swarm-orchestrator-loop)     │    │            │
+│  │   └─────────────────────────────────────────────┘    │            │
+│  └──┬──────────┬──────────┬──────────┬──────────────────┘            │
+│     │          │          │          │                               │
+│     ▼          ▼          ▼          ▼                               │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────────┐                            │
+│  │Builder│ │Review│ │  QA  │ │Researcher│  ...                       │
+│  │  tmux │ │ tmux │ │ tmux │ │   tmux   │                            │
+│  └──┬───┘ └──┬───┘ └──┬───┘ └────┬─────┘                            │
+│     │        │        │          │                                    │
+│     │  结构化 Checkpoint (runtime.json + 对话历史)                     │
+│     │        │        │          │                                    │
+│     └────────┴────────┴──────────┘                                    │
+│                    │                                                  │
+│                    ▼                                                  │
+│  ┌──────────────────────────────────────────────────────┐            │
+│  │           通知路由 (swarm-notifications.ts)            │            │
+│  │   • DONE/HANDOFF/BLOCKED → Orchestrator              │            │
+│  │   • NEEDS_INPUT → 主会话升级                          │            │
+│  │   • 去重: checkpoint 签名 + 已处理集合                 │            │
+│  └──────────────────────────────────────────────────────┘            │
+└──────────────────────────────────────────────────────────────────────┘</code></pre>
+
+<h3>3.2 通信机制：tmux 注入</h3>
+
+<p>Worker 间通信的核心是 <strong>tmux send-keys</strong>，而非 HTTP 回调或消息队列：</p>
+
+<pre><code>┌─────────────┐    tmux load-buffer     ┌──────────────────┐
+│  dispatch   │ ──────────────────────▶ │  Worker tmux      │
+│  server     │    + paste-buffer       │  session          │
+│             │    + 双重 Enter          │                   │
+└─────────────┘                         │  hermes agent     │
+       │                                │  (profile:builder) │
+       │  轮询 runtime.json             │                   │
+       │  和对话历史                     └──────────────────┘
+       │                                        │
+       │  读取 checkpoint                       │ 写入 checkpoint
+       ▼                                        ▼
+┌─────────────────────────────────────────────────────┐
+│              runtime.json (文件系统)                  │
+│  STATE: DONE | BLOCKED | NEEDS_INPUT | HANDOFF      │
+│  FILES_CHANGED: [...]                                │
+│  COMMANDS_RUN: [...]                                 │
+│  RESULT: ...                                         │
+└─────────────────────────────────────────────────────┘</code></pre>
+
+<p><strong>两种派发模式</strong>：</p>
+<ol>
+  <li><strong>tmux 持久会话</strong>（优先）：长任务，保持上下文，通过 <code>sendPromptToLiveSession()</code> 注入 prompt</li>
+  <li><strong>oneshot 回退</strong>：<code>hermes chat -q</code> 一次性执行，用于短任务或 tmux 不可用时</li>
+</ol>
+
+<h3>3.3 Checkpoint 契约</h3>
+
+<p>Worker 完成任务后返回结构化 checkpoint：</p>
+
+<pre><code>STATE: DONE | BLOCKED | NEEDS_INPUT | HANDOFF | IN_PROGRESS | NEEDS_REVIEW
+FILES_CHANGED: exact paths or none
+COMMANDS_RUN: exact commands or none
+RESULT: concrete result/proof
+BLOCKER: blocker or none
+NEXT_ACTION: exact recommended next action</code></pre>
+
+<blockquote>好的 checkpoint 包含证据，坏的 checkpoint 包含形容词。Swarm 系统优化的是证据。</blockquote>
+
+<h3>3.4 通知路由规则</h3>
+
+<table>
+  <tr><th>Checkpoint 状态</th><th>路由目标</th><th>说明</th></tr>
+  <tr><td><span class="badge badge-green">DONE</span></td><td>Orchestrator</td><td>任务完成，等待下一步指令</td></tr>
+  <tr><td><span class="badge badge-blue">HANDOFF</span></td><td>Orchestrator</td><td>任务交接给其他 Worker</td></tr>
+  <tr><td><span class="badge badge-red">BLOCKED</span></td><td>Orchestrator</td><td>遇到阻塞，需要决策</td></tr>
+  <tr><td><span class="badge badge-amber">NEEDS_INPUT</span></td><td>主会话升级</td><td>需要人工输入</td></tr>
+  <tr><td>Orchestrator 不可达</td><td>主会话升级</td><td>兜底升级</td></tr>
+</table>
+
+<p><strong>去重机制</strong>：通过 <code>orchestratorProcessedRaw</code>（已处理的原始 checkpoint 集合）和 <code>lastNotifiedCheckpointSignature</code>（上次通知的签名）双重机制防止重复处理和通知。</p>
+
+<!-- ============================================================ -->
+<h2 id="s4">4. 派发流程详解</h2>
+
+<h3>4.1 核心函数调用链</h3>
+
+<pre><code>dispatchSwarmAssignments()                    [swarm-dispatch.ts:1018]
+  │
+  ├─ 解析 assignments (worker × task 映射)
+  ├─ 创建 Mission 记录
+  │
+  └─ Promise.all(assignments.map(runWorker))
+       │
+       └─ runWorker()                         [swarm-dispatch.ts:760]
+            │
+            ├─ 1. 构建 prompt
+            │     (任务描述 + checkpoint 契约 + 约束)
+            │
+            ├─ 2. 标记 runtime.json 状态
+            │     state: "running", phase: "dispatched"
+            │
+            ├─ 3. 尝试 tmux 注入
+            │     └─ sendPromptToLiveSession()  [swarm-dispatch.ts:588]
+            │          ├─ tmux load-buffer (将 prompt 写入 buffer)
+            │          ├─ tmux paste-buffer (粘贴到会话)
+            │          └─ tmux send-keys Enter Enter (执行)
+            │
+            ├─ 4. 失败则回退 oneshot
+            │     └─ hermes chat -q --profile &lt;worker&gt; "&lt;prompt&gt;"
+            │
+            ├─ 5. 等待 checkpoint
+            │     └─ waitForFreshCheckpoint()   [swarm-dispatch.ts:534]
+            │          轮询 runtime.json + 对话历史
+            │
+            ├─ 6. 记录结果
+            │     └─ markCheckpointResult()     [swarm-dispatch.ts:505]
+            │          更新 runtime.json + 触发通知
+            │
+            └─ 7. 返回 { workerId, checkpoint, ... }</code></pre>
+
+<h3>4.2 Orchestrator 的三种调用路径</h3>
+
+<h4>路径 A: Conductor 原生派发</h4>
+<pre><code>用户 → Conductor UI → conductor-spawn.ts
+  │
+  ├─ mode: "dashboard" → 使用 Hermes Dashboard mission API
+  │
+  └─ mode: "native-swarm" → 直接调用 dispatchSwarmAssignments()
+       │
+       └─ 并行派发 builder + reviewer + qa ...
+            │
+            └─ 完成后 → checkpoint 通知 → Orchestrator tmux</code></pre>
+
+<h4>路径 B: 自动编排循环</h4>
+<pre><code>swarm-orchestrator-loop.ts (独立 API 端点)
+  │
+  ├─ 轮询所有 Worker 的 runtime.json
+  ├─ 检测 DONE/BLOCKED 状态
+  ├─ 自动决定下一步 (continue/repair/review)
+  └─ 调用 POST /api/swarm-dispatch 续派</code></pre>
+
+<h4>路径 C: 直接 API 调用</h4>
+<pre><code>外部系统 / 脚本 → POST /api/swarm-dispatch
+  │
+  └─ { assignments: [{ workerId: "builder", task: "..." }] }
+       │
+       └─ dispatchSwarmAssignments()</code></pre>
+
+<h3>4.3 Orchestrator 的被动响应模式</h3>
+
+<div class="highlight-box">
+  <strong>关键设计决策：</strong>Orchestrator <strong>不是</strong>独立调度进程，而是一个普通 Worker Profile，运行在 tmux 会话中，通过接收其他 Worker 的 checkpoint 消息<strong>被动触发</strong>后续派发。
+</div>
+
+<ol>
+  <li>其他 Worker 完成任务 → checkpoint 写入 runtime.json</li>
+  <li><code>swarm-notifications.ts</code> 检测到新 checkpoint</li>
+  <li>通过 tmux send-keys 将 checkpoint 注入 Orchestrator 的 tmux 会话</li>
+  <li>Orchestrator Agent 读取 checkpoint，决定下一步</li>
+  <li>Orchestrator 自行调用 <code>POST /api/swarm-dispatch</code> 派发下一轮任务</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="s5">5. Swarm Board 与 Hermes Kanban 的关系</h2>
+
+<h3>5.1 两套系统对比</h3>
+
+<table>
+  <tr><th>维度</th><th>Hermes 内置 Kanban</th><th>Swarm Board（工作区看板）</th></tr>
+  <tr>
+    <td><strong>存储</strong></td>
+    <td>SQLite (<code>~/.hermes/kanban.db</code>)</td>
+    <td>JSON 文件 (<code>~/.hermes/swarm2-kanban.json</code>)</td>
+  </tr>
+  <tr>
+    <td><strong>派发机制</strong></td>
+    <td>内置 Dispatcher，自动 spawn worker 进程</td>
+    <td><code>swarm-dispatch.ts</code>，通过 tmux 注入 prompt</td>
+  </tr>
+  <tr>
+    <td><strong>任务生命周期</strong></td>
+    <td>triage → todo → ready → running → done/blocked</td>
+    <td>backlog → todo → ready → running → <span class="badge badge-violet">review</span> → blocked → done</td>
+  </tr>
+  <tr>
+    <td><strong>Worker 通信</strong></td>
+    <td>进程级，通过 <code>KANBAN_GUIDANCE</code> 注入 system prompt</td>
+    <td>tmux 会话级，通过 checkpoint 结构化文本</td>
+  </tr>
+  <tr>
+    <td><strong>依赖管理</strong></td>
+    <td>内置 parent/child 门控</td>
+    <td>无内置依赖，由 Orchestrator 手动编排</td>
+  </tr>
+  <tr>
+    <td><strong>心跳/超时</strong></td>
+    <td>内置 heartbeat、max_runtime、retry 诊断</td>
+    <td>无内置，由 <code>swarm-orchestrator-loop.ts</code> 轮询</td>
+  </tr>
+  <tr>
+    <td><strong>UI</strong></td>
+    <td><code>hermes kanban</code> CLI + Dashboard 插件</td>
+    <td>Swarm2 Web UI 中的 <code>&lt;Swarm2KanbanBoard&gt;</code> 组件</td>
+  </tr>
+</table>
+
+<h3>5.2 数据桥接：三层后端</h3>
+
+<pre><code>┌─────────────────────────────────────────────────────┐
+│                  Swarm Board UI                      │
+│            (swarm2-kanban-board.tsx)                  │
+└─────────────────────┬───────────────────────────────┘
+                      │  GET/POST/PATCH /api/swarm-kanban
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│              kanban-backend.ts                       │
+│   ┌──────────┐  ┌──────────────┐  ┌───────────────┐ │
+│   │  local   │  │    claude    │  │ hermes-proxy  │ │
+│   │ (JSON)   │  │  (SQLite直连)│  │  (HTTP代理)   │ │
+│   └──────────┘  └──────────────┘  └───────────────┘ │
+└─────────────────────────────────────────────────────┘</code></pre>
+
+<ol>
+  <li><strong><code>claude</code> 后端</strong>（优先）：直接读写 Hermes Kanban 的 <code>kanban.db</code> SQLite 文件。这是<strong>共享数据源</strong>模式。</li>
+  <li><strong><code>hermes-proxy</code> 后端</strong>：通过 HTTP 代理访问 Hermes Dashboard 的 <code>/api/plugins/kanban/*</code> 路由。用于远程工作区场景（Docker/VPS）。</li>
+  <li><strong><code>local</code> 后端</strong>（兜底）：纯 JSON 文件存储。当 Hermes Kanban 不可用时自动启用。</li>
+</ol>
+
+<h3>5.3 状态映射</h3>
+
+<table>
+  <tr><th>Hermes Kanban</th><th>→</th><th>Swarm Board</th></tr>
+  <tr><td>triage / queued</td><td>→</td><td>backlog</td></tr>
+  <tr><td>todo</td><td>→</td><td>todo</td></tr>
+  <tr><td>ready</td><td>→</td><td>ready</td></tr>
+  <tr><td>running / claimed</td><td>→</td><td>running</td></tr>
+  <tr><td><em>(无对应)</em></td><td>→</td><td><span class="badge badge-violet">review</span> ← Swarm 独有</td></tr>
+  <tr><td>blocked</td><td>→</td><td>blocked</td></tr>
+  <tr><td>done / complete</td><td>→</td><td>done</td></tr>
+</table>
+
+<p>注意 <code>review</code> 是 Swarm Board 独有的泳道，Hermes Kanban 没有原生支持。写回时 <code>review</code> 被映射为 <code>ready</code>。</p>
+
+<h3>5.4 派发机制的独立性</h3>
+
+<div class="highlight-box">
+  <strong>这是最关键的区别</strong>——两套系统的派发路径<strong>完全不同</strong>。Swarm 不使用 Hermes Kanban 的 Dispatcher。即使 Swarm Board 从同一个 <code>kanban.db</code> 读取卡片，点击 "Run" 按钮触发的也是 Swarm 自己的 <code>swarm-dispatch.ts</code> 流程（tmux 注入），而不是 Hermes Kanban 的进程 spawn。
+</div>
+
+<pre><code>Hermes Kanban 派发链:
+  kanban_create() → SQLite INSERT → Dispatcher 轮询 → spawn worker 进程
+       ↓
+  worker 通过 KANBAN_GUIDANCE 注入 system prompt
+       ↓
+  worker 调用 kanban_complete() / kanban_block()
+
+Swarm 派发链:
+  Swarm Board 卡片 → 用户手动 Router 派发 → POST /api/swarm-dispatch
+       ↓
+  dispatchSwarmAssignments() → runWorker() → tmux send-keys 注入 prompt
+       ↓
+  worker 完成后写 runtime.json checkpoint
+       ↓
+  swarm-notifications.ts 通知 Orchestrator</code></pre>
+
+<h3>5.5 Kanban 技能的角色</h3>
+
+<p><code>swarm.yaml</code> 中 Orchestrator 的 skills 列表包含 <code>kanban-orchestrator</code> 和 <code>kanban-worker</code>：</p>
+
+<ul>
+  <li><strong><code>kanban-orchestrator</code></strong>：教 Agent 如何分解任务、创建卡片、路由工作。核心规则是 "Decompose, don't execute"。</li>
+  <li><strong><code>kanban-worker</code></strong>：教 Agent worker 生命周期（orient → work → heartbeat → block/complete）。</li>
+  <li><strong><code>kanban-codex-lane</code></strong>：教 Agent 如何将 Codex CLI 作为隔离实现通道使用。</li>
+</ul>
+
+<p>这些技能教 Agent <strong>如何使用 Hermes Kanban 工具</strong>（<code>kanban_create</code>、<code>kanban_complete</code>、<code>kanban_block</code> 等），但实际派发仍然走 Swarm 的 tmux 通道。</p>
+
+<h3>5.6 整体关系图</h3>
+
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│                     Hermes Agent                          │
+│  ┌────────────────────┐    ┌───────────────────────────┐ │
+│  │   Hermes Kanban     │    │   Swarm Workspace         │ │
+│  │  ┌──────────────┐  │    │  ┌─────────────────────┐  │ │
+│  │  │ kanban.db    │◄─┼────┼──┤ Swarm Board (UI)    │  │ │
+│  │  │ (SQLite)     │  │    │  │ swarm2-kanban.json  │  │ │
+│  │  └──────┬───────┘  │    │  └─────────────────────┘  │ │
+│  │         │           │    │           │                │ │
+│  │  ┌──────▼───────┐  │    │  ┌────────▼──────────┐    │ │
+│  │  │  Dispatcher  │  │    │  │ swarm-dispatch.ts │    │ │
+│  │  │ (进程spawn)   │  │    │  │ (tmux注入)        │    │ │
+│  │  └──────────────┘  │    │  └────────┬──────────┘    │ │
+│  └────────────────────┘    │           │                │ │
+│                             │  ┌────────▼──────────┐    │ │
+│  ┌────────────────────┐    │  │  Worker tmux       │    │ │
+│  │  Kanban Skills      │    │  │  sessions          │    │ │
+│  │  - orchestrator     │    │  │  (builder,         │    │ │
+│  │  - worker           │    │  │   reviewer, qa…)   │    │ │
+│  │  - codex-lane       │    │  └───────────────────┘    │ │
+│  └────────────────────┘    └───────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
+
+数据层：共享 kanban.db（通过 kanban-backend.ts 桥接）
+派发层：完全独立（Dispatcher vs tmux）
+技能层：教 Agent 使用 kanban_* 工具，但派发仍走 Swarm 通道</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="s6">6. 关键数据结构</h2>
+
+<h3>6.1 SwarmBrief（任务契约）</h3>
+
+<pre><code>brief_id: brief-&lt;timestamp&gt;-&lt;slug&gt;
+worker: builder
+project: hermes-workspace
+goal: Implement rate limiter with token bucket algorithm
+why_now: Needed for API protection
+scope:
+  - rate_limiter.py
+  - tests/test_rate_limiter.py
+deliverables:
+  - src/rate_limiter.py
+  - tests/test_rate_limiter.py
+test_or_proof:
+  - pytest tests/test_rate_limiter.py -v
+constraints:
+  - Must use token bucket algorithm
+  - Must support user_id and IP fallback
+checkpoint_contract:
+  state: DONE
+  files_changed: [src/rate_limiter.py, tests/test_rate_limiter.py]
+  commands_run: [pytest tests/test_rate_limiter.py -v]
+  proof: 14/14 tests pass
+  next_action: Submit for review
+  blockers: none
+escalation:
+  on_blocked: route to orchestrator
+  on_done: route to reviewer
+budget:
+  wall_clock_hours: 2</code></pre>
+
+<h3>6.2 Checkpoint（Worker 返回）</h3>
+
+<pre><code>STATE: DONE
+FILES_CHANGED: src/rate_limiter.py, tests/test_rate_limiter.py
+COMMANDS_RUN: pytest tests/test_rate_limiter.py -v
+RESULT: 14/14 tests pass, token bucket with user_id primary + IP fallback
+BLOCKER: none
+NEXT_ACTION: Submit for code review by reviewer</code></pre>
+
+<h3>6.3 runtime.json（Worker 状态）</h3>
+
+<pre><code>{
+  "workerId": "builder",
+  "role": "builder",
+  "state": "running",
+  "phase": "executing",
+  "currentTask": "Implement rate limiter",
+  "cwd": "/home/ramon.jing/hermes-workspace",
+  "lastOutputTime": 1717800000000,
+  "lastCheckin": 1717800000000,
+  "lastSummary": "Shipped rate limiter — token bucket...",
+  "nextAction": "awaiting review",
+  "blockedReason": null,
+  "checkpointStatus": "DONE",
+  "taskCount": 42,
+  "cronCount": 3
+}</code></pre>
+
+<h3>6.4 SwarmKanbanCard（看板卡片）</h3>
+
+<pre><code>type SwarmKanbanCard = {
+  id: string
+  title: string
+  spec: string
+  acceptanceCriteria: string[]
+  assignedWorker: string | null
+  reviewer: string | null
+  status: 'backlog' | 'todo' | 'ready' | 'running' | 'review' | 'blocked' | 'done'
+  missionId: string | null
+  reportPath: string | null
+  createdBy: string
+  createdAt: number
+  updatedAt: number
+  parents?: string[]
+  children?: string[]
+  latestRun?: { summary?: string; outcome?: string; status?: string }
+  source?: string
+}</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="s7">7. 文件索引</h2>
+
+<h3>核心源代码</h3>
+
+<table class="file-table">
+  <tr><th>文件</th><th>行数</th><th>职责</th></tr>
+  <tr><td><code>src/routes/api/swarm-dispatch.ts</code></td><td>1138</td><td>核心派发逻辑</td></tr>
+  <tr><td><code>src/routes/api/swarm-orchestrator-loop.ts</code></td><td>~600</td><td>自动编排循环</td></tr>
+  <tr><td><code>src/routes/api/swarm-roster.ts</code></td><td>~50</td><td>Worker 花名册 API</td></tr>
+  <tr><td><code>src/routes/api/conductor-spawn.ts</code></td><td>477</td><td>Conductor 任务启动</td></tr>
+  <tr><td><code>src/routes/api/swarm-direct-chat.ts</code></td><td>293</td><td>直接向 Worker 发送消息</td></tr>
+  <tr><td><code>src/routes/api/swarm-kanban.ts</code></td><td>93</td><td>看板 CRUD API</td></tr>
+  <tr><td><code>src/server/swarm-foundation.ts</code></td><td>~600</td><td>基础设施（路径/profile 管理）</td></tr>
+  <tr><td><code>src/server/swarm-notifications.ts</code></td><td>~300</td><td>通知路由与发布</td></tr>
+  <tr><td><code>src/server/swarm-roster.ts</code></td><td>~180</td><td>swarm.yaml 解析与校验</td></tr>
+  <tr><td><code>src/server/swarm-checkpoints.ts</code></td><td>~120</td><td>Checkpoint 解析与契约</td></tr>
+  <tr><td><code>src/server/swarm-mode.ts</code></td><td>63</td><td>控制模式读写</td></tr>
+  <tr><td><code>src/server/swarm-missions.ts</code></td><td>478</td><td>Mission 持久化</td></tr>
+  <tr><td><code>src/server/kanban-backend.ts</code></td><td>629</td><td>三层看板后端</td></tr>
+  <tr><td><code>src/server/swarm-kanban-store.ts</code></td><td>161</td><td>本地 JSON 看板存储</td></tr>
+  <tr><td><code>src/server/kanban-dashboard-proxy.ts</code></td><td>203</td><td>Dashboard Kanban HTTP 代理</td></tr>
+  <tr><td><code>src/server/claude-tasks-backend.ts</code></td><td>166</td><td>Claude Tasks 兼容层</td></tr>
+  <tr><td><code>src/screens/swarm2/swarm2-screen.tsx</code></td><td>1774</td><td>Swarm2 主界面</td></tr>
+  <tr><td><code>src/screens/swarm2/swarm2-kanban-board.tsx</code></td><td>503</td><td>看板 UI 组件</td></tr>
+  <tr><td><code>src/lib/tasks-api.ts</code></td><td>263</td><td>任务 API 客户端</td></tr>
+</table>
+
+<h3>配置文件</h3>
+
+<table>
+  <tr><th>文件</th><th>职责</th></tr>
+  <tr><td><code>swarm.yaml</code></td><td>Worker 定义、角色、工具、技能配置</td></tr>
+  <tr><td><code>AGENTS.md</code></td><td>Agent 契约与操作规则</td></tr>
+  <tr><td><code>docs/swarm/ARCHITECTURE.md</code></td><td>Swarm 架构文档</td></tr>
+</table>
+
+<h3>Skills（技能文件）</h3>
+
+<table>
+  <tr><th>Skill</th><th>路径</th><th>职责</th></tr>
+  <tr><td><code>kanban-orchestrator</code></td><td><code>devops/kanban-orchestrator/</code></td><td>任务分解、卡片创建、路由编排</td></tr>
+  <tr><td><code>kanban-worker</code></td><td><code>devops/kanban-worker/</code></td><td>Worker 生命周期、handoff 格式、pitfalls</td></tr>
+  <tr><td><code>kanban-codex-lane</code></td><td><code>autonomous-ai-agents/kanban-codex-lane/</code></td><td>Codex CLI 作为隔离实现通道</td></tr>
+  <tr><td><code>hermes-agent</code></td><td>(内置)</td><td>Hermes Agent 配置与扩展指南</td></tr>
+</table>
+
+<hr>
+
+<div class="highlight-box">
+  <strong>一句话总结：</strong>Swarm 是一个基于 Profile 隔离 + tmux 持久会话 + 文件系统状态总线 + 结构化 Checkpoint 的多 Agent 协同系统。Swarm Board 是 Hermes Kanban 的可视化 + 替代派发层——共享数据存储，但用自己的 tmux + checkpoint 机制替代了 Hermes Kanban 的进程 Dispatcher。Orchestrator 不是独立调度进程，而是一个被动响应的 Agent Profile，通过接收 checkpoint 通知来决定下一步派发。
+</div>
+
+</body>
+</html>

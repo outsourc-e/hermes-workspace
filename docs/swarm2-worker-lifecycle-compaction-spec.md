@@ -48,10 +48,16 @@ BLOCKER: blocker or none
 NEXT_ACTION: exact next step after renewal
 ```
 
-Durable handoff path:
+Durable handoff path (shared, cross-worker):
 
 ```text
 /Users/aurora/.openclaw/workspace/memory/handoffs/swarm/<workerId>-latest.md
+```
+
+Worker-local session snapshot (same renewal, profile copy):
+
+```text
+~/.hermes/profiles/<workerId>/memory/session-snapshots/latest.md
 ```
 
 Optional timestamped archive can exist later, but `latest.md` is the resume source.
