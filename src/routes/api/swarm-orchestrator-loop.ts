@@ -1,17 +1,18 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProfilesDir } from '../../server/claude-paths'
-import { newestCheckpointFromMessages, readRuntimeJson, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
+import {  newestCheckpointFromMessages, readRuntimeJson } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { getSwarmProfilePath, listSwarmWorkerIds } from '../../server/swarm-foundation'
-import { appendMissionContinuation, markMissionAssignmentsReviewedByWorker, recordMissionCheckpoint } from '../../server/swarm-missions'
+import { appendMissionContinuation, getSwarmMission, markMissionAssignmentsReviewedByWorker, recordMissionCheckpoint } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { publishSwarmActionPrompt, publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { applySwarmModeToLoopFlags, readSwarmMode } from '../../server/swarm-mode'
 import { isSwarmWorkerId, readSwarmRoster } from '../../server/swarm-roster'
+import type {ParsedSwarmCheckpoint} from '../../server/swarm-checkpoints';
 
 type LoopRequest = {
   workerIds?: unknown
@@ -110,13 +111,13 @@ function recordCheckpoint(input: {
   checkpoint: ParsedSwarmCheckpoint
   current: Record<string, unknown>
   dryRun: boolean
-}): { notification: { published: boolean; sessionKey: string }; missionRecorded: boolean } {
+}): { notification: { published: boolean; sessionKey: string }; missionRecorded: boolean; reviewedAssignmentIds: Array<string> } {
   const missionId = runtimeString(input.current, 'currentMissionId')
   const assignmentId = runtimeString(input.current, 'currentAssignmentId')
   const notifySessionKey = runtimeString(input.current, 'notifySessionKey')
 
   if (input.dryRun) {
-    return { notification: { published: false, sessionKey: notifySessionKey ?? 'main' }, missionRecorded: false }
+    return { notification: { published: false, sessionKey: notifySessionKey ?? 'main' }, missionRecorded: false, reviewedAssignmentIds: [] }
   }
 
   const mission = recordMissionCheckpoint({
@@ -150,7 +151,39 @@ function recordCheckpoint(input: {
     assignmentId,
     notifySessionKey,
   })
-  return { notification, missionRecorded: Boolean(mission) }
+
+  // When a reviewer worker checkpoints DONE, close the review gate on any
+  // sibling assignment that required review. Without this, missions stay in
+  // `reviewing` forever even after the reviewer approved (deriveMissionState
+  // treats `checkpointed && reviewRequired` as reviewing regardless of the
+  // reviewer's verdict).
+  let reviewedIds: Array<string> = []
+  if (
+    missionId &&
+    input.checkpoint.stateLabel === 'DONE' &&
+    isReviewer(input.workerId, validWorkerIdsForReview(missionId))
+  ) {
+    const reviewed = markMissionAssignmentsReviewedByWorker({
+      missionId,
+      reviewerId: input.workerId,
+      excludeAssignmentId: assignmentId,
+    })
+    reviewedIds = reviewed?.reviewedAssignmentIds ?? []
+  }
+
+  return { notification, missionRecorded: Boolean(mission), reviewedAssignmentIds: reviewedIds }
+}
+
+// Resolve the worker roster for the given mission so isReviewer() can match
+// the reviewer role without re-reading the global roster.
+function validWorkerIdsForReview(missionId: string): Array<string> {
+  try {
+    const mission = getSwarmMission(missionId)
+    if (!mission) return []
+    return mission.assignments.map((a: { workerId: string }) => a.workerId)
+  } catch {
+    return []
+  }
 }
 
 function runWorkerLoop(workerId: string, staleMs: number, dryRun: boolean): WorkerLoopResult {
