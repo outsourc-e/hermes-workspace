@@ -9,7 +9,10 @@ import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../../server/gateway-capabilities'
-import { requireJsonContentType, safeErrorMessage } from '../../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import { normalizeTestResult } from '../../../server/mcp-normalize'
 import { runHermesMcpTest } from '../../../server/mcp-cli-bridge'
 import { setProbe } from '../../../server/mcp-tools-cache'
@@ -58,7 +61,9 @@ export const Route = createFileRoute('/api/mcp/test')({
                   'Local fallback only supports testing existing servers by name.',
               })
             }
-            const result = await runHermesMcpTest(name, { timeoutMs: TEST_TIMEOUT_MS })
+            const result = await runHermesMcpTest(name, {
+              timeoutMs: TEST_TIMEOUT_MS,
+            })
             setProbe(name, {
               status: result.status,
               toolCount: result.discoveredTools.length,
@@ -96,7 +101,11 @@ export const Route = createFileRoute('/api/mcp/test')({
             const parsed = parseMcpServerInput(raw)
             if (!parsed.ok) {
               return json(
-                { ok: false, error: 'Invalid MCP test payload', errors: parsed.errors },
+                {
+                  ok: false,
+                  error: 'Invalid MCP test payload',
+                  errors: parsed.errors,
+                },
                 { status: 400 },
               )
             }
@@ -110,9 +119,19 @@ export const Route = createFileRoute('/api/mcp/test')({
           })
           const payload = (await response.json().catch(() => ({}))) as unknown
           const result = normalizeTestResult(payload)
-          return json(result, { status: response.ok ? 200 : response.status || 502 })
+          return json(result, {
+            status: response.ok ? 200 : response.status || 502,
+          })
         } catch (err) {
-          return json({ ok: false, status: 'failed', discoveredTools: [], error: safeErrorMessage(err) }, { status: 500 })
+          return json(
+            {
+              ok: false,
+              status: 'failed',
+              discoveredTools: [],
+              error: safeErrorMessage(err),
+            },
+            { status: 500 },
+          )
         }
       },
     },

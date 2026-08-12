@@ -76,7 +76,11 @@ function execHermes(
       if (settled) return
       settled = true
       clearTimeout(timer)
-      resolve({ code: -1, stdout, stderr: stderr + `\n[spawn error] ${err.message}` })
+      resolve({
+        code: -1,
+        stdout,
+        stderr: stderr + `\n[spawn error] ${err.message}`,
+      })
     })
     child.on('close', (code) => {
       if (settled) return

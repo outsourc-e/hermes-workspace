@@ -23,7 +23,7 @@ Plus: `tavernkeeper`, `banker`, `trainer`, `innkeeper`, `apothecary`, `recruiter
    - `hermes.glb` — "Greek god Hermes, winged sandals, winged helmet, caduceus, traveler robe, stylized low-poly game character, T-pose, full body"
    - `eros.glb` — "Greek god Eros as an apothecary, bow on back, robe with vials, stylized low-poly game character, T-pose, full body"
 4. Refine to a "Stylized" or "Realistic" art style — pick whichever looks
-   most consistent across the set. Recommend the *same* style for all 8.
+   most consistent across the set. Recommend the _same_ style for all 8.
 5. Download → "Download Model" → GLB format, 8K texture is fine.
 6. Drop into `public/avatars-3d/<id>.glb`. Reload the page.
 

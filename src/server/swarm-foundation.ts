@@ -27,15 +27,50 @@ export const SwarmCheckpointStatusSchema = z.enum([
   'needs_input',
 ])
 
-export const SwarmTerminalKindSchema = z.enum(['tmux', 'log-tail', 'shell', 'none'])
+export const SwarmTerminalKindSchema = z.enum([
+  'tmux',
+  'log-tail',
+  'shell',
+  'none',
+])
 export const SwarmRuntimeSourceSchema = z.enum(['runtime.json', 'fallback'])
-export const SwarmTaskSourceSchema = z.enum(['runtime', 'claude-api', 'plugin', 'inferred'])
-export const SwarmArtifactKindSchema = z.enum(['file', 'diff', 'patch', 'build', 'log', 'report', 'preview'])
-export const SwarmArtifactSourceSchema = z.enum(['runtime', 'workspace', 'plugin', 'inferred'])
-export const SwarmPreviewSourceSchema = z.enum(['detected-port', 'plugin', 'runtime'])
+export const SwarmTaskSourceSchema = z.enum([
+  'runtime',
+  'claude-api',
+  'plugin',
+  'inferred',
+])
+export const SwarmArtifactKindSchema = z.enum([
+  'file',
+  'diff',
+  'patch',
+  'build',
+  'log',
+  'report',
+  'preview',
+])
+export const SwarmArtifactSourceSchema = z.enum([
+  'runtime',
+  'workspace',
+  'plugin',
+  'inferred',
+])
+export const SwarmPreviewSourceSchema = z.enum([
+  'detected-port',
+  'plugin',
+  'runtime',
+])
 export const SwarmPreviewStatusSchema = z.enum(['ready', 'unknown', 'down'])
-export const SwarmHistorySourceSchema = z.enum(['state.db', 'local-cache', 'unavailable'])
-export const SwarmSessionTransportSchema = z.enum(['tmux', 'oneshot', 'unknown'])
+export const SwarmHistorySourceSchema = z.enum([
+  'state.db',
+  'local-cache',
+  'unavailable',
+])
+export const SwarmSessionTransportSchema = z.enum([
+  'tmux',
+  'oneshot',
+  'unknown',
+])
 export const SwarmDispatchModeSchema = z.enum(['tmux', 'oneshot', 'none'])
 export const SwarmPluginScopeSchema = z.enum([
   'worker-registry:read',
@@ -147,7 +182,9 @@ export type SwarmHistorySource = z.infer<typeof SwarmHistorySourceSchema>
 export type SwarmSessionTransport = z.infer<typeof SwarmSessionTransportSchema>
 export type SwarmDispatchMode = z.infer<typeof SwarmDispatchModeSchema>
 export type SwarmTaskMetadata = z.infer<typeof RuntimeTaskMetadataSchema>
-export type SwarmArtifactMetadata = z.infer<typeof RuntimeArtifactMetadataSchema>
+export type SwarmArtifactMetadata = z.infer<
+  typeof RuntimeArtifactMetadataSchema
+>
 export type SwarmPreviewMetadata = z.infer<typeof RuntimePreviewMetadataSchema>
 export type SwarmBoundary = z.infer<typeof RuntimeBoundarySchema>
 export type SwarmRuntime = z.infer<typeof SwarmRuntimeSchema>
@@ -221,15 +258,23 @@ function readBoolean(value: unknown): boolean | null {
 }
 
 function readTransport(value: unknown): SwarmSessionTransport | null {
-  return value === 'tmux' || value === 'oneshot' || value === 'unknown' ? value : null
+  return value === 'tmux' || value === 'oneshot' || value === 'unknown'
+    ? value
+    : null
 }
 
 function readDispatchMode(value: unknown): SwarmDispatchMode | null {
-  return value === 'tmux' || value === 'oneshot' || value === 'none' ? value : null
+  return value === 'tmux' || value === 'oneshot' || value === 'none'
+    ? value
+    : null
 }
 
 function readHistorySource(value: unknown): SwarmHistorySource | null {
-  return value === 'state.db' || value === 'local-cache' || value === 'unavailable' ? value : null
+  return value === 'state.db' ||
+    value === 'local-cache' ||
+    value === 'unavailable'
+    ? value
+    : null
 }
 
 function readStringArray(value: unknown): Array<string> {
@@ -240,14 +285,23 @@ function readStringArray(value: unknown): Array<string> {
     .filter(Boolean)
 }
 
-function parseTaskMetadata(workerId: string, value: unknown): Array<SwarmTaskMetadata> {
+function parseTaskMetadata(
+  workerId: string,
+  value: unknown,
+): Array<SwarmTaskMetadata> {
   if (!Array.isArray(value)) return []
   return value
     .map((entry, index) => {
-      const row = entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {}
+      const row =
+        entry && typeof entry === 'object'
+          ? (entry as Record<string, unknown>)
+          : {}
       return RuntimeTaskMetadataSchema.safeParse({
         id: readString(row.id) ?? `${workerId}-task-${index}`,
-        title: readString(row.title) ?? readString(row.currentTask) ?? 'Untitled task',
+        title:
+          readString(row.title) ??
+          readString(row.currentTask) ??
+          'Untitled task',
         status: readString(row.status) ?? 'unknown',
         source: readString(row.source) ?? 'runtime',
         priority: readNumber(row.priority),
@@ -259,11 +313,17 @@ function parseTaskMetadata(workerId: string, value: unknown): Array<SwarmTaskMet
     .flatMap((result) => (result.success ? [result.data] : []))
 }
 
-function parseArtifactMetadata(workerId: string, value: unknown): Array<SwarmArtifactMetadata> {
+function parseArtifactMetadata(
+  workerId: string,
+  value: unknown,
+): Array<SwarmArtifactMetadata> {
   if (!Array.isArray(value)) return []
   return value
     .map((entry, index) => {
-      const row = entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {}
+      const row =
+        entry && typeof entry === 'object'
+          ? (entry as Record<string, unknown>)
+          : {}
       return RuntimeArtifactMetadataSchema.safeParse({
         id: readString(row.id) ?? `${workerId}-artifact-${index}`,
         kind: readString(row.kind) ?? 'file',
@@ -279,11 +339,17 @@ function parseArtifactMetadata(workerId: string, value: unknown): Array<SwarmArt
     .flatMap((result) => (result.success ? [result.data] : []))
 }
 
-function parsePreviewMetadata(workerId: string, value: unknown): Array<SwarmPreviewMetadata> {
+function parsePreviewMetadata(
+  workerId: string,
+  value: unknown,
+): Array<SwarmPreviewMetadata> {
   if (!Array.isArray(value)) return []
   return value
     .map((entry, index) => {
-      const row = entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {}
+      const row =
+        entry && typeof entry === 'object'
+          ? (entry as Record<string, unknown>)
+          : {}
       return RuntimePreviewMetadataSchema.safeParse({
         id: readString(row.id) ?? `${workerId}-preview-${index}`,
         label: readString(row.label) ?? readString(row.url) ?? 'preview',
@@ -322,7 +388,7 @@ export function deriveSwarmBoundary(
     workspaceRoot: normalizedWorkspace,
     cwd: normalizedCwd,
     insideWorkspace,
-    relativeCwd: insideWorkspace ? (relative || '.') : null,
+    relativeCwd: insideWorkspace ? relative || '.' : null,
     owner: insideWorkspace ? 'workspace' : 'external',
   }
 }
@@ -382,7 +448,10 @@ export function readSwarmRuntimeFile(
   }
 
   try {
-    const raw = JSON.parse(fs.readFileSync(runtimePath, 'utf8')) as Record<string, unknown>
+    const raw = JSON.parse(fs.readFileSync(runtimePath, 'utf8')) as Record<
+      string,
+      unknown
+    >
     return {
       source: 'runtime.json',
       runtime: normalizeSwarmRuntime(workerId, raw, options),
@@ -450,14 +519,18 @@ export function patchSwarmRuntimeFile(
   }
 }
 
-export function listSwarmWorkerIds(options?: { swarmOnly?: boolean }): Array<string> {
+export function listSwarmWorkerIds(options?: {
+  swarmOnly?: boolean
+}): Array<string> {
   const profilesDir = getProfilesDir()
   if (!fs.existsSync(profilesDir)) return []
   const entries = fs.readdirSync(profilesDir, { withFileTypes: true })
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .filter((name) => (options?.swarmOnly ?? false ? isSwarmWorkerId(name) : true))
+    .filter((name) =>
+      (options?.swarmOnly ?? false) ? isSwarmWorkerId(name) : true,
+    )
     .sort()
 }
 
@@ -475,7 +548,9 @@ export function getSwarmTmuxSessionName(workerId: string): string {
   return `swarm-${workerId}`
 }
 
-export function inferSwarmHistorySource(profilePath: string): SwarmHistorySource {
+export function inferSwarmHistorySource(
+  profilePath: string,
+): SwarmHistorySource {
   if (fs.existsSync(path.join(profilePath, 'state.db'))) return 'state.db'
   if (fs.existsSync(path.join(profilePath, 'sessions'))) return 'local-cache'
   return 'unavailable'
@@ -547,7 +622,9 @@ export function classifySwarmPluginBoundary(input: {
   ])
   const hasRuntime = runtimeScopes.length > 0
   const hasWorkspace = workspaceScopes.length > 0
-  const hasRuntimeWrite = runtimeScopes.some((scope) => runtimeWriteScopes.has(scope))
+  const hasRuntimeWrite = runtimeScopes.some((scope) =>
+    runtimeWriteScopes.has(scope),
+  )
 
   if (hasRuntimeWrite && hasWorkspace) return 'hybrid'
   if (hasRuntimeWrite) return 'runtime-control'
@@ -560,9 +637,16 @@ export function parseSwarmPluginManifest(input: {
   source: 'user' | 'project'
 }): SwarmPluginDescriptor {
   const manifest = YAML.parse(fs.readFileSync(input.manifestPath, 'utf8'))
-  const obj = manifest && typeof manifest === 'object' ? (manifest as Record<string, unknown>) : {}
-  const runtimeScopes = normalizeScopeList(obj.runtimeScopes ?? obj.swarmRuntimeScopes)
-  const workspaceScopes = normalizeScopeList(obj.workspaceScopes ?? obj.swarmWorkspaceScopes)
+  const obj =
+    manifest && typeof manifest === 'object'
+      ? (manifest as Record<string, unknown>)
+      : {}
+  const runtimeScopes = normalizeScopeList(
+    obj.runtimeScopes ?? obj.swarmRuntimeScopes,
+  )
+  const workspaceScopes = normalizeScopeList(
+    obj.workspaceScopes ?? obj.swarmWorkspaceScopes,
+  )
   const workerScopes = normalizeScopeList(obj.workerScopes)
 
   const validationErrors: Array<string> = []
@@ -570,7 +654,8 @@ export function parseSwarmPluginManifest(input: {
   if (!readString(obj.version)) validationErrors.push('missing version')
 
   const parsed = SwarmPluginManifestSchema.parse({
-    name: readString(obj.name) ?? path.basename(path.dirname(input.manifestPath)),
+    name:
+      readString(obj.name) ?? path.basename(path.dirname(input.manifestPath)),
     version: readString(obj.version) ?? '',
     description: readString(obj.description) ?? '',
     runtimeScopes,
@@ -597,7 +682,10 @@ export function getWorkspacePluginRoots(workspaceRoot = process.cwd()): Array<{
   root: string
   source: 'user' | 'project'
 }> {
-  const hermesHome = process.env.HERMES_HOME || process.env.CLAUDE_HOME || path.join(os.homedir(), '.hermes')
+  const hermesHome =
+    process.env.HERMES_HOME ||
+    process.env.CLAUDE_HOME ||
+    path.join(os.homedir(), '.hermes')
   return [
     { root: path.join(hermesHome, 'plugins'), source: 'user' },
     { root: path.join(workspaceRoot, '.hermes', 'plugins'), source: 'project' },

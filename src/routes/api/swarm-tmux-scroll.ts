@@ -51,7 +51,10 @@ function execFileAsync(
   return new Promise((resolve) => {
     execFile(cmd, args, { timeout: 5_000 }, (error, _stdout, stderr) => {
       if (error) {
-        resolve({ ok: false, error: stderr?.toString().trim() || error.message })
+        resolve({
+          ok: false,
+          error: stderr?.toString().trim() || error.message,
+        })
         return
       }
       resolve({ ok: true })
@@ -92,7 +95,10 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
           return json({ error: 'invalid session' }, { status: 400 })
         }
         if (!direction) {
-          return json({ error: 'direction must be up or down' }, { status: 400 })
+          return json(
+            { error: 'direction must be up or down' },
+            { status: 400 },
+          )
         }
 
         const tmuxBin = resolveTmuxBin()

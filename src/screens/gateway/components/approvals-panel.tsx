@@ -49,7 +49,10 @@ function agentBadgeClass(agentName: string): string {
 }
 
 function approvalActionText(approval: GatewayApprovalEntry): string {
-  if (typeof approval.action === 'string' && approval.action.trim().length > 0) {
+  if (
+    typeof approval.action === 'string' &&
+    approval.action.trim().length > 0
+  ) {
     return approval.action
   }
   if (typeof approval.tool === 'string' && approval.tool.trim().length > 0) {
@@ -66,7 +69,10 @@ function approvalActionText(approval: GatewayApprovalEntry): string {
 }
 
 function approvalContextText(approval: GatewayApprovalEntry): string {
-  if (typeof approval.context === 'string' && approval.context.trim().length > 0) {
+  if (
+    typeof approval.context === 'string' &&
+    approval.context.trim().length > 0
+  ) {
     return approval.context
   }
   if (approval.input !== undefined) {
@@ -101,7 +107,9 @@ export function ApprovalsPanel({
   const refreshPending = useCallback(async () => {
     const response = await fetchGatewayApprovals()
     const rows = response.pending ?? response.approvals ?? []
-    const normalized = rows.filter((entry) => (entry.status ?? 'pending') === 'pending')
+    const normalized = rows.filter(
+      (entry) => (entry.status ?? 'pending') === 'pending',
+    )
     setPending(normalized)
     onPendingCountChange?.(normalized.length)
     return normalized
@@ -110,7 +118,9 @@ export function ApprovalsPanel({
   const refreshHistory = useCallback(async () => {
     const response = await fetchGatewayApprovals()
     const rows = response.approvals ?? response.pending ?? []
-    setHistory(rows.filter((entry) => (entry.status ?? 'pending') !== 'pending'))
+    setHistory(
+      rows.filter((entry) => (entry.status ?? 'pending') !== 'pending'),
+    )
   }, [])
 
   const refreshAll = useCallback(async () => {
@@ -150,11 +160,12 @@ export function ApprovalsPanel({
       id: entry.id,
       agentName: entry.agentName ?? entry.sessionKey ?? 'Gateway',
       action: approvalActionText(entry),
-      status: entry.status === 'approved'
-        ? 'approved'
-        : entry.status === 'denied'
-          ? 'denied'
-          : 'pending',
+      status:
+        entry.status === 'approved'
+          ? 'approved'
+          : entry.status === 'denied'
+            ? 'denied'
+            : 'pending',
       timestamp: entry.requestedAt ?? Date.now(),
     }))
 
@@ -201,7 +212,9 @@ export function ApprovalsPanel({
           )}
         </div>
         {pendingCount > 0 && (
-          <span className="text-[10px] text-amber-500 dark:text-amber-400">⚠ Review required</span>
+          <span className="text-[10px] text-amber-500 dark:text-amber-400">
+            ⚠ Review required
+          </span>
         )}
       </div>
 
@@ -221,32 +234,32 @@ export function ApprovalsPanel({
           ) : null}
 
           {!loading && pending.length === 0 ? (
-          <div className="flex h-full items-center justify-center p-8">
-            <div className="text-center">
-              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
-                <span className="text-2xl">✅</span>
+            <div className="flex h-full items-center justify-center p-8">
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
+                  <span className="text-2xl">✅</span>
+                </div>
+                <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  No pending approvals
+                </p>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Agents are running autonomously
+                </p>
               </div>
-              <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                No pending approvals
-              </p>
-              <p className="mt-1 text-xs text-neutral-400">
-                Agents are running autonomously
-              </p>
             </div>
-          </div>
           ) : null}
 
           {pending.length > 0 ? (
             <div className="space-y-2 p-4">
               {pending.map((approval) => (
-              <ApprovalCard
-                key={approval.id}
-                approval={approval}
-                disabled={Boolean(resolvingIds[approval.id])}
-                onApprove={() => void handleResolve(approval.id, 'approve')}
-                onDeny={() => void handleResolve(approval.id, 'deny')}
-              />
-            ))}
+                <ApprovalCard
+                  key={approval.id}
+                  approval={approval}
+                  disabled={Boolean(resolvingIds[approval.id])}
+                  onApprove={() => void handleResolve(approval.id, 'approve')}
+                  onDeny={() => void handleResolve(approval.id, 'deny')}
+                />
+              ))}
             </div>
           ) : null}
         </div>

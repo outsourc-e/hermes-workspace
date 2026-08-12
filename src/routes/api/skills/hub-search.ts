@@ -88,9 +88,11 @@ async function searchBundledSkills(
     const content = await readFile(file, 'utf-8').catch(() => '')
     if (!content) continue
     const metadata = parseFrontmatter(content)
-    const name = normalizeText(metadata.name) || path.basename(path.dirname(file))
+    const name =
+      normalizeText(metadata.name) || path.basename(path.dirname(file))
     const description = normalizeText(metadata.description)
-    const category = path.relative(skillsRoot, path.dirname(file)).split(path.sep)[0] || ''
+    const category =
+      path.relative(skillsRoot, path.dirname(file)).split(path.sep)[0] || ''
     const tags = Array.isArray(metadata.tags)
       ? metadata.tags.map(String)
       : normalizeText(metadata.tags)
@@ -100,7 +102,10 @@ async function searchBundledSkills(
     const haystack = [name, description, category, tags.join(' '), content]
       .join('\n')
       .toLowerCase()
-    const score = terms.reduce((acc, term) => acc + (haystack.includes(term) ? 1 : 0), 0)
+    const score = terms.reduce(
+      (acc, term) => acc + (haystack.includes(term) ? 1 : 0),
+      0,
+    )
     if (score === 0) continue
 
     results.push({
@@ -165,9 +170,7 @@ export const Route = createFileRoute('/api/skills/hub-search')({
             50,
             Math.max(1, Number(url.searchParams.get('limit') || '20')),
           )
-          const source = (
-            url.searchParams.get('source') || 'all'
-          ).trim()
+          const source = (url.searchParams.get('source') || 'all').trim()
 
           if (!query) {
             return json({ results: [], source: 'idle' })

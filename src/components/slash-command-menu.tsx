@@ -45,11 +45,17 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/goal pause', description: 'Pause active goal' },
   { command: '/goal resume', description: 'Resume paused goal' },
   { command: '/goal clear', description: 'Clear active goal' },
-  { command: '/subgoal <text>', description: 'Add extra success criteria to active goal' },
+  {
+    command: '/subgoal <text>',
+    description: 'Add extra success criteria to active goal',
+  },
 
   // Model & config
   { command: '/model', description: 'Show or change the current model' },
-  { command: '/reasoning', description: 'Set reasoning level (none/minimal/low/medium/high/xhigh)' },
+  {
+    command: '/reasoning',
+    description: 'Set reasoning level (none/minimal/low/medium/high/xhigh)',
+  },
   { command: '/skin', description: 'Change the display theme' },
   { command: '/config', description: 'Show session config' },
   { command: '/profile', description: 'Show active Hermes profile info' },
@@ -57,7 +63,10 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   // Tools & skills
   { command: '/skills', description: 'Browse and manage skills' },
   { command: '/skill <name>', description: 'Load a skill into session' },
-  { command: '/plugins', description: 'List installed plugins and their status' },
+  {
+    command: '/plugins',
+    description: 'List installed plugins and their status',
+  },
   { command: '/mcp', description: 'Manage MCP servers' },
   { command: '/cron', description: 'Manage cron jobs' },
   { command: '/kanban', description: 'Kanban collaboration board' },
@@ -98,7 +107,12 @@ export function mergeSlashCommands(
 }
 
 const SlashCommandMenu = forwardRef(function SlashCommandMenu(
-  { open, query, onSelect, commands = DEFAULT_SLASH_COMMANDS }: SlashCommandMenuProps,
+  {
+    open,
+    query,
+    onSelect,
+    commands = DEFAULT_SLASH_COMMANDS,
+  }: SlashCommandMenuProps,
   ref: Ref<SlashCommandMenuHandle>,
 ) {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -190,7 +204,8 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
                   }}
                   className={cn(
                     'flex items-center gap-2 px-3 py-2 text-sm transition-colors',
-                    index === activeIndex && 'bg-neutral-100 dark:bg-neutral-800',
+                    index === activeIndex &&
+                      'bg-neutral-100 dark:bg-neutral-800',
                   )}
                 >
                   <span className="font-mono text-[var(--color-accent,#6366f1)]">

@@ -22,9 +22,9 @@ import {
   unlinkSync,
   writeSync,
 } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { homedir } from 'node:os'
 import { randomBytes } from 'node:crypto'
-import { getStateDir } from './workspace-state-dir'
 
 export interface CachedProbe {
   status: 'connected' | 'failed' | 'unknown'
@@ -59,7 +59,11 @@ function getTtlMs(): number {
 }
 
 export function cacheFilePath(): string {
-  return join(getStateDir(), 'cache', 'mcp-tools.json')
+  const hermesHome =
+    process.env.HERMES_HOME?.trim() ??
+    process.env.CLAUDE_HOME?.trim() ??
+    join(homedir(), '.hermes')
+  return resolve(join(hermesHome, 'cache', 'mcp-tools.json'))
 }
 
 // ---------------------------------------------------------------------------
@@ -109,10 +113,18 @@ function writeDisk(probes: Record<string, CachedProbe>): void {
   // but linkSync + unlinkSync mirrors the presets-store pattern used here).
   try {
     // Remove existing file if present so linkSync doesn't fail with EEXIST.
-    try { unlinkSync(path) } catch { /* not present */ }
+    try {
+      unlinkSync(path)
+    } catch {
+      /* not present */
+    }
     linkSync(tmp, path)
   } finally {
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -126,7 +138,10 @@ const cache = new Map<string, CachedProbe>(Object.entries(readDisk()))
 // Public API
 // ---------------------------------------------------------------------------
 
-export function setProbe(name: string, entry: Omit<CachedProbe, 'testedAt' | 'stale'>): void {
+export function setProbe(
+  name: string,
+  entry: Omit<CachedProbe, 'testedAt' | 'stale'>,
+): void {
   const probe: CachedProbe = { ...entry, testedAt: Date.now() }
   cache.set(name, probe)
 

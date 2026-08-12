@@ -33,7 +33,10 @@ const mockFetchGenericJson = vi.mocked(fetchGenericJson)
 const mockReadHubSources = vi.mocked(readHubSources)
 const mockGetConfig = vi.mocked(getConfig)
 
-function makeEntry(name: string, source: 'local' | 'mcp-get' = 'mcp-get'): HubMcpEntry {
+function makeEntry(
+  name: string,
+  source: 'local' | 'mcp-get' = 'mcp-get',
+): HubMcpEntry {
   return {
     id: `${source}:${name}`,
     name,
@@ -42,15 +45,36 @@ function makeEntry(name: string, source: 'local' | 'mcp-get' = 'mcp-get'): HubMc
     homepage: null,
     tags: [],
     trust: 'community',
-    template: { name, transportType: 'stdio', command: 'npx', args: ['-y', name] },
+    template: {
+      name,
+      transportType: 'stdio',
+      command: 'npx',
+      args: ['-y', name],
+    },
     installed: false,
   }
 }
 
 const BUILTIN_SOURCES_RESULT = {
   sources: [
-    { id: 'mcp-get', name: 'Smithery', url: 'https://registry.smithery.ai/servers', trust: 'community', format: 'smithery', enabled: true, builtin: true },
-    { id: 'local-file', name: 'Local', url: 'file://~/.hermes/mcp-presets.json', trust: 'official', format: 'generic-json', enabled: true, builtin: true },
+    {
+      id: 'mcp-get',
+      name: 'Smithery',
+      url: 'https://registry.smithery.ai/servers',
+      trust: 'community',
+      format: 'smithery',
+      enabled: true,
+      builtin: true,
+    },
+    {
+      id: 'local-file',
+      name: 'Local',
+      url: 'file://~/.hermes/mcp-presets.json',
+      trust: 'official',
+      format: 'generic-json',
+      enabled: true,
+      builtin: true,
+    },
   ],
   source: 'seed' as const,
 }
@@ -69,25 +93,48 @@ describe('unifiedSearch with user sources', () => {
     mockReadHubSources.mockResolvedValue({
       sources: [
         ...BUILTIN_SOURCES_RESULT.sources,
-        { id: 'corp', name: 'Corp', url: 'https://corp.example.com/mcp.json', trust: 'community', format: 'generic-json', enabled: true, builtin: false },
+        {
+          id: 'corp',
+          name: 'Corp',
+          url: 'https://corp.example.com/mcp.json',
+          trust: 'community',
+          format: 'generic-json',
+          enabled: true,
+          builtin: false,
+        },
       ],
       source: 'user-file' as const,
     } as never)
     mockFetchGenericJson.mockResolvedValue({ entries: [userEntry] })
-    mockFetchMcpGet.mockResolvedValue({ entries: [makeEntry('smithery-server')] })
+    mockFetchMcpGet.mockResolvedValue({
+      entries: [makeEntry('smithery-server')],
+    })
     mockFetchLocalFile.mockResolvedValue({ entries: [] })
 
     const result = await unifiedSearch('', 'all', 100)
     expect(result.results.some((e) => e.name === 'user-server')).toBe(true)
     expect(result.results.some((e) => e.name === 'smithery-server')).toBe(true)
-    expect(mockFetchGenericJson).toHaveBeenCalledWith('corp', 'https://corp.example.com/mcp.json', 'community', expect.anything())
+    expect(mockFetchGenericJson).toHaveBeenCalledWith(
+      'corp',
+      'https://corp.example.com/mcp.json',
+      'community',
+      expect.anything(),
+    )
   })
 
   it('skips disabled user sources', async () => {
     mockReadHubSources.mockResolvedValue({
       sources: [
         ...BUILTIN_SOURCES_RESULT.sources,
-        { id: 'disabled-source', name: 'Disabled', url: 'https://disabled.example.com/mcp.json', trust: 'community', format: 'generic-json', enabled: false, builtin: false },
+        {
+          id: 'disabled-source',
+          name: 'Disabled',
+          url: 'https://disabled.example.com/mcp.json',
+          trust: 'community',
+          format: 'generic-json',
+          enabled: false,
+          builtin: false,
+        },
       ],
       source: 'user-file' as const,
     } as never)
@@ -100,7 +147,15 @@ describe('unifiedSearch with user sources', () => {
     mockReadHubSources.mockResolvedValue({
       sources: [
         ...BUILTIN_SOURCES_RESULT.sources,
-        { id: 'smithery-user', name: 'Smithery User', url: 'https://smithery.example.com', trust: 'community', format: 'smithery', enabled: true, builtin: false },
+        {
+          id: 'smithery-user',
+          name: 'Smithery User',
+          url: 'https://smithery.example.com',
+          trust: 'community',
+          format: 'smithery',
+          enabled: true,
+          builtin: false,
+        },
       ],
       source: 'user-file' as const,
     } as never)
@@ -114,7 +169,15 @@ describe('unifiedSearch with user sources', () => {
     mockReadHubSources.mockResolvedValue({
       sources: [
         ...BUILTIN_SOURCES_RESULT.sources,
-        { id: 'failing', name: 'Failing', url: 'https://failing.example.com', trust: 'community', format: 'generic-json', enabled: true, builtin: false },
+        {
+          id: 'failing',
+          name: 'Failing',
+          url: 'https://failing.example.com',
+          trust: 'community',
+          format: 'generic-json',
+          enabled: true,
+          builtin: false,
+        },
       ],
       source: 'user-file' as const,
     } as never)
@@ -129,7 +192,9 @@ describe('unifiedSearch with user sources', () => {
 
   it('continues normally when readHubSources itself throws', async () => {
     mockReadHubSources.mockRejectedValue(new Error('store read failed'))
-    mockFetchMcpGet.mockResolvedValue({ entries: [makeEntry('smithery-server')] })
+    mockFetchMcpGet.mockResolvedValue({
+      entries: [makeEntry('smithery-server')],
+    })
 
     const result = await unifiedSearch('', 'all', 100)
     // Should still get built-in results
@@ -140,7 +205,15 @@ describe('unifiedSearch with user sources', () => {
     mockReadHubSources.mockResolvedValue({
       sources: [
         ...BUILTIN_SOURCES_RESULT.sources,
-        { id: 'dup-source', name: 'Dup', url: 'https://dup.example.com', trust: 'community', format: 'generic-json', enabled: true, builtin: false },
+        {
+          id: 'dup-source',
+          name: 'Dup',
+          url: 'https://dup.example.com',
+          trust: 'community',
+          format: 'generic-json',
+          enabled: true,
+          builtin: false,
+        },
       ],
       source: 'user-file' as const,
     } as never)
@@ -150,7 +223,9 @@ describe('unifiedSearch with user sources', () => {
     mockFetchGenericJson.mockResolvedValue({ entries: [entry] }) // same id
 
     const result = await unifiedSearch('', 'all', 100)
-    const count = result.results.filter((e) => e.name === 'my-server' && e.source === 'mcp-get').length
+    const count = result.results.filter(
+      (e) => e.name === 'my-server' && e.source === 'mcp-get',
+    ).length
     expect(count).toBe(1)
   })
 })

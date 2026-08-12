@@ -1,7 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { createClaudeTask, listClaudeTasks } from '../../server/claude-tasks-backend'
-import type { TaskColumn, TaskPriority } from '../../server/claude-tasks-backend'
+import {
+  createClaudeTask,
+  listClaudeTasks,
+} from '../../server/claude-tasks-backend'
+import type {
+  TaskColumn,
+  TaskPriority,
+} from '../../server/claude-tasks-backend'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -57,13 +63,19 @@ export const Route = createFileRoute('/api/claude-tasks')({
 
           const task = await createClaudeTask({
             title: body.title,
-            description: typeof body.description === 'string' ? body.description : '',
+            description:
+              typeof body.description === 'string' ? body.description : '',
             column: isTaskColumn(body.column) ? body.column : undefined,
             priority: isTaskPriority(body.priority) ? body.priority : undefined,
             assignee: typeof body.assignee === 'string' ? body.assignee : null,
-            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+            tags: Array.isArray(body.tags)
+              ? body.tags.filter(
+                  (tag): tag is string => typeof tag === 'string',
+                )
+              : [],
             due_date: typeof body.due_date === 'string' ? body.due_date : null,
-            created_by: typeof body.created_by === 'string' ? body.created_by : 'user',
+            created_by:
+              typeof body.created_by === 'string' ? body.created_by : 'user',
           })
 
           return jsonResponse({ task }, 201)

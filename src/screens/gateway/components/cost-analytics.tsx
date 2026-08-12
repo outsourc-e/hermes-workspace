@@ -35,18 +35,33 @@ function relativeDay(dateStr: string): string {
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
   if (dateStr === today) return 'Today'
   if (dateStr === yesterday) return 'Yesterday'
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 type BarEntry = { label: string; value: number; pct: number }
 
-function CSSBarChart({ entries, unit = '', color = 'bg-accent-500' }: { entries: BarEntry[]; unit?: string; color?: string }) {
-  if (entries.length === 0) return <p className="text-xs text-neutral-400 italic">No data</p>
+function CSSBarChart({
+  entries,
+  unit = '',
+  color = 'bg-accent-500',
+}: {
+  entries: BarEntry[]
+  unit?: string
+  color?: string
+}) {
+  if (entries.length === 0)
+    return <p className="text-xs text-neutral-400 italic">No data</p>
   return (
     <div className="space-y-1.5">
       {entries.map((e) => (
         <div key={e.label} className="flex items-center gap-2">
-          <span className="w-24 shrink-0 truncate text-[11px] text-neutral-600 dark:text-neutral-400 text-right">{e.label}</span>
+          <span className="w-24 shrink-0 truncate text-[11px] text-neutral-600 dark:text-neutral-400 text-right">
+            {e.label}
+          </span>
           <div className="flex-1 h-5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
             <div
               className={cn('h-full rounded-full transition-all', color)}
@@ -54,7 +69,8 @@ function CSSBarChart({ entries, unit = '', color = 'bg-accent-500' }: { entries:
             />
           </div>
           <span className="w-20 shrink-0 text-[11px] font-mono text-neutral-500 dark:text-neutral-400 tabular-nums">
-            {unit === '$' ? `$${e.value.toFixed(4)}` : e.value.toLocaleString()}{unit !== '$' ? ` ${unit}` : ''}
+            {unit === '$' ? `$${e.value.toFixed(4)}` : e.value.toLocaleString()}
+            {unit !== '$' ? ` ${unit}` : ''}
           </span>
         </div>
       ))}
@@ -64,7 +80,10 @@ function CSSBarChart({ entries, unit = '', color = 'bg-accent-500' }: { entries:
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function CostAnalyticsDashboard({ missionReports, compact = false }: CostAnalyticsDashboardProps) {
+export function CostAnalyticsDashboard({
+  missionReports,
+  compact = false,
+}: CostAnalyticsDashboardProps) {
   const stats = useMemo(() => {
     const now = Date.now()
     const todayStr = new Date().toISOString().slice(0, 10)
@@ -91,8 +110,14 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       totalTokens += tokens
       totalCost += cost
 
-      if (day === todayStr) { todayTokens += tokens; todayCost += cost }
-      if (tsNum > weekAgo) { weekTokens += tokens; weekCost += cost }
+      if (day === todayStr) {
+        todayTokens += tokens
+        todayCost += cost
+      }
+      if (tsNum > weekAgo) {
+        weekTokens += tokens
+        weekCost += cost
+      }
 
       // By agent
       if (r.agents && r.agents.length > 0) {
@@ -121,20 +146,35 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       byDay[day].cost += cost
     }
 
-    const avgCost = missionReports.length > 0 ? totalCost / missionReports.length : 0
+    const avgCost =
+      missionReports.length > 0 ? totalCost / missionReports.length : 0
 
     // Build bar entries
-    const maxAgentCost = Math.max(...Object.values(byAgent).map((a) => a.cost), 0.0001)
+    const maxAgentCost = Math.max(
+      ...Object.values(byAgent).map((a) => a.cost),
+      0.0001,
+    )
     const agentBars: BarEntry[] = Object.entries(byAgent)
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
-      .map(([label, v]) => ({ label, value: v.cost, pct: (v.cost / maxAgentCost) * 100 }))
+      .map(([label, v]) => ({
+        label,
+        value: v.cost,
+        pct: (v.cost / maxAgentCost) * 100,
+      }))
 
-    const maxModelCost = Math.max(...Object.values(byModel).map((m) => m.cost), 0.0001)
+    const maxModelCost = Math.max(
+      ...Object.values(byModel).map((m) => m.cost),
+      0.0001,
+    )
     const modelBars: BarEntry[] = Object.entries(byModel)
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
-      .map(([label, v]) => ({ label: label.split('/').pop() ?? label, value: v.cost, pct: (v.cost / maxModelCost) * 100 }))
+      .map(([label, v]) => ({
+        label: label.split('/').pop() ?? label,
+        value: v.cost,
+        pct: (v.cost / maxModelCost) * 100,
+      }))
 
     // Last 7 days
     const days: string[] = []
@@ -148,7 +188,19 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       pct: ((byDay[d]?.cost ?? 0) / maxDayCost) * 100,
     }))
 
-    return { totalTokens, totalCost, todayTokens, todayCost, weekTokens, weekCost, avgCost, agentBars, modelBars, dayBars, missionCount: missionReports.length }
+    return {
+      totalTokens,
+      totalCost,
+      todayTokens,
+      todayCost,
+      weekTokens,
+      weekCost,
+      avgCost,
+      agentBars,
+      modelBars,
+      dayBars,
+      missionCount: missionReports.length,
+    }
   }, [missionReports])
 
   const CARD = cn(
@@ -169,28 +221,58 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
         { label: 'Tot. Tok', value: stats.totalTokens.toLocaleString() },
         { label: 'Tot. Cost', value: `$${stats.totalCost.toFixed(4)}` },
         { label: 'Avg/Mis', value: `$${stats.avgCost.toFixed(4)}` },
-        { label: 'Today', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
-        { label: '7d', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
+        {
+          label: 'Today',
+          value: `$${stats.todayCost.toFixed(4)}`,
+          detail: `${stats.todayTokens.toLocaleString()} tok`,
+        },
+        {
+          label: '7d',
+          value: `$${stats.weekCost.toFixed(4)}`,
+          detail: `${stats.weekTokens.toLocaleString()} tok`,
+        },
       ]
     : [
         { label: 'Total Missions', value: String(stats.missionCount) },
         { label: 'Total Tokens', value: stats.totalTokens.toLocaleString() },
         { label: 'Total Cost', value: `$${stats.totalCost.toFixed(4)}` },
         { label: 'Avg / Mission', value: `$${stats.avgCost.toFixed(4)}` },
-        { label: 'Today', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
-        { label: 'This Week', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
+        {
+          label: 'Today',
+          value: `$${stats.todayCost.toFixed(4)}`,
+          detail: `${stats.todayTokens.toLocaleString()} tok`,
+        },
+        {
+          label: 'This Week',
+          value: `$${stats.weekCost.toFixed(4)}`,
+          detail: `${stats.weekTokens.toLocaleString()} tok`,
+        },
       ]
-  const chartTitleClass = compact ? 'mb-2 text-xs font-semibold text-neutral-900 dark:text-white' : 'mb-3 text-sm font-semibold text-neutral-900 dark:text-white'
+  const chartTitleClass = compact
+    ? 'mb-2 text-xs font-semibold text-neutral-900 dark:text-white'
+    : 'mb-3 text-sm font-semibold text-neutral-900 dark:text-white'
 
   return (
-    <div className={cn('overflow-y-auto', compact ? 'space-y-3 p-3' : 'space-y-4 p-4')}>
+    <div
+      className={cn(
+        'overflow-y-auto',
+        compact ? 'space-y-3 p-3' : 'space-y-4 p-4',
+      )}
+    >
       {/* ── Summary Cards ──────────────────────────────────────────────── */}
-      <div className={cn('grid gap-3', compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6')}>
+      <div
+        className={cn(
+          'grid gap-3',
+          compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6',
+        )}
+      >
         {summaryCards.map((card) => (
           <div key={card.label} className={CARD}>
             <p className={STAT_LABEL}>{card.label}</p>
             <p className={STAT_VALUE}>{card.value}</p>
-            {card.detail ? <p className="text-[10px] text-neutral-400">{card.detail}</p> : null}
+            {card.detail ? (
+              <p className="text-[10px] text-neutral-400">{card.detail}</p>
+            ) : null}
           </div>
         ))}
       </div>
@@ -200,7 +282,11 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
         {/* By Agent */}
         <div className={CARD}>
           <h3 className={chartTitleClass}>Cost by Agent</h3>
-          <CSSBarChart entries={stats.agentBars} unit="$" color="bg-violet-500" />
+          <CSSBarChart
+            entries={stats.agentBars}
+            unit="$"
+            color="bg-violet-500"
+          />
         </div>
 
         {/* By Model */}
@@ -212,7 +298,11 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
         {/* Daily Timeline */}
         <div className={CARD}>
           <h3 className={chartTitleClass}>Daily Cost (7d)</h3>
-          <CSSBarChart entries={stats.dayBars} unit="$" color="bg-emerald-500" />
+          <CSSBarChart
+            entries={stats.dayBars}
+            unit="$"
+            color="bg-emerald-500"
+          />
         </div>
       </div>
 

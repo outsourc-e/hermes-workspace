@@ -6,15 +6,16 @@ Last updated: 2026-05-28
 
 Three services, three config files:
 
-| Service | Port | Config file |
-|---|---|---|
+| Service              | Port | Config file                                |
+| -------------------- | ---- | ------------------------------------------ |
 | Hermes Agent Gateway | 8642 | `C:\Users\<you>\AppData\Local\hermes\.env` |
-| Hermes CLI tools | — | `C:\Users\<you>\.hermes\.env` |
-| Workspace Dashboard | 3000 | `C:\Users\<you>\hermes-workspace\.env` |
+| Hermes CLI tools     | —    | `C:\Users\<you>\.hermes\.env`              |
+| Workspace Dashboard  | 3000 | `C:\Users\<you>\hermes-workspace\.env`     |
 
 ## Required .env contents
 
 ### `AppData\Local\hermes\.env` (gateway)
+
 ```
 OPENROUTER_API_KEY=<your-key>
 OPENROUTER_API_KEY_1=<your-key-2>
@@ -25,9 +26,11 @@ API_SERVER_KEY=<generate-a-random-hex-string>
 ```
 
 ### `~/.hermes\.env` (CLI tools)
+
 Same as above — same keys, same API_SERVER_KEY.
 
 ### `hermes-workspace\.env` (dashboard)
+
 ```
 OPENROUTER_API_KEY=<your-key>
 HERMES_API_URL=http://127.0.0.1:8642
@@ -91,24 +94,24 @@ Stop-Process -Id <PID> -Force
 
 ## Common errors
 
-| Error | Fix |
-|---|---|
-| `API_SERVER_KEY is required` | Add `API_SERVER_KEY=<value>` to `AppData\Local\hermes\.env` |
-| `spawnSync sqlite3 ENOENT` | Install sqlite3 via winget, copy exe to PATH |
-| `which: no claude in` | `npm install -g @anthropic-ai/claude-code` |
-| `Port 3000 already in use` | Kill stale process via `netstat -ano` + `Stop-Process` |
-| `Slack invalid_auth` | Expected if Slack not configured — ignore |
+| Error                                           | Fix                                                         |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `API_SERVER_KEY is required`                    | Add `API_SERVER_KEY=<value>` to `AppData\Local\hermes\.env` |
+| `spawnSync sqlite3 ENOENT`                      | Install sqlite3 via winget, copy exe to PATH                |
+| `which: no claude in`                           | `npm install -g @anthropic-ai/claude-code`                  |
+| `Port 3000 already in use`                      | Kill stale process via `netstat -ano` + `Stop-Process`      |
+| `Slack invalid_auth`                            | Expected if Slack not configured — ignore                   |
 | Dashboard shows "not available on this backend" | Gateway API server not running or HERMES_API_TOKEN mismatch |
 
 ## File locations reference
 
-| What | Path |
-|---|---|
-| Gateway env | `C:\Users\<you>\AppData\Local\hermes\.env` |
-| CLI env | `C:\Users\<you>\.hermes\.env` |
-| Workspace env | `C:\Users\<you>\hermes-workspace\.env` |
-| Kanban DB | `C:\Users\<you>\AppData\Local\hermes\kanban.db` |
-| Gateway code | `C:\Users\<you>\AppData\Local\hermes\hermes-agent\` |
-| Workspace code | `C:\Users\<you>\hermes-workspace\` |
-| Custom skills | `C:\Users\<you>\AppData\Local\hermes\skills\` |
-| Hermes config | `C:\Users\<you>\.hermes\config.yaml` |
+| What           | Path                                                |
+| -------------- | --------------------------------------------------- |
+| Gateway env    | `C:\Users\<you>\AppData\Local\hermes\.env`          |
+| CLI env        | `C:\Users\<you>\.hermes\.env`                       |
+| Workspace env  | `C:\Users\<you>\hermes-workspace\.env`              |
+| Kanban DB      | `C:\Users\<you>\AppData\Local\hermes\kanban.db`     |
+| Gateway code   | `C:\Users\<you>\AppData\Local\hermes\hermes-agent\` |
+| Workspace code | `C:\Users\<you>\hermes-workspace\`                  |
+| Custom skills  | `C:\Users\<you>\AppData\Local\hermes\skills\`       |
+| Hermes config  | `C:\Users\<you>\.hermes\config.yaml`                |

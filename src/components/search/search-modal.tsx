@@ -195,23 +195,25 @@ export function SearchModal() {
             RESULT_LIMITS.chats,
           )
 
-    const chats = chatCandidates.slice(0, RESULT_LIMITS.chats).map<SearchResultItemData>((entry) => ({
-      id: entry.id,
-      scope: 'chats',
-      icon: <HugeiconsIcon icon={Chat01Icon} size={20} strokeWidth={1.5} />,
-      title: entry.title || entry.friendlyId,
-      snippet: entry.preview || `Session: ${entry.key}`,
-      meta: entry.updatedAt
-        ? new Date(entry.updatedAt).toLocaleTimeString()
-        : '',
-      onSelect: () => {
-        closeModal()
-        navigate({
-          to: '/chat/$sessionKey',
-          params: { sessionKey: entry.key },
-        })
-      },
-    }))
+    const chats = chatCandidates
+      .slice(0, RESULT_LIMITS.chats)
+      .map<SearchResultItemData>((entry) => ({
+        id: entry.id,
+        scope: 'chats',
+        icon: <HugeiconsIcon icon={Chat01Icon} size={20} strokeWidth={1.5} />,
+        title: entry.title || entry.friendlyId,
+        snippet: entry.preview || `Session: ${entry.key}`,
+        meta: entry.updatedAt
+          ? new Date(entry.updatedAt).toLocaleTimeString()
+          : '',
+        onSelect: () => {
+          closeModal()
+          navigate({
+            to: '/chat/$sessionKey',
+            params: { sessionKey: entry.key },
+          })
+        },
+      }))
 
     // Real files data
     const fileResults = filterResults(

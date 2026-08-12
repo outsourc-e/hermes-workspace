@@ -18,7 +18,10 @@ import { lookup } from 'node:dns/promises'
  */
 function isPrivateIPv4(addr: string): boolean {
   const parts = addr.split('.').map(Number)
-  if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) {
+  if (
+    parts.length !== 4 ||
+    parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)
+  ) {
     return true // malformed — treat as unsafe
   }
   const [a, b] = parts
@@ -92,17 +95,22 @@ export async function assertNotPrivate(url: string): Promise<void> {
   }
 
   if (parsed.protocol !== 'https:') {
-    throw new Error(`SSRF guard: only HTTPS URLs are allowed (got "${parsed.protocol}")`)
+    throw new Error(
+      `SSRF guard: only HTTPS URLs are allowed (got "${parsed.protocol}")`,
+    )
   }
 
   const hostname = parsed.hostname
 
   // If hostname is already an IP literal (IPv6 brackets stripped by URL)
   // check it directly without a DNS lookup.
-  const isIpLiteral = /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/.test(hostname) || hostname.includes(':')
+  const isIpLiteral =
+    /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/.test(hostname) || hostname.includes(':')
   if (isIpLiteral) {
     if (isPrivateAddress(hostname)) {
-      throw new Error(`SSRF guard: IP address "${hostname}" is in a private/reserved range`)
+      throw new Error(
+        `SSRF guard: IP address "${hostname}" is in a private/reserved range`,
+      )
     }
     return
   }

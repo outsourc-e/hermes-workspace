@@ -12,7 +12,9 @@ type Swarm2WiresProps = {
   /** The container the wires draw inside (positioned `relative`). */
   containerRef: React.RefObject<HTMLDivElement | null>
   /** Anchor at the bottom of the orchestrator card. */
-  anchorRef: React.RefObject<HTMLDivElement | null> | { current: HTMLDivElement | null }
+  anchorRef:
+    | React.RefObject<HTMLDivElement | null>
+    | { current: HTMLDivElement | null }
   /** Each worker card root element keyed by worker id. */
   workerRefs: Map<string, HTMLElement>
   workers: Array<WireTarget>
@@ -159,7 +161,7 @@ export function Swarm2Wires({
               stroke="url(#swarm2-wire)"
               strokeWidth={isHot ? 2.2 : 1.5}
               strokeLinecap="round"
-              strokeDasharray={isHot ? undefined : "5 10"}
+              strokeDasharray={isHot ? undefined : '5 10'}
               opacity={isHot ? 0.82 : 0.64}
             />
             {isHot ? (

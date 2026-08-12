@@ -11,9 +11,10 @@ Branch: `main` (head: `72dd321e8`)
 **Three concurrent `vite dev` processes were running against the same `hermes-workspace` source tree.**
 
 Process inventory at start of session:
+
 - pid 40934 — vite dev on **:3001** (running 36+ min, cwd `/Users/aurora/hermes-workspace`)
-- pid 8826  — vite dev on **:3003** (running 12+ hours, same cwd)
-- pid 8866  — vite dev (zombie pair to 8826, same cwd)
+- pid 8826 — vite dev on **:3003** (running 12+ hours, same cwd)
+- pid 8866 — vite dev (zombie pair to 8826, same cwd)
 - pid 50028 — vite dev on **:3002** (the one we cared about, same cwd)
 - pid 71649 — vite dev on **:3005** (different cwd: `/Users/aurora/.worktrees/hermes-playground-local`) — **fine**
 - pid 11433 — vite dev on **:3006** (worktree, fine)

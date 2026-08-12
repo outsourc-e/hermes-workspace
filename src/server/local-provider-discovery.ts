@@ -109,8 +109,8 @@ async function probeProvider(
         ? payload.models
         : []
 
-    const models: DiscoveredModel[] = rawModels
-      .flatMap((entry: Record<string, unknown>) => {
+    const models: DiscoveredModel[] = rawModels.flatMap(
+      (entry: Record<string, unknown>) => {
         const id =
           typeof entry.id === 'string'
             ? entry.id
@@ -118,17 +118,20 @@ async function probeProvider(
               ? entry.name
               : ''
         if (!id) return []
-        return [{
-          id,
-          name: cleanModelName(id),
-          provider: def.id,
-          source: 'local-discovery' as const,
-          size:
-            typeof entry.size === 'number'
-              ? Math.round(entry.size / 1024 / 1024 / 1024)
-              : null,
-        }]
-      })
+        return [
+          {
+            id,
+            name: cleanModelName(id),
+            provider: def.id,
+            source: 'local-discovery' as const,
+            size:
+              typeof entry.size === 'number'
+                ? Math.round(entry.size / 1024 / 1024 / 1024)
+                : null,
+          },
+        ]
+      },
+    )
 
     return { def, online: true, models, lastProbe: Date.now() }
   } catch {
@@ -225,9 +228,7 @@ export function getDiscoveryStatus(): Array<{
 /**
  * Get the provider definition for a given ID.
  */
-export function getLocalProviderDef(
-  id: string,
-): LocalProviderDef | undefined {
+export function getLocalProviderDef(id: string): LocalProviderDef | undefined {
   return LOCAL_PROVIDERS.find((def) => def.id === id)
 }
 
@@ -244,7 +245,9 @@ void ensureDiscovery()
 // -------------------------------------------------------------------
 
 const CONFIG_PATH = path.join(
-  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes'),
+  process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes'),
   'config.yaml',
 )
 

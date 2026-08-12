@@ -118,8 +118,8 @@ export function Swarm2ActivityFeed({
           Recent swarm activity
         </div>
         <p className="mt-3 text-sm text-[var(--theme-muted)]">
-          No worker output captured yet. Once swarm TUIs emit logs they will show
-          up here, ordered by latest event.
+          No worker output captured yet. Once swarm TUIs emit logs they will
+          show up here, ordered by latest event.
         </p>
       </section>
     )

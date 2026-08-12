@@ -58,7 +58,9 @@ function fromServer(server: McpServer): McpClientInput {
 }
 
 function isMcpServer(value: unknown): value is McpServer {
-  return Boolean(value && typeof value === 'object' && 'discoveredToolsCount' in (value))
+  return Boolean(
+    value && typeof value === 'object' && 'discoveredToolsCount' in value,
+  )
 }
 
 export function McpServerDialog({ open, initial, onClose }: Props) {
@@ -118,7 +120,8 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
         <div className="flex max-h-[85vh] flex-col">
           <div className="border-b border-primary-200 px-5 py-4">
             <DialogTitle className="text-balance">
-              🔌 {draft.name || (initial ? 'Edit MCP Server' : 'Add MCP Server')}
+              🔌{' '}
+              {draft.name || (initial ? 'Edit MCP Server' : 'Add MCP Server')}
             </DialogTitle>
             <DialogDescription className="mt-1 text-pretty">
               {initial ? 'Edit MCP Server' : 'Add MCP Server'} •{' '}
@@ -239,7 +242,9 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
                     />
                     {authEnvRef ? (
                       <span className="text-[11px] text-amber-700 dark:text-amber-300">
-                        Token resolved from env var <code className="font-mono">{authEnvRef}</code> — leave blank to keep current, or type to override.
+                        Token resolved from env var{' '}
+                        <code className="font-mono">{authEnvRef}</code> — leave
+                        blank to keep current, or type to override.
                       </span>
                     ) : initialHasBearer ? (
                       <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
@@ -252,9 +257,9 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
 
                 {fallbackMode ? (
                   <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-                    ⚠ Local fallback mode — config-only CRUD. Live tool
-                    Discover and connectivity Test require the hermes-agent
-                    /api/mcp runtime endpoint.
+                    ⚠ Local fallback mode — config-only CRUD. Live tool Discover
+                    and connectivity Test require the hermes-agent /api/mcp
+                    runtime endpoint.
                   </p>
                 ) : null}
                 {discover.data ? (
@@ -289,42 +294,42 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
               </code>
             </p>
             <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              disabled={upsert.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={discover.isPending || !draft.name || fallbackMode}
-              title={discoverDisabledReason}
-              onClick={() => discover.mutate(draft)}
-            >
-              {discover.isPending ? 'Discovering…' : 'Discover'}
-            </Button>
-            <Button
-              size="sm"
-              disabled={upsert.isPending || !draft.name}
-              onClick={async () => {
-                const payload = bearerToken
-                  ? { ...draft, bearerToken }
-                  : draft
-                try {
-                  await upsert.mutateAsync(payload)
-                  onClose()
-                } finally {
-                  // Wipe ephemeral secret on success and on error so it
-                  // does not linger if the user retries the dialog.
-                  setBearerToken('')
-                }
-              }}
-            >
-              {upsert.isPending ? 'Saving…' : 'Save'}
-            </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                disabled={upsert.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={discover.isPending || !draft.name || fallbackMode}
+                title={discoverDisabledReason}
+                onClick={() => discover.mutate(draft)}
+              >
+                {discover.isPending ? 'Discovering…' : 'Discover'}
+              </Button>
+              <Button
+                size="sm"
+                disabled={upsert.isPending || !draft.name}
+                onClick={async () => {
+                  const payload = bearerToken
+                    ? { ...draft, bearerToken }
+                    : draft
+                  try {
+                    await upsert.mutateAsync(payload)
+                    onClose()
+                  } finally {
+                    // Wipe ephemeral secret on success and on error so it
+                    // does not linger if the user retries the dialog.
+                    setBearerToken('')
+                  }
+                }}
+              >
+                {upsert.isPending ? 'Saving…' : 'Save'}
+              </Button>
             </div>
           </div>
         </div>

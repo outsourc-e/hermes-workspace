@@ -34,33 +34,69 @@ const AGENT_TYPES = new Set<FeedEventType>([
   'agent_killed',
 ])
 
-const SYSTEM_TYPES = new Set<FeedEventType>([
-  'gateway_health',
-  'system',
-])
+const SYSTEM_TYPES = new Set<FeedEventType>(['gateway_health', 'system'])
 
 // Activity = all except system/health
-const ACTIVITY_TYPES = new Set<FeedEventType>([
-  ...TASK_TYPES,
-  ...AGENT_TYPES,
-])
+const ACTIVITY_TYPES = new Set<FeedEventType>([...TASK_TYPES, ...AGENT_TYPES])
 
 type EventBadge = { label: string; className: string }
 type EventSeverity = 'error' | 'spawn' | 'system' | 'default'
 
 const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
-  mission_started: { label: 'MISSION', className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
-  task_created:    { label: 'TASK',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
-  task_moved:      { label: 'MOVE',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
-  task_completed:  { label: 'DONE',    className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
-  task_assigned:   { label: 'ASSIGN',  className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
-  agent_active:    { label: 'AGENT',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
-  agent_idle:      { label: 'IDLE',    className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700' },
-  agent_paused:    { label: 'PAUSE',   className: 'bg-amber-950/70 text-amber-400 border border-amber-800/50' },
-  agent_spawned:   { label: 'SPAWN',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
-  agent_killed:    { label: 'KILL',    className: 'bg-red-950/70 text-red-400 border border-red-800/50' },
-  gateway_health:  { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
-  system:          { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
+  mission_started: {
+    label: 'MISSION',
+    className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50',
+  },
+  task_created: {
+    label: 'TASK',
+    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50',
+  },
+  task_moved: {
+    label: 'MOVE',
+    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50',
+  },
+  task_completed: {
+    label: 'DONE',
+    className:
+      'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50',
+  },
+  task_assigned: {
+    label: 'ASSIGN',
+    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50',
+  },
+  agent_active: {
+    label: 'AGENT',
+    className:
+      'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50',
+  },
+  agent_idle: {
+    label: 'IDLE',
+    className:
+      'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700',
+  },
+  agent_paused: {
+    label: 'PAUSE',
+    className: 'bg-amber-950/70 text-amber-400 border border-amber-800/50',
+  },
+  agent_spawned: {
+    label: 'SPAWN',
+    className:
+      'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50',
+  },
+  agent_killed: {
+    label: 'KILL',
+    className: 'bg-red-950/70 text-red-400 border border-red-800/50',
+  },
+  gateway_health: {
+    label: 'SYS',
+    className:
+      'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800',
+  },
+  system: {
+    label: 'SYS',
+    className:
+      'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800',
+  },
 }
 
 function readString(value: unknown): string {
@@ -128,7 +164,10 @@ function severityClass(severity: EventSeverity): string {
 
 function severityBadge(event: FeedRow, severity: EventSeverity): EventBadge {
   if (severity === 'error') {
-    return { label: 'ERROR', className: 'bg-red-950/70 text-red-300 border border-red-800/60' }
+    return {
+      label: 'ERROR',
+      className: 'bg-red-950/70 text-red-300 border border-red-800/60',
+    }
   }
   return EVENT_BADGE[event.type] ?? EVENT_BADGE.system
 }
@@ -197,7 +236,9 @@ export function LiveFeedPanel() {
       try {
         const response = await fetch('/api/sessions')
         if (!response.ok) return
-        const payload = (await response.json()) as { sessions?: Array<SessionRecord> }
+        const payload = (await response.json()) as {
+          sessions?: Array<SessionRecord>
+        }
         const sessions = Array.isArray(payload.sessions) ? payload.sessions : []
         const next = new Map<string, string>()
         sessions.forEach((session) => {
@@ -209,12 +250,20 @@ export function LiveFeedPanel() {
         if (previous) {
           next.forEach((name, id) => {
             if (!previous.has(id)) {
-              emitFeedEvent({ type: 'agent_spawned', message: `Session started: ${name}`, agentName: name })
+              emitFeedEvent({
+                type: 'agent_spawned',
+                message: `Session started: ${name}`,
+                agentName: name,
+              })
             }
           })
           previous.forEach((name, id) => {
             if (!next.has(id)) {
-              emitFeedEvent({ type: 'agent_killed', message: `Session ended: ${name}`, agentName: name || id })
+              emitFeedEvent({
+                type: 'agent_killed',
+                message: `Session ended: ${name}`,
+                agentName: name || id,
+              })
             }
           })
         }
@@ -229,7 +278,8 @@ export function LiveFeedPanel() {
   }, [])
 
   useEffect(() => {
-    const emit = () => emitFeedEvent({ type: 'gateway_health', message: 'Gateway health check' })
+    const emit = () =>
+      emitFeedEvent({ type: 'gateway_health', message: 'Gateway health check' })
     emit()
     const interval = window.setInterval(emit, 30_000)
     return () => window.clearInterval(interval)
@@ -334,9 +384,20 @@ export function LiveFeedPanel() {
 
                     {/* Message + agent name */}
                     <div className="min-w-0 flex-1">
-                      <p className={cn('truncate text-[11px] leading-tight', severityTextClass(severity))} title={message}>{message}</p>
+                      <p
+                        className={cn(
+                          'truncate text-[11px] leading-tight',
+                          severityTextClass(severity),
+                        )}
+                        title={message}
+                      >
+                        {message}
+                      </p>
                       {event.agentName ? (
-                        <p className="mt-0.5 truncate font-mono text-[9px] text-neutral-600 dark:text-neutral-500" title={event.agentName}>
+                        <p
+                          className="mt-0.5 truncate font-mono text-[9px] text-neutral-600 dark:text-neutral-500"
+                          title={event.agentName}
+                        >
                           {event.agentName}
                         </p>
                       ) : null}

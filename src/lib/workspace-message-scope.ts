@@ -18,7 +18,10 @@ function escapeAttribute(value: string): string {
 export function buildWorkspaceDirective(workspace: WorkspaceScope): string {
   const path = workspace.path?.trim() ?? ''
   if (!path || workspace.isValid === false) return ''
-  const name = workspace.folderName?.trim() || path.split('/').filter(Boolean).at(-1) || 'workspace'
+  const name =
+    workspace.folderName?.trim() ||
+    path.split('/').filter(Boolean).at(-1) ||
+    'workspace'
   return `<workspace_context active="true" name="${escapeAttribute(name)}" path="${escapeAttribute(path)}" />`
 }
 

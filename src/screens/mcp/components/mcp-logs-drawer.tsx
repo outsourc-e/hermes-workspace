@@ -17,7 +17,9 @@ const MAX_LINES = 500
 
 export function McpLogsDrawer({ server, open, onClose }: Props) {
   const [lines, setLines] = useState<Array<LogLine>>([])
-  const [status, setStatus] = useState<'idle' | 'connecting' | 'open' | 'error' | 'closed'>('idle')
+  const [status, setStatus] = useState<
+    'idle' | 'connecting' | 'open' | 'error' | 'closed'
+  >('idle')
   const [autoScroll, setAutoScroll] = useState(true)
   const idRef = useRef(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -116,7 +118,8 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
               {server.name} logs
             </h3>
             <p className="text-xs text-primary-500">
-              {status === 'open' ? 'streaming' : status} · {lines.length}/{MAX_LINES}
+              {status === 'open' ? 'streaming' : status} · {lines.length}/
+              {MAX_LINES}
             </p>
           </div>
           <div className="flex items-center gap-2">

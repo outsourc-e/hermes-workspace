@@ -28,7 +28,8 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   const candidates: string[] = []
 
-  const explicitAgentPath = env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
+  const explicitAgentPath =
+    env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
   if (explicitAgentPath) {
     candidates.push(explicitAgentPath)
   }
@@ -438,6 +439,7 @@ const config = defineConfig(({ mode, command }) => {
         '**/dist/**',
         '**/skills-bundle/**',
         '**/.{idea,git,cache,output,temp}/**',
+        'e2e/**',
       ],
       // Force vitest to run React through its own transform pipeline so ESM
       // `import` and CJS `require('react')` share a single module instance.

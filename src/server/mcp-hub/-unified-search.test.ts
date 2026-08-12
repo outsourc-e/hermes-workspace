@@ -24,7 +24,10 @@ const mockFetchLocalFile = vi.mocked(fetchLocalFile)
 const mockFetchMcpGet = vi.mocked(fetchMcpGet)
 const mockGetConfig = vi.mocked(getConfig)
 
-function makeEntry(name: string, source: 'local' | 'mcp-get' = 'mcp-get'): HubMcpEntry {
+function makeEntry(
+  name: string,
+  source: 'local' | 'mcp-get' = 'mcp-get',
+): HubMcpEntry {
   return {
     id: `${source}:${name}`,
     name,
@@ -45,8 +48,12 @@ beforeEach(() => {
 
 describe('unifiedSearch — basic', () => {
   it('returns merged results from all sources', async () => {
-    mockFetchMcpGet.mockResolvedValue({ entries: [makeEntry('github', 'mcp-get')] })
-    mockFetchLocalFile.mockResolvedValue({ entries: [makeEntry('mypreset', 'local')] })
+    mockFetchMcpGet.mockResolvedValue({
+      entries: [makeEntry('github', 'mcp-get')],
+    })
+    mockFetchLocalFile.mockResolvedValue({
+      entries: [makeEntry('mypreset', 'local')],
+    })
 
     const result = await unifiedSearch('', 'all', 20)
     expect(result.results).toHaveLength(2)
@@ -74,7 +81,9 @@ describe('unifiedSearch — basic', () => {
   })
 
   it('respects limit param', async () => {
-    const entries = Array.from({ length: 10 }, (_, i) => makeEntry(`server-${i}`, 'mcp-get'))
+    const entries = Array.from({ length: 10 }, (_, i) =>
+      makeEntry(`server-${i}`, 'mcp-get'),
+    )
     mockFetchMcpGet.mockResolvedValue({ entries })
     mockFetchLocalFile.mockResolvedValue({ entries: [] })
 
@@ -105,7 +114,9 @@ describe('unifiedSearch — installed flag', () => {
     mockGetConfig.mockResolvedValue({
       config: { mcp_servers: { github: {} } },
     })
-    mockFetchMcpGet.mockResolvedValue({ entries: [makeEntry('github', 'mcp-get')] })
+    mockFetchMcpGet.mockResolvedValue({
+      entries: [makeEntry('github', 'mcp-get')],
+    })
     mockFetchLocalFile.mockResolvedValue({ entries: [] })
 
     const result = await unifiedSearch('', 'all', 20)
@@ -114,7 +125,9 @@ describe('unifiedSearch — installed flag', () => {
 
   it('defaults installed=false when getConfig throws', async () => {
     mockGetConfig.mockRejectedValue(new Error('gateway down'))
-    mockFetchMcpGet.mockResolvedValue({ entries: [makeEntry('github', 'mcp-get')] })
+    mockFetchMcpGet.mockResolvedValue({
+      entries: [makeEntry('github', 'mcp-get')],
+    })
     mockFetchLocalFile.mockResolvedValue({ entries: [] })
 
     const result = await unifiedSearch('', 'all', 20)
@@ -125,7 +138,9 @@ describe('unifiedSearch — installed flag', () => {
 describe('unifiedSearch — partial failure', () => {
   it('surfaces warnings when one source fails and others succeed', async () => {
     mockFetchMcpGet.mockRejectedValue(new Error('timeout'))
-    mockFetchLocalFile.mockResolvedValue({ entries: [makeEntry('local-preset', 'local')] })
+    mockFetchLocalFile.mockResolvedValue({
+      entries: [makeEntry('local-preset', 'local')],
+    })
 
     const result = await unifiedSearch('', 'all', 20)
     expect(result.results).toHaveLength(1)
@@ -135,7 +150,9 @@ describe('unifiedSearch — partial failure', () => {
 
   it('falls back to local-file when all remote sources fail', async () => {
     mockFetchMcpGet.mockRejectedValue(new Error('network error'))
-    mockFetchLocalFile.mockResolvedValue({ entries: [makeEntry('fallback-preset', 'local')] })
+    mockFetchLocalFile.mockResolvedValue({
+      entries: [makeEntry('fallback-preset', 'local')],
+    })
 
     // Request only remote sources — unifiedSearch should auto-add local fallback
     const result = await unifiedSearch('', 'mcp-get', 20)
@@ -156,7 +173,9 @@ describe('unifiedSearch — partial failure', () => {
 
 describe('unifiedSearch — single source', () => {
   it('queries only mcp-get when source=mcp-get', async () => {
-    mockFetchMcpGet.mockResolvedValue({ entries: [makeEntry('pkg', 'mcp-get')] })
+    mockFetchMcpGet.mockResolvedValue({
+      entries: [makeEntry('pkg', 'mcp-get')],
+    })
 
     const result = await unifiedSearch('', 'mcp-get', 20)
     expect(result.results).toHaveLength(1)
@@ -164,7 +183,9 @@ describe('unifiedSearch — single source', () => {
   })
 
   it('queries only local when source=local', async () => {
-    mockFetchLocalFile.mockResolvedValue({ entries: [makeEntry('preset', 'local')] })
+    mockFetchLocalFile.mockResolvedValue({
+      entries: [makeEntry('preset', 'local')],
+    })
 
     const result = await unifiedSearch('', 'local', 20)
     expect(result.results).toHaveLength(1)
@@ -180,7 +201,9 @@ describe('unifiedSearch — degraded fallback', () => {
       warnings: ['mcp-get: rate limited (403); remaining=0, reset=9999999'],
       degraded: true,
     })
-    mockFetchLocalFile.mockResolvedValue({ entries: [makeEntry('local-fallback', 'local')] })
+    mockFetchLocalFile.mockResolvedValue({
+      entries: [makeEntry('local-fallback', 'local')],
+    })
 
     const result = await unifiedSearch('', 'mcp-get', 20)
     // Should have triggered local fallback
@@ -207,7 +230,9 @@ describe('unifiedSearch — degraded fallback', () => {
       warnings: ['mcp-get: network error: ECONNREFUSED'],
       degraded: true,
     })
-    mockFetchLocalFile.mockResolvedValue({ entries: [makeEntry('local-entry', 'local')] })
+    mockFetchLocalFile.mockResolvedValue({
+      entries: [makeEntry('local-entry', 'local')],
+    })
 
     const result = await unifiedSearch('', 'mcp-get', 20)
     expect(result.warnings!.some((w) => w.includes('fallback'))).toBe(true)

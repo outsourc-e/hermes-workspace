@@ -28,7 +28,9 @@ export function rewriteLocalMediaSources(content: string): string {
     markdownImage,
     (_match, prefix: string, mediaPath: string, suffix: string) => {
       const rewritten = rewritePath(mediaPath)
-      return rewritten ? `${prefix}${rewritten}${suffix}` : `${prefix}MEDIA:${mediaPath}${suffix}`
+      return rewritten
+        ? `${prefix}${rewritten}${suffix}`
+        : `${prefix}MEDIA:${mediaPath}${suffix}`
     },
   )
 

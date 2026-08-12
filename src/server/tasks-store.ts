@@ -3,7 +3,14 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done' | 'deleted'
+export type TaskColumn =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'review'
+  | 'blocked'
+  | 'done'
+  | 'deleted'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
 export type TaskRecord = {
@@ -32,15 +39,24 @@ type TaskFilters = {
 }
 
 type CreateTaskInput = Partial<TaskRecord> & { title: string }
-type UpdateTaskInput = Partial<Omit<TaskRecord, 'id' | 'created_at' | 'created_by'>>
+type UpdateTaskInput = Partial<
+  Omit<TaskRecord, 'id' | 'created_at' | 'created_by'>
+>
 
-const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+const CLAUDE_HOME =
+  process.env.HERMES_HOME ??
+  process.env.CLAUDE_HOME ??
+  path.join(os.homedir(), '.hermes')
 const TASKS_FILE = path.join(CLAUDE_HOME, 'tasks.json')
 
 function ensureTasksFile(): void {
   fs.mkdirSync(CLAUDE_HOME, { recursive: true })
   if (!fs.existsSync(TASKS_FILE)) {
-    fs.writeFileSync(TASKS_FILE, JSON.stringify({ tasks: [] }, null, 2) + '\n', 'utf-8')
+    fs.writeFileSync(
+      TASKS_FILE,
+      JSON.stringify({ tasks: [] }, null, 2) + '\n',
+      'utf-8',
+    )
   }
 }
 
@@ -61,7 +77,13 @@ function writeTaskFile(data: TaskFile): void {
   fs.writeFileSync(TASKS_FILE, JSON.stringify(data, null, 2) + '\n', 'utf-8')
 }
 
-function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' | 'created_at' | 'updated_at' | 'created_by'>): TaskRecord {
+function normalizeTask(
+  task: Partial<TaskRecord> &
+    Pick<
+      TaskRecord,
+      'id' | 'title' | 'created_at' | 'updated_at' | 'created_by'
+    >,
+): TaskRecord {
   return {
     id: task.id,
     title: task.title,
@@ -69,7 +91,9 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     column: (task.column as TaskColumn) ?? 'backlog',
     priority: (task.priority as TaskPriority) ?? 'medium',
     assignee: task.assignee ?? null,
-    tags: Array.isArray(task.tags) ? task.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+    tags: Array.isArray(task.tags)
+      ? task.tags.filter((tag): tag is string => typeof tag === 'string')
+      : [],
     due_date: task.due_date ?? null,
     position: typeof task.position === 'number' ? task.position : 0,
     created_by: task.created_by,
@@ -93,11 +117,18 @@ export function listTasks(filters: TaskFilters = {}): TaskRecord[] {
   if (filters.priority) {
     tasks = tasks.filter((task) => task.priority === filters.priority)
   }
-  return tasks.sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
+  return tasks.sort(
+    (a, b) =>
+      a.position - b.position || a.created_at.localeCompare(b.created_at),
+  )
 }
 
 export function getTask(taskId: string): TaskRecord | null {
-  return readTaskFile().tasks.map(normalizeTask).find((task) => task.id === taskId) ?? null
+  return (
+    readTaskFile()
+      .tasks.map(normalizeTask)
+      .find((task) => task.id === taskId) ?? null
+  )
 }
 
 export function createTask(input: CreateTaskInput): TaskRecord {
@@ -113,7 +144,10 @@ export function createTask(input: CreateTaskInput): TaskRecord {
     tags: input.tags,
     due_date: input.due_date,
     position: typeof input.position === 'number' ? input.position : 0,
-    created_by: typeof input.created_by === 'string' && input.created_by ? input.created_by : 'user',
+    created_by:
+      typeof input.created_by === 'string' && input.created_by
+        ? input.created_by
+        : 'user',
     created_at: now,
     updated_at: now,
   })
@@ -122,7 +156,10 @@ export function createTask(input: CreateTaskInput): TaskRecord {
   return task
 }
 
-export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord | null {
+export function updateTask(
+  taskId: string,
+  updates: UpdateTaskInput,
+): TaskRecord | null {
   const file = readTaskFile()
   const index = file.tasks.findIndex((task) => task.id === taskId)
   if (index === -1) return null
@@ -143,7 +180,10 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
   return next
 }
 
-export function moveTask(taskId: string, column: TaskColumn): TaskRecord | null {
+export function moveTask(
+  taskId: string,
+  column: TaskColumn,
+): TaskRecord | null {
   return updateTask(taskId, { column })
 }
 
@@ -151,10 +191,15 @@ export function deleteTask(taskId: string): boolean {
   const file = readTaskFile()
   const nextTasks = file.tasks.filter((task) => task.id !== taskId)
   if (nextTasks.length === file.tasks.length) return false
-  writeTaskFile({ tasks: nextTasks.map((task) => normalizeTask(task as TaskRecord)) })
+  writeTaskFile({
+    tasks: nextTasks.map((task) => normalizeTask(task as TaskRecord)),
+  })
   return true
 }
 
-export function linkTaskSession(taskId: string, sessionId: string | null): TaskRecord | null {
+export function linkTaskSession(
+  taskId: string,
+  sessionId: string | null,
+): TaskRecord | null {
   return updateTask(taskId, { session_id: sessionId })
 }

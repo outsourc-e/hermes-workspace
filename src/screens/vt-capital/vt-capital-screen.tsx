@@ -106,7 +106,10 @@ function entryTitle(entry: Record<string, unknown>, fallback: string): string {
   return String(entry.asset ?? entry.symbol ?? fallback)
 }
 
-function fieldValue(entry: Record<string, unknown> | null | undefined, field: string): string {
+function fieldValue(
+  entry: Record<string, unknown> | null | undefined,
+  field: string,
+): string {
   if (!entry) return '—'
   const value = entry[field]
   if (value == null || value === '') return '—'
@@ -136,12 +139,17 @@ function MiniEvent({
   return (
     <div
       className="rounded-lg border p-3"
-      style={{ background: 'var(--theme-card2)', borderColor: 'var(--theme-border)' }}
+      style={{
+        background: 'var(--theme-card2)',
+        borderColor: 'var(--theme-border)',
+      }}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
         {label}
       </div>
-      <div className="mt-1 text-sm font-semibold text-ink">{scopeLine(event)}</div>
+      <div className="mt-1 text-sm font-semibold text-ink">
+        {scopeLine(event)}
+      </div>
       <div className="mt-1 text-xs text-muted">
         approval {fieldValue(event, 'approval_id')} · stato{' '}
         {fieldValue(event, 'status') !== '—'
@@ -462,7 +470,10 @@ export function VtCapitalScreen() {
               />
             </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              <MiniEvent label="Ultimo risk.check" event={data.guardian.lastRiskCheck} />
+              <MiniEvent
+                label="Ultimo risk.check"
+                event={data.guardian.lastRiskCheck}
+              />
               <MiniEvent
                 label="Ultimo order.proposed"
                 event={data.guardian.lastOrderProposed}
@@ -473,7 +484,8 @@ export function VtCapitalScreen() {
               />
             </div>
             {data.guardian.recentBlocks.length > 0 ? (
-              <div className="mt-4 rounded-lg border p-3"
+              <div
+                className="mt-4 rounded-lg border p-3"
                 style={{
                   background: 'var(--theme-card2)',
                   borderColor: 'var(--theme-border)',

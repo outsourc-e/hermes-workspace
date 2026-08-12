@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,7 +13,8 @@ let tempRoot: string
 
 // child_process.execFileSync is used by the orchestrator-routing tmux call. The test mocks it
 // to (a) accept has-session checks and (b) record send-keys arguments.
-const execFileSyncCalls: Array<{ cmd: string; args: ReadonlyArray<string> }> = []
+const execFileSyncCalls: Array<{ cmd: string; args: ReadonlyArray<string> }> =
+  []
 let hasSessionShouldFail = false
 
 async function loadModule() {
@@ -40,7 +47,11 @@ afterEach(() => {
   vi.doUnmock('./swarm-foundation')
   vi.doUnmock('./chat-event-bus')
   vi.doUnmock('node:child_process')
-  try { rmSync(tempRoot, { recursive: true, force: true }) } catch { /* ignore */ }
+  try {
+    rmSync(tempRoot, { recursive: true, force: true })
+  } catch {
+    /* ignore */
+  }
 })
 
 describe('swarm-notifications', () => {
@@ -76,14 +87,27 @@ describe('swarm-notifications', () => {
     })
 
     // DONE checkpoints route to the orchestrator tmux session, not main.
-    expect(first).toMatchObject({ published: true, sessionKey: 'qa-main', route: 'orchestrator' })
-    expect(first.orchestrator).toMatchObject({ sent: true, session: 'swarm-orchestrator' })
+    expect(first).toMatchObject({
+      published: true,
+      sessionKey: 'qa-main',
+      route: 'orchestrator',
+    })
+    expect(first.orchestrator).toMatchObject({
+      sent: true,
+      session: 'swarm-orchestrator',
+    })
     // Same raw is deduped on the second call.
-    expect(second).toMatchObject({ published: false, sessionKey: 'qa-main', route: 'noop' })
+    expect(second).toMatchObject({
+      published: false,
+      sessionKey: 'qa-main',
+      route: 'noop',
+    })
     // No chat event was published — DONE goes to orchestrator only.
     expect(publishChatEvent).not.toHaveBeenCalled()
     // tmux send-keys ran for orchestrator routing on the first call.
-    const sendKeyCalls = execFileSyncCalls.filter((c) => c.args[0] === 'send-keys')
+    const sendKeyCalls = execFileSyncCalls.filter(
+      (c) => c.args[0] === 'send-keys',
+    )
     expect(sendKeyCalls.length).toBeGreaterThanOrEqual(2) // -l <text>, then Enter
 
     const runtimePath = join(tempRoot, 'swarm11', 'runtime.json')
@@ -158,8 +182,15 @@ describe('swarm-notifications', () => {
       notifySessionKey: 'qa-main',
     })
 
-    expect(result).toMatchObject({ published: true, sessionKey: 'qa-main', route: 'main' })
-    expect(result.orchestrator).toMatchObject({ sent: true, session: 'swarm-orchestrator' })
+    expect(result).toMatchObject({
+      published: true,
+      sessionKey: 'qa-main',
+      route: 'main',
+    })
+    expect(result.orchestrator).toMatchObject({
+      sent: true,
+      session: 'swarm-orchestrator',
+    })
     // Both the orchestrator AND main were notified.
     expect(publishChatEvent).toHaveBeenCalledTimes(2)
     expect(publishChatEvent).toHaveBeenNthCalledWith(
@@ -200,8 +231,15 @@ describe('swarm-notifications', () => {
       notifySessionKey: 'qa-main',
     })
 
-    expect(result).toMatchObject({ published: true, sessionKey: 'qa-main', route: 'main' })
-    expect(result.orchestrator).toMatchObject({ sent: false, session: 'swarm-orchestrator' })
+    expect(result).toMatchObject({
+      published: true,
+      sessionKey: 'qa-main',
+      route: 'main',
+    })
+    expect(result.orchestrator).toMatchObject({
+      sent: false,
+      session: 'swarm-orchestrator',
+    })
     expect(publishChatEvent).toHaveBeenCalled()
   })
 
@@ -227,6 +265,10 @@ describe('swarm-notifications', () => {
     })
 
     // skippedSelf -> orchestrator route is treated as 'orchestrator' (self-report doesn't escalate either).
-    expect(result.orchestrator).toMatchObject({ sent: false, session: 'swarm-orchestrator', skippedSelf: true })
+    expect(result.orchestrator).toMatchObject({
+      sent: false,
+      session: 'swarm-orchestrator',
+      skippedSelf: true,
+    })
   })
 })

@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { buildSwarm2ReportRows } from './swarm2-reports-view'
+import { buildSwarm2ReportRows, postSwarmDispatch } from './swarm2-reports-view'
+
+describe('postSwarmDispatch', () => {
+  it('marks native Kanban dispatches asynchronous', async () => {
+    let requestBody: Record<string, unknown> | null = null
+    const fetchImpl = (_input: RequestInfo | URL, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return Promise.resolve(new Response('{}', { status: 200 }))
+    }
+
+    await postSwarmDispatch(
+      {
+        assignments: [{ workerId: 'builder', task: 'Run the vertical slice' }],
+        dispatchMode: 'kanban',
+      },
+      fetchImpl,
+    )
+
+    expect(requestBody).toMatchObject({
+      dispatchMode: 'kanban',
+      waitForCheckpoint: false,
+      allowAsync: true,
+    })
+  })
+})
 
 describe('Swarm2 reports view model', () => {
   it('turns review-required checkpoints into needs-review report rows', () => {
@@ -31,7 +55,14 @@ describe('Swarm2 reports view model', () => {
           ],
         },
       ],
-      runtimes: [{ workerId: 'swarm5', displayName: 'Swarm5', artifacts: [], previews: [] }],
+      runtimes: [
+        {
+          workerId: 'swarm5',
+          displayName: 'Swarm5',
+          artifacts: [],
+          previews: [],
+        },
+      ],
     })
 
     expect(rows[0]).toMatchObject({
@@ -41,7 +72,9 @@ describe('Swarm2 reports view model', () => {
       stateLabel: 'Needs review',
       summary: 'Page is implemented.',
     })
-    expect(rows[0].artifacts[0].path).toBe('src/screens/swarm2/swarm2-reports-view.tsx')
+    expect(rows[0].artifacts[0].path).toBe(
+      'src/screens/swarm2/swarm2-reports-view.tsx',
+    )
   })
 
   it('surfaces runtime artifacts when no mission checkpoint exists', () => {
@@ -93,7 +126,9 @@ describe('Swarm2 reports view model', () => {
       stateLabel: 'Needs review',
       summary: 'Reviewer inbox is ready for Eric handoff',
     })
-    expect(rows[0].details.find((detail) => detail.label === 'Result')?.value).toBe('Reviewer inbox is ready for Eric handoff')
+    expect(
+      rows[0].details.find((detail) => detail.label === 'Result')?.value,
+    ).toBe('Reviewer inbox is ready for Eric handoff')
   })
 
   it('prioritizes blocked affordances from checkpoints and runtime state', () => {

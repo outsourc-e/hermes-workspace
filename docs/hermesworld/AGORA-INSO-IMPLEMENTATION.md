@@ -36,11 +36,13 @@ Create an Agora scene that feels like the reference while staying browser-native
 ### Slice 1 — Layout/composition
 
 Files likely touched:
+
 - `src/screens/playground/components/playground-world-3d.tsx`
 - `src/screens/playground/components/playground-environment.tsx`
 - `src/screens/playground/components/playground-minimap.tsx`
 
 Tasks:
+
 - Add `AgoraCommons` component.
 - Build circular plaza with stone rings/tiles.
 - Add central obelisk/monument.
@@ -48,23 +50,27 @@ Tasks:
 - Add walkable clear center.
 
 Acceptance:
+
 - desktop screenshot reads as an Agora hub from zoomed-out camera.
 - NPCs are not visually piled up.
 
 ### Slice 2 — Lighting/material realism
 
 Tasks:
+
 - warm torch/lantern lights around ring
 - blue/cyan roof/portal accents
 - contact shadows, ambient occlusion/postprocessing if performant
 - textured-looking procedural stone via repeated geometry/material variation
 
 Acceptance:
+
 - screenshot has depth, focal point, and warm/cool contrast.
 
 ### Slice 3 — Prop density
 
 Tasks:
+
 - stalls with colored awnings
 - benches
 - barrels/crates/pots
@@ -73,11 +79,13 @@ Tasks:
 - small portal booth/gate
 
 Acceptance:
+
 - edges feel alive while center remains playable.
 
 ### Slice 4 — HUD/game readability
 
 Tasks:
+
 - top-left status card compact
 - top-center objective card compact
 - top-right minimap card styled like reference
@@ -85,11 +93,13 @@ Tasks:
 - bottom-left chat collapsed/compact
 
 Acceptance:
+
 - no top clutter, clear objective, map, status.
 
 ### Slice 5 — Asset upgrade loop
 
 Tasks:
+
 - generate/refine zone art, NPC portraits, item icons, sigils
 - place assets in UI
 - screenshot
@@ -97,6 +107,7 @@ Tasks:
 - revise
 
 Acceptance:
+
 - one browser screenshot side-by-side with reference showing visible convergence.
 
 ## Swarm assignment

@@ -1,10 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import {
-  ensureGatewayProbed,
-  searchSessions,
-} from '../../../server/claude-api'
+import { ensureGatewayProbed, searchSessions } from '../../../server/claude-api'
 import { searchLocalSessions } from '../../../server/local-session-store'
 
 type NormalizedSessionSearchResult = {
@@ -19,7 +16,10 @@ type NormalizedSessionSearchResult = {
   updatedAt?: number | null
 }
 
-function getString(record: Record<string, unknown>, keys: Array<string>): string {
+function getString(
+  record: Record<string, unknown>,
+  keys: Array<string>,
+): string {
   for (const key of keys) {
     const value = record[key]
     if (typeof value === 'string' && value.trim()) return value.trim()
@@ -27,7 +27,10 @@ function getString(record: Record<string, unknown>, keys: Array<string>): string
   return ''
 }
 
-function getNumber(record: Record<string, unknown>, keys: Array<string>): number | null {
+function getNumber(
+  record: Record<string, unknown>,
+  keys: Array<string>,
+): number | null {
   for (const key of keys) {
     const value = record[key]
     if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -54,7 +57,11 @@ function normalizeResult(
     role: getString(record, ['role']) || null,
     source: getString(record, ['source']) || null,
     model: getString(record, ['model']) || null,
-    updatedAt: getNumber(record, ['updatedAt', 'last_active', 'session_started']),
+    updatedAt: getNumber(record, [
+      'updatedAt',
+      'last_active',
+      'session_started',
+    ]),
   }
 }
 

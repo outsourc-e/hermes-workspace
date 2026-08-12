@@ -56,7 +56,9 @@ export function parseEnvText(raw: string): Record<string, string> {
 }
 
 export function readHermesEnv(
-  envHome = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
+  envHome = process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    join(homedir(), '.hermes'),
 ): Record<string, string> {
   const envPath = join(envHome, '.env')
   if (!existsSync(envPath)) return {}
@@ -81,7 +83,10 @@ export function resolveTranscriptionTarget(
     const apiKey =
       readString(runtimeEnv.GROQ_API_KEY) || readString(hermesEnv.GROQ_API_KEY)
     if (!apiKey) {
-      return { ok: false, error: 'Groq STT is configured but GROQ_API_KEY is missing.' }
+      return {
+        ok: false,
+        error: 'Groq STT is configured but GROQ_API_KEY is missing.',
+      }
     }
     return {
       ok: true,
@@ -106,7 +111,8 @@ export function resolveTranscriptionTarget(
     if (!apiKey) {
       return {
         ok: false,
-        error: 'OpenAI STT is configured but VOICE_TOOLS_OPENAI_KEY or OPENAI_API_KEY is missing.',
+        error:
+          'OpenAI STT is configured but VOICE_TOOLS_OPENAI_KEY or OPENAI_API_KEY is missing.',
       }
     }
     return {

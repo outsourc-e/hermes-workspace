@@ -217,7 +217,7 @@ export function normalizeSessions(
         : deriveFriendlyIdFromKey(session.friendlyId ?? session.key)
     const friendlyIdCandidate =
       typeof session.friendlyId === 'string' &&
-        session.friendlyId.trim().length > 0
+      session.friendlyId.trim().length > 0
         ? session.friendlyId.trim()
         : deriveFriendlyIdFromKey(key)
 
@@ -231,10 +231,11 @@ export function normalizeSessions(
         : undefined
     const derivedTitle =
       typeof session.derivedTitle === 'string' &&
-        session.derivedTitle.trim().length > 0
-        ? cleanUserText(session.derivedTitle.trim()) || session.derivedTitle.trim()
+      session.derivedTitle.trim().length > 0
+        ? cleanUserText(session.derivedTitle.trim()) ||
+          session.derivedTitle.trim()
         : typeof session.preview === 'string' &&
-          session.preview.trim().length > 0
+            session.preview.trim().length > 0
           ? cleanUserText(session.preview.trim()) || session.preview.trim()
           : undefined
     const titleStatus = deriveTitleStatus(
@@ -265,7 +266,7 @@ export function normalizeSessions(
       preview:
         typeof session.preview === 'string'
           ? cleanUserText(session.preview) || session.preview.trim() || null
-          : session.preview ?? null,
+          : (session.preview ?? null),
     }
   })
 }

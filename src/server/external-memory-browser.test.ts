@@ -45,7 +45,9 @@ con.close()
 }
 
 beforeEach(() => {
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-external-memory-'))
+  tempRoot = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'workspace-external-memory-'),
+  )
   process.env.HERMES_HOME = tempRoot
 })
 

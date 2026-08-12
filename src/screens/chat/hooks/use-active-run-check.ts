@@ -76,7 +76,11 @@ export function useActiveRunCheck({
     const timeoutId = window.setTimeout(() => {
       if (settled) return
       settle()
-      try { controller.abort() } catch { /* ignore */ }
+      try {
+        controller.abort()
+      } catch {
+        /* ignore */
+      }
       // Clear stale waiting state — the run is almost certainly dead
       const store = useChatStore.getState()
       if (store.isSessionWaiting(sessionKeyRef.current)) {

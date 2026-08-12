@@ -121,9 +121,7 @@ Expected response shape:
 ```json
 {
   "missionId": "mission-...",
-  "assignments": [
-    { "workerId": "swarm7", "task": "..." }
-  ],
+  "assignments": [{ "workerId": "swarm7", "task": "..." }],
   "results": [
     {
       "workerId": "swarm7",
@@ -159,14 +157,14 @@ Switch to Kanban view for planning. The board is useful when you want a visual q
 
 Recommended lane meanings:
 
-| Lane | Meaning |
-| --- | --- |
-| Backlog | Useful but not ready. |
-| Ready | Clear enough to dispatch. |
-| Running | Worker owns it now. |
-| Review | Needs reviewer or Eric. |
+| Lane    | Meaning                                  |
+| ------- | ---------------------------------------- |
+| Backlog | Useful but not ready.                    |
+| Ready   | Clear enough to dispatch.                |
+| Running | Worker owns it now.                      |
+| Review  | Needs reviewer or Eric.                  |
 | Blocked | Needs repair, input, auth, or scope cut. |
-| Done | Verified checkpoint landed. |
+| Done    | Verified checkpoint landed.              |
 
 ## 9. Add a worker with role presets
 

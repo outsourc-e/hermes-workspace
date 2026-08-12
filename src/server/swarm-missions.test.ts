@@ -1,4 +1,11 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +29,11 @@ describe('swarm-missions', () => {
   afterEach(() => {
     vi.resetModules()
     vi.doUnmock('./swarm-environment')
-    try { rmSync(tempRoot, { recursive: true, force: true }) } catch { /* ignore */ }
+    try {
+      rmSync(tempRoot, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
   })
 
   it('records checkpoints by assignment id, stores report metadata, and exposes flattened reports', async () => {
@@ -30,7 +41,13 @@ describe('swarm-missions', () => {
     const mission = mod.createOrUpdateMission({
       missionId: 'mission-report-1',
       title: 'Mission report test',
-      assignments: [{ workerId: 'swarm2', task: 'Land backend patch', reviewRequired: false }],
+      assignments: [
+        {
+          workerId: 'swarm2',
+          task: 'Land backend patch',
+          reviewRequired: false,
+        },
+      ],
     })
     const assignmentId = mission.assignments[0]?.id
     expect(assignmentId).toBeTruthy()
@@ -58,10 +75,14 @@ describe('swarm-missions', () => {
     expect(updated?.assignments[0]?.state).toBe('checkpointed')
     expect(updated?._completed).toBe(true)
 
-    const checkpointEvent = updated?.events.find((event) => event.type === 'checkpoint')
+    const checkpointEvent = updated?.events.find(
+      (event) => event.type === 'checkpoint',
+    )
     expect(checkpointEvent?.data?.source).toBe('swarm-orchestrator-loop')
     expect(checkpointEvent?.data?.result).toBe('Recorded canonical checkpoint')
-    expect(checkpointEvent?.data?.commandsRun).toBe('pnpm vitest src/server/swarm-missions.test.ts')
+    expect(checkpointEvent?.data?.commandsRun).toBe(
+      'pnpm vitest src/server/swarm-missions.test.ts',
+    )
 
     const reports = mod.listSwarmReports({ missionId: mission.id })
     expect(reports).toHaveLength(1)
@@ -80,9 +101,15 @@ describe('swarm-missions', () => {
     const mission = mod.createOrUpdateMission({
       missionId: 'mission-report-2',
       title: 'Dedup test',
-      assignments: [{ workerId: 'swarm2', task: 'Land backend patch', reviewRequired: false }],
+      assignments: [
+        {
+          workerId: 'swarm2',
+          task: 'Land backend patch',
+          reviewRequired: false,
+        },
+      ],
     })
-    const assignmentId = mission.assignments[0]?.id as string
+    const assignmentId = mission.assignments[0]?.id
     const checkpoint = {
       stateLabel: 'DONE' as const,
       runtimeState: 'idle' as const,
@@ -95,11 +122,27 @@ describe('swarm-missions', () => {
       raw: 'STATE: DONE\nFILES_CHANGED: none\nCOMMANDS_RUN: none\nRESULT: Same checkpoint\nBLOCKER: none\nNEXT_ACTION: none',
     }
 
-    const first = mod.recordMissionCheckpoint({ missionId: mission.id, assignmentId, workerId: 'swarm2', checkpoint, source: 'swarm-checkpoint-api' })
-    const second = mod.recordMissionCheckpoint({ missionId: mission.id, assignmentId, workerId: 'swarm2', checkpoint, source: 'swarm-checkpoint-api' })
+    const first = mod.recordMissionCheckpoint({
+      missionId: mission.id,
+      assignmentId,
+      workerId: 'swarm2',
+      checkpoint,
+      source: 'swarm-checkpoint-api',
+    })
+    const second = mod.recordMissionCheckpoint({
+      missionId: mission.id,
+      assignmentId,
+      workerId: 'swarm2',
+      checkpoint,
+      source: 'swarm-checkpoint-api',
+    })
 
-    expect(first?.events.filter((event) => event.type === 'checkpoint')).toHaveLength(1)
-    expect(second?.events.filter((event) => event.type === 'checkpoint')).toHaveLength(1)
+    expect(
+      first?.events.filter((event) => event.type === 'checkpoint'),
+    ).toHaveLength(1)
+    expect(
+      second?.events.filter((event) => event.type === 'checkpoint'),
+    ).toHaveLength(1)
     expect(mod.listSwarmReports({ missionId: mission.id })).toHaveLength(1)
     expect(existsSync(mod.SWARM_MISSIONS_PATH)).toBe(true)
   })
@@ -109,11 +152,13 @@ describe('swarm-missions', () => {
     const mission = mod.createOrUpdateMission({
       missionId: 'mission-dispatch-smoke-review',
       title: 'Diagnostic dispatch smoke',
-      assignments: [{
-        workerId: 'builder',
-        task: 'Diagnostic smoke only. Return RESULT: workspace swarm dispatch API smoke passed.',
-        rationale: 'diagnostic dispatch smoke',
-      }],
+      assignments: [
+        {
+          workerId: 'builder',
+          task: 'Diagnostic smoke only. Return RESULT: workspace swarm dispatch API smoke passed.',
+          rationale: 'diagnostic dispatch smoke',
+        },
+      ],
     })
 
     expect(mission.assignments[0]?.reviewRequired).toBe(false)
@@ -139,14 +184,47 @@ describe('swarm-missions', () => {
     expect(updated?.state).toBe('complete')
   })
 
+  it('records the native Hermes task ID on a mission assignment', async () => {
+    const mod = await loadModule()
+    const mission = mod.createOrUpdateMission({
+      missionId: 'mission-native-task-link',
+      title: 'Native task link test',
+      assignments: [
+        { workerId: 'builder', task: 'Run native task', reviewRequired: false },
+      ],
+    })
+    const assignmentId = mission.assignments[0]?.id ?? ''
+
+    const updated = mod.recordMissionHermesTask({
+      missionId: mission.id,
+      assignmentId,
+      hermesTaskId: 't_native123',
+    })
+
+    expect(updated?.assignments[0]?.hermesTaskId).toBe('t_native123')
+    expect(updated?.events.at(-1)?.data).toMatchObject({
+      hermesTaskId: 't_native123',
+    })
+  })
+
   it('records dispatch failures as blocked mission assignments', async () => {
     const mod = await loadModule()
     const mission = mod.createOrUpdateMission({
       missionId: 'mission-dispatch-failure',
       title: 'Dispatch failure test',
-      assignments: [{ workerId: 'builder', task: 'Probe runtime health', reviewRequired: false }],
+      assignments: [
+        {
+          workerId: 'builder',
+          task: 'Probe runtime health',
+          reviewRequired: false,
+        },
+      ],
     })
-    mod.markMissionAssignmentDispatched({ missionId: mission.id, workerId: 'builder', task: 'Probe runtime health' })
+    mod.markMissionAssignmentDispatched({
+      missionId: mission.id,
+      workerId: 'builder',
+      task: 'Probe runtime health',
+    })
 
     const blocked = mod.recordMissionAssignmentBlocked({
       missionId: mission.id,
@@ -172,8 +250,17 @@ describe('swarm-missions', () => {
       missionId: 'mission-review-gate',
       title: 'Review gate test',
       assignments: [
-        { workerId: 'swarm2', task: 'Implement orchestration patch', reviewRequired: true },
-        { workerId: 'swarm8', task: 'Ship final action', dependsOn: [], reviewRequired: false },
+        {
+          workerId: 'swarm2',
+          task: 'Implement orchestration patch',
+          reviewRequired: true,
+        },
+        {
+          workerId: 'swarm8',
+          task: 'Ship final action',
+          dependsOn: [],
+          reviewRequired: false,
+        },
       ],
     })
     const implementation = mission.assignments[0]
@@ -214,7 +301,9 @@ describe('swarm-missions', () => {
       state: 'done',
       reviewedBy: 'swarm11',
     })
-    expect(mod.readyQueuedAssignments(mission.id).map((assignment) => assignment.id)).toEqual([finalAction.id])
+    expect(
+      mod.readyQueuedAssignments(mission.id).map((assignment) => assignment.id),
+    ).toEqual([finalAction.id])
   })
 
   it('cancels active missions without accepting stale checkpoints afterward', async () => {
@@ -223,11 +312,23 @@ describe('swarm-missions', () => {
       missionId: 'mission-cancel-1',
       title: 'Cancel test',
       assignments: [
-        { workerId: 'swarm2', task: 'Active backend task', reviewRequired: false },
-        { workerId: 'swarm5', task: 'Queued builder task', reviewRequired: false },
+        {
+          workerId: 'swarm2',
+          task: 'Active backend task',
+          reviewRequired: false,
+        },
+        {
+          workerId: 'swarm5',
+          task: 'Queued builder task',
+          reviewRequired: false,
+        },
       ],
     })
-    mod.markMissionAssignmentDispatched({ missionId: mission.id, workerId: 'swarm2', task: 'Active backend task' })
+    mod.markMissionAssignmentDispatched({
+      missionId: mission.id,
+      workerId: 'swarm2',
+      task: 'Active backend task',
+    })
 
     const cancelled = mod.cancelSwarmMission({
       missionId: mission.id,
@@ -237,7 +338,9 @@ describe('swarm-missions', () => {
 
     expect(cancelled?.mission.state).toBe('cancelled')
     expect(cancelled?.cancelledAssignmentIds).toHaveLength(2)
-    expect(cancelled?.mission.assignments.map((assignment) => assignment.state)).toEqual(['cancelled', 'cancelled'])
+    expect(
+      cancelled?.mission.assignments.map((assignment) => assignment.state),
+    ).toEqual(['cancelled', 'cancelled'])
     expect(cancelled?.mission.events.at(-1)?.type).toBe('mission_cancelled')
 
     const staleCheckpoint = mod.recordMissionCheckpoint({
@@ -262,7 +365,9 @@ describe('swarm-missions', () => {
     const persisted = mod.getSwarmMission(mission.id)
     expect(persisted?.state).toBe('cancelled')
     expect(persisted?.assignments[0]?.state).toBe('cancelled')
-    expect(persisted?.events.filter((event) => event.type === 'checkpoint')).toHaveLength(0)
+    expect(
+      persisted?.events.filter((event) => event.type === 'checkpoint'),
+    ).toHaveLength(0)
   })
 
   it('cancels a single assignment and leaves unaffected work active', async () => {
@@ -285,7 +390,9 @@ describe('swarm-missions', () => {
 
     expect(cancelled?.assignment?.state).toBe('cancelled')
     expect(cancelled?.mission.state).toBe('planning')
-    expect(cancelled?.mission.assignments.map((assignment) => assignment.state)).toEqual(['cancelled', 'queued'])
+    expect(
+      cancelled?.mission.assignments.map((assignment) => assignment.state),
+    ).toEqual(['cancelled', 'queued'])
     expect(cancelled?.mission.events.at(-1)?.type).toBe('assignment_cancelled')
   })
 
@@ -293,48 +400,53 @@ describe('swarm-missions', () => {
     const mod = await loadModule()
     const staleMission = {
       version: 1,
-      missions: [{
-        id: 'mission-stale-terminal',
-        title: 'Stale executing mission',
-        state: 'executing',
-        createdAt: 1,
-        updatedAt: 1,
-        assignments: [
-          {
-            id: 'assign-1',
-            workerId: 'swarm2',
-            task: 'Done work',
-            rationale: null,
-            dependsOn: [],
-            reviewRequired: false,
-            state: 'done',
-            dispatchedAt: 1,
-            completedAt: 1,
-            reviewedAt: 1,
-            reviewedBy: 'swarm6',
-            checkpoint: null,
-          },
-          {
-            id: 'assign-2',
-            workerId: 'swarm3',
-            task: 'Blocked work',
-            rationale: null,
-            dependsOn: [],
-            reviewRequired: false,
-            state: 'blocked',
-            dispatchedAt: 1,
-            completedAt: 1,
-            reviewedAt: null,
-            reviewedBy: null,
-            checkpoint: null,
-          },
-        ],
-        events: [],
-      }],
+      missions: [
+        {
+          id: 'mission-stale-terminal',
+          title: 'Stale executing mission',
+          state: 'executing',
+          createdAt: 1,
+          updatedAt: 1,
+          assignments: [
+            {
+              id: 'assign-1',
+              workerId: 'swarm2',
+              task: 'Done work',
+              rationale: null,
+              dependsOn: [],
+              reviewRequired: false,
+              state: 'done',
+              dispatchedAt: 1,
+              completedAt: 1,
+              reviewedAt: 1,
+              reviewedBy: 'swarm6',
+              checkpoint: null,
+            },
+            {
+              id: 'assign-2',
+              workerId: 'swarm3',
+              task: 'Cancelled work',
+              rationale: null,
+              dependsOn: [],
+              reviewRequired: false,
+              state: 'cancelled',
+              dispatchedAt: 1,
+              completedAt: 1,
+              reviewedAt: null,
+              reviewedBy: null,
+              checkpoint: null,
+            },
+          ],
+          events: [],
+        },
+      ],
     }
 
     mkdirSync(join(tempRoot, '.runtime'), { recursive: true })
-    writeFileSync(mod.SWARM_MISSIONS_PATH, JSON.stringify(staleMission, null, 2))
+    writeFileSync(
+      mod.SWARM_MISSIONS_PATH,
+      JSON.stringify(staleMission, null, 2),
+    )
 
     expect(mod.archiveStaleMissions()).toEqual({
       archivedIds: ['mission-stale-terminal'],
@@ -343,40 +455,110 @@ describe('swarm-missions', () => {
 
     const persisted = JSON.parse(readFileSync(mod.SWARM_MISSIONS_PATH, 'utf8'))
     expect(persisted.missions[0]?.state).toBe('complete')
-    expect(persisted.missions[0]?.events.at(-1)?.message).toContain('Archived as stale')
+    expect(persisted.missions[0]?.events.at(-1)?.message).toContain(
+      'Archived as stale',
+    )
+  })
+
+  it('does not archive stale missions that are blocked or awaiting input', async () => {
+    const mod = await loadModule()
+    const blockedMission = {
+      version: 1,
+      missions: [
+        {
+          id: 'mission-stale-blocked',
+          title: 'Stale blocked mission',
+          state: 'executing',
+          createdAt: 1,
+          updatedAt: 1,
+          assignments: [
+            {
+              id: 'assign-1',
+              workerId: 'swarm2',
+              task: 'Done work',
+              rationale: null,
+              dependsOn: [],
+              reviewRequired: false,
+              state: 'done',
+              dispatchedAt: 1,
+              completedAt: 1,
+              reviewedAt: 1,
+              reviewedBy: 'swarm6',
+              checkpoint: null,
+            },
+            {
+              id: 'assign-2',
+              workerId: 'swarm3',
+              task: 'Blocked work',
+              rationale: null,
+              dependsOn: [],
+              reviewRequired: false,
+              state: 'blocked',
+              dispatchedAt: 1,
+              completedAt: 1,
+              reviewedAt: null,
+              reviewedBy: null,
+              checkpoint: null,
+            },
+          ],
+          events: [],
+        },
+      ],
+    }
+
+    mkdirSync(join(tempRoot, '.runtime'), { recursive: true })
+    writeFileSync(
+      mod.SWARM_MISSIONS_PATH,
+      JSON.stringify(blockedMission, null, 2),
+    )
+
+    expect(mod.archiveStaleMissions()).toEqual({
+      archivedIds: [],
+      count: 0,
+    })
+
+    const persisted = JSON.parse(readFileSync(mod.SWARM_MISSIONS_PATH, 'utf8'))
+    expect(persisted.missions[0]?.state).toBe('executing')
   })
 
   it('leaves recent executing missions alone', async () => {
     const mod = await loadModule()
-    const recentUpdatedAt = Date.now() - (60 * 60 * 1000)
+    const recentUpdatedAt = Date.now() - 60 * 60 * 1000
     const recentMission = {
       version: 1,
-      missions: [{
-        id: 'mission-recent-terminal',
-        title: 'Recent executing mission',
-        state: 'executing',
-        createdAt: recentUpdatedAt,
-        updatedAt: recentUpdatedAt,
-        assignments: [{
-          id: 'assign-1',
-          workerId: 'swarm2',
-          task: 'Done work',
-          rationale: null,
-          dependsOn: [],
-          reviewRequired: false,
-          state: 'done',
-          dispatchedAt: recentUpdatedAt,
-          completedAt: recentUpdatedAt,
-          reviewedAt: recentUpdatedAt,
-          reviewedBy: 'swarm6',
-          checkpoint: null,
-        }],
-        events: [],
-      }],
+      missions: [
+        {
+          id: 'mission-recent-terminal',
+          title: 'Recent executing mission',
+          state: 'executing',
+          createdAt: recentUpdatedAt,
+          updatedAt: recentUpdatedAt,
+          assignments: [
+            {
+              id: 'assign-1',
+              workerId: 'swarm2',
+              task: 'Done work',
+              rationale: null,
+              dependsOn: [],
+              reviewRequired: false,
+              state: 'done',
+              dispatchedAt: recentUpdatedAt,
+              completedAt: recentUpdatedAt,
+              reviewedAt: recentUpdatedAt,
+              reviewedBy: 'swarm6',
+              checkpoint: null,
+            },
+          ],
+          events: [],
+        },
+      ],
     }
 
     mkdirSync(join(tempRoot, '.runtime'), { recursive: true })
-    writeFileSync(mod.SWARM_MISSIONS_PATH, JSON.stringify(recentMission, null, 2))
+    writeFileSync(
+      mod.SWARM_MISSIONS_PATH,
+      JSON.stringify(recentMission, null, 2),
+    )
 
     expect(mod.archiveStaleMissions()).toEqual({
       archivedIds: [],

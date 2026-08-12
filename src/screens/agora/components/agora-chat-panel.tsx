@@ -11,12 +11,18 @@ interface AgoraChatPanelProps {
   onSend: (body: string) => void
 }
 
-export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPanelProps) {
+export function AgoraChatPanel({
+  self,
+  others,
+  messages,
+  onSend,
+}: AgoraChatPanelProps) {
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (scrollRef.current)
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length])
 
   function handleSubmit(e: React.FormEvent) {
@@ -39,20 +45,33 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
         border: '1px solid var(--theme-border)',
       }}
     >
-      <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--theme-border)' }}>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">Room Chat</span>
+      <div
+        className="flex items-center justify-between px-3 py-2 border-b"
+        style={{ borderColor: 'var(--theme-border)' }}
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">
+          Room Chat
+        </span>
         <span className="text-[10px] opacity-50">{messages.length} msg</span>
       </div>
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-[12px] leading-snug">
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-[12px] leading-snug"
+      >
         {messages.length === 0 ? (
-          <div className="opacity-50 text-center mt-6 text-[11px]">No messages yet — say hi 👋</div>
+          <div className="opacity-50 text-center mt-6 text-[11px]">
+            No messages yet — say hi 👋
+          </div>
         ) : (
           messages.map((m) => (
             <div key={m.id} className="mb-1.5">
               <span
                 className="font-semibold"
                 style={{
-                  color: m.userId === self.profile.id ? 'var(--theme-accent)' : 'var(--theme-text)',
+                  color:
+                    m.userId === self.profile.id
+                      ? 'var(--theme-accent)'
+                      : 'var(--theme-text)',
                 }}
               >
                 {nameFor(m.userId)}:
@@ -62,7 +81,11 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
           ))
         )}
       </div>
-      <form onSubmit={handleSubmit} className="flex gap-2 border-t p-2" style={{ borderColor: 'var(--theme-border)' }}>
+      <form
+        onSubmit={handleSubmit}
+        className="flex gap-2 border-t p-2"
+        style={{ borderColor: 'var(--theme-border)' }}
+      >
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

@@ -1,15 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { usePageTitle } from '@/hooks/use-page-title'
+import { z } from 'zod'
+
+const ConfirmSearchSchema = z.object({
+  token: z.string().optional(),
+})
 
 export const Route = createFileRoute('/reserve/confirm')({
   ssr: false,
+  validateSearch: ConfirmSearchSchema,
   component: ReserveConfirmRoute,
 })
 
 function ReserveConfirmRoute() {
   usePageTitle('Confirm HermesWorld reservation')
-  const token = Route.useSearch({ strict: false }).token || ''
+  const token = Route.useSearch().token || ''
   const [state, setState] = useState<{
     status: 'loading' | 'success' | 'error'
     message: string
@@ -22,7 +28,8 @@ function ReserveConfirmRoute() {
     if (!token) {
       setState({
         status: 'error',
-        message: 'Missing confirmation token. Re-open the link from your email.',
+        message:
+          'Missing confirmation token. Re-open the link from your email.',
       })
       return
     }
@@ -63,7 +70,9 @@ function ReserveConfirmRoute() {
               ? 'Confirmation problem.'
               : 'Confirming reservation…'}
         </h1>
-        <p className="mt-4 text-base leading-7 text-[#d7d0bd]/68">{state.message}</p>
+        <p className="mt-4 text-base leading-7 text-[#d7d0bd]/68">
+          {state.message}
+        </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <a
             href="/reserve"

@@ -39,7 +39,8 @@ function classifyConnectionError(
     return {
       title: 'Authentication required',
       description: 'Hermes Agent rejected the connection token.',
-      action: 'Go to Settings -> Advanced -> Hermes Agent to update your token.',
+      action:
+        'Go to Settings -> Advanced -> Hermes Agent to update your token.',
     }
   }
 
@@ -59,7 +60,8 @@ function classifyConnectionError(
     return {
       title: 'Hermes Agent gateway not running',
       description: 'The Hermes Agent gateway is not running on port 8642.',
-      action: 'Run the official Hermes installer, then start the gateway with: hermes gateway run',
+      action:
+        'Run the official Hermes installer, then start the gateway with: hermes gateway run',
     }
   }
 

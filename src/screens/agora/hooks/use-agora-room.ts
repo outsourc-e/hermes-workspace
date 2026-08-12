@@ -59,9 +59,26 @@ export function useAgoraRoom({
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      if (
+        t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.isContentEditable)
+      )
+        return
       const k = e.key.toLowerCase()
-      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+      if (
+        [
+          'w',
+          'a',
+          's',
+          'd',
+          'arrowup',
+          'arrowdown',
+          'arrowleft',
+          'arrowright',
+        ].includes(k)
+      ) {
         keysRef.current.add(k)
         e.preventDefault()
       }
@@ -121,7 +138,10 @@ export function useAgoraRoom({
       setOthers((prev) =>
         prev.map((u) =>
           Math.random() < 0.5
-            ? driftUser(u, { worldWidth: world.width, worldHeight: world.height })
+            ? driftUser(u, {
+                worldWidth: world.width,
+                worldHeight: world.height,
+              })
             : { ...u, isMoving: false },
         ),
       )
@@ -245,7 +265,8 @@ export function useAgoraRoom({
   const nearbyIds = useMemo(() => {
     const ids = new Set<string>()
     for (const o of others) {
-      if (Math.hypot(o.x - self.x, o.y - self.y) < PROXIMITY_PX) ids.add(o.profile.id)
+      if (Math.hypot(o.x - self.x, o.y - self.y) < PROXIMITY_PX)
+        ids.add(o.profile.id)
     }
     return ids
   }, [others, self.x, self.y])

@@ -5,13 +5,14 @@ Last updated: 2026-05-06 02:22 EDT
 Reference: `docs/hermesworld/reference-images/INGAME-TARGET-AGORA.png`
 
 This is the **playable view** the marketing graphic implies.
-When a user is *in* HermesWorld, this is what their screen should look like.
+When a user is _in_ HermesWorld, this is what their screen should look like.
 
 ---
 
 ## What the reference shows
 
 A circular plaza in Agora Commons:
+
 - isometric/over-the-shoulder camera (closer to high 3/4 than top-down)
 - central stone monument with a gold pyramid finial, ringed by lit torches
 - radial cobblestone tiles with rune circles
@@ -22,6 +23,7 @@ A circular plaza in Agora Commons:
 - a wisp/sparkle near front-right (collectible/quest cue)
 
 ### HUD layout
+
 - **Top-left**: player card
   - portrait
   - name "Eric"
@@ -51,6 +53,7 @@ A circular plaza in Agora Commons:
   - "gm builders"
 
 ### Mood
+
 - warm golden hour lighting
 - premium 3D rendered look (Genshin / Honkai / Dragon Quest XII territory)
 - crisp UI overlays with glassy panels and warm inner glow
@@ -87,6 +90,7 @@ Both must be honored. They should feel like the same product.
 ## Asset list driven by this image
 
 ### 3D / world
+
 - circular plaza floor (cobblestones, rune circles)
 - central monument (stone tiers + gold pyramid finial)
 - torches (low + tall)
@@ -100,6 +104,7 @@ Both must be honored. They should feel like the same product.
 - atmospheric particles
 
 ### Characters / agents
+
 - player avatar template, with class swaps:
   - Priest, Guardian, Mage, Rogue, Engineer, Oracle, Bard
 - NPC roster (Agora):
@@ -112,6 +117,7 @@ Both must be honored. They should feel like the same product.
 - agent companions per the marketing graphic
 
 ### UI
+
 - player card panel
 - stat bubbles (HP/MP/SP/XP)
 - objective banner
@@ -124,6 +130,7 @@ Both must be honored. They should feel like the same product.
 - toast cards
 
 ### FX
+
 - torch flames + glow
 - wisps / sparkles
 - dust motes
@@ -144,6 +151,7 @@ Both must be honored. They should feel like the same product.
 ## Realism loop on this view
 
 For every iteration:
+
 1. take the current playable Agora screenshot
 2. diff against `INGAME-TARGET-AGORA.png`
 3. list the top 3 visible differences (camera, lighting, monument, torches, NPCs, HUD, chat panel, etc.)

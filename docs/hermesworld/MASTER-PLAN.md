@@ -21,6 +21,7 @@ HermesWorld = the first **Agentic MMO**.
 - Acquisition narrative: first AI-agent video game company
 
 Two locked references:
+
 - **Marketing/store page spec**: `docs/hermesworld/reference-images/MASTER-PRODUCT-GRAPHIC.png`
 - **Playable in-game spec**: `docs/hermesworld/reference-images/INGAME-TARGET-AGORA.png`
 
@@ -78,6 +79,7 @@ The marketing graphic is what the website looks like. The in-game target is what
 - **Coin fees ($6k+)** → buys GPU time, asset gen credits, CDN, contractor reviewers
 
 Anti-drift gate (every output runs through this):
+
 > Does this serve **Agentic MMO with humans + agents as guildmates**?
 > If yes → ship. If no → reshape or park.
 
@@ -141,10 +143,10 @@ prompt → generate → vision review → optimize → drop into game → screen
 
 ## 7. Persistent goals registry
 
-| Goal ID | File | State |
-| --- | --- | --- |
+| Goal ID                                  | File                                                     | State  |
+| ---------------------------------------- | -------------------------------------------------------- | ------ |
 | 2026-05-06-hermesworld-swarm-game-studio | `memory/goals/2026-05-06-hermesworld-swarm-game-studio/` | active |
-| 2026-05-06-hermesworld-master-plan | this file | active |
+| 2026-05-06-hermesworld-master-plan       | this file                                                | active |
 
 When new goals are spawned, register them here so future agents see them.
 

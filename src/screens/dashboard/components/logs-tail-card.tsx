@@ -30,11 +30,7 @@ function lineTone(line: string): string {
  * Hides itself when the dashboard isn't returning logs (vanilla install
  * with auth disabled, or running without a dashboard).
  */
-export function LogsTailCard({
-  logs,
-}: {
-  logs: DashboardOverview['logs']
-}) {
+export function LogsTailCard({ logs }: { logs: DashboardOverview['logs'] }) {
   const [showModal, setShowModal] = useState(false)
   if (!logs) return null
 

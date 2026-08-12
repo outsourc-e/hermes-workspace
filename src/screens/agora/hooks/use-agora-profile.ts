@@ -13,7 +13,15 @@ import {
 } from '../lib/agora-types'
 
 const FUNNY_ANIMALS = [
-  'Owl', 'Fox', 'Wolf', 'Otter', 'Hawk', 'Lynx', 'Crow', 'Stag', 'Heron',
+  'Owl',
+  'Fox',
+  'Wolf',
+  'Otter',
+  'Hawk',
+  'Lynx',
+  'Crow',
+  'Stag',
+  'Heron',
 ]
 
 function generateInitialProfile(): AgoraProfile {
@@ -40,11 +48,19 @@ function loadProfile(): AgoraProfile {
     const raw = window.localStorage.getItem(AGORA_PROFILE_STORAGE_KEY)
     if (!raw) {
       const initial = generateInitialProfile()
-      window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(initial))
+      window.localStorage.setItem(
+        AGORA_PROFILE_STORAGE_KEY,
+        JSON.stringify(initial),
+      )
       return initial
     }
     const parsed = JSON.parse(raw) as AgoraProfile
-    if (!parsed.id || !parsed.handle || !parsed.displayName || !parsed.avatarId) {
+    if (
+      !parsed.id ||
+      !parsed.handle ||
+      !parsed.displayName ||
+      !parsed.avatarId
+    ) {
       return generateInitialProfile()
     }
     return parsed
@@ -58,7 +74,10 @@ export function useAgoraProfile() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(profile))
+      window.localStorage.setItem(
+        AGORA_PROFILE_STORAGE_KEY,
+        JSON.stringify(profile),
+      )
     } catch {
       // ignore quota / private mode
     }

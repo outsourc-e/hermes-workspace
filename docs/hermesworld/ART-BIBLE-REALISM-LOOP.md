@@ -7,6 +7,7 @@ Last updated: 2026-05-06
 HermesWorld should feel like a premium browser-native fantasy/sci-fi agent RPG, not a demo scene.
 
 Target vibe:
+
 - cinematic dark fantasy meets agent command center
 - realistic/stylized hybrid, readable at browser scale
 - moody lighting, fog, emissive magical UI, high contrast
@@ -14,11 +15,13 @@ Target vibe:
 - every asset should support mechanics
 
 Primary Agora target:
+
 - Use `docs/hermesworld/reference-images/agora-center-inso-reference.jpeg` as the primary visual target for Agora realism work.
 - The goal is a composed game screen: circular civic plaza, central obelisk/monument, warm torchlight, blue/cyan roof/portal accents, dense market edges, clear walkable center, readable NPC clusters, and compact HUD islands.
 - Asset prompts and manifest live in `docs/hermesworld/AGORA-INSO-ASSET-PROMPTS.md`.
 
 Reference workflow from Eric's Downloads:
+
 - Imagegen creates high-quality source material.
 - The game places assets in the real interface.
 - Browser screenshots capture actual player view.
@@ -28,21 +31,25 @@ Reference workflow from Eric's Downloads:
 ## Palette
 
 Base:
+
 - Obsidian: `#080F14`
 - Panel: `#18212B`
 - Deep ink: `#030712`
 
 Accents:
+
 - Action green: `#2FCA94`
 - Vision blue: `#78A8C8`
 - Insight amber: `#F2C768`
 - Arcane purple: `#8B5CF6`, only as controlled magic/glow
 
 Text:
+
 - Primary: `#E6E7EA`
 - Muted: `rgba(230,231,234,.65)`
 
 Avoid:
+
 - oversaturated neon everywhere
 - purple fog as the only mood
 - cute/cartoon mascot style
@@ -52,18 +59,21 @@ Avoid:
 ## Shape language
 
 Panels:
+
 - 6-10px radius
 - 1px low-contrast borders
 - subtle inner highlights
 - dark glass/metal material
 
 HUD:
+
 - compact islands, not slabs
 - status visible at a glance
 - icons readable at 48-64px source size
 - mobile gets its own layout, never desktop squeezed down
 
 World:
+
 - large silhouettes first
 - readable landmarks
 - one hero light source per scene
@@ -73,6 +83,7 @@ World:
 ## Asset rules
 
 Generate with imagegen:
+
 - hero art / zone banners, 16:9
 - NPC portraits, square 1:1, consistent framing
 - item icons, square 1:1, readable at 64px
@@ -105,6 +116,7 @@ Create a mystical sigil icon for HermesWorld. Ancient agent-world symbol, clean 
 ## Vision review checklist
 
 Every screenshot must be judged on:
+
 1. Playable first: can the player tell what to do?
 2. Status visibility: HP/objective/map readable instantly?
 3. HUD readability: text, icon, and tap targets clear?
@@ -117,6 +129,7 @@ Every screenshot must be judged on:
 ## HermesWorld v0.3 realism goals
 
 Minimum visible leap:
+
 - replace flat/placeholder zone art with generated cinematic zone banners
 - 5 NPC portraits with consistent premium framing
 - 12 item icons with readable silhouettes

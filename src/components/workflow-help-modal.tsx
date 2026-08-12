@@ -30,10 +30,16 @@ export function WorkflowHelpModal({
         onClick={() => setOpen(true)}
         className={cn(
           'inline-flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]',
-          compact ? 'px-2.5 py-2 text-xs font-medium' : 'px-3 py-2 text-sm font-medium',
+          compact
+            ? 'px-2.5 py-2 text-xs font-medium'
+            : 'px-3 py-2 text-sm font-medium',
         )}
       >
-        <HugeiconsIcon icon={HelpCircleIcon} size={compact ? 14 : 16} strokeWidth={1.8} />
+        <HugeiconsIcon
+          icon={HelpCircleIcon}
+          size={compact ? 14 : 16}
+          strokeWidth={1.8}
+        />
         <span>{triggerLabel}</span>
       </button>
 
@@ -55,7 +61,11 @@ export function WorkflowHelpModal({
                 className="rounded-lg p-2 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
                 aria-label={`Close ${title}`}
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />
+                <HugeiconsIcon
+                  icon={Cancel01Icon}
+                  size={18}
+                  strokeWidth={1.8}
+                />
               </button>
             </div>
 

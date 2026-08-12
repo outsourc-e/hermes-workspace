@@ -38,9 +38,11 @@ const KIND_ICONS: Record<string, string> = {
  * and a heuristic on the session key (cron sessions use the canonical
  * `cron_<jobId>_<ts>` key format the agent confirmed).
  */
-function sessionGlyph(
-  s: { kind: string; source: string | null; key: string },
-): string {
+function sessionGlyph(s: {
+  kind: string
+  source: string | null
+  key: string
+}): string {
   if (typeof s.key === 'string' && s.key.startsWith('cron_')) {
     return KIND_ICONS.cron
   }
@@ -85,11 +87,7 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
   const badges: Array<SessionBadge> = []
   const now = Date.now()
   // Hot: started or updated within 5 minutes and still idle/active
-  if (
-    s.updatedAt &&
-    now - s.updatedAt < 5 * 60_000 &&
-    s.status !== 'ended'
-  ) {
+  if (s.updatedAt && now - s.updatedAt < 5 * 60_000 && s.status !== 'ended') {
     badges.push({
       label: 'hot',
       tone: 'var(--theme-success)',
@@ -110,7 +108,10 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
       title: `${formatTokens(s.tokenCount)} tokens`,
     })
   }
-  if (s.status?.toLowerCase() === 'error' || s.status?.toLowerCase() === 'failed') {
+  if (
+    s.status?.toLowerCase() === 'error' ||
+    s.status?.toLowerCase() === 'failed'
+  ) {
     badges.push({
       label: 'error',
       tone: 'var(--theme-danger)',
@@ -163,9 +164,7 @@ export function SessionsIntelligenceCard({
 
   // Highlight: top hot session, otherwise top tool-heavy, otherwise top recent.
   const highlightId = useMemo(() => {
-    const hot = enriched.find((e) =>
-      e.badges.some((b) => b.label === 'hot'),
-    )
+    const hot = enriched.find((e) => e.badges.some((b) => b.label === 'hot'))
     if (hot) return hot.session.key
     const heavy = enriched.find((e) =>
       e.badges.some((b) => b.label === 'tool-heavy'),

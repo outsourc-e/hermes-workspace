@@ -54,7 +54,7 @@
     "motion": "^12.29.2",
     "motion-dom": "^12.36.0",
     "motion-utils": "^12.36.0",
-    "playwright": "^1.58.2",
+    "playwright": "^1.62.1",
     "playwright-extra": "^4.3.6",
     "postprocessing": "^6.39.1",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
@@ -82,12 +82,14 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tanstack/eslint-config": "0.3.4",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^5.0.4",
     "concurrently": "^8.2.2",
     "electron": "^40.8.2",

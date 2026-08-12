@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { ensureGatewayProbed, getResolvedUrls } from '../../server/gateway-capabilities'
+import {
+  ensureGatewayProbed,
+  getResolvedUrls,
+} from '../../server/gateway-capabilities'
 import { getBearerToken } from '../../server/openai-compat-api'
 
 type DecomposeRequest = {
@@ -40,7 +43,11 @@ Rules:
 - Keep rationale short (one sentence).
 `
 
-async function callOrchestrator(prompt: string, workers: WorkerHint[], model: string): Promise<{ assignments: RouteAssignment[]; unassigned: string[] }>{
+async function callOrchestrator(
+  prompt: string,
+  workers: WorkerHint[],
+  model: string,
+): Promise<{ assignments: RouteAssignment[]; unassigned: string[] }> {
   const rosterText = workers
     .map((worker) => {
       const parts = [
@@ -49,9 +56,13 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
         worker.specialty ? `specialty=${worker.specialty}` : '',
         worker.mission ? `mission=${worker.mission}` : '',
         worker.skills?.length ? `skills=${worker.skills.join(',')}` : '',
-        worker.capabilities?.length ? `capabilities=${worker.capabilities.join(',')}` : '',
+        worker.capabilities?.length
+          ? `capabilities=${worker.capabilities.join(',')}`
+          : '',
         worker.notes ? `notes=${worker.notes}` : '',
-      ].filter(Boolean).join('; ')
+      ]
+        .filter(Boolean)
+        .join('; ')
       return `- ${worker.id}${parts ? ` — ${parts}` : ''}`
     })
     .join('\n')
@@ -83,7 +94,9 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
     const text = await res.text().catch(() => '')
     throw new Error(`Orchestrator HTTP ${res.status}: ${text.slice(0, 240)}`)
   }
-  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>
+  }
   const raw = data.choices?.[0]?.message?.content?.trim() ?? ''
   if (!raw) throw new Error('Orchestrator returned empty content')
 
@@ -91,14 +104,18 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')
   if (start === -1 || end === -1 || end <= start) {
-    throw new Error(`Orchestrator did not return JSON. Snippet: ${raw.slice(0, 240)}`)
+    throw new Error(
+      `Orchestrator did not return JSON. Snippet: ${raw.slice(0, 240)}`,
+    )
   }
   const slice = raw.slice(start, end + 1)
   let parsed: unknown
   try {
     parsed = JSON.parse(slice)
   } catch (error) {
-    throw new Error(`Orchestrator returned invalid JSON: ${(error as Error).message}`)
+    throw new Error(
+      `Orchestrator returned invalid JSON: ${(error as Error).message}`,
+    )
   }
 
   const obj = parsed as { assignments?: unknown; unassigned?: unknown }
@@ -108,9 +125,11 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
   for (const entry of assignmentsRaw) {
     if (!entry || typeof entry !== 'object') continue
     const item = entry as Record<string, unknown>
-    const workerId = typeof item.workerId === 'string' ? item.workerId.trim() : ''
+    const workerId =
+      typeof item.workerId === 'string' ? item.workerId.trim() : ''
     const task = typeof item.task === 'string' ? item.task.trim() : ''
-    const rationale = typeof item.rationale === 'string' ? item.rationale.trim() : ''
+    const rationale =
+      typeof item.rationale === 'string' ? item.rationale.trim() : ''
     if (!workerId || !task) continue
     if (!validIds.has(workerId)) continue
     assignments.push({ workerId, task, rationale })
@@ -123,18 +142,35 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
   return { assignments, unassigned }
 }
 
-
 function scoreWorker(prompt: string, worker: WorkerHint): number {
-  const text = [worker.id, worker.role, worker.model, worker.specialty, worker.mission, ...(worker.skills ?? []), ...(worker.capabilities ?? []), worker.notes]
+  const text = [
+    worker.id,
+    worker.role,
+    worker.model,
+    worker.specialty,
+    worker.mission,
+    ...(worker.skills ?? []),
+    ...(worker.capabilities ?? []),
+    worker.notes,
+  ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase()
   const lower = prompt.toLowerCase()
   let score = 0
   const pairs: Array<[RegExp, Array<string>]> = [
-    [/research|investigate|options|tradeoff|source|synth/i, ['research', 'analysis']],
-    [/build|implement|code|patch|ui|frontend|backend|api|fix/i, ['builder', 'implementation', 'ui', 'backend', 'runtime']],
-    [/review|test|verify|quality|regression|gate/i, ['reviewer', 'review', 'pr', 'issues']],
+    [
+      /research|investigate|options|tradeoff|source|synth/i,
+      ['research', 'analysis'],
+    ],
+    [
+      /build|implement|code|patch|ui|frontend|backend|api|fix/i,
+      ['builder', 'implementation', 'ui', 'backend', 'runtime'],
+    ],
+    [
+      /review|test|verify|quality|regression|gate/i,
+      ['reviewer', 'review', 'pr', 'issues'],
+    ],
     [/pr|issue|github|repro/i, ['pr', 'issues', 'github']],
     [/ops|health|runtime|tmux|gateway/i, ['ops', 'runtime', 'backend']],
     [/docs|handoff|spec|readme/i, ['docs', 'scribe']],
@@ -147,12 +183,19 @@ function scoreWorker(prompt: string, worker: WorkerHint): number {
   return score
 }
 
-function heuristicAssignments(prompt: string, workers: WorkerHint[]): { assignments: RouteAssignment[]; unassigned: string[] } {
+function heuristicAssignments(
+  prompt: string,
+  workers: WorkerHint[],
+): { assignments: RouteAssignment[]; unassigned: string[] } {
   const ranked = [...workers]
     .map((worker) => ({ worker, score: scoreWorker(prompt, worker) }))
     .sort((a, b) => b.score - a.score || a.worker.id.localeCompare(b.worker.id))
-  const selected = ranked.filter((row) => row.score > 0).slice(0, Math.min(3, workers.length))
-  const fallback = selected.length ? selected : ranked.slice(0, Math.min(2, workers.length))
+  const selected = ranked
+    .filter((row) => row.score > 0)
+    .slice(0, Math.min(3, workers.length))
+  const fallback = selected.length
+    ? selected
+    : ranked.slice(0, Math.min(2, workers.length))
   const assignments = fallback.map(({ worker }) => ({
     workerId: worker.id,
     task: `Handle your lane for this Swarm2 mission and return only the required proof checkpoint. Mission: ${prompt}`,
@@ -160,7 +203,11 @@ function heuristicAssignments(prompt: string, workers: WorkerHint[]): { assignme
   }))
   return {
     assignments,
-    unassigned: selected.length ? [] : ['Model decomposition failed or produced no confident matches; used deterministic roster fallback.'],
+    unassigned: selected.length
+      ? []
+      : [
+          'Model decomposition failed or produced no confident matches; used deterministic roster fallback.',
+        ],
   }
 }
 
@@ -173,11 +220,16 @@ export const Route = createFileRoute('/api/swarm-decompose')({
         }
         await ensureGatewayProbed()
         let body: DecomposeRequest
-        try { body = await request.json() as DecomposeRequest } catch { return json({ error: 'Invalid JSON body' }, { status: 400 }) }
+        try {
+          body = (await request.json()) as DecomposeRequest
+        } catch {
+          return json({ error: 'Invalid JSON body' }, { status: 400 })
+        }
 
         const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
         if (!prompt) return json({ error: 'prompt required' }, { status: 400 })
-        if (prompt.length > 16_000) return json({ error: 'prompt too long' }, { status: 400 })
+        if (prompt.length > 16_000)
+          return json({ error: 'prompt too long' }, { status: 400 })
 
         const workersRaw = Array.isArray(body.workers) ? body.workers : []
         const workers: WorkerHint[] = []
@@ -190,16 +242,29 @@ export const Route = createFileRoute('/api/swarm-decompose')({
             id,
             role: typeof obj.role === 'string' ? obj.role : undefined,
             model: typeof obj.model === 'string' ? obj.model : undefined,
-            specialty: typeof obj.specialty === 'string' ? obj.specialty : undefined,
+            specialty:
+              typeof obj.specialty === 'string' ? obj.specialty : undefined,
             mission: typeof obj.mission === 'string' ? obj.mission : undefined,
-            skills: Array.isArray(obj.skills) ? obj.skills.filter((value): value is string => typeof value === 'string') : undefined,
-            capabilities: Array.isArray(obj.capabilities) ? obj.capabilities.filter((value): value is string => typeof value === 'string') : undefined,
+            skills: Array.isArray(obj.skills)
+              ? obj.skills.filter(
+                  (value): value is string => typeof value === 'string',
+                )
+              : undefined,
+            capabilities: Array.isArray(obj.capabilities)
+              ? obj.capabilities.filter(
+                  (value): value is string => typeof value === 'string',
+                )
+              : undefined,
             notes: typeof obj.notes === 'string' ? obj.notes : undefined,
           })
         }
-        if (workers.length === 0) return json({ error: 'workers[] required' }, { status: 400 })
+        if (workers.length === 0)
+          return json({ error: 'workers[] required' }, { status: 400 })
 
-        const requestedModel = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : (process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-opus-4-7')
+        const requestedModel =
+          typeof body.model === 'string' && body.model.trim()
+            ? body.model.trim()
+            : (process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-opus-4-7')
 
         try {
           const result = await callOrchestrator(prompt, workers, requestedModel)
@@ -214,7 +279,8 @@ export const Route = createFileRoute('/api/swarm-decompose')({
           return json({
             ok: true,
             fallback: true,
-            warning: error instanceof Error ? error.message : 'decompose failed',
+            warning:
+              error instanceof Error ? error.message : 'decompose failed',
             decomposedAt: Date.now(),
             model: requestedModel,
             ...fallback,

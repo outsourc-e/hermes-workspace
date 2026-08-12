@@ -112,7 +112,9 @@ export function collectSyntheticLiveToolEvents({
       readString(toolCall.name) ||
       readString(toolFunction?.name) ||
       'tool'
-    const args = parseJsonIfPossible(toolFunction?.arguments ?? toolCall.arguments)
+    const args = parseJsonIfPossible(
+      toolFunction?.arguments ?? toolCall.arguments,
+    )
     const resultEntry = resultByCallId.get(toolCallId)
     const nextPhase = resultEntry
       ? resultEntry.isError

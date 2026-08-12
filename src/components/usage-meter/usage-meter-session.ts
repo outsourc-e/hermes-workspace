@@ -34,7 +34,8 @@ export function resolveContextAlertThreshold({
   if (current <= previous) return null
 
   const crossed = thresholds.filter(
-    (threshold) => previous < threshold && current >= threshold && !sent[threshold],
+    (threshold) =>
+      previous < threshold && current >= threshold && !sent[threshold],
   )
 
   if (crossed.length === 0) return null

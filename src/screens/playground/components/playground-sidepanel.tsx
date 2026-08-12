@@ -118,15 +118,22 @@ export function PlaygroundSidePanel({
         <div
           className="pointer-events-auto fixed right-3 top-[356px] z-[76] rounded-2xl border-2 bg-gradient-to-b from-[#0b1320]/92 to-black/86 p-3 text-white shadow-2xl backdrop-blur-xl md:w-[280px]"
           hidden={!questRailOpen}
-
           style={{
             borderColor: `${worldAccent}55`,
             boxShadow: `0 0 16px ${worldAccent}33, 0 8px 22px rgba(0,0,0,.55)`,
           }}
         >
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/55">Quest Tracker</span>
-            <button type="button" onClick={() => setQuestRailOpen(false)} className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white/55">Hide</button>
+            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/55">
+              Quest Tracker
+            </span>
+            <button
+              type="button"
+              onClick={() => setQuestRailOpen(false)}
+              className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white/55"
+            >
+              Hide
+            </button>
           </div>
           <div className="flex items-start gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg">

@@ -9,7 +9,10 @@ import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../../server/gateway-capabilities'
-import { requireJsonContentType, safeErrorMessage } from '../../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import { getConfig, saveConfig } from '../../../server/claude-dashboard-api'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
@@ -48,18 +51,32 @@ export const Route = createFileRoute('/api/mcp/$name')({
         }
         const name = (params as { name?: string }).name?.trim() || ''
         if (!name) {
-          return json({ ok: false, error: 'Missing server name' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Missing server name' },
+            { status: 400 },
+          )
         }
         try {
           if (capabilities.mcp) {
-            const response = await mcpFetch(`/api/mcp/${encodeURIComponent(name)}`, {
-              method: 'DELETE',
-              signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-            })
+            const response = await mcpFetch(
+              `/api/mcp/${encodeURIComponent(name)}`,
+              {
+                method: 'DELETE',
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+              },
+            )
             if (!response.ok) {
-              const body = (await response.json().catch(() => ({}))) as Record<string, unknown>
+              const body = (await response.json().catch(() => ({}))) as Record<
+                string,
+                unknown
+              >
               return json(
-                { ok: false, error: (body.error as string) || `MCP delete failed (${response.status})` },
+                {
+                  ok: false,
+                  error:
+                    (body.error as string) ||
+                    `MCP delete failed (${response.status})`,
+                },
                 { status: response.status || 502 },
               )
             }
@@ -77,19 +94,29 @@ export const Route = createFileRoute('/api/mcp/$name')({
               : cfg
           const rawServers = root.mcp_servers
           const servers =
-            rawServers && typeof rawServers === 'object' && !Array.isArray(rawServers)
+            rawServers &&
+            typeof rawServers === 'object' &&
+            !Array.isArray(rawServers)
               ? { ...(rawServers as Record<string, unknown>) }
               : {}
           if (!(name in servers)) {
-            return json({ ok: false, error: `MCP server not found: ${name}` }, { status: 404 })
+            return json(
+              { ok: false, error: `MCP server not found: ${name}` },
+              { status: 404 },
+            )
           }
           delete servers[name]
           // Mark the deleted key as null so deepMerge in saveConfig removes it.
-          const patch: Record<string, unknown> = { mcp_servers: { ...servers, [name]: null } }
+          const patch: Record<string, unknown> = {
+            mcp_servers: { ...servers, [name]: null },
+          }
           await saveConfig(patch)
           return json({ ok: true })
         } catch (err) {
-          return json({ ok: false, error: safeErrorMessage(err) }, { status: 500 })
+          return json(
+            { ok: false, error: safeErrorMessage(err) },
+            { status: 500 },
+          )
         }
       },
     },

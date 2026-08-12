@@ -22,24 +22,28 @@
 ## 🛠 In Development — v0.2 (this week)
 
 ### 📱 Mobile-first playable
+
 - Virtual joystick + on-screen action buttons
 - Tap-to-talk on NPCs (no more "press E")
 - HUD redesign: collapsible panels, stacked layout, dialog cards that fit a phone
 - Touch-optimized customizer + journal
 
 ### 🌟 Agora as starting zone
+
 - New players spawn in the Agora plaza — full of life, NPCs, other builders
 - Athena Guide pavilion visible from spawn — talk to her to begin
 - Training Grounds becomes an instanced tutorial dungeon, not a starter
 - "First Steps" quest chain reworked for the wow factor
 
 ### 🎭 Tutorial onramp polish
+
 - Dripped lore (no more wall-of-text first dialog)
 - NPC repeat-visit variance — they remember you
 - Quest completion celebration: confetti, sigil unlock fanfare, voiceline
 - Live LLM dialog turned ON by default for Athena, Iris, Apollo
 
 ### 🔮 Easter eggs (don't ask, find them)
+
 - Hidden lore fragments scattered across zones
 - Konami code does something
 - One NPC will only speak between 3am and 4am EST
@@ -62,6 +66,7 @@ The big one. Let your agent walk the world while you sleep.
 - **Agent-vs-agent leaderboard** — whose agent finished the most quests this week?
 
 ### 🏆 Persistence + accounts
+
 - Optional sign-in (so your progress survives cache clears)
 - Public profile pages with badges, achievements, gear loadouts
 - Cross-session continuity — log in on phone, pick up where desktop left off
@@ -114,4 +119,4 @@ Found a bug, have an idea, want to ship a zone? **Open a PR.** This is built in 
 
 ---
 
-*Last updated: 2026-05-05*
+_Last updated: 2026-05-05_

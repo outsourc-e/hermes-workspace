@@ -27,7 +27,11 @@ function setEnv(key: string, value: string | undefined) {
 function writeRuntime(workerId: string, runtime: Record<string, unknown>) {
   const profilePath = path.join(tmpHome, 'profiles', workerId)
   fs.mkdirSync(profilePath, { recursive: true })
-  fs.writeFileSync(path.join(profilePath, 'runtime.json'), JSON.stringify(runtime, null, 2) + '\n', 'utf-8')
+  fs.writeFileSync(
+    path.join(profilePath, 'runtime.json'),
+    JSON.stringify(runtime, null, 2) + '\n',
+    'utf-8',
+  )
 }
 
 beforeEach(() => {
@@ -73,7 +77,11 @@ describe('/api/swarm-runtime/reset', () => {
       request: new Request('http://localhost/api/swarm-runtime/reset', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workerIds: ['augur'], actor: 'test-suite', reason: 'manual cleanup' }),
+        body: JSON.stringify({
+          workerIds: ['augur'],
+          actor: 'test-suite',
+          reason: 'manual cleanup',
+        }),
       }),
     })
     const body = await res.json()
@@ -83,8 +91,18 @@ describe('/api/swarm-runtime/reset', () => {
     expect(body.workerIds).toEqual(['augur'])
     expect(body.resetCount).toBe(1)
 
-    const augurRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'augur', 'runtime.json'), 'utf-8'))
-    const consulRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'consul', 'runtime.json'), 'utf-8'))
+    const augurRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'augur', 'runtime.json'),
+        'utf-8',
+      ),
+    )
+    const consulRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'consul', 'runtime.json'),
+        'utf-8',
+      ),
+    )
 
     expect(augurRuntime.state).toBe('idle')
     expect(augurRuntime.phase).toBe('cancelled')
@@ -96,9 +114,21 @@ describe('/api/swarm-runtime/reset', () => {
   })
 
   it('resets all worker profiles but skips the synthetic workspace profile', async () => {
-    writeRuntime('builder', { workerId: 'builder', state: 'blocked', phase: 'stalled' })
-    writeRuntime('reviewer', { workerId: 'reviewer', state: 'executing', phase: 'running' })
-    writeRuntime('workspace', { workerId: 'workspace', state: 'blocked', phase: 'stalled' })
+    writeRuntime('builder', {
+      workerId: 'builder',
+      state: 'blocked',
+      phase: 'stalled',
+    })
+    writeRuntime('reviewer', {
+      workerId: 'reviewer',
+      state: 'executing',
+      phase: 'running',
+    })
+    writeRuntime('workspace', {
+      workerId: 'workspace',
+      state: 'blocked',
+      phase: 'stalled',
+    })
 
     const handlers = await loadHandlers()
     const res = await handlers.POST({
@@ -113,9 +143,24 @@ describe('/api/swarm-runtime/reset', () => {
     expect(res.status).toBe(200)
     expect(body.workerIds).toEqual(['builder', 'reviewer'])
 
-    const builderRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'builder', 'runtime.json'), 'utf-8'))
-    const reviewerRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'reviewer', 'runtime.json'), 'utf-8'))
-    const workspaceRuntime = JSON.parse(fs.readFileSync(path.join(tmpHome, 'profiles', 'workspace', 'runtime.json'), 'utf-8'))
+    const builderRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'builder', 'runtime.json'),
+        'utf-8',
+      ),
+    )
+    const reviewerRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'reviewer', 'runtime.json'),
+        'utf-8',
+      ),
+    )
+    const workspaceRuntime = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpHome, 'profiles', 'workspace', 'runtime.json'),
+        'utf-8',
+      ),
+    )
 
     expect(builderRuntime.state).toBe('idle')
     expect(reviewerRuntime.state).toBe('idle')
@@ -123,7 +168,11 @@ describe('/api/swarm-runtime/reset', () => {
   })
 
   it('rejects unknown worker ids', async () => {
-    writeRuntime('builder', { workerId: 'builder', state: 'blocked', phase: 'stalled' })
+    writeRuntime('builder', {
+      workerId: 'builder',
+      state: 'blocked',
+      phase: 'stalled',
+    })
 
     const handlers = await loadHandlers()
     const res = await handlers.POST({

@@ -35,7 +35,10 @@ function isHttpsLikeUrl(value: string): boolean {
 export function parseMcpServerInput(raw: unknown): ValidateResult {
   const errors: Array<ValidationError> = []
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { ok: false, errors: [{ path: '', message: 'payload must be an object' }] }
+    return {
+      ok: false,
+      errors: [{ path: '', message: 'payload must be an object' }],
+    }
   }
   const r = raw as Record<string, unknown>
 
@@ -63,26 +66,44 @@ export function parseMcpServerInput(raw: unknown): ValidateResult {
   // Transport-specific validation
   if (transport === 'http') {
     if (!out.url) {
-      errors.push({ path: 'url', message: 'url is required for http transport' })
+      errors.push({
+        path: 'url',
+        message: 'url is required for http transport',
+      })
     } else if (!isHttpsLikeUrl(out.url)) {
       errors.push({ path: 'url', message: 'url must be http(s)' })
     }
     if (out.command) {
-      errors.push({ path: 'command', message: 'command is not allowed for http transport' })
+      errors.push({
+        path: 'command',
+        message: 'command is not allowed for http transport',
+      })
     }
     if (out.args) {
-      errors.push({ path: 'args', message: 'args is not allowed for http transport' })
+      errors.push({
+        path: 'args',
+        message: 'args is not allowed for http transport',
+      })
     }
   } else {
     // stdio
     if (!out.command) {
-      errors.push({ path: 'command', message: 'command is required for stdio transport' })
+      errors.push({
+        path: 'command',
+        message: 'command is required for stdio transport',
+      })
     }
     if (!out.args) {
-      errors.push({ path: 'args', message: 'args is required for stdio transport' })
+      errors.push({
+        path: 'args',
+        message: 'args is required for stdio transport',
+      })
     }
     if (out.url) {
-      errors.push({ path: 'url', message: 'url is not allowed for stdio transport' })
+      errors.push({
+        path: 'url',
+        message: 'url is not allowed for stdio transport',
+      })
     }
   }
 
@@ -91,7 +112,10 @@ export function parseMcpServerInput(raw: unknown): ValidateResult {
     const env: Record<string, string> = {}
     for (const [k, v] of envEntries) {
       if (!ENV_KEY_RE.test(k)) {
-        errors.push({ path: `env.${k}`, message: 'env keys must match /^[A-Z][A-Z0-9_]*$/' })
+        errors.push({
+          path: `env.${k}`,
+          message: 'env keys must match /^[A-Z][A-Z0-9_]*$/',
+        })
         continue
       }
       env[k] = String(v ?? '')
@@ -101,11 +125,18 @@ export function parseMcpServerInput(raw: unknown): ValidateResult {
 
   if (r.headers && typeof r.headers === 'object' && !Array.isArray(r.headers)) {
     out.headers = Object.fromEntries(
-      Object.entries(r.headers as Record<string, unknown>).map(([k, v]) => [k, String(v ?? '')]),
+      Object.entries(r.headers as Record<string, unknown>).map(([k, v]) => [
+        k,
+        String(v ?? ''),
+      ]),
     )
   }
 
-  if (r.authType === 'bearer' || r.authType === 'oauth' || r.authType === 'none') {
+  if (
+    r.authType === 'bearer' ||
+    r.authType === 'oauth' ||
+    r.authType === 'none'
+  ) {
     out.authType = r.authType
   }
   if (typeof r.bearerToken === 'string') out.bearerToken = r.bearerToken
@@ -115,13 +146,22 @@ export function parseMcpServerInput(raw: unknown): ValidateResult {
       out.oauth = {
         clientId: o.clientId,
         clientSecret: o.clientSecret,
-        authorizationUrl: typeof o.authorizationUrl === 'string' ? o.authorizationUrl : undefined,
+        authorizationUrl:
+          typeof o.authorizationUrl === 'string'
+            ? o.authorizationUrl
+            : undefined,
         tokenUrl: typeof o.tokenUrl === 'string' ? o.tokenUrl : undefined,
-        scopes: Array.isArray(o.scopes) ? (o.scopes as Array<string>) : undefined,
+        scopes: Array.isArray(o.scopes)
+          ? (o.scopes as Array<string>)
+          : undefined,
       }
     }
   }
-  if (r.toolMode === 'all' || r.toolMode === 'include' || r.toolMode === 'exclude') {
+  if (
+    r.toolMode === 'all' ||
+    r.toolMode === 'include' ||
+    r.toolMode === 'exclude'
+  ) {
     out.toolMode = r.toolMode
   }
   if (Array.isArray(r.includeTools)) {

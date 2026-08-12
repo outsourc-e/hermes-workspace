@@ -36,12 +36,14 @@ HermesWorld should be built like an agent-native game studio:
 Goal: make HermesWorld playable on phones.
 
 Outputs:
+
 - fixed viewport, no document scroll
 - mobile HUD island layout
 - collapsible objective/chat
 - actual mobile smoke notes
 
 Stop condition:
+
 - build passes and screenshot/description proves no scroll/clutter regression
 
 ### Lane B — World/gameplay systems
@@ -49,12 +51,14 @@ Stop condition:
 Goal: make the game loop feel real.
 
 Outputs:
+
 - quest/event system boundaries
 - NPC dialog/state model
 - inventory/title/reward system cleanup
 - agent action API shape
 
 Stop condition:
+
 - minimal patch or spec with exact files and interfaces
 
 ### Lane C — Content/easter eggs
@@ -62,12 +66,14 @@ Stop condition:
 Goal: ship discoverability and lore without leaking prizes.
 
 Outputs:
+
 - public lore/easter egg layer
 - private prize-oracle interface
 - 7-sigil hunt design
 - decoy vs prize-sensitive boundary
 
 Stop condition:
+
 - no hardcoded prize coordinates/secrets in client
 
 ### Lane D — Infra/multiplayer/prize oracle
@@ -75,12 +81,14 @@ Stop condition:
 Goal: server-authoritative backbone.
 
 Outputs:
+
 - Cloudflare Worker architecture
 - claim endpoint contract
 - wallet signed-message flow
 - anti-cheat/rate-limit/event-log model
 
 Stop condition:
+
 - private-service spec and stubs only unless secrets are available
 
 ### Lane E — Art/assets/procedural generation
@@ -88,12 +96,14 @@ Stop condition:
 Goal: make zones look better fast.
 
 Outputs:
+
 - asset pipeline recommendation
 - glTF/low-poly style guide
 - prompt library for Meshy/Tripo/Spline/Codex asset generation
 - zone visual pass plan
 
 Stop condition:
+
 - 5 concrete tools/prompts/assets to test this week
 
 ### Lane F — Integration reviewer
@@ -101,6 +111,7 @@ Stop condition:
 Goal: prevent swarm chaos.
 
 Outputs:
+
 - review every lane for overlap/security/perf
 - enforce small patches
 - reject client-side secrets

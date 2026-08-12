@@ -30,13 +30,20 @@ function emitMute() {
 function applyMute() {
   if (!masterGain) return
   masterGain.gain.cancelScheduledValues(audioContext!.currentTime)
-  masterGain.gain.setTargetAtTime(mutedCache ? 0 : 0.82, audioContext!.currentTime, 0.03)
+  masterGain.gain.setTargetAtTime(
+    mutedCache ? 0 : 0.82,
+    audioContext!.currentTime,
+    0.03,
+  )
 }
 
 function ensureContext() {
   if (typeof window === 'undefined') return null
   if (!audioContext) {
-    const Ctor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const Ctor =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext
     if (!Ctor) return null
     audioContext = new Ctor()
     masterGain = audioContext.createGain()
@@ -91,7 +98,14 @@ function createNoiseBuffer(ctx: AudioContext, duration = 1.5) {
   return buffer
 }
 
-function connectTone(ctx: AudioContext, frequency: number, type: OscillatorType, start: number, duration: number, gainValue: number) {
+function connectTone(
+  ctx: AudioContext,
+  frequency: number,
+  type: OscillatorType,
+  start: number,
+  duration: number,
+  gainValue: number,
+) {
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
   osc.type = type
@@ -105,7 +119,14 @@ function connectTone(ctx: AudioContext, frequency: number, type: OscillatorType,
   osc.stop(start + duration + 0.05)
 }
 
-function connectWhoosh(ctx: AudioContext, start: number, duration: number, fromHz: number, toHz: number, gainValue: number) {
+function connectWhoosh(
+  ctx: AudioContext,
+  start: number,
+  duration: number,
+  fromHz: number,
+  toHz: number,
+  gainValue: number,
+) {
   const source = ctx.createBufferSource()
   source.buffer = createNoiseBuffer(ctx, duration + 0.2)
   const filter = ctx.createBiquadFilter()

@@ -29,9 +29,15 @@ type Stats = {
 type Transport = 'offline' | 'broadcast' | 'ws' | 'both'
 
 const STATS_URL =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_PLAYGROUND_STATS_URL) || ''
+  (typeof import.meta !== 'undefined' &&
+    (import.meta as any).env?.VITE_PLAYGROUND_STATS_URL) ||
+  ''
 
-export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }) {
+export function PlaygroundOnlineChip({
+  accent = '#34d399',
+}: {
+  accent?: string
+}) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [transport, setTransport] = useState<Transport>('offline')
   const [reachable, setReachable] = useState<boolean | null>(null)
@@ -55,7 +61,9 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
     // Pre-populate from window globals if hook fired before mount.
     const cur = (window as any).__hermesPlaygroundLiveCount as Stats | undefined
     if (cur) setStats(cur)
-    const curT = (window as any).__hermesPlaygroundLiveTransport as Transport | undefined
+    const curT = (window as any).__hermesPlaygroundLiveTransport as
+      | Transport
+      | undefined
     if (curT) setTransport(curT)
 
     // Fallback: one-shot /stats fetch if no push arrives in 3s.
@@ -95,7 +103,8 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
   // count from /stats (it does NOT include you yet because you haven't connected).
   const liveConnected = transport === 'ws' || transport === 'both'
   const n = stats?.online ?? 0
-  const displayCount = stats == null ? '—' : liveConnected ? String(n) : n === 0 ? '0' : String(n)
+  const displayCount =
+    stats == null ? '—' : liveConnected ? String(n) : n === 0 ? '0' : String(n)
   const status: { color: string; label: string } = (() => {
     switch (transport) {
       case 'both':
@@ -137,11 +146,16 @@ export function PlaygroundOnlineChip({ accent = '#34d399' }: { accent?: string }
           borderRadius: '50%',
           background: status.color,
           boxShadow: `0 0 8px ${status.color}`,
-          animation: status.color === '#34d399' ? 'pulse-online 2s ease-in-out infinite' : undefined,
+          animation:
+            status.color === '#34d399'
+              ? 'pulse-online 2s ease-in-out infinite'
+              : undefined,
         }}
       />
       <span>Players online</span>
-      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/80">{displayCount}</span>
+      <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/80">
+        {displayCount}
+      </span>
       {stats?.peakToday && stats.peakToday > 0 && (
         <span className="text-white/45">· peak {stats.peakToday}</span>
       )}

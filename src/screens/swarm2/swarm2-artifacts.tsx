@@ -110,22 +110,29 @@ export function Swarm2Artifacts({
 }: Swarm2ArtifactsProps) {
   const declaredArtifacts = artifacts ?? []
   const changedFileArtifacts =
-    changedFiles.length > 0 ? synthesizeFromChangedFiles(workerId, changedFiles) : []
-  const showingChangedFiles = mode === 'files'
-    ? changedFileArtifacts.length > 0
-    : mode === 'artifacts'
-      ? false
-      : changedFileArtifacts.length > 0
-  const allArtifacts = mode === 'files'
-    ? changedFileArtifacts
-    : showingChangedFiles
+    changedFiles.length > 0
+      ? synthesizeFromChangedFiles(workerId, changedFiles)
+      : []
+  const showingChangedFiles =
+    mode === 'files'
+      ? changedFileArtifacts.length > 0
+      : mode === 'artifacts'
+        ? false
+        : changedFileArtifacts.length > 0
+  const allArtifacts =
+    mode === 'files'
       ? changedFileArtifacts
-      : declaredArtifacts
+      : showingChangedFiles
+        ? changedFileArtifacts
+        : declaredArtifacts
   const allPreviews = previews ?? []
   const limit = expanded ? expandedLimit : collapsedLimit
   const visibleArtifacts = allArtifacts.slice(0, limit)
   const visiblePreviews = allPreviews.slice(0, expanded ? 4 : 2)
-  const overflowArtifacts = Math.max(0, allArtifacts.length - visibleArtifacts.length)
+  const overflowArtifacts = Math.max(
+    0,
+    allArtifacts.length - visibleArtifacts.length,
+  )
   const isEmpty = allArtifacts.length === 0 && allPreviews.length === 0
 
   return (
@@ -154,7 +161,12 @@ export function Swarm2Artifacts({
       ) : null}
 
       <div className={cn('space-y-2', centered && 'text-center')}>
-        <p className={cn('text-[11px] leading-relaxed text-[var(--theme-muted)]', centered && 'mx-auto max-w-2xl')}>
+        <p
+          className={cn(
+            'text-[11px] leading-relaxed text-[var(--theme-muted)]',
+            centered && 'mx-auto max-w-2xl',
+          )}
+        >
           {isEmpty
             ? `No artifacts yet for ${workerId}. Will surface as the agent writes files, diffs, or build outputs.`
             : showingChangedFiles
@@ -163,7 +175,12 @@ export function Swarm2Artifacts({
         </p>
 
         {visibleArtifacts.length > 0 ? (
-          <div className={cn('flex flex-wrap gap-1.5', centered && 'justify-center')}>
+          <div
+            className={cn(
+              'flex flex-wrap gap-1.5',
+              centered && 'justify-center',
+            )}
+          >
             {visibleArtifacts.slice(0, expanded ? 6 : 4).map((artifact) => {
               const icon = iconForKind(artifact.kind)
               return (
@@ -173,7 +190,9 @@ export function Swarm2Artifacts({
                   className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] text-[var(--theme-muted-2)]"
                 >
                   <HugeiconsIcon icon={icon} size={9} />
-                  <span className="truncate max-w-[10rem]">{shortLabel(artifact.label, 24)}</span>
+                  <span className="truncate max-w-[10rem]">
+                    {shortLabel(artifact.label, 24)}
+                  </span>
                 </span>
               )
             })}
@@ -186,7 +205,12 @@ export function Swarm2Artifacts({
         ) : null}
 
         {visiblePreviews.length > 0 ? (
-          <div className={cn('flex flex-wrap items-center gap-1', centered && 'justify-center')}>
+          <div
+            className={cn(
+              'flex flex-wrap items-center gap-1',
+              centered && 'justify-center',
+            )}
+          >
             {visiblePreviews.map((preview) => (
               <a
                 key={preview.id}
@@ -203,7 +227,9 @@ export function Swarm2Artifacts({
                 )}
               >
                 <HugeiconsIcon icon={Globe02Icon} size={9} />
-                <span className="max-w-[7rem] truncate">{shortLabel(preview.label, 18)}</span>
+                <span className="max-w-[7rem] truncate">
+                  {shortLabel(preview.label, 18)}
+                </span>
                 <HugeiconsIcon icon={ArrowExpand02Icon} size={8} />
               </a>
             ))}

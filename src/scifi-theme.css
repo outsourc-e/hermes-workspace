@@ -18,8 +18,10 @@
   --theme-text: #e0f7fa;
   --theme-muted: #5d9bb8;
   --theme-shadow-1: 0 1px 3px rgba(0, 240, 255, 0.06);
-  --theme-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 240, 255, 0.1);
-  --theme-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 240, 255, 0.08);
+  --theme-shadow-2:
+    0 4px 16px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 240, 255, 0.1);
+  --theme-shadow-3:
+    0 12px 40px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 240, 255, 0.08);
   --theme-glass: rgba(6, 11, 24, 0.9);
   --theme-focus: #00f0ff;
   --theme-accent: #00f0ff;

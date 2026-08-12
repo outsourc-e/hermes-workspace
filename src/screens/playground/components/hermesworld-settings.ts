@@ -84,28 +84,49 @@ export const DEFAULT_HERMESWORLD_SETTINGS: HermesWorldSettings = {
   },
 }
 
-function mergeSettings(value: Partial<HermesWorldSettings> | null): HermesWorldSettings {
+function mergeSettings(
+  value: Partial<HermesWorldSettings> | null,
+): HermesWorldSettings {
   return {
     ...DEFAULT_HERMESWORLD_SETTINGS,
     ...value,
     graphics: { ...DEFAULT_HERMESWORLD_SETTINGS.graphics, ...value?.graphics },
-    performance: { ...DEFAULT_HERMESWORLD_SETTINGS.performance, ...value?.performance },
+    performance: {
+      ...DEFAULT_HERMESWORLD_SETTINGS.performance,
+      ...value?.performance,
+    },
     controls: {
       ...DEFAULT_HERMESWORLD_SETTINGS.controls,
       ...value?.controls,
-      bindings: { ...DEFAULT_HERMESWORLD_SETTINGS.controls.bindings, ...value?.controls?.bindings },
+      bindings: {
+        ...DEFAULT_HERMESWORLD_SETTINGS.controls.bindings,
+        ...value?.controls?.bindings,
+      },
     },
     audio: { ...DEFAULT_HERMESWORLD_SETTINGS.audio, ...value?.audio },
     display: { ...DEFAULT_HERMESWORLD_SETTINGS.display, ...value?.display },
-    accessibility: { ...DEFAULT_HERMESWORLD_SETTINGS.accessibility, ...value?.accessibility },
+    accessibility: {
+      ...DEFAULT_HERMESWORLD_SETTINGS.accessibility,
+      ...value?.accessibility,
+    },
   }
 }
 
 function prefersReducedMotion() {
-  try { return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches } catch { return false }
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    )
+  } catch {
+    return false
+  }
 }
 
-function withReducedMotionDefaults(settings: HermesWorldSettings, hasStoredSettings: boolean): HermesWorldSettings {
+function withReducedMotionDefaults(
+  settings: HermesWorldSettings,
+  hasStoredSettings: boolean,
+): HermesWorldSettings {
   if (!prefersReducedMotion()) return settings
   if (hasStoredSettings) return settings
   return {
@@ -119,7 +140,10 @@ export function loadHermesWorldSettings(): HermesWorldSettings {
   if (typeof window === 'undefined') return DEFAULT_HERMESWORLD_SETTINGS
   try {
     const raw = window.localStorage.getItem(HERMESWORLD_SETTINGS_KEY)
-    return withReducedMotionDefaults(mergeSettings(raw ? JSON.parse(raw) : null), !!raw)
+    return withReducedMotionDefaults(
+      mergeSettings(raw ? JSON.parse(raw) : null),
+      !!raw,
+    )
   } catch {
     return withReducedMotionDefaults(DEFAULT_HERMESWORLD_SETTINGS, false)
   }
@@ -127,23 +151,48 @@ export function loadHermesWorldSettings(): HermesWorldSettings {
 
 export function applyHermesWorldSettings(settings: HermesWorldSettings) {
   if (typeof document === 'undefined') return
-  document.documentElement.style.setProperty('--hermesworld-ui-scale', String(settings.display.uiScale / 100))
-  document.documentElement.style.setProperty('--hermesworld-hud-opacity', String(settings.display.hudOpacity / 100))
-  document.documentElement.style.setProperty('--hermesworld-master-volume', String(settings.audio.master / 100))
-  document.documentElement.style.setProperty('--hw-flash-rate', settings.accessibility.photosensitiveMode ? '0s' : '1.5s')
-  document.documentElement.classList.toggle('hermesworld-photosensitive', settings.accessibility.photosensitiveMode)
-  document.documentElement.classList.toggle('hermesworld-reduced-motion', settings.performance.reducedMotion)
+  document.documentElement.style.setProperty(
+    '--hermesworld-ui-scale',
+    String(settings.display.uiScale / 100),
+  )
+  document.documentElement.style.setProperty(
+    '--hermesworld-hud-opacity',
+    String(settings.display.hudOpacity / 100),
+  )
+  document.documentElement.style.setProperty(
+    '--hermesworld-master-volume',
+    String(settings.audio.master / 100),
+  )
+  document.documentElement.style.setProperty(
+    '--hw-flash-rate',
+    settings.accessibility.photosensitiveMode ? '0s' : '1.5s',
+  )
+  document.documentElement.classList.toggle(
+    'hermesworld-photosensitive',
+    settings.accessibility.photosensitiveMode,
+  )
+  document.documentElement.classList.toggle(
+    'hermesworld-reduced-motion',
+    settings.performance.reducedMotion,
+  )
 }
 
 export function saveHermesWorldSettings(settings: HermesWorldSettings) {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(HERMESWORLD_SETTINGS_KEY, JSON.stringify(settings))
+  window.localStorage.setItem(
+    HERMESWORLD_SETTINGS_KEY,
+    JSON.stringify(settings),
+  )
   applyHermesWorldSettings(settings)
-  window.dispatchEvent(new CustomEvent('hermesworld-settings-changed', { detail: settings }))
+  window.dispatchEvent(
+    new CustomEvent('hermesworld-settings-changed', { detail: settings }),
+  )
 }
 
 export function useHermesWorldSettings() {
-  const [settings, setSettings] = useState<HermesWorldSettings>(() => loadHermesWorldSettings())
+  const [settings, setSettings] = useState<HermesWorldSettings>(() =>
+    loadHermesWorldSettings(),
+  )
 
   useEffect(() => {
     applyHermesWorldSettings(settings)

@@ -255,9 +255,9 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               Welcome! Let&apos;s connect your backend
             </p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace works with any OpenAI-compatible backend. Hermes Agent
-              gateway APIs unlock enhanced features automatically when they are
-              available.
+              Hermes Workspace works with any OpenAI-compatible backend. Hermes
+              Agent gateway APIs unlock enhanced features automatically when
+              they are available.
             </p>
 
             {/* Auto-start section */}

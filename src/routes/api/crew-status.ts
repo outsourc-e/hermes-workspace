@@ -5,9 +5,21 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
-import { BEARER_TOKEN, CLAUDE_API, ensureGatewayProbed } from '../../server/gateway-capabilities'
-import { getClaudeRoot, getProfileClaudeHome, getWorkspaceClaudeHome } from '../../server/claude-paths'
-import { formatSwarmWorkerLabel, rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
+import {
+  BEARER_TOKEN,
+  CLAUDE_API,
+  ensureGatewayProbed,
+} from '../../server/gateway-capabilities'
+import {
+  getClaudeRoot,
+  getProfileClaudeHome,
+  getWorkspaceClaudeHome,
+} from '../../server/claude-paths'
+import {
+  formatSwarmWorkerLabel,
+  rosterByWorkerId,
+  type SwarmRosterWorker,
+} from '../../server/swarm-roster'
 
 type CrewDefinition = {
   id: string
@@ -39,7 +51,10 @@ function titleCase(value: string): string {
     .join(' ')
 }
 
-function buildCrewDefinitionFromRoster(profile: string, worker: SwarmRosterWorker | null | undefined): CrewDefinition {
+function buildCrewDefinitionFromRoster(
+  profile: string,
+  worker: SwarmRosterWorker | null | undefined,
+): CrewDefinition {
   const displayName = worker?.name || titleCase(profile)
   const role = worker?.role || 'Profile'
   return {
@@ -50,7 +65,9 @@ function buildCrewDefinitionFromRoster(profile: string, worker: SwarmRosterWorke
     specialty: worker?.specialty || undefined,
     mission: worker?.mission || undefined,
     skills: worker?.skills?.length ? worker.skills : undefined,
-    capabilities: worker?.capabilities?.length ? worker.capabilities : undefined,
+    capabilities: worker?.capabilities?.length
+      ? worker.capabilities
+      : undefined,
     profilePath: profile,
   }
 }
@@ -75,18 +92,37 @@ function buildCrewDefinitions(): CrewDefinition[] {
 
   const roster = rosterByWorkerId(dynamicProfiles)
   return [
-    { id: 'workspace', displayName: 'Workspace', humanLabel: 'Workspace — Primary profile', role: 'Primary profile', profilePath: null },
-    ...dynamicProfiles.map((profile) => buildCrewDefinitionFromRoster(profile, /^swarm\d+$/i.test(profile) ? roster.get(profile) : null)),
+    {
+      id: 'workspace',
+      displayName: 'Workspace',
+      humanLabel: 'Workspace — Primary profile',
+      role: 'Primary profile',
+      profilePath: null,
+    },
+    ...dynamicProfiles.map((profile) =>
+      buildCrewDefinitionFromRoster(
+        profile,
+        /^swarm\d+$/i.test(profile) ? roster.get(profile) : null,
+      ),
+    ),
   ]
 }
 
 function getClaudeHome(profilePath: string | null): string {
-  return profilePath ? getProfileClaudeHome(profilePath) : getWorkspaceClaudeHome()
+  return profilePath
+    ? getProfileClaudeHome(profilePath)
+    : getWorkspaceClaudeHome()
 }
 
 function readGatewayState(claudeHome: string) {
   const path = join(claudeHome, 'gateway_state.json')
-  if (!existsSync(path)) return { pid: null, gatewayState: 'unknown', platforms: {}, updatedAt: null }
+  if (!existsSync(path))
+    return {
+      pid: null,
+      gatewayState: 'unknown',
+      platforms: {},
+      updatedAt: null,
+    }
   try {
     const raw = JSON.parse(readFileSync(path, 'utf-8'))
     return {
@@ -96,7 +132,12 @@ function readGatewayState(claudeHome: string) {
       updatedAt: raw.updated_at ?? null,
     }
   } catch {
-    return { pid: null, gatewayState: 'unknown', platforms: {}, updatedAt: null }
+    return {
+      pid: null,
+      gatewayState: 'unknown',
+      platforms: {},
+      updatedAt: null,
+    }
   }
 }
 
@@ -185,7 +226,10 @@ function readConfig(claudeHome: string): { model: string; provider: string } {
   const configPath = join(claudeHome, 'config.yaml')
   if (!existsSync(configPath)) return { model: 'unknown', provider: 'unknown' }
   try {
-    const raw = yaml.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
+    const raw = yaml.parse(readFileSync(configPath, 'utf-8')) as Record<
+      string,
+      unknown
+    >
     const modelVal = raw.model
     const providerVal = raw.provider
 
@@ -229,7 +273,7 @@ async function fetchAssignedTaskCounts(): Promise<Record<string, number>> {
     })
     if (!res.ok) return {}
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       tasks?: Array<{ assignee?: string | null; column?: string | null }>
     }
 

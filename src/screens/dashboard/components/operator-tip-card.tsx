@@ -34,7 +34,7 @@ const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'cache-low',
     title: 'Cache hit rate is low',
-    body: "Reusable system prompts get cached on most providers. Pin shared scaffolding (skills, persona, tools) into a stable preamble so the next request hits cache instead of paying for fresh input.",
+    body: 'Reusable system prompts get cached on most providers. Pin shared scaffolding (skills, persona, tools) into a stable preamble so the next request hits cache instead of paying for fresh input.',
     tone: 'warn',
     cta: 'Open analytics',
     href: '/analytics',
@@ -50,7 +50,7 @@ const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'cache-high',
     title: 'Cache hit rate looks great',
-    body: "Cache reads are doing the heavy lifting. Worth checking if any *cold* sessions are skipping your shared preamble — those usually represent untapped savings.",
+    body: 'Cache reads are doing the heavy lifting. Worth checking if any *cold* sessions are skipping your shared preamble — those usually represent untapped savings.',
     tone: 'positive',
     score: (o) => {
       const a = o?.analytics
@@ -83,7 +83,7 @@ const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'config-drift',
     title: 'Gateway config has drift',
-    body: "There are pending diffs between your local gateway config and the latest committed version. Apply or reject them so your live behavior matches what the repo says.",
+    body: 'There are pending diffs between your local gateway config and the latest committed version. Apply or reject them so your live behavior matches what the repo says.',
     tone: 'warn',
     cta: 'Open settings',
     href: '/settings',
@@ -103,7 +103,7 @@ const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'restart-pending',
     title: 'Gateway restart pending',
-    body: "Some config or plugin change wants a gateway restart to take effect. Best to do it during a quiet window — long-running sessions handle it gracefully.",
+    body: 'Some config or plugin change wants a gateway restart to take effect. Best to do it during a quiet window — long-running sessions handle it gracefully.',
     tone: 'warn',
     cta: 'Open settings',
     href: '/settings',
@@ -112,7 +112,7 @@ const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'achievements-momentum',
     title: 'Achievement momentum',
-    body: "You unlocked something recently — keep going. The Hermes achievements track real workflows, so the next tier usually drops out of normal usage rather than grinding.",
+    body: 'You unlocked something recently — keep going. The Hermes achievements track real workflows, so the next tier usually drops out of normal usage rather than grinding.',
     tone: 'positive',
     cta: 'View all',
     score: (o) => {
@@ -127,7 +127,7 @@ const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'sessions-low',
     title: 'Things have been quiet',
-    body: "Session count is below the prior period — could be intentional, could be silent breakage. Worth scanning recent logs and reviewing your cron / heartbeat schedule.",
+    body: 'Session count is below the prior period — could be intentional, could be silent breakage. Worth scanning recent logs and reviewing your cron / heartbeat schedule.',
     tone: 'info',
     cta: 'Open sessions',
     href: '/sessions',
@@ -147,7 +147,7 @@ const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'top-model-share',
     title: 'One model is doing all the work',
-    body: "Concentration risk: if your top model is handling >70% of calls, an outage or pricing change hits hard. Worth setting up a fallback even if you never use it.",
+    body: 'Concentration risk: if your top model is handling >70% of calls, an outage or pricing change hits hard. Worth setting up a fallback even if you never use it.',
     tone: 'info',
     cta: 'Open models',
     href: '/models',
@@ -181,8 +181,8 @@ const TIPS: ReadonlyArray<Tip> = [
   },
   {
     id: 'new-chat',
-    title: "Pick the right model up-front",
-    body: "Hitting New Chat without a model in mind is fine, but Hermes routes faster when you set a default in Settings → Models for your common task types.",
+    title: 'Pick the right model up-front',
+    body: 'Hitting New Chat without a model in mind is fine, but Hermes routes faster when you set a default in Settings → Models for your common task types.',
     tone: 'info',
     cta: 'New chat',
     href: '/chat/new',
@@ -317,11 +317,7 @@ export function OperatorTipCard({
                 color: 'var(--theme-muted)',
               }}
             >
-              <HugeiconsIcon
-                icon={Refresh01Icon}
-                size={11}
-                strokeWidth={1.8}
-              />
+              <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.8} />
             </button>
           </div>
         </div>

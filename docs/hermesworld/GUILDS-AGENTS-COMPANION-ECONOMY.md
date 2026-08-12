@@ -11,6 +11,7 @@ The guild is not only humans. The guild is **humans + their agents**.
 Players bring their agents into HermesWorld, level with them, quest with them, trade with them, and build complementary party compositions.
 
 Example:
+
 - Human player: Priest / Healer
 - Friend/player: Mage / Promptcaster
 - Agent companion: Scout Agent finds secrets
@@ -22,6 +23,7 @@ This solves the MMO loneliness problem: you always have someone to play with, be
 ## Class + companion pairing
 
 Human classes:
+
 - Priest / Healer
 - Guardian / Tank
 - Mage / Promptcaster
@@ -31,6 +33,7 @@ Human classes:
 - Bard / Social
 
 Agent companions:
+
 - Scout Agent
 - Scribe Agent
 - Builder Agent
@@ -39,6 +42,7 @@ Agent companions:
 - Healer Agent
 
 Design rule:
+
 - humans choose fantasy identity
 - agents fill tactical gaps
 - party/guild builds become complementary
@@ -62,6 +66,7 @@ Design rule:
 ### Guild composition
 
 Guilds want mixed roles:
+
 - tanks/frontline
 - healers/support
 - mages/damage
@@ -98,6 +103,7 @@ Primary revenue options:
    - tournament/event entries
 
 Hard rule:
+
 - avoid obvious pay-to-win in competitive guild wars
 - paid boosts should accelerate progress or cosmetics, not destroy fairness
 - prize claims remain server-authoritative
@@ -119,24 +125,28 @@ Build these as game surfaces:
 ## v0.3-v0.6 path
 
 ### v0.3
+
 - class identity placeholders
 - companion role concepts
 - guild systems graphic/landing surface
 - Agora hub visual upgrade
 
 ### v0.4
+
 - player class selection
 - first companion agent role
 - class/companion XP
 - simple party/companion action loop
 
 ### v0.5
+
 - guild creation
 - guild chat/guild hall prototype
 - shared vault UI mock
 - leaderboard skeleton
 
 ### v0.6
+
 - weekend event prototype
 - guild war map
 - season pass/cosmetic reward track

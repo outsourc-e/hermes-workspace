@@ -60,7 +60,9 @@ async function resolveBackend(): Promise<BackendResolution> {
     const useHermes = hermesCount > 0 && hermesCount >= claudeCount
     _resolved = {
       base: useHermes ? HERMES_BASE : CLAUDE_BASE,
-      assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',
+      assigneesBase: useHermes
+        ? '/api/hermes-tasks-assignees'
+        : '/api/claude-tasks-assignees',
       backend: useHermes ? 'hermes' : 'claude',
     }
     return _resolved
@@ -82,7 +84,14 @@ export function resetBackendResolution(): void {
 
 // --- Types --------------------------------------------------------------
 
-export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done' | 'deleted'
+export type TaskColumn =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'review'
+  | 'blocked'
+  | 'done'
+  | 'deleted'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
 export type ClaudeTask = {
@@ -162,12 +171,18 @@ export async function createTask(input: CreateTaskInput): Promise<ClaudeTask> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error((body as { detail?: string }).detail || `Failed to create task: ${res.status}`)
+    throw new Error(
+      (body as { detail?: string }).detail ||
+        `Failed to create task: ${res.status}`,
+    )
   }
   return (await res.json()).task
 }
 
-export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<ClaudeTask> {
+export async function updateTask(
+  taskId: string,
+  input: UpdateTaskInput,
+): Promise<ClaudeTask> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}`, {
     method: 'PATCH',
@@ -184,7 +199,10 @@ export async function deleteTask(taskId: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete task: ${res.status}`)
 }
 
-export async function linkSession(taskId: string, sessionId: string | null): Promise<ClaudeTask> {
+export async function linkSession(
+  taskId: string,
+  sessionId: string | null,
+): Promise<ClaudeTask> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}`, {
     method: 'PATCH',
@@ -195,7 +213,9 @@ export async function linkSession(taskId: string, sessionId: string | null): Pro
   return (await res.json()).task
 }
 
-export async function launchSession(taskId: string): Promise<{ sessionId: string; briefing: string; task: ClaudeTask }> {
+export async function launchSession(
+  taskId: string,
+): Promise<{ sessionId: string; briefing: string; task: ClaudeTask }> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=launch`, {
     method: 'POST',
@@ -206,7 +226,11 @@ export async function launchSession(taskId: string): Promise<{ sessionId: string
   return res.json()
 }
 
-export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'user'): Promise<ClaudeTask> {
+export async function moveTask(
+  taskId: string,
+  column: TaskColumn,
+  movedBy = 'user',
+): Promise<ClaudeTask> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=move`, {
     method: 'POST',
@@ -215,7 +239,10 @@ export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'us
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error((body as { detail?: string }).detail || `Failed to move task: ${res.status}`)
+    throw new Error(
+      (body as { detail?: string }).detail ||
+        `Failed to move task: ${res.status}`,
+    )
   }
   return (await res.json()).task
 }
@@ -232,7 +259,14 @@ export const COLUMN_LABELS: Record<TaskColumn, string> = {
   deleted: 'Deleted',
 }
 
-export const COLUMN_ORDER: Array<TaskColumn> = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done']
+export const COLUMN_ORDER: Array<TaskColumn> = [
+  'backlog',
+  'todo',
+  'in_progress',
+  'review',
+  'blocked',
+  'done',
+]
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
   high: '#ef4444',

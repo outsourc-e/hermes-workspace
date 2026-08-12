@@ -8,7 +8,13 @@
  *  - HERMES_HOME override for path resolution
  */
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -54,10 +60,15 @@ describe('write → read roundtrip', () => {
     // Verify disk file was written
     const diskPath = mod.cacheFilePath()
     const raw = readFileSync(diskPath, 'utf8')
-    const parsed = JSON.parse(raw) as { version: number; probes: Record<string, unknown> }
+    const parsed = JSON.parse(raw) as {
+      version: number
+      probes: Record<string, unknown>
+    }
     expect(parsed.version).toBe(1)
     expect(parsed.probes['my-server']).toBeDefined()
-    expect((parsed.probes['my-server'] as { toolCount: number }).toolCount).toBe(3)
+    expect(
+      (parsed.probes['my-server'] as { toolCount: number }).toolCount,
+    ).toBe(3)
 
     // Re-import module — should prime from disk
     vi.resetModules()
@@ -78,7 +89,11 @@ describe('corrupt file → empty cache', () => {
     // Write corrupt file before module load
     const cacheDir = join(tmpDir, 'cache')
     mkdirSync(cacheDir, { recursive: true })
-    writeFileSync(join(cacheDir, 'mcp-tools.json'), '{ not valid json !!!', 'utf8')
+    writeFileSync(
+      join(cacheDir, 'mcp-tools.json'),
+      '{ not valid json !!!',
+      'utf8',
+    )
 
     vi.resetModules()
     // Should not throw
@@ -98,7 +113,10 @@ describe('corrupt file → empty cache', () => {
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(
       join(cacheDir, 'mcp-tools.json'),
-      JSON.stringify({ version: 99, probes: { 'my-server': { toolCount: 99 } } }),
+      JSON.stringify({
+        version: 99,
+        probes: { 'my-server': { toolCount: 99 } },
+      }),
       'utf8',
     )
 
@@ -164,7 +182,9 @@ describe('HERMES_HOME override for path resolution', () => {
     vi.resetModules()
 
     const mod = await loadCache()
-    expect(mod.cacheFilePath()).toBe(join(customHome, 'cache', 'mcp-tools.json'))
+    expect(mod.cacheFilePath()).toBe(
+      join(customHome, 'cache', 'mcp-tools.json'),
+    )
 
     mod.setProbe('server-x', {
       status: 'failed',

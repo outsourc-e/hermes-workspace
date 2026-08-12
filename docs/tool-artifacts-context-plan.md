@@ -180,17 +180,17 @@ If > 4k chars:
 
 ## Per-tool Defaults
 
-| Tool type | Context policy |
-|---|---|
-| `read_file` | Store full as artifact; context gets file path, line range, preview/excerpts |
-| `search_files` | Keep compact matches inline |
-| `terminal` success | Store full log; context gets command, exit code, last ~20 lines |
-| `terminal` failure | Store full log; context gets command, exit code, relevant error/tail |
-| `skill_view` | Store/reference skill doc; context gets skill name/version/summary/hash |
-| `browser_snapshot` | Store full snapshot/artifact; context gets page summary |
-| `patch` | Keep summary/full diff if small; externalize large diffs |
-| `todo` | Compact state only |
-| GitHub issue/PR lists | Store full list; context gets counts/top N |
+| Tool type             | Context policy                                                               |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `read_file`           | Store full as artifact; context gets file path, line range, preview/excerpts |
+| `search_files`        | Keep compact matches inline                                                  |
+| `terminal` success    | Store full log; context gets command, exit code, last ~20 lines              |
+| `terminal` failure    | Store full log; context gets command, exit code, relevant error/tail         |
+| `skill_view`          | Store/reference skill doc; context gets skill name/version/summary/hash      |
+| `browser_snapshot`    | Store full snapshot/artifact; context gets page summary                      |
+| `patch`               | Keep summary/full diff if small; externalize large diffs                     |
+| `todo`                | Compact state only                                                           |
+| GitHub issue/PR lists | Store full list; context gets counts/top N                                   |
 
 ## Workspace UI Fixes Already Started
 

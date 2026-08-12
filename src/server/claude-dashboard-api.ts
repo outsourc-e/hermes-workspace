@@ -1,7 +1,4 @@
-import {
-  dashboardFetch,
-  CLAUDE_DASHBOARD_URL,
-} from './gateway-capabilities'
+import { dashboardFetch, CLAUDE_DASHBOARD_URL } from './gateway-capabilities'
 
 export type DashboardSession = {
   id: string
@@ -115,15 +112,16 @@ async function dashboardJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function listSessions(limit = 50, offset = 0): Promise<{
+export async function listSessions(
+  limit = 50,
+  offset = 0,
+): Promise<{
   sessions: DashboardSession[]
   total: number
   limit: number
   offset: number
 }> {
-  return dashboardJson(
-    `/api/sessions?limit=${limit}&offset=${offset}`,
-  )
+  return dashboardJson(`/api/sessions?limit=${limit}&offset=${offset}`)
 }
 
 export async function getSession(id: string): Promise<DashboardSession> {
@@ -138,7 +136,9 @@ export async function getSessionMessages(id: string): Promise<{
   return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/messages`)
 }
 
-export async function searchSessions(q: string): Promise<SessionSearchResponse> {
+export async function searchSessions(
+  q: string,
+): Promise<SessionSearchResponse> {
   return dashboardJson(`/api/sessions/search?q=${encodeURIComponent(q)}`)
 }
 

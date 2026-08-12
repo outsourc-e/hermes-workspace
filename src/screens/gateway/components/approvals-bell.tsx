@@ -19,15 +19,24 @@ function timeAgo(ms: number): string {
   return `${Math.floor(m / 60)}h ago`
 }
 
-export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellProps) {
+export function ApprovalsBell({
+  approvals,
+  onApprove,
+  onDeny,
+}: ApprovalsBellProps) {
   const [open, setOpen] = useState(false)
   const [pulse, setPulse] = useState(false)
   const [prevCount, setPrevCount] = useState(0)
-  const [actingIds, setActingIds] = useState<Record<string, 'approve' | 'deny'>>({})
+  const [actingIds, setActingIds] = useState<
+    Record<string, 'approve' | 'deny'>
+  >({})
   const ref = useRef<HTMLDivElement>(null)
 
   const pending = useMemo(
-    () => approvals.filter((entry) => entry.status === 'pending').sort((a, b) => b.requestedAt - a.requestedAt),
+    () =>
+      approvals
+        .filter((entry) => entry.status === 'pending')
+        .sort((a, b) => b.requestedAt - a.requestedAt),
     [approvals],
   )
   const count = pending.length
@@ -108,7 +117,9 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
           <span className="pointer-events-none absolute inset-0 animate-ping rounded-lg border-2 border-amber-400 opacity-30" />
         ) : null}
 
-        <span aria-hidden className="text-sm leading-none">{count > 0 ? '🔔' : '🔕'}</span>
+        <span aria-hidden className="text-sm leading-none">
+          {count > 0 ? '🔔' : '🔕'}
+        </span>
 
         {count > 0 ? (
           <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white">
@@ -128,7 +139,9 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
         >
           <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--theme-text)]">Approvals</span>
+              <span className="text-sm font-semibold text-[var(--theme-text)]">
+                Approvals
+              </span>
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                 {count} pending
               </span>
@@ -139,8 +152,19 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
               className="rounded-md p-0.5 text-neutral-400 transition-colors hover:text-neutral-600 dark:hover:text-neutral-200"
               aria-label="Close"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                aria-hidden
+              >
+                <path
+                  d="M1 1l12 12M13 1L1 13"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -149,8 +173,12 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
             {latestThree.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <span className="mb-2 text-2xl">🛡️</span>
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">All clear</p>
-                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">No pending approvals</p>
+                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                  All clear
+                </p>
+                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
+                  No pending approvals
+                </p>
               </div>
             ) : (
               latestThree.map((approval) => {
@@ -166,14 +194,22 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100">{approval.agentName}</p>
-                      <span className="shrink-0 text-[10px] text-neutral-400">{timeAgo(approval.requestedAt)}</span>
+                      <p className="truncate text-xs font-semibold text-neutral-800 dark:text-neutral-100">
+                        {approval.agentName}
+                      </p>
+                      <span className="shrink-0 text-[10px] text-neutral-400">
+                        {timeAgo(approval.requestedAt)}
+                      </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-[11px] text-neutral-700 dark:text-neutral-300">{approval.action}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] text-neutral-700 dark:text-neutral-300">
+                      {approval.action}
+                    </p>
                     <div className="mt-2 flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => void handleQuickAction(approval.id, 'approve')}
+                        onClick={() =>
+                          void handleQuickAction(approval.id, 'approve')
+                        }
                         disabled={Boolean(busy)}
                         className="flex-1 rounded-lg bg-emerald-500 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -181,7 +217,9 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleQuickAction(approval.id, 'deny')}
+                        onClick={() =>
+                          void handleQuickAction(approval.id, 'deny')
+                        }
                         disabled={Boolean(busy)}
                         className="flex-1 rounded-lg border border-red-200 bg-white py-1.5 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-800/50 dark:bg-neutral-800 dark:text-red-400 dark:hover:bg-red-900/20"
                       >

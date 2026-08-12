@@ -45,7 +45,9 @@ export function isEnvPlaceholder(key: string, value: string): boolean {
 /**
  * Scan a McpClientInput template and return every placeholder field detected.
  */
-export function detectPlaceholders(template: McpClientInput): Array<PlaceholderField> {
+export function detectPlaceholders(
+  template: McpClientInput,
+): Array<PlaceholderField> {
   const found: Array<PlaceholderField> = []
 
   // Check args[]
@@ -77,7 +79,10 @@ export function detectPlaceholders(template: McpClientInput): Array<PlaceholderF
 /**
  * Returns true if a value is still a placeholder (used to check filled overrides).
  */
-export function isStillPlaceholder(kind: PlaceholderField['kind'], value: string): boolean {
+export function isStillPlaceholder(
+  kind: PlaceholderField['kind'],
+  value: string,
+): boolean {
   if (!value) return true
   if (kind === 'arg') return isArgPlaceholder(value)
   if (kind === 'url') return isUrlPlaceholder(value)

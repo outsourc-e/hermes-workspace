@@ -14,7 +14,7 @@
 
 Docs are boring. Agents are abstract. Communities need shared space.
 
-So **Hermes turns onboarding into a multiplayer RPG world**. You don't read about Hermes Agent — you *play* it. Five worlds, six enterable buildings, a town full of NPCs that explain memory/tools/routing through quests, and presence multiplayer so other builders are walking around the same Agora as you.
+So **Hermes turns onboarding into a multiplayer RPG world**. You don't read about Hermes Agent — you _play_ it. Five worlds, six enterable buildings, a town full of NPCs that explain memory/tools/routing through quests, and presence multiplayer so other builders are walking around the same Agora as you.
 
 ## Try it
 
@@ -91,29 +91,29 @@ Hermes Playground turns AI-agent onboarding into a multiplayer RPG: move, gear u
 
 ## What's inside
 
-| | |
-|---|---|
-| **Worlds** | Agora, Forge, Grove, Oracle Temple, Benchmark Arena |
-| **Enterable buildings** | Tavern, Bank, Smithy, Inn, Apothecary, Guild Hall |
-| **NPCs** | Athena, Apollo, Iris, Nike, Pan, Chronos, Hermes, Artemis, Eros + 5 Agora keepers (Dorian, Leonidas, Midas, Cassia, Selene, Hestia) |
-| **Skills** | Promptcraft, Worldsmithing, Summoning, Engineering, Oracle, Diplomacy |
-| **Items** | 10+ collectible quest artifacts |
-| **Quests** | Multi-chapter campaign through every world |
-| **Multiplayer** | BroadcastChannel (same-machine) + WebSocket (any-device) via Cloudflare Worker + Durable Object hub. World-scoped fan-out, server-pushed live counts, 5 Hz presence with skip-when-still, token-bucket rate limit. |
-| **LLM dialog** | Free-form chat with each NPC — type into the dialog box, gets persona-wrapped LLM reply via `/api/playground-npc`. Falls back gracefully if the gateway is offline. |
+|                         |                                                                                                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Worlds**              | Agora, Forge, Grove, Oracle Temple, Benchmark Arena                                                                                                                                                                |
+| **Enterable buildings** | Tavern, Bank, Smithy, Inn, Apothecary, Guild Hall                                                                                                                                                                  |
+| **NPCs**                | Athena, Apollo, Iris, Nike, Pan, Chronos, Hermes, Artemis, Eros + 5 Agora keepers (Dorian, Leonidas, Midas, Cassia, Selene, Hestia)                                                                                |
+| **Skills**              | Promptcraft, Worldsmithing, Summoning, Engineering, Oracle, Diplomacy                                                                                                                                              |
+| **Items**               | 10+ collectible quest artifacts                                                                                                                                                                                    |
+| **Quests**              | Multi-chapter campaign through every world                                                                                                                                                                         |
+| **Multiplayer**         | BroadcastChannel (same-machine) + WebSocket (any-device) via Cloudflare Worker + Durable Object hub. World-scoped fan-out, server-pushed live counts, 5 Hz presence with skip-when-still, token-bucket rate limit. |
+| **LLM dialog**          | Free-form chat with each NPC — type into the dialog box, gets persona-wrapped LLM reply via `/api/playground-npc`. Falls back gracefully if the gateway is offline.                                                |
 
 ## Controls
 
-| Action | Input |
-|---|---|
-| Walk | Click ground · WASD |
-| Talk | Click NPC · E |
-| Camera | Arrow keys / `[` `]` zoom |
-| Sprint | Shift |
-| Skills | 1–6 |
-| Journal | J |
-| World Map | M |
-| Chat focus | T |
+| Action     | Input                     |
+| ---------- | ------------------------- |
+| Walk       | Click ground · WASD       |
+| Talk       | Click NPC · E             |
+| Camera     | Arrow keys / `[` `]` zoom |
+| Sprint     | Shift                     |
+| Skills     | 1–6                       |
+| Journal    | J                         |
+| World Map  | M                         |
+| Chat focus | T                         |
 
 ## Architecture
 
@@ -142,6 +142,7 @@ No external 3D assets — everything is procedurally drawn from primitives so th
 ## Stylized > photoreal
 
 We chose stylized indie 3D over photoreal AAA. Reasoning:
+
 - Browser. Single-developer. Hackathon clock.
 - Anyone can join from any device, instantly.
 - "Genshin-lite for agents" reads as intentional, not unfinished.
@@ -157,9 +158,21 @@ Two transports run in parallel inside one client hook:
 Wire schema (mirrors what a future Colyseus / Durable Object server will use):
 
 ```ts
-type PresenceWire = { kind: 'presence'; id; name; color; world; interior; x; y; z; yaw; ts }
-type ChatWire     = { kind: 'chat';     id; name; color; world; text; ts }
-type LeaveWire    = { kind: 'leave';    id }
+type PresenceWire = {
+  kind: 'presence'
+  id
+  name
+  color
+  world
+  interior
+  x
+  y
+  z
+  yaw
+  ts
+}
+type ChatWire = { kind: 'chat'; id; name; color; world; text; ts }
+type LeaveWire = { kind: 'leave'; id }
 ```
 
 Deploy options for the WS relay are listed in `memory/goals/2026-05-03-playground-mmorpg/multiplayer-deploy.md` (Fly.io / Render / Railway).

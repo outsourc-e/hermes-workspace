@@ -1,11 +1,12 @@
 import { join } from 'node:path'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 import { getSwarmProfilePath } from './swarm-foundation'
 import { publishChatEvent } from './chat-event-bus'
+import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
-const ORCHESTRATOR_WORKER_ID = process.env.SWARM_ORCHESTRATOR_WORKER_ID?.trim() || 'orchestrator'
+const ORCHESTRATOR_WORKER_ID =
+  process.env.SWARM_ORCHESTRATOR_WORKER_ID?.trim() || 'orchestrator'
 const ORCHESTRATOR_TMUX_SESSION = `swarm-${ORCHESTRATOR_WORKER_ID}`
 const MAIN_SESSION_KEY = process.env.SWARM_MAIN_SESSION_KEY?.trim() || 'main'
 
@@ -18,17 +19,29 @@ function tmuxSessionExists(session: string): boolean {
   }
 }
 
-function tmuxSendText(session: string, text: string): { sent: boolean; error?: string } {
+function tmuxSendText(
+  session: string,
+  text: string,
+): { sent: boolean; error?: string } {
   if (!tmuxSessionExists(session)) {
     return { sent: false, error: `tmux session ${session} not found` }
   }
   try {
     // Use literal mode so multi-line content sends without shell interpretation, then send Enter to submit.
-    execFileSync('tmux', ['send-keys', '-t', session, '-l', text], { stdio: 'ignore' })
-    execFileSync('tmux', ['send-keys', '-t', session, 'Enter'], { stdio: 'ignore' })
+    execFileSync('tmux', ['send-keys', '-t', session, '-l', text], {
+      stdio: 'ignore',
+      timeout: 5_000,
+    })
+    execFileSync('tmux', ['send-keys', '-t', session, 'Enter'], {
+      stdio: 'ignore',
+      timeout: 5_000,
+    })
     return { sent: true }
   } catch (err) {
-    return { sent: false, error: err instanceof Error ? err.message : String(err) }
+    return {
+      sent: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
   }
 }
 
@@ -43,21 +56,33 @@ function orchestratorPromptForCheckpoint(input: {
   ]
   if (input.missionId) lines.push(`Mission: ${input.missionId}`)
   if (input.checkpoint.result) lines.push(`Result: ${input.checkpoint.result}`)
-  if (input.checkpoint.blocker && input.checkpoint.blocker.toLowerCase() !== 'none') {
+  if (
+    input.checkpoint.blocker &&
+    input.checkpoint.blocker.toLowerCase() !== 'none'
+  ) {
     lines.push(`Blocker: ${input.checkpoint.blocker}`)
   }
-  if (input.checkpoint.nextAction && input.checkpoint.nextAction.toLowerCase() !== 'none') {
+  if (
+    input.checkpoint.nextAction &&
+    input.checkpoint.nextAction.toLowerCase() !== 'none'
+  ) {
     lines.push(`Next: ${input.checkpoint.nextAction}`)
   }
   lines.push('')
-  lines.push(`Decide next action per the swarm review spec for ${input.workerId} and the swarm auto-repair playbook:`)
+  lines.push(
+    `Decide next action per the swarm review spec for ${input.workerId} and the swarm auto-repair playbook:`,
+  )
   lines.push(`- DONE → mark mission complete, assign next from lane priority`)
   lines.push(`- HANDOFF → dispatch to named worker per next_action`)
-  lines.push(`- BLOCKED → consult auto-repair.yaml; if not in playbook, escalate to the main agent (publish to '${MAIN_SESSION_KEY}')`)
+  lines.push(
+    `- BLOCKED → consult auto-repair.yaml; if not in playbook, escalate to the main agent (publish to '${MAIN_SESSION_KEY}')`,
+  )
   lines.push(`- NEEDS_INPUT → escalate to the main agent`)
   lines.push(`- NEEDS_REVIEW → queue Inbox card, route to Eric`)
   lines.push('')
-  lines.push(`Reply with the dispatch you fired (POST /api/swarm-dispatch on http://localhost:3002) OR the escalation summary.`)
+  lines.push(
+    `Reply with the dispatch you fired (POST /api/swarm-dispatch on http://localhost:3002) OR the escalation summary.`,
+  )
   return lines.join('\n')
 }
 
@@ -68,7 +93,11 @@ export function publishCheckpointToOrchestrator(input: {
 }): { sent: boolean; session: string; error?: string; skippedSelf?: boolean } {
   // Don't echo a checkpoint into the orchestrator's own pane.
   if (input.workerId === ORCHESTRATOR_WORKER_ID) {
-    return { sent: false, session: ORCHESTRATOR_TMUX_SESSION, skippedSelf: true }
+    return {
+      sent: false,
+      session: ORCHESTRATOR_TMUX_SESSION,
+      skippedSelf: true,
+    }
   }
   const text = orchestratorPromptForCheckpoint(input)
   const result = tmuxSendText(ORCHESTRATOR_TMUX_SESSION, text)
@@ -87,21 +116,31 @@ function publishChatStatus(sessionKey: string, text: string): void {
 function readRuntime(runtimePath: string): Record<string, unknown> {
   if (!existsSync(runtimePath)) return {}
   try {
-    return JSON.parse(readFileSync(runtimePath, 'utf8')) as Record<string, unknown>
+    return JSON.parse(readFileSync(runtimePath, 'utf8')) as Record<
+      string,
+      unknown
+    >
   } catch {
     return {}
   }
 }
 
-function writeRuntime(runtimePath: string, value: Record<string, unknown>): void {
+function writeRuntime(
+  runtimePath: string,
+  value: Record<string, unknown>,
+): void {
   writeFileSync(runtimePath, JSON.stringify(value, null, 2) + '\n')
 }
 
 function checkpointSummary(checkpoint: ParsedSwarmCheckpoint): string {
   const parts = [
     checkpoint.result,
-    checkpoint.blocker && checkpoint.blocker.toLowerCase() !== 'none' ? `Blocker: ${checkpoint.blocker}` : null,
-    checkpoint.nextAction && checkpoint.nextAction.toLowerCase() !== 'none' ? `Next: ${checkpoint.nextAction}` : null,
+    checkpoint.blocker && checkpoint.blocker.toLowerCase() !== 'none'
+      ? `Blocker: ${checkpoint.blocker}`
+      : null,
+    checkpoint.nextAction && checkpoint.nextAction.toLowerCase() !== 'none'
+      ? `Next: ${checkpoint.nextAction}`
+      : null,
   ].filter(Boolean)
   return parts.join(' | ')
 }
@@ -114,7 +153,9 @@ export function publishSwarmActionPrompt(input: {
   details?: Record<string, unknown>
 }): { published: boolean; sessionKey: string } {
   const sessionKey = input.sessionKey?.trim() || 'main'
-  const headline = input.missionId ? `[Swarm] ${input.title} — Mission: ${input.missionId}` : `[Swarm] ${input.title}`
+  const headline = input.missionId
+    ? `[Swarm] ${input.title} — Mission: ${input.missionId}`
+    : `[Swarm] ${input.title}`
   const messageText = [headline, input.text].filter(Boolean).join('\n')
 
   publishChatEvent('message', {
@@ -149,14 +190,34 @@ export function publishSwarmCheckpointNotification(input: {
   missionId?: string | null
   assignmentId?: string | null
   notifySessionKey?: string | null
-}): { published: boolean; sessionKey: string; route: 'orchestrator' | 'main' | 'noop'; orchestrator?: { sent: boolean; session: string; error?: string; skippedSelf?: boolean } } {
+}): {
+  published: boolean
+  sessionKey: string
+  route: 'orchestrator' | 'main' | 'noop'
+  orchestrator?: {
+    sent: boolean
+    session: string
+    error?: string
+    skippedSelf?: boolean
+  }
+} {
   const profilePath = getSwarmProfilePath(input.workerId)
   const runtimePath = join(profilePath, 'runtime.json')
   const current = readRuntime(runtimePath)
-  const currentRaw = typeof current.lastNotifiedCheckpointRaw === 'string' ? current.lastNotifiedCheckpointRaw : null
-  const currentSig = typeof current.lastNotifiedCheckpointSignature === 'string' ? current.lastNotifiedCheckpointSignature : null
+  const currentRaw =
+    typeof current.lastNotifiedCheckpointRaw === 'string'
+      ? current.lastNotifiedCheckpointRaw
+      : null
+  const currentSig =
+    typeof current.lastNotifiedCheckpointSignature === 'string'
+      ? current.lastNotifiedCheckpointSignature
+      : null
   const checkpointRaw = input.checkpoint.raw?.trim() || ''
-  const sessionKey = input.notifySessionKey?.trim() || (typeof current.notifySessionKey === 'string' && current.notifySessionKey.trim()) || MAIN_SESSION_KEY
+  const sessionKey =
+    input.notifySessionKey?.trim() ||
+    (typeof current.notifySessionKey === 'string' &&
+      current.notifySessionKey.trim()) ||
+    MAIN_SESSION_KEY
 
   // Build a checkpoint signature that includes state + status + raw + result, so dedupe
   // doesn't suppress a notification when raw text is empty/recycled but the semantic
@@ -176,7 +237,13 @@ export function publishSwarmCheckpointNotification(input: {
   // Backwards-compat: if no signature was ever stored but raw matches AND nothing else
   // could have changed (raw is non-empty + state matches a 'no progress' shape), still skip.
   // Otherwise, fall through and publish.
-  if (!currentSig && checkpointRaw && currentRaw === checkpointRaw && (input.checkpoint.stateLabel === 'IN_PROGRESS' || !input.checkpoint.stateLabel)) {
+  if (
+    !currentSig &&
+    checkpointRaw &&
+    currentRaw === checkpointRaw &&
+    (input.checkpoint.stateLabel === 'IN_PROGRESS' ||
+      !input.checkpoint.stateLabel)
+  ) {
     return { published: false, sessionKey, route: 'noop' }
   }
 
@@ -185,7 +252,9 @@ export function publishSwarmCheckpointNotification(input: {
     headline,
     input.missionId ? `Mission: ${input.missionId}` : null,
     checkpointSummary(input.checkpoint),
-  ].filter(Boolean).join(' — ')
+  ]
+    .filter(Boolean)
+    .join(' — ')
 
   // 1. Route to orchestrator by default.
   const orchestratorResult = publishCheckpointToOrchestrator({
@@ -195,7 +264,9 @@ export function publishSwarmCheckpointNotification(input: {
   })
 
   // 2. Escalate to the main agent only on NEEDS_INPUT, or when the orchestrator is unreachable.
-  const mustEscalate = shouldEscalateToMain(input.checkpoint.stateLabel) || (!orchestratorResult.sent && !orchestratorResult.skippedSelf)
+  const mustEscalate =
+    shouldEscalateToMain(input.checkpoint.stateLabel) ||
+    (!orchestratorResult.sent && !orchestratorResult.skippedSelf)
   let publishedToMain = false
 
   if (mustEscalate) {
@@ -233,6 +304,15 @@ export function publishSwarmCheckpointNotification(input: {
     lastOrchestratorSendOk: orchestratorResult.sent,
   })
 
-  const route: 'orchestrator' | 'main' | 'noop' = publishedToMain ? 'main' : (orchestratorResult.sent || orchestratorResult.skippedSelf ? 'orchestrator' : 'noop')
-  return { published: publishedToMain || orchestratorResult.sent, sessionKey, route, orchestrator: orchestratorResult }
+  const route: 'orchestrator' | 'main' | 'noop' = publishedToMain
+    ? 'main'
+    : orchestratorResult.sent || orchestratorResult.skippedSelf
+      ? 'orchestrator'
+      : 'noop'
+  return {
+    published: publishedToMain || orchestratorResult.sent,
+    sessionKey,
+    route,
+    orchestrator: orchestratorResult,
+  }
 }

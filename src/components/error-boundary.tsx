@@ -32,7 +32,9 @@ async function clearStaleRuntimeCaches(): Promise<void> {
   try {
     if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations()
-      await Promise.all(registrations.map((registration) => registration.update()))
+      await Promise.all(
+        registrations.map((registration) => registration.update()),
+      )
     }
   } catch {
     // Best-effort only. Recovery should not fail because SW APIs are blocked.
@@ -63,11 +65,16 @@ export class ErrorBoundary extends Component<
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Unhandled UI error', error, errorInfo)
 
-    if (typeof window === 'undefined' || !isReactDomReconciliationError(error)) {
+    if (
+      typeof window === 'undefined' ||
+      !isReactDomReconciliationError(error)
+    ) {
       return
     }
 
-    const previous = Number(window.sessionStorage.getItem(REACT_DOM_RECOVERY_KEY) ?? '0')
+    const previous = Number(
+      window.sessionStorage.getItem(REACT_DOM_RECOVERY_KEY) ?? '0',
+    )
     const alreadyRetried = Number.isFinite(previous)
       ? Date.now() - previous < REACT_DOM_RECOVERY_TTL_MS
       : false

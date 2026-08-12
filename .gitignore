@@ -1,6 +1,6 @@
 # Nix build outputs
-result
-result-*
+/result
+/result-*
 .direnv/
 
 # Dependencies
@@ -61,6 +61,10 @@ src-tauri/WixTools
 count.txt
 todos.json
 releases/
+
+# Playwright
+test-results/
+e2e/.auth/
 
 # Wrangler (Cloudflare Workers)
 .wrangler

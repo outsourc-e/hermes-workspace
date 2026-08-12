@@ -160,7 +160,8 @@ async function tryServeStatic(req, res) {
     } catch {
       res.writeHead(404, {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control':
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
       })
       res.end('Asset not found')
       return true
@@ -188,6 +189,10 @@ async function tryServeStatic(req, res) {
     // Cache hashed assets aggressively (they have content hashes in filenames)
     if (pathname.startsWith('/assets/')) {
       headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    } else if (pathname === '/sw.js') {
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+      headers['Pragma'] = 'no-cache'
+      headers['Expires'] = '0'
     }
 
     res.writeHead(200, headers)
@@ -254,7 +259,7 @@ async function requestHandler(req, res) {
     // header (set above in tryServeStatic) and are unaffected here
     // because static assets short-circuit before this branch.
     const reqPathname = new URL(request.url).pathname
-    if (reqPathname.startsWith('/api/')) {
+    if (reqPathname.startsWith('/api/') || reqPathname === '/' || reqPathname === '/conductor' || reqPathname === '/mission-graph' || reqPathname === '/sw.js') {
       headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
       headers['Pragma'] = 'no-cache'
       headers['Expires'] = '0'

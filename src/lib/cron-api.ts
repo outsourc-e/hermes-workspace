@@ -210,7 +210,8 @@ async function readError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as Record<string, unknown>
     if (typeof payload.error === 'string') return friendlyError(payload.error)
-    if (typeof payload.message === 'string') return friendlyError(payload.message)
+    if (typeof payload.message === 'string')
+      return friendlyError(payload.message)
     return JSON.stringify(payload)
   } catch {
     const text = await response.text().catch(() => '')
@@ -290,9 +291,7 @@ export async function runCronJob(jobId: string): Promise<RunCronPayload> {
   return readJsonAndCheckOk<RunCronPayload>(response)
 }
 
-export async function runCronJobIfDue(
-  jobId: string,
-): Promise<RunCronPayload> {
+export async function runCronJobIfDue(jobId: string): Promise<RunCronPayload> {
   const response = await fetch(
     `/api/claude-jobs/${encodeURIComponent(jobId)}?action=run-if-due`,
     {

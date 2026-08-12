@@ -1696,7 +1696,10 @@ type OrchestratorAvatarProps = {
   compact?: boolean
 }
 
-function OrchestratorAvatarComponent({ size = 48, compact = false }: OrchestratorAvatarProps) {
+function OrchestratorAvatarComponent({
+  size = 48,
+  compact = false,
+}: OrchestratorAvatarProps) {
   const { state, label } = useOrchestratorState()
   const [avatarStyle, setAvatarStyle] = useState<AvatarStyle>(getStoredAvatar)
   const [showPicker, setShowPicker] = useState(false)

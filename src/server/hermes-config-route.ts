@@ -6,10 +6,7 @@ import { z } from 'zod'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 import { isAuthenticated } from './auth-middleware'
-import {
-  ensureGatewayProbed,
-  getCapabilities,
-} from './gateway-capabilities'
+import { ensureGatewayProbed, getCapabilities } from './gateway-capabilities'
 import { normalizeHermesConfigState } from './hermes-config-migration'
 import {
   applyHermesConfigPatch,
@@ -227,12 +224,19 @@ export async function handleHermesConfigPatch({
     const parsed = PatchActionSchema.safeParse(body)
     if (!parsed.success) {
       return Response.json(
-        { ok: false, error: 'Invalid patch action body', issues: parsed.error.issues },
+        {
+          ok: false,
+          error: 'Invalid patch action body',
+          issues: parsed.error.issues,
+        },
         { status: 400 },
       )
     }
     const result = applyHermesConfigPatch(paths, parsed.data)
-    return Response.json({ ...result, message: ACTION_MESSAGES[parsed.data.action] })
+    return Response.json({
+      ...result,
+      message: ACTION_MESSAGES[parsed.data.action],
+    })
   }
 
   const legacy = LegacyPatchSchema.safeParse(body)
@@ -243,7 +247,8 @@ export async function handleHermesConfigPatch({
     )
   }
 
-  if (legacy.data.config) applyLegacyConfigBody(paths.configPath, legacy.data.config)
+  if (legacy.data.config)
+    applyLegacyConfigBody(paths.configPath, legacy.data.config)
   if (legacy.data.env) applyLegacyEnvBody(paths.envPath, legacy.data.env)
 
   return Response.json({ ok: true, message: LEGACY_SAVE_MESSAGE })

@@ -46,7 +46,9 @@ function countWords(input: string): number {
 }
 
 export function StreamingText({ text, isStreaming }: StreamingTextProps) {
-  const [revealedChars, setRevealedChars] = useState(isStreaming ? 0 : text.length)
+  const [revealedChars, setRevealedChars] = useState(
+    isStreaming ? 0 : text.length,
+  )
 
   useEffect(() => {
     if (!isStreaming) {
@@ -115,7 +117,11 @@ export function StreamingText({ text, isStreaming }: StreamingTextProps) {
                   if (token.length === 0) return null
                   const isWhitespace = /^\s+$/.test(token)
                   if (isWhitespace) {
-                    return <span key={`space-${segmentIndex}-${tokenIndex}`}>{token}</span>
+                    return (
+                      <span key={`space-${segmentIndex}-${tokenIndex}`}>
+                        {token}
+                      </span>
+                    )
                   }
 
                   const currentWord = wordIndex
@@ -127,7 +133,10 @@ export function StreamingText({ text, isStreaming }: StreamingTextProps) {
                       key={`word-${segmentIndex}-${tokenIndex}`}
                       style={
                         isNewWord
-                          ? { animation: 'streaming-word-fade 220ms ease-out both' }
+                          ? {
+                              animation:
+                                'streaming-word-fade 220ms ease-out both',
+                            }
                           : undefined
                       }
                     >
@@ -144,7 +153,9 @@ export function StreamingText({ text, isStreaming }: StreamingTextProps) {
       {isStreaming ? (
         <span
           aria-hidden="true"
-          className={cn('ml-0.5 inline-block h-4 w-1 align-[-2px] animate-pulse rounded-sm bg-emerald-400')}
+          className={cn(
+            'ml-0.5 inline-block h-4 w-1 align-[-2px] animate-pulse rounded-sm bg-emerald-400',
+          )}
         />
       ) : null}
     </div>

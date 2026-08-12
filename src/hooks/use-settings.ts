@@ -113,8 +113,10 @@ export function resolveTheme(theme: SettingsThemeMode): 'light' | 'dark' {
 
 export function applyInterfacePreferences(settings: Partial<StudioSettings>) {
   if (typeof document === 'undefined') return
-  document.documentElement.dataset.interfaceFont = settings.interfaceFont ?? 'system'
-  document.documentElement.dataset.interfaceDensity = settings.interfaceDensity ?? 'comfortable'
+  document.documentElement.dataset.interfaceFont =
+    settings.interfaceFont ?? 'system'
+  document.documentElement.dataset.interfaceDensity =
+    settings.interfaceDensity ?? 'comfortable'
 }
 
 export function applyTheme(_theme?: SettingsThemeMode) {

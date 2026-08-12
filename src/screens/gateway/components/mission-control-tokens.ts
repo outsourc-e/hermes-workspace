@@ -32,10 +32,13 @@ export const HUB_COLORS = {
 } as const
 
 export const HUB_STATUS = {
-  ready: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300',
-  paused: 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300',
+  ready:
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300',
+  paused:
+    'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300',
   blocked: 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300',
-  neutral: 'bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+  neutral:
+    'bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
 } as const
 
 export const HUB_TYPE = {

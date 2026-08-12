@@ -72,11 +72,12 @@ export function advanceStickyStreamingText(params: {
   const nextRunId = runId ?? previousState.runId ?? 'streaming'
   const isNewRun = nextRunId !== previousState.runId
   const candidateText = smoothedText || rawText
-  const nextText = candidateText.length > 0
-    ? candidateText
-    : isNewRun
-      ? ''
-      : previousState.text
+  const nextText =
+    candidateText.length > 0
+      ? candidateText
+      : isNewRun
+        ? ''
+        : previousState.text
 
   return {
     runId: nextRunId,

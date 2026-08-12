@@ -157,14 +157,16 @@ function normalizeEvent(event: MissionEventInput): MissionEvent {
   } as MissionEvent
 }
 
-function hasAgentId(event: MissionEvent): event is Extract<
-  MissionEvent,
-  { payload: { agentId: string } }
-> {
+function hasAgentId(
+  event: MissionEvent,
+): event is Extract<MissionEvent, { payload: { agentId: string } }> {
   return 'agentId' in event.payload
 }
 
-function matchesFilter(event: MissionEvent, filter?: MissionEventFilter): boolean {
+function matchesFilter(
+  event: MissionEvent,
+  filter?: MissionEventFilter,
+): boolean {
   if (!filter) return true
 
   if (filter.type) {
@@ -173,14 +175,21 @@ function matchesFilter(event: MissionEvent, filter?: MissionEventFilter): boolea
   }
 
   if (filter.agentId) {
-    if (!hasAgentId(event) || event.payload.agentId !== filter.agentId) return false
+    if (!hasAgentId(event) || event.payload.agentId !== filter.agentId)
+      return false
   }
 
-  if (typeof filter.fromTimestamp === 'number' && event.timestamp < filter.fromTimestamp) {
+  if (
+    typeof filter.fromTimestamp === 'number' &&
+    event.timestamp < filter.fromTimestamp
+  ) {
     return false
   }
 
-  if (typeof filter.toTimestamp === 'number' && event.timestamp > filter.toTimestamp) {
+  if (
+    typeof filter.toTimestamp === 'number' &&
+    event.timestamp > filter.toTimestamp
+  ) {
     return false
   }
 
@@ -218,4 +227,3 @@ export class MissionEventLog {
     }
   }
 }
-

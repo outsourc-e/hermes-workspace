@@ -60,16 +60,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'cache_efficiency',
     label: 'Cache efficiency',
-    description:
-      'Cache-hit rate with daily sparkline. Higher = lower cost.',
+    description: 'Cache-hit rate with daily sparkline. Higher = lower cost.',
     column: 'main',
     hideable: true,
   },
   {
     id: 'velocity',
     label: 'Velocity',
-    description:
-      'Sessions/day average + delta vs prior period + sparkline.',
+    description: 'Sessions/day average + delta vs prior period + sparkline.',
     column: 'main',
     hideable: true,
   },
@@ -251,15 +249,9 @@ export function useDashboardLayout() {
   // Reset returns to the iteration-006 defaults rather than "show
   // literally everything" so first-time users hitting Reset don't
   // suddenly see Logs they never asked for.
-  const reset = useCallback(
-    () => setHidden(new Set(DEFAULT_HIDDEN)),
-    [],
-  )
+  const reset = useCallback(() => setHidden(new Set(DEFAULT_HIDDEN)), [])
 
-  const isVisible = useCallback(
-    (id: WidgetId) => !hidden.has(id),
-    [hidden],
-  )
+  const isVisible = useCallback((id: WidgetId) => !hidden.has(id), [hidden])
 
   const counts = useMemo(() => {
     const total = WIDGET_CATALOG.length

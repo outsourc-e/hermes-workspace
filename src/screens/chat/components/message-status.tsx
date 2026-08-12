@@ -20,7 +20,9 @@ export function MessageStatus({
   className,
 }: MessageStatusProps) {
   return (
-    <div className={cn('w-full max-w-[var(--chat-content-max-width)]', className)}>
+    <div
+      className={cn('w-full max-w-[var(--chat-content-max-width)]', className)}
+    >
       <Message>
         <div className="w-full rounded-xl border border-primary-200 bg-primary-50 p-4 text-primary-900">
           <div className="text-balance font-medium">{title}</div>

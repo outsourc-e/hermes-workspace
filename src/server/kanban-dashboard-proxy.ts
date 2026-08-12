@@ -44,6 +44,35 @@ export type DashboardKanbanTask = {
   completed_at?: number | null
   workspace_kind?: string | null
   workspace_path?: string | null
+  model_override?: string | null
+  reasoning_effort?: string | null
+  latest_summary?: string | null
+  result?: string | null
+}
+
+export type DashboardKanbanRun = {
+  id?: number | null
+  status?: string | null
+  outcome?: string | null
+  started_at?: number | null
+  ended_at?: number | null
+  summary?: string | null
+  metadata?: string | Record<string, unknown> | null
+  error?: string | null
+}
+
+export type DashboardKanbanComment = {
+  id?: number | null
+  author?: string | null
+  body?: string | null
+  created_at?: number | null
+}
+
+export type DashboardKanbanTaskDetails = {
+  task: DashboardKanbanTask
+  runs?: Array<DashboardKanbanRun>
+  comments?: Array<DashboardKanbanComment>
+  events?: Array<Record<string, unknown>>
 }
 
 export type DashboardKanbanBoardResponse = {
@@ -73,7 +102,10 @@ async function buildHeaders(): Promise<Record<string, string>> {
   return headers
 }
 
-function dashboardUrl(path: string, params: Record<string, string | undefined> = {}): string {
+function dashboardUrl(
+  path: string,
+  params: Record<string, string | undefined> = {},
+): string {
   const base = CLAUDE_DASHBOARD_URL.replace(/\/+$/, '')
   const url = new URL(`${base}${path}`)
   for (const [key, value] of Object.entries(params)) {
@@ -131,6 +163,23 @@ export async function fetchDashboardKanbanTask(
   }
 }
 
+/** Fetch task details, including native run summaries/comments, by id. */
+export async function fetchDashboardKanbanTaskDetails(
+  taskId: string,
+  board?: string,
+): Promise<DashboardKanbanTaskDetails | null> {
+  try {
+    return await dashboardFetch<DashboardKanbanTaskDetails>(
+      `/api/plugins/kanban/tasks/${encodeURIComponent(taskId)}`,
+      {},
+      board ? { board } : {},
+    )
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('→ 404')) return null
+    throw err
+  }
+}
+
 export type CreateDashboardKanbanTaskInput = {
   title: string
   body?: string
@@ -140,6 +189,8 @@ export type CreateDashboardKanbanTaskInput = {
   created_by?: string
   workspace_kind?: string
   workspace_path?: string
+  model_override?: string
+  reasoning_effort?: string
 }
 
 /** Create a task on the dashboard board. */

@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AgentSessionStatusEntry, TeamMember } from '@/screens/gateway/components/team-panel'
-import type { HubTask, TaskStatus } from '@/screens/gateway/components/task-board'
+import type {
+  AgentSessionStatusEntry,
+  TeamMember,
+} from '@/screens/gateway/components/team-panel'
+import type {
+  HubTask,
+  TaskStatus,
+} from '@/screens/gateway/components/task-board'
 import {
   archiveMissionToHistory,
   loadMissionHistory,
@@ -30,7 +36,12 @@ export type ActiveMission = {
   id: string
   goal: string
   name: string
-  plan?: Array<{ title: string; description: string; agent?: string; enabled: boolean }>
+  plan?: Array<{
+    title: string
+    description: string
+    agent?: string
+    enabled: boolean
+  }>
   state: MissionLifecycleState
   team: TeamMember[]
   tasks: HubTask[]
@@ -51,7 +62,11 @@ type Updater<T> = T | ((previous: T) => T)
 
 type StartMissionInput = Omit<
   ActiveMission,
-  'state' | 'agentSessionMap' | 'agentSessionModelMap' | 'agentSessionStatus' | 'artifacts'
+  | 'state'
+  | 'agentSessionMap'
+  | 'agentSessionModelMap'
+  | 'agentSessionStatus'
+  | 'artifacts'
 > & {
   agentSessionMap?: Record<string, string>
   agentSessionModelMap?: Record<string, string>
@@ -87,9 +102,7 @@ type MissionStore = {
     options?: { sessionKey?: string | null; model?: string | null },
   ) => void
   addArtifact: (artifact: MissionArtifact | MissionArtifact[]) => void
-  setMissionState: (
-    state: Updater<MissionStore['missionState']>,
-  ) => void
+  setMissionState: (state: Updater<MissionStore['missionState']>) => void
   restoreMission: (checkpoint: MissionCheckpoint) => void
   setMissionGoal: (goal: string) => void
   setRestoreCheckpoint: (checkpoint: MissionCheckpoint | null) => void
@@ -112,9 +125,7 @@ type MissionStore = {
 const MAX_HISTORY = 20
 
 function applyUpdater<T>(previous: T, next: Updater<T>): T {
-  return typeof next === 'function'
-    ? (next as (value: T) => T)(previous)
-    : next
+  return typeof next === 'function' ? (next as (value: T) => T)(previous) : next
 }
 
 function clampHistory(reports: MissionCheckpoint[]): MissionCheckpoint[] {
@@ -178,7 +189,8 @@ function syncActiveMission(state: MissionStore): Partial<MissionStore> {
 
   return {
     missionActive:
-      state.activeMission.state === 'running' || state.activeMission.state === 'paused',
+      state.activeMission.state === 'running' ||
+      state.activeMission.state === 'paused',
     activeMissionName: state.activeMission.name,
     activeMissionGoal: state.activeMission.goal,
     missionTasks: state.activeMission.tasks,
@@ -193,7 +205,8 @@ function updateCheckpointSnapshot(state: MissionStore): Partial<MissionStore> {
   const checkpoint = buildCheckpoint(state)
   return {
     restoreCheckpoint:
-      checkpoint && (state.missionState === 'running' || state.missionState === 'paused')
+      checkpoint &&
+      (state.missionState === 'running' || state.missionState === 'paused')
         ? checkpoint
         : null,
   }
@@ -270,7 +283,12 @@ export const useMissionStore = create<MissionStore>()(
           activeMission: completedMission,
         })
         const reports = checkpoint
-          ? clampHistory([checkpoint, ...state.missionHistory.reports.filter((entry) => entry.id !== checkpoint.id)])
+          ? clampHistory([
+              checkpoint,
+              ...state.missionHistory.reports.filter(
+                (entry) => entry.id !== checkpoint.id,
+              ),
+            ])
           : state.missionHistory.reports
         if (checkpoint) {
           archiveMissionToHistory(checkpoint)
@@ -298,7 +316,12 @@ export const useMissionStore = create<MissionStore>()(
           activeMission: abortedMission,
         })
         const reports = checkpoint
-          ? clampHistory([checkpoint, ...state.missionHistory.reports.filter((entry) => entry.id !== checkpoint.id)])
+          ? clampHistory([
+              checkpoint,
+              ...state.missionHistory.reports.filter(
+                (entry) => entry.id !== checkpoint.id,
+              ),
+            ])
           : state.missionHistory.reports
         if (checkpoint) {
           archiveMissionToHistory(checkpoint)
@@ -360,7 +383,9 @@ export const useMissionStore = create<MissionStore>()(
       updateAgentStatus: (agentId, entry, options) => {
         set((state) => {
           if (!state.activeMission) return state
-          const agentSessionStatus = { ...state.activeMission.agentSessionStatus }
+          const agentSessionStatus = {
+            ...state.activeMission.agentSessionStatus,
+          }
           if (entry) {
             agentSessionStatus[agentId] = entry
           } else {
@@ -374,10 +399,15 @@ export const useMissionStore = create<MissionStore>()(
             agentSessionMap[agentId] = options.sessionKey
           }
 
-          const agentSessionModelMap = { ...state.activeMission.agentSessionModelMap }
+          const agentSessionModelMap = {
+            ...state.activeMission.agentSessionModelMap,
+          }
           if (options?.model === null) {
             delete agentSessionModelMap[agentId]
-          } else if (typeof options?.model === 'string' && options.model.length > 0) {
+          } else if (
+            typeof options?.model === 'string' &&
+            options.model.length > 0
+          ) {
             agentSessionModelMap[agentId] = options.model
           }
 
@@ -424,7 +454,10 @@ export const useMissionStore = create<MissionStore>()(
 
       setMissionState: (missionStateValue) => {
         set((state) => {
-          const missionState = applyUpdater(state.missionState, missionStateValue)
+          const missionState = applyUpdater(
+            state.missionState,
+            missionStateValue,
+          )
           const activeMission = state.activeMission
             ? {
                 ...state.activeMission,
@@ -509,7 +542,10 @@ export const useMissionStore = create<MissionStore>()(
         set((state) => ({ boardTasks: applyUpdater(state.boardTasks, tasks) })),
       setDispatchedTaskIdsByAgent: (value) =>
         set((state) => ({
-          dispatchedTaskIdsByAgent: applyUpdater(state.dispatchedTaskIdsByAgent, value),
+          dispatchedTaskIdsByAgent: applyUpdater(
+            state.dispatchedTaskIdsByAgent,
+            value,
+          ),
         })),
       setMissionTasks: (tasks) =>
         set((state) => {
@@ -551,7 +587,10 @@ export const useMissionStore = create<MissionStore>()(
         }),
       setAgentSessionModelMap: (value) =>
         set((state) => {
-          const agentSessionModelMap = applyUpdater(state.agentSessionModelMap, value)
+          const agentSessionModelMap = applyUpdater(
+            state.agentSessionModelMap,
+            value,
+          )
           const activeMission = state.activeMission
             ? {
                 ...state.activeMission,
@@ -570,7 +609,10 @@ export const useMissionStore = create<MissionStore>()(
         }),
       setAgentSessionStatus: (value) =>
         set((state) => {
-          const agentSessionStatus = applyUpdater(state.agentSessionStatus, value)
+          const agentSessionStatus = applyUpdater(
+            state.agentSessionStatus,
+            value,
+          )
           const activeMission = state.activeMission
             ? {
                 ...state.activeMission,
@@ -645,12 +687,18 @@ export const useMissionStore = create<MissionStore>()(
         if (!state) return
         if (state.activeMission && !state.restoreCheckpoint) {
           const checkpoint = buildCheckpoint(state)
-          if (checkpoint && (state.missionState === 'running' || state.missionState === 'paused')) {
+          if (
+            checkpoint &&
+            (state.missionState === 'running' ||
+              state.missionState === 'paused')
+          ) {
             state.restoreCheckpoint = checkpoint
           }
         }
         state.missionHistory = {
-          reports: clampHistory(state.missionHistory?.reports ?? initialHistory),
+          reports: clampHistory(
+            state.missionHistory?.reports ?? initialHistory,
+          ),
         }
       },
     },

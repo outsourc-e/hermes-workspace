@@ -1,498 +1,519 @@
 version: 1
+identities:
+  executive:
+    primary: orchestrator
+    capabilities:
+      [planning, prioritization, delegation, approvals, recommendations]
+  builder:
+    primary: builder
+    capabilities: [implementation, testing, refactoring, worktrees]
+    supporting: [maintainer]
+  researcher:
+    primary: researcher
+    capabilities: [web-research, synthesis, grounded-citations, gbrain]
+    supporting: [strategist, km-agent]
+  operator:
+    primary: ops-watch
+    capabilities: [services, packages, docker, backups, recovery, health]
+  critic:
+    primary: reviewer
+    capabilities: [review, security, qa, evidence-gates]
+    supporting: [qa]
 workers:
-- id: orchestrator
-  name: Orchestrator
-  role: Swarm Orchestrator / Greenlight Gate
-  specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates
-  model: GPT-5.5
-  mission: Decompose missions into safe, proof-bearing work and route to the right specialist while preserving human greenlight control.
-  profile: orchestrator
-  modes:
-  - plan
-  tools:
-  - todo
-  - kanban
-  - delegation
-  - terminal
-  - file
-  - gbrain
-  - session_search
-  - cronjob
-  - skills
-  - clarify
-  - web
-  skills:
-  - orchestrator-core
-  - gstack-for-hermes
-  - gbrain
-  - kanban-orchestrator
-  - subagent-driven-development
-  - writing-plans
-  - requesting-code-review
-  - workspace-dispatch
-  capabilities:
-  - orchestration
-  - decomposition
-  - routing
-  - proof-contracts
-  - greenlight-gate
-  preferredTaskTypes:
-  - orchestration
-  - planning
-  - routing
-  - coordination
-  - handoff
-  greenlightRequiredFor:
-  - merge
-  - publish
-  - destructive
-  - external-send
-  - credential-change
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: orchestrator:plan
-- id: km-agent
-  name: KM Agent
-  role: RAZSOC / GBrain Knowledge Steward
-  specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits
-  model: GPT-5.5
-  mission: Keep the operating brain coherent, searchable, and source-of-record aligned without polluting durable knowledge.
-  profile: km-agent
-  modes:
-  - health
-  - curate
-  tools:
-  - gbrain
-  - file
-  - terminal
-  - session_search
-  - skills
-  - todo
-  - cronjob
-  - web
-  skills:
-  - km-agent-core
-  - gbrain
-  - obsidian-markdown
-  - obsidian-cli
-  - obsidian-bases
-  - json-canvas
-  - gstack-for-hermes
-  capabilities:
-  - gbrain
-  - razsoc
-  - obsidian
-  - tasknotes
-  - drift-audit
-  - knowledge-curation
-  preferredTaskTypes:
-  - knowledge
-  - curation
-  - brain-health
-  - drift
-  - documentation
-  greenlightRequiredFor:
-  - delete
-  - purge
-  - bulk-edit
-  - source-of-record-change
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: km:health
-- id: builder
-  name: Builder
-  role: Scoped Implementation Agent
-  specialty: focused implementation, tests, small diffs, integration fixes
-  model: GPT-5.5
-  mission: Ship scoped product/code slices with tests, minimal diffs, and clear verification evidence.
-  profile: builder
-  modes:
-  - task
-  tools:
-  - terminal
-  - file
-  - browser
-  - web
-  - gbrain
-  - session_search
-  - skills
-  - todo
-  skills:
-  - builder-core
-  - gstack-for-hermes
-  - test-driven-development
-  - systematic-debugging
-  - github-pr-workflow
-  - requesting-code-review
-  - codebase-inspection
-  capabilities:
-  - implementation
-  - code-editing
-  - tests
-  - integration
-  - build-verification
-  preferredTaskTypes:
-  - implementation
-  - bugfix
-  - feature
-  - refactor
-  - integration
-  greenlightRequiredFor:
-  - merge
-  - push
-  - destructive
-  - external-write
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: builder:task
-- id: reviewer
-  name: Reviewer
-  role: Independent Review / Merge Gate
-  specialty: security review, logic review, regression detection, quality gates
-  model: GPT-5.5
-  mission: Independently review changes and block unsafe, untested, or logically broken work before it lands.
-  profile: reviewer
-  modes:
-  - gate
-  tools:
-  - terminal
-  - file
-  - web
-  - gbrain
-  - session_search
-  - skills
-  skills:
-  - reviewer-core
-  - requesting-code-review
-  - github-code-review
-  - systematic-debugging
-  - gstack-for-hermes
-  - gbrain
-  - codebase-inspection
-  capabilities:
-  - code-review
-  - security-review
-  - regression-analysis
-  - quality-gate
-  - merge-readiness
-  preferredTaskTypes:
-  - review
-  - qa
-  - regression
-  - verification
-  - merge-gate
-  greenlightRequiredFor:
-  - approve-merge
-  - external-comment
-  - destructive
-  reviewRequired: false
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: reviewer:gate
-- id: qa
-  name: QA
-  role: Browser / Workflow / CLI Smoke Verification
-  specialty: browser QA, workflow smoke tests, expected-vs-actual checks, regression reproduction
-  model: GPT-5.5
-  mission: Verify user-visible behavior with concrete smoke evidence and concise bug reports.
-  profile: qa
-  modes:
-  - smoke
-  tools:
-  - browser
-  - terminal
-  - file
-  - vision
-  - gbrain
-  - session_search
-  - skills
-  - web
-  skills:
-  - qa-core
-  - browser-harness-power-use
-  - dogfood
-  - gstack-for-hermes
-  capabilities:
-  - browser-qa
-  - smoke-verification
-  - regression-reproduction
-  - cli-verification
-  - evidence-capture
-  preferredTaskTypes:
-  - qa
-  - smoke
-  - browser
-  - verification
-  - regression
-  greenlightRequiredFor:
-  - destructive
-  - external-write
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: qa:smoke
-- id: researcher
-  name: Researcher
-  role: Brain-first Research / Bounded Autoresearch
-  specialty: GBrain-first lookup, external research, synthesis, source trails, bounded research loops
-  model: GPT-5.5
-  mission: Produce decision-grade research with brain-first context, external verification, and explicit uncertainty.
-  profile: researcher
-  modes:
-  - quick
-  - autoresearch
-  tools:
-  - gbrain
-  - web
-  - browser
-  - terminal
-  - file
-  - vision
-  - session_search
-  - skills
-  - todo
-  skills:
-  - researcher-core
-  - gbrain
-  - autoresearch
-  - browser-harness-power-use
-  - gstack-for-hermes
-  - researcher-quick
-  - researcher-autoresearch
-  - arxiv
-  - youtube-content
-  - polymarket
-  capabilities:
-  - research
-  - synthesis
-  - source-verification
-  - gbrain-query
-  - autoresearch
-  preferredTaskTypes:
-  - research
-  - analysis
-  - options
-  - source-review
-  - market-map
-  greenlightRequiredFor:
-  - publish
-  - external-send
-  - long-running-loop
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: researcher:quick
-- id: ops-watch
-  name: Ops Watch
-  role: Local Infra / Runtime Health Watch
-  specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability
-  model: GPT-5.5
-  mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks.
-  profile: ops-watch
-  modes:
-  - health
-  tools:
-  - terminal
-  - cronjob
-  - file
-  - gbrain
-  - skills
-  - session_search
-  - web
-  skills:
-  - ops-watch-core
-  - gbrain
-  - hermes-agent
-  - systematic-debugging
-  - webhook-subscriptions
-  capabilities:
-  - ops-health
-  - gateway-status
-  - runtime-monitoring
-  - cron
-  - mcp-health
-  - lifecycle-sweep
-  preferredTaskTypes:
-  - ops
-  - health
-  - monitoring
-  - lifecycle
-  - incident-triage
-  greenlightRequiredFor:
-  - restart-service
-  - destructive
-  - config-change
-  - credential-change
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: ops:health
-- id: maintainer
-  name: Maintainer
-  role: Upstream Dependency / Patch Hygiene
-  specialty: upstream tracking, local patch hygiene, dependency updates, PR/issue follow-through
-  model: GPT-5.5
-  mission: Keep local forks and upstream dependencies healthy without losing local patches or dirty-worktree context.
-  profile: maintainer
-  modes:
-  - check
-  tools:
-  - terminal
-  - file
-  - web
-  - browser
-  - gbrain
-  - session_search
-  - skills
-  skills:
-  - maintainer-core
-  - github-repo-management
-  - github-pr-workflow
-  - github-issues
-  - github-code-review
-  - gbrain
-  - gstack-for-hermes
-  - hermes-agent
-  capabilities:
-  - upstream-tracking
-  - dependency-maintenance
-  - patch-hygiene
-  - git-review
-  - issue-tracking
-  preferredTaskTypes:
-  - maintenance
-  - upstream
-  - dependency
-  - patch
-  - release-notes
-  greenlightRequiredFor:
-  - merge
-  - push
-  - destructive
-  - fork-reset
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: maintainer:check
-- id: strategist
-  name: Strategist
-  role: Wedges / Bets / Kill Criteria
-  specialty: operating plans, gstack-style wedges, strategy reviews, decision framing, kill criteria
-  model: GPT-5.5
-  mission: Turn ambiguity into crisp wedges, bets, constraints, and kill criteria without over-planning.
-  profile: strategist
-  modes:
-  - review
-  tools:
-  - gbrain
-  - web
-  - session_search
-  - file
-  - skills
-  - todo
-  - clarify
-  skills:
-  - strategist-core
-  - gstack-for-hermes
-  - gbrain
-  - writing-plans
-  - polymarket
-  capabilities:
-  - strategy
-  - planning
-  - ideation
-  - decision-framing
-  - kill-criteria
-  preferredTaskTypes:
-  - strategy
-  - planning
-  - review
-  - ideation
-  - prioritization
-  greenlightRequiredFor:
-  - publish
-  - external-send
-  - irreversible-decision
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: strategist:review
-- id: inbox-triage
-  name: Inbox Triage
-  role: Capture / Discard / Route / Task Triage
-  specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
-  model: GPT-5.5
-  mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
-  profile: inbox-triage
-  modes:
-  - triage
-  tools:
-  - gbrain
-  - web
-  - file
-  - session_search
-  - todo
-  - skills
-  - terminal
-  skills:
-  - inbox-triage-core
-  - gbrain
-  - obsidian-markdown
-  - gstack-for-hermes
-  - defuddle
-  - youtube-content
-  capabilities:
-  - inbox-triage
-  - capture-routing
-  - task-routing
-  - knowledge-filtering
-  - source-review
-  preferredTaskTypes:
-  - triage
-  - inbox
-  - capture
-  - task-routing
-  - reading-queue
-  greenlightRequiredFor:
-  - delete
-  - purge
-  - publish
-  - external-send
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: inbox:triage
+  - id: orchestrator
+    name: Orchestrator
+    role: Swarm Orchestrator / Greenlight Gate
+    specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates
+    model: GPT-5.5
+    mission: Decompose missions into safe, proof-bearing work and route to the right specialist while preserving human greenlight control.
+    profile: orchestrator
+    modes:
+      - plan
+    tools:
+      - todo
+      - kanban
+      - delegation
+      - terminal
+      - file
+      - gbrain
+      - session_search
+      - cronjob
+      - skills
+      - clarify
+      - web
+    skills:
+      - orchestrator-core
+      - gstack-for-hermes
+      - gbrain
+      - kanban-orchestrator
+      - subagent-driven-development
+      - writing-plans
+      - requesting-code-review
+      - workspace-dispatch
+    capabilities:
+      - orchestration
+      - decomposition
+      - routing
+      - proof-contracts
+      - greenlight-gate
+    preferredTaskTypes:
+      - orchestration
+      - planning
+      - routing
+      - coordination
+      - handoff
+    greenlightRequiredFor:
+      - merge
+      - publish
+      - destructive
+      - external-send
+      - credential-change
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: orchestrator:plan
+  - id: km-agent
+    name: KM Agent
+    role: RAZSOC / GBrain Knowledge Steward
+    specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits
+    model: GPT-5.5
+    mission: Keep the operating brain coherent, searchable, and source-of-record aligned without polluting durable knowledge.
+    profile: km-agent
+    modes:
+      - health
+      - curate
+    tools:
+      - gbrain
+      - file
+      - terminal
+      - session_search
+      - skills
+      - todo
+      - cronjob
+      - web
+    skills:
+      - km-agent-core
+      - gbrain
+      - obsidian-markdown
+      - obsidian-cli
+      - obsidian-bases
+      - json-canvas
+      - gstack-for-hermes
+    capabilities:
+      - gbrain
+      - razsoc
+      - obsidian
+      - tasknotes
+      - drift-audit
+      - knowledge-curation
+    preferredTaskTypes:
+      - knowledge
+      - curation
+      - brain-health
+      - drift
+      - documentation
+    greenlightRequiredFor:
+      - delete
+      - purge
+      - bulk-edit
+      - source-of-record-change
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: km:health
+  - id: builder
+    name: Builder
+    role: Scoped Implementation Agent
+    specialty: focused implementation, tests, small diffs, integration fixes
+    model: GPT-5.5
+    mission: Ship scoped product/code slices with tests, minimal diffs, and clear verification evidence.
+    profile: builder
+    modes:
+      - task
+    tools:
+      - terminal
+      - file
+      - browser
+      - web
+      - gbrain
+      - session_search
+      - skills
+      - todo
+    skills:
+      - builder-core
+      - gstack-for-hermes
+      - test-driven-development
+      - systematic-debugging
+      - github-pr-workflow
+      - requesting-code-review
+      - codebase-inspection
+    capabilities:
+      - implementation
+      - code-editing
+      - tests
+      - integration
+      - build-verification
+    preferredTaskTypes:
+      - implementation
+      - bugfix
+      - feature
+      - refactor
+      - integration
+    greenlightRequiredFor:
+      - merge
+      - push
+      - destructive
+      - external-write
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: builder:task
+  - id: reviewer
+    name: Reviewer
+    role: Independent Review / Merge Gate
+    specialty: security review, logic review, regression detection, quality gates
+    model: GPT-5.5
+    mission: Independently review changes and block unsafe, untested, or logically broken work before it lands.
+    profile: reviewer
+    modes:
+      - gate
+    tools:
+      - terminal
+      - file
+      - web
+      - gbrain
+      - session_search
+      - skills
+    skills:
+      - reviewer-core
+      - requesting-code-review
+      - github-code-review
+      - systematic-debugging
+      - gstack-for-hermes
+      - gbrain
+      - codebase-inspection
+    capabilities:
+      - code-review
+      - security-review
+      - regression-analysis
+      - quality-gate
+      - merge-readiness
+    preferredTaskTypes:
+      - review
+      - qa
+      - regression
+      - verification
+      - merge-gate
+    greenlightRequiredFor:
+      - approve-merge
+      - external-comment
+      - destructive
+    reviewRequired: false
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: reviewer:gate
+  - id: qa
+    name: QA
+    role: Browser / Workflow / CLI Smoke Verification
+    specialty: browser QA, workflow smoke tests, expected-vs-actual checks, regression reproduction
+    model: GPT-5.5
+    mission: Verify user-visible behavior with concrete smoke evidence and concise bug reports.
+    profile: qa
+    modes:
+      - smoke
+    tools:
+      - browser
+      - terminal
+      - file
+      - vision
+      - gbrain
+      - session_search
+      - skills
+      - web
+    skills:
+      - qa-core
+      - browser-harness-power-use
+      - dogfood
+      - gstack-for-hermes
+    capabilities:
+      - browser-qa
+      - smoke-verification
+      - regression-reproduction
+      - cli-verification
+      - evidence-capture
+    preferredTaskTypes:
+      - qa
+      - smoke
+      - browser
+      - verification
+      - regression
+    greenlightRequiredFor:
+      - destructive
+      - external-write
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: qa:smoke
+  - id: researcher
+    name: Researcher
+    role: Brain-first Research / Bounded Autoresearch
+    specialty: GBrain-first lookup, external research, synthesis, source trails, bounded research loops
+    model: omniroute/hermes-research
+    mission: Produce decision-grade research with brain-first context, external verification, and explicit uncertainty.
+    profile: researcher
+    modes:
+      - quick
+      - autoresearch
+    tools:
+      - gbrain
+      - web
+      - browser
+      - terminal
+      - file
+      - vision
+      - session_search
+      - skills
+      - todo
+    skills:
+      - researcher-core
+      - gbrain
+      - autoresearch
+      - browser-harness-power-use
+      - gstack-for-hermes
+      - researcher-quick
+      - researcher-autoresearch
+      - grounded-citations
+      - arxiv
+      - youtube-content
+      - polymarket
+    capabilities:
+      - research
+      - synthesis
+      - source-verification
+      - gbrain-query
+      - autoresearch
+    preferredTaskTypes:
+      - research
+      - analysis
+      - options
+      - source-review
+      - market-map
+    greenlightRequiredFor:
+      - publish
+      - external-send
+      - long-running-loop
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: researcher:quick
+  - id: ops-watch
+    name: Ops Watch
+    role: Local Infra / Runtime Health Watch
+    specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability
+    model: GPT-5.5
+    mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks.
+    profile: ops-watch
+    modes:
+      - health
+    tools:
+      - terminal
+      - cronjob
+      - file
+      - gbrain
+      - skills
+      - session_search
+      - web
+    skills:
+      - ops-watch-core
+      - gbrain
+      - hermes-agent
+      - systematic-debugging
+      - webhook-subscriptions
+    capabilities:
+      - ops-health
+      - gateway-status
+      - runtime-monitoring
+      - cron
+      - mcp-health
+      - lifecycle-sweep
+    preferredTaskTypes:
+      - ops
+      - health
+      - monitoring
+      - lifecycle
+      - incident-triage
+    greenlightRequiredFor:
+      - restart-service
+      - destructive
+      - config-change
+      - credential-change
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: ops:health
+  - id: maintainer
+    name: Maintainer
+    role: Upstream Dependency / Patch Hygiene
+    specialty: upstream tracking, local patch hygiene, dependency updates, PR/issue follow-through
+    model: GPT-5.5
+    mission: Keep local forks and upstream dependencies healthy without losing local patches or dirty-worktree context.
+    profile: maintainer
+    modes:
+      - check
+    tools:
+      - terminal
+      - file
+      - web
+      - browser
+      - gbrain
+      - session_search
+      - skills
+    skills:
+      - maintainer-core
+      - github-repo-management
+      - github-pr-workflow
+      - github-issues
+      - github-code-review
+      - gbrain
+      - gstack-for-hermes
+      - hermes-agent
+    capabilities:
+      - upstream-tracking
+      - dependency-maintenance
+      - patch-hygiene
+      - git-review
+      - issue-tracking
+    preferredTaskTypes:
+      - maintenance
+      - upstream
+      - dependency
+      - patch
+      - release-notes
+    greenlightRequiredFor:
+      - merge
+      - push
+      - destructive
+      - fork-reset
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: maintainer:check
+  - id: strategist
+    name: Strategist
+    role: Wedges / Bets / Kill Criteria
+    specialty: operating plans, gstack-style wedges, strategy reviews, decision framing, kill criteria
+    model: GPT-5.5
+    mission: Turn ambiguity into crisp wedges, bets, constraints, and kill criteria without over-planning.
+    profile: strategist
+    modes:
+      - review
+    tools:
+      - gbrain
+      - web
+      - session_search
+      - file
+      - skills
+      - todo
+      - clarify
+    skills:
+      - strategist-core
+      - gstack-for-hermes
+      - gbrain
+      - writing-plans
+      - polymarket
+    capabilities:
+      - strategy
+      - planning
+      - ideation
+      - decision-framing
+      - kill-criteria
+    preferredTaskTypes:
+      - strategy
+      - planning
+      - review
+      - ideation
+      - prioritization
+    greenlightRequiredFor:
+      - publish
+      - external-send
+      - irreversible-decision
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: strategist:review
+  - id: inbox-triage
+    name: Inbox Triage
+    role: Capture / Discard / Route / Task Triage
+    specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
+    model: GPT-5.5
+    mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
+    profile: inbox-triage
+    modes:
+      - triage
+    tools:
+      - gbrain
+      - web
+      - file
+      - session_search
+      - todo
+      - skills
+      - terminal
+    skills:
+      - inbox-triage-core
+      - gbrain
+      - obsidian-markdown
+      - gstack-for-hermes
+      - defuddle
+      - youtube-content
+    capabilities:
+      - inbox-triage
+      - capture-routing
+      - task-routing
+      - knowledge-filtering
+      - source-review
+    preferredTaskTypes:
+      - triage
+      - inbox
+      - capture
+      - task-routing
+      - reading-queue
+    greenlightRequiredFor:
+      - delete
+      - purge
+      - publish
+      - external-send
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    plugins: []
+    pluginToolsets: []
+    mcpServers:
+      - gbrain
+    wrapper: inbox:triage

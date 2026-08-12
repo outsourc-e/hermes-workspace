@@ -90,10 +90,13 @@ export const BUILTIN_IDS = new Set(BUILTIN_SOURCES.map((s) => s.id))
 // ---------------------------------------------------------------------------
 
 const ID_RE = /^[a-z][a-z0-9_-]{0,63}$/
-const VALID_TRUST: ReadonlySet<string> = new Set(['official', 'community', 'unverified'])
+const VALID_TRUST: ReadonlySet<string> = new Set([
+  'official',
+  'community',
+  'unverified',
+])
 const VALID_FORMAT: ReadonlySet<string> = new Set(['smithery', 'generic-json'])
 const KNOWN_TOP_FIELDS = new Set(['version', 'sources'])
-
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -123,7 +126,13 @@ function statKey(path: string): StatKeyResult {
     const fd = openSync(path, 'r')
     try {
       const st = fstatSync(fd)
-      return { ok: true, mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, ctimeMs: st.ctimeMs }
+      return {
+        ok: true,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+        ino: st.ino,
+        ctimeMs: st.ctimeMs,
+      }
     } finally {
       closeSync(fd)
     }
@@ -141,7 +150,10 @@ function statKey(path: string): StatKeyResult {
   }
 }
 
-function makeCacheKey(path: string, st: { mtimeMs: number; size: number; ino: number; ctimeMs: number }): string {
+function makeCacheKey(
+  path: string,
+  st: { mtimeMs: number; size: number; ino: number; ctimeMs: number },
+): string {
   return `${path}:${st.mtimeMs}:${st.size}:${st.ino}:${st.ctimeMs}`
 }
 
@@ -171,10 +183,18 @@ function bootstrapSeed(final: string): boolean {
 
   try {
     linkSync(tmp, final)
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
     return true
   } catch (linkErr) {
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
     if ((linkErr as NodeJS.ErrnoException).code === 'EEXIST') {
       return false
     }
@@ -230,11 +250,17 @@ function validatePayload(parsed: unknown): PayloadValidationResult {
 
     const id = typeof p.id === 'string' ? p.id : ''
     if (!ID_RE.test(id)) {
-      errors.push({ path: `${base}.id`, message: 'id must match /^[a-z][a-z0-9_-]{0,63}$/' })
+      errors.push({
+        path: `${base}.id`,
+        message: 'id must match /^[a-z][a-z0-9_-]{0,63}$/',
+      })
       continue
     }
     if (BUILTIN_IDS.has(id)) {
-      errors.push({ path: `${base}.id`, message: `"${id}" is a reserved built-in source id` })
+      errors.push({
+        path: `${base}.id`,
+        message: `"${id}" is a reserved built-in source id`,
+      })
       continue
     }
     if (seen.has(id)) {
@@ -245,7 +271,10 @@ function validatePayload(parsed: unknown): PayloadValidationResult {
 
     const name = typeof p.name === 'string' ? p.name.trim() : ''
     if (name.length < 1 || name.length > 100) {
-      errors.push({ path: `${base}.name`, message: 'name must be 1..100 characters' })
+      errors.push({
+        path: `${base}.name`,
+        message: 'name must be 1..100 characters',
+      })
     }
 
     const url = typeof p.url === 'string' ? p.url.trim() : ''
@@ -255,21 +284,33 @@ function validatePayload(parsed: unknown): PayloadValidationResult {
       try {
         const parsedUrl = new URL(url)
         if (parsedUrl.protocol !== 'https:') {
-          errors.push({ path: `${base}.url`, message: 'url must use https:// (http:// is not allowed)' })
+          errors.push({
+            path: `${base}.url`,
+            message: 'url must use https:// (http:// is not allowed)',
+          })
         }
       } catch {
-        errors.push({ path: `${base}.url`, message: `url is not a valid URL: "${url}"` })
+        errors.push({
+          path: `${base}.url`,
+          message: `url is not a valid URL: "${url}"`,
+        })
       }
     }
 
     const trust = typeof p.trust === 'string' ? p.trust : ''
     if (!VALID_TRUST.has(trust)) {
-      errors.push({ path: `${base}.trust`, message: `trust must be one of: ${[...VALID_TRUST].join(', ')}` })
+      errors.push({
+        path: `${base}.trust`,
+        message: `trust must be one of: ${[...VALID_TRUST].join(', ')}`,
+      })
     }
 
     const format = typeof p.format === 'string' ? p.format : ''
     if (!VALID_FORMAT.has(format)) {
-      errors.push({ path: `${base}.format`, message: `format must be one of: ${[...VALID_FORMAT].join(', ')}` })
+      errors.push({
+        path: `${base}.format`,
+        message: `format must be one of: ${[...VALID_FORMAT].join(', ')}`,
+      })
     }
 
     const entryErrors = errors.filter((e) => e.path.startsWith(base))
@@ -323,7 +364,11 @@ export async function readHubSources(): Promise<ReadHubSourcesResult> {
     if (_cache && _cache.key === key) return _cache.result
 
     let text: string | null = null
-    try { text = readFileSync(path, 'utf8') } catch { /* file vanished */ }
+    try {
+      text = readFileSync(path, 'utf8')
+    } catch {
+      /* file vanished */
+    }
 
     if (text !== null) {
       let parsed: unknown
@@ -395,7 +440,11 @@ export async function readHubSources(): Promise<ReadHubSourcesResult> {
 // Internal: read only user-defined sources from the file
 // ---------------------------------------------------------------------------
 
-async function readUserSources(): Promise<{ sources: HubSourceEntry[]; error?: string; validationErrors?: ValidationIssue[] }> {
+async function readUserSources(): Promise<{
+  sources: HubSourceEntry[]
+  error?: string
+  validationErrors?: ValidationIssue[]
+}> {
   const path = hubSourcesFilePath()
   const stat = statKey(path)
   if (!stat.ok) {
@@ -404,7 +453,11 @@ async function readUserSources(): Promise<{ sources: HubSourceEntry[]; error?: s
   }
 
   let text: string | null = null
-  try { text = readFileSync(path, 'utf8') } catch { /* ignore */ }
+  try {
+    text = readFileSync(path, 'utf8')
+  } catch {
+    /* ignore */
+  }
   if (!text) return { sources: [] }
 
   let parsed: unknown
@@ -415,9 +468,15 @@ async function readUserSources(): Promise<{ sources: HubSourceEntry[]; error?: s
   }
 
   const validation = validatePayload(parsed)
-  const hardErrors = validation.errors.filter((e) => !e.message.includes('unknown top-level field'))
+  const hardErrors = validation.errors.filter(
+    (e) => !e.message.includes('unknown top-level field'),
+  )
   if (hardErrors.length > 0) {
-    return { sources: validation.sources, error: 'validation errors', validationErrors: hardErrors }
+    return {
+      sources: validation.sources,
+      error: 'validation errors',
+      validationErrors: hardErrors,
+    }
   }
   return { sources: validation.sources }
 }
@@ -447,7 +506,11 @@ function writeUserSourcesSync(userSources: HubSourceEntry[]): void {
   try {
     renameSync(tmp, path)
   } catch (err) {
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
     throw err
   }
   _cache = null
@@ -459,18 +522,29 @@ function writeUserSourcesSync(userSources: HubSourceEntry[]): void {
 
 export function validateSourceEntry(
   raw: unknown,
-): { ok: true; entry: Omit<HubSourceEntry, 'builtin'> } | { ok: false; errors: ValidationIssue[] } {
+):
+  | { ok: true; entry: Omit<HubSourceEntry, 'builtin'> }
+  | { ok: false; errors: ValidationIssue[] } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { ok: false, errors: [{ path: '', message: 'body must be a plain object' }] }
+    return {
+      ok: false,
+      errors: [{ path: '', message: 'body must be a plain object' }],
+    }
   }
   const p = raw as Record<string, unknown>
   const errors: ValidationIssue[] = []
 
   const id = typeof p.id === 'string' ? p.id : ''
   if (!ID_RE.test(id)) {
-    errors.push({ path: 'id', message: 'id must match /^[a-z][a-z0-9_-]{0,63}$/' })
+    errors.push({
+      path: 'id',
+      message: 'id must match /^[a-z][a-z0-9_-]{0,63}$/',
+    })
   } else if (BUILTIN_IDS.has(id)) {
-    errors.push({ path: 'id', message: `"${id}" is a reserved built-in source id` })
+    errors.push({
+      path: 'id',
+      message: `"${id}" is a reserved built-in source id`,
+    })
   }
 
   const name = typeof p.name === 'string' ? p.name.trim() : ''
@@ -485,7 +559,10 @@ export function validateSourceEntry(
     try {
       const parsedUrl = new URL(url)
       if (parsedUrl.protocol !== 'https:') {
-        errors.push({ path: 'url', message: 'url must use https:// (http:// is not allowed)' })
+        errors.push({
+          path: 'url',
+          message: 'url must use https:// (http:// is not allowed)',
+        })
       }
     } catch {
       errors.push({ path: 'url', message: `url is not a valid URL: "${url}"` })
@@ -494,12 +571,18 @@ export function validateSourceEntry(
 
   const trust = typeof p.trust === 'string' ? p.trust : ''
   if (!VALID_TRUST.has(trust)) {
-    errors.push({ path: 'trust', message: `trust must be one of: ${[...VALID_TRUST].join(', ')}` })
+    errors.push({
+      path: 'trust',
+      message: `trust must be one of: ${[...VALID_TRUST].join(', ')}`,
+    })
   }
 
   const format = typeof p.format === 'string' ? p.format : ''
   if (!VALID_FORMAT.has(format)) {
-    errors.push({ path: 'format', message: `format must be one of: ${[...VALID_FORMAT].join(', ')}` })
+    errors.push({
+      path: 'format',
+      message: `format must be one of: ${[...VALID_FORMAT].join(', ')}`,
+    })
   }
 
   if (errors.length > 0) return { ok: false, errors }
@@ -530,7 +613,9 @@ let _crudPending: Promise<void> = Promise.resolve()
 
 function withCrudLock<T>(fn: () => Promise<T>): Promise<T> {
   let resolve!: () => void
-  const next = new Promise<void>((r) => { resolve = r })
+  const next = new Promise<void>((r) => {
+    resolve = r
+  })
   const result = _crudPending.then(fn).finally(resolve)
   _crudPending = next.catch(() => undefined)
   return result
@@ -543,7 +628,10 @@ function withCrudLock<T>(fn: () => Promise<T>): Promise<T> {
 /** Append a new user-defined source. */
 export async function addHubSource(
   raw: unknown,
-): Promise<{ ok: true; sources: HubSourceEntry[] } | { ok: false; errors: ValidationIssue[]; status?: number }> {
+): Promise<
+  | { ok: true; sources: HubSourceEntry[] }
+  | { ok: false; errors: ValidationIssue[]; status?: number }
+> {
   const validation = validateSourceEntry(raw)
   if (!validation.ok) return { ok: false, errors: validation.errors }
 
@@ -552,7 +640,12 @@ export async function addHubSource(
     const userSources = existing.sources
 
     if (userSources.some((s) => s.id === validation.entry.id)) {
-      return { ok: false, errors: [{ path: 'id', message: `duplicate id "${validation.entry.id}"` }] }
+      return {
+        ok: false,
+        errors: [
+          { path: 'id', message: `duplicate id "${validation.entry.id}"` },
+        ],
+      }
     }
 
     writeUserSourcesSync([...userSources, validation.entry])
@@ -566,9 +659,21 @@ export async function addHubSource(
 export async function updateHubSource(
   id: string,
   raw: unknown,
-): Promise<{ ok: true; sources: HubSourceEntry[] } | { ok: false; errors: ValidationIssue[]; status?: number }> {
+): Promise<
+  | { ok: true; sources: HubSourceEntry[] }
+  | { ok: false; errors: ValidationIssue[]; status?: number }
+> {
   if (BUILTIN_IDS.has(id)) {
-    return { ok: false, errors: [{ path: 'id', message: `"${id}" is a built-in source and cannot be modified` }], status: 400 }
+    return {
+      ok: false,
+      errors: [
+        {
+          path: 'id',
+          message: `"${id}" is a built-in source and cannot be modified`,
+        },
+      ],
+      status: 400,
+    }
   }
 
   const body = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
@@ -582,7 +687,11 @@ export async function updateHubSource(
 
     const idx = userSources.findIndex((s) => s.id === id)
     if (idx === -1) {
-      return { ok: false, errors: [{ path: 'id', message: `source "${id}" not found` }], status: 404 }
+      return {
+        ok: false,
+        errors: [{ path: 'id', message: `source "${id}" not found` }],
+        status: 404,
+      }
     }
 
     const updated = [...userSources]
@@ -597,9 +706,21 @@ export async function updateHubSource(
 /** Remove a user-defined source by id. */
 export async function deleteHubSource(
   id: string,
-): Promise<{ ok: true; sources: HubSourceEntry[] } | { ok: false; errors: ValidationIssue[]; status?: number }> {
+): Promise<
+  | { ok: true; sources: HubSourceEntry[] }
+  | { ok: false; errors: ValidationIssue[]; status?: number }
+> {
   if (BUILTIN_IDS.has(id)) {
-    return { ok: false, errors: [{ path: 'id', message: `"${id}" is a built-in source and cannot be removed` }], status: 400 }
+    return {
+      ok: false,
+      errors: [
+        {
+          path: 'id',
+          message: `"${id}" is a built-in source and cannot be removed`,
+        },
+      ],
+      status: 400,
+    }
   }
 
   return withCrudLock(async () => {
@@ -608,7 +729,11 @@ export async function deleteHubSource(
 
     const idx = userSources.findIndex((s) => s.id === id)
     if (idx === -1) {
-      return { ok: false, errors: [{ path: 'id', message: `source "${id}" not found` }], status: 404 }
+      return {
+        ok: false,
+        errors: [{ path: 'id', message: `source "${id}" not found` }],
+        status: 404,
+      }
     }
 
     writeUserSourcesSync(userSources.filter((_, i) => i !== idx))

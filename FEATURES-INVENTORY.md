@@ -160,13 +160,13 @@
 
 ### 2.4 Memory
 
-| Endpoint             | Method | Description                      |
-| -------------------- | ------ | -------------------------------- |
-| `/api/memory`        | GET    | Get memory from Hermes Agent gateway   |
-| `/api/memory/list`   | GET    | List local memory markdown files |
-| `/api/memory/read`   | GET    | Read specific memory file        |
-| `/api/memory/search` | GET    | Search across memory files       |
-| `/api/memory/write`  | POST   | Write/update memory file         |
+| Endpoint             | Method | Description                          |
+| -------------------- | ------ | ------------------------------------ |
+| `/api/memory`        | GET    | Get memory from Hermes Agent gateway |
+| `/api/memory/list`   | GET    | List local memory markdown files     |
+| `/api/memory/read`   | GET    | Read specific memory file            |
+| `/api/memory/search` | GET    | Search across memory files           |
+| `/api/memory/write`  | POST   | Write/update memory file             |
 
 ### 2.5 Skills
 
@@ -211,7 +211,7 @@
 | `/api/connection-status` | GET    | Gateway connection status with capabilities   |
 | `/api/gateway-status`    | GET    | Detailed gateway capabilities                 |
 | `/api/start-agent`       | POST   | Auto-start Claude agent process               |
-| `/api/start-claude`      | POST   | Start Hermes Agent gateway                          |
+| `/api/start-claude`      | POST   | Start Hermes Agent gateway                    |
 | `/api/workspace`         | GET    | Workspace auto-detection                      |
 
 ### 2.10 OAuth
@@ -326,7 +326,7 @@
 
 | Setting                   | Type                            | Default  | Description                 |
 | ------------------------- | ------------------------------- | -------- | --------------------------- |
-| `claudeUrl`               | string                          | `''`     | Hermes Agent API URL              |
+| `claudeUrl`               | string                          | `''`     | Hermes Agent API URL        |
 | `claudeToken`             | string                          | `''`     | Bearer token                |
 | `theme`                   | `system\|light\|dark`           | `system` | Color mode                  |
 | `accentColor`             | `orange\|purple\|blue\|green`   | `blue`   | Accent color                |

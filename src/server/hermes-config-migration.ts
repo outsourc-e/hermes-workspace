@@ -85,17 +85,77 @@ export type NormalizeHermesConfigInput = {
 
 export const HERMES_PROVIDER_CATALOG: Array<ProviderDef> = [
   { id: 'nous', name: 'Nous Portal', kind: 'oauth', envKeys: [], models: [] },
-  { id: 'openai-codex', name: 'OpenAI Codex', kind: 'oauth', envKeys: [], models: [] },
-  { id: 'anthropic', name: 'Anthropic', kind: 'api_key', envKeys: ['ANTHROPIC_API_KEY'], models: [] },
-  { id: 'openrouter', name: 'OpenRouter', kind: 'api_key', envKeys: ['OPENROUTER_API_KEY'], models: [] },
-  { id: 'zai', name: 'Z.AI / GLM', kind: 'api_key', envKeys: ['GLM_API_KEY'], models: [] },
-  { id: 'kimi-coding', name: 'Kimi', kind: 'api_key', envKeys: ['KIMI_API_KEY'], models: [] },
-  { id: 'minimax', name: 'MiniMax', kind: 'api_key', envKeys: ['MINIMAX_API_KEY'], models: [] },
-  { id: 'minimax-cn', name: 'MiniMax (China)', kind: 'api_key', envKeys: ['MINIMAX_CN_API_KEY'], models: [] },
-  { id: 'xiaomi', name: 'Xiaomi MiMo', kind: 'api_key', envKeys: ['XIAOMI_API_KEY'], models: [] },
+  {
+    id: 'openai-codex',
+    name: 'OpenAI Codex',
+    kind: 'oauth',
+    envKeys: [],
+    models: [],
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    kind: 'api_key',
+    envKeys: ['ANTHROPIC_API_KEY'],
+    models: [],
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    kind: 'api_key',
+    envKeys: ['OPENROUTER_API_KEY'],
+    models: [],
+  },
+  {
+    id: 'zai',
+    name: 'Z.AI / GLM',
+    kind: 'api_key',
+    envKeys: ['GLM_API_KEY'],
+    models: [],
+  },
+  {
+    id: 'kimi-coding',
+    name: 'Kimi',
+    kind: 'api_key',
+    envKeys: ['KIMI_API_KEY'],
+    models: [],
+  },
+  {
+    id: 'minimax',
+    name: 'MiniMax',
+    kind: 'api_key',
+    envKeys: ['MINIMAX_API_KEY'],
+    models: [],
+  },
+  {
+    id: 'minimax-cn',
+    name: 'MiniMax (China)',
+    kind: 'api_key',
+    envKeys: ['MINIMAX_CN_API_KEY'],
+    models: [],
+  },
+  {
+    id: 'xiaomi',
+    name: 'Xiaomi MiMo',
+    kind: 'api_key',
+    envKeys: ['XIAOMI_API_KEY'],
+    models: [],
+  },
   { id: 'ollama', name: 'Ollama', kind: 'local', envKeys: [], models: [] },
-  { id: 'atomic-chat', name: 'Atomic Chat', kind: 'local', envKeys: [], models: [] },
-  { id: 'custom', name: 'Custom', kind: 'custom', envKeys: ['CUSTOM_API_KEY'], models: [] },
+  {
+    id: 'atomic-chat',
+    name: 'Atomic Chat',
+    kind: 'local',
+    envKeys: [],
+    models: [],
+  },
+  {
+    id: 'custom',
+    name: 'Custom',
+    kind: 'custom',
+    envKeys: ['CUSTOM_API_KEY'],
+    models: [],
+  },
 ]
 
 const KNOWN_PROVIDER_IDS = new Set(HERMES_PROVIDER_CATALOG.map((p) => p.id))
@@ -116,7 +176,9 @@ function maskSecret(value: string): string {
   return `${value.slice(0, 4)}...${value.slice(-4)}`
 }
 
-function readDefaultModel(config: Record<string, unknown>): HermesConfigState['defaultModel'] {
+function readDefaultModel(
+  config: Record<string, unknown>,
+): HermesConfigState['defaultModel'] {
   const flatModel = readString(config.model)
   const flatProvider = readString(config.provider)
   if (flatModel && flatProvider) {
@@ -130,7 +192,10 @@ function readDefaultModel(config: Record<string, unknown>): HermesConfigState['d
   return { provider: nestedProvider, model: nestedModel, source: 'nested' }
 }
 
-function authProfileToken(authProfiles: Record<string, unknown>, providerId: string): string {
+function authProfileToken(
+  authProfiles: Record<string, unknown>,
+  providerId: string,
+): string {
   const profiles = readRecord(authProfiles.profiles)
   for (const [key, value] of Object.entries(profiles)) {
     if (!key.startsWith(`${providerId}:`)) continue
@@ -145,11 +210,15 @@ function authProfileToken(authProfiles: Record<string, unknown>, providerId: str
   return ''
 }
 
-function readCustomProviderEntries(config: Record<string, unknown>): Array<Record<string, unknown>> {
+function readCustomProviderEntries(
+  config: Record<string, unknown>,
+): Array<Record<string, unknown>> {
   const entries = config.custom_providers
   return Array.isArray(entries)
     ? entries.filter((entry): entry is Record<string, unknown> => {
-        return Boolean(entry && typeof entry === 'object' && !Array.isArray(entry))
+        return Boolean(
+          entry && typeof entry === 'object' && !Array.isArray(entry),
+        )
       })
     : []
 }
@@ -163,18 +232,28 @@ function customProviderBaseUrl(entry: Record<string, unknown>): string {
 }
 
 function customProviderKeyEnv(entry: Record<string, unknown>): string {
-  return readString(entry.key_env) || readString(entry.keyEnv) || readString(entry.api_key_env)
+  return (
+    readString(entry.key_env) ||
+    readString(entry.keyEnv) ||
+    readString(entry.api_key_env)
+  )
 }
 
 function customProviderApiMode(entry: Record<string, unknown>): string {
   return readString(entry.api_mode) || readString(entry.apiMode)
 }
 
-export function normalizeHermesConfigState(input: NormalizeHermesConfigInput): HermesConfigState {
+export function normalizeHermesConfigState(
+  input: NormalizeHermesConfigInput,
+): HermesConfigState {
   const defaultModel = readDefaultModel(input.config)
   const customEntries = readCustomProviderEntries(input.config)
-  const customByName = new Map(customEntries.map((entry) => [customProviderName(entry), entry]))
-  const localById = new Map(input.localProviders.map((provider) => [provider.id, provider]))
+  const customByName = new Map(
+    customEntries.map((entry) => [customProviderName(entry), entry]),
+  )
+  const localById = new Map(
+    input.localProviders.map((provider) => [provider.id, provider]),
+  )
 
   const providers = HERMES_PROVIDER_CATALOG.map((def): HermesProviderState => {
     const maskedCredentials: Record<string, string> = {}
@@ -241,23 +320,26 @@ export function normalizeHermesConfigState(input: NormalizeHermesConfigInput): H
     }
   })
 
-  const customProviders = customEntries.flatMap((entry): Array<HermesCustomProviderState> => {
-    const id = customProviderName(entry)
-    if (!id || KNOWN_PROVIDER_IDS.has(id)) return []
-    const apiKeyEnv = customProviderKeyEnv(entry)
-    const configured = Boolean(customProviderBaseUrl(entry))
-    return [
-      {
-        id,
-        name: id,
-        baseUrl: customProviderBaseUrl(entry),
-        apiKeyEnv: apiKeyEnv || undefined,
-        apiMode: customProviderApiMode(entry),
-        configured,
-        available: configured && (!apiKeyEnv || Boolean(input.env[apiKeyEnv])),
-      },
-    ]
-  })
+  const customProviders = customEntries.flatMap(
+    (entry): Array<HermesCustomProviderState> => {
+      const id = customProviderName(entry)
+      if (!id || KNOWN_PROVIDER_IDS.has(id)) return []
+      const apiKeyEnv = customProviderKeyEnv(entry)
+      const configured = Boolean(customProviderBaseUrl(entry))
+      return [
+        {
+          id,
+          name: id,
+          baseUrl: customProviderBaseUrl(entry),
+          apiKeyEnv: apiKeyEnv || undefined,
+          apiMode: customProviderApiMode(entry),
+          configured,
+          available:
+            configured && (!apiKeyEnv || Boolean(input.env[apiKeyEnv])),
+        },
+      ]
+    },
+  )
 
   return {
     ok: true,

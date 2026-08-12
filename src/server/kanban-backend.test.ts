@@ -23,23 +23,26 @@ async function loadKanbanBackend(options?: {
       missionId: input.missionId ?? null,
       reportPath: input.reportPath ?? null,
       createdBy: input.createdBy ?? 'swarm2-kanban',
+      modelOverride: input.modelOverride ?? null,
       createdAt: 1,
       updatedAt: 1,
     })),
-    listSwarmKanbanCards: vi.fn(() => [{
-      id: 'local-1',
-      title: 'Local task',
-      spec: '',
-      acceptanceCriteria: [],
-      assignedWorker: null,
-      reviewer: null,
-      status: 'backlog',
-      missionId: null,
-      reportPath: null,
-      createdBy: 'local',
-      createdAt: 1,
-      updatedAt: 1,
-    }]),
+    listSwarmKanbanCards: vi.fn(() => [
+      {
+        id: 'local-1',
+        title: 'Local task',
+        spec: '',
+        acceptanceCriteria: [],
+        assignedWorker: null,
+        reviewer: null,
+        status: 'backlog',
+        missionId: null,
+        reportPath: null,
+        createdBy: 'local',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ]),
     updateSwarmKanbanCard: vi.fn((cardId, updates) => ({
       id: cardId,
       title: updates.title ?? 'Local task',
@@ -51,6 +54,7 @@ async function loadKanbanBackend(options?: {
       missionId: null,
       reportPath: null,
       createdBy: 'local',
+      modelOverride: updates.modelOverride ?? null,
       createdAt: 1,
       updatedAt: 2,
     })),
@@ -61,7 +65,10 @@ async function loadKanbanBackend(options?: {
   }))
 
   vi.doMock('node:child_process', () => ({
-    execFileSync: vi.fn((command: string, args?: string[]) => options?.execFileSync?.(command, args) ?? ''),
+    execFileSync: vi.fn(
+      (command: string, args?: string[]) =>
+        options?.execFileSync?.(command, args) ?? '',
+    ),
   }))
 
   return import('./kanban-backend')
@@ -73,10 +80,17 @@ describe('kanban-backend', () => {
     vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
     const sqliteCalls: Array<{ command: string; args?: string[] }> = []
     const mod = await loadKanbanBackend({
-      existsSync: (target) => target === '/Users/aurora/.claude/kanban.db' || target === '/Users/aurora/.claude/kanban',
+      existsSync: (target) =>
+        target === '/Users/aurora/.claude/kanban.db' ||
+        target === '/Users/aurora/.claude/kanban',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'claude') return '/Users/aurora/.local/bin/claude\n'
-        if (command === '/Users/aurora/.local/bin/claude' && args[0] === '--version') return 'claude 1.0.0\n'
+        if (command === 'which' && args[0] === 'claude')
+          return '/Users/aurora/.local/bin/claude\n'
+        if (
+          command === '/Users/aurora/.local/bin/claude' &&
+          args[0] === '--version'
+        )
+          return 'claude 1.0.0\n'
         if (command === 'sqlite3') {
           sqliteCalls.push({ command, args })
           return JSON.stringify([
@@ -120,7 +134,8 @@ describe('kanban-backend', () => {
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'claude') throw new Error('not found')
+        if (command === 'which' && args[0] === 'claude')
+          throw new Error('not found')
         if (command === 'sqlite3') {
           return JSON.stringify([
             {
@@ -144,8 +159,13 @@ describe('kanban-backend', () => {
       writable: true,
       path: '/Users/aurora/.claude/kanban.db',
     })
-    expect(mod.getKanbanBackendMeta().details).toContain('direct local storage access')
-    expect((await mod.listKanbanCards())[0]).toMatchObject({ id: 't_direct', status: 'ready' })
+    expect(mod.getKanbanBackendMeta().details).toContain(
+      'direct local storage access',
+    )
+    expect((await mod.listKanbanCards())[0]).toMatchObject({
+      id: 't_direct',
+      status: 'ready',
+    })
   })
 
   it('resolves canonical Kanban paths from legacy profile-home env fallback too', async () => {
@@ -154,7 +174,8 @@ describe('kanban-backend', () => {
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'claude') throw new Error('not found')
+        if (command === 'which' && args[0] === 'claude')
+          throw new Error('not found')
         if (command === 'sqlite3') return '[]'
         throw new Error(`Unexpected command: ${command} ${args.join(' ')}`)
       },
@@ -173,8 +194,13 @@ describe('kanban-backend', () => {
     const mod = await loadKanbanBackend({
       existsSync: () => false,
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'claude') return '/Users/aurora/.local/bin/claude\n'
-        if (command === '/Users/aurora/.local/bin/claude' && args[0] === '--version') return 'claude 1.0.0\n'
+        if (command === 'which' && args[0] === 'claude')
+          return '/Users/aurora/.local/bin/claude\n'
+        if (
+          command === '/Users/aurora/.local/bin/claude' &&
+          args[0] === '--version'
+        )
+          return 'claude 1.0.0\n'
         throw new Error(`Unexpected command: ${command} ${args.join(' ')}`)
       },
     })
@@ -194,10 +220,17 @@ describe('kanban-backend', () => {
     const sqliteCalls: string[] = []
     let readCount = 0
     const mod = await loadKanbanBackend({
-      existsSync: (target) => target === '/Users/aurora/.claude/kanban.db' || target === '/Users/aurora/.claude/kanban',
+      existsSync: (target) =>
+        target === '/Users/aurora/.claude/kanban.db' ||
+        target === '/Users/aurora/.claude/kanban',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'claude') return '/Users/aurora/.local/bin/claude\n'
-        if (command === '/Users/aurora/.local/bin/claude' && args[0] === '--version') return 'claude 1.0.0\n'
+        if (command === 'which' && args[0] === 'claude')
+          return '/Users/aurora/.local/bin/claude\n'
+        if (
+          command === '/Users/aurora/.local/bin/claude' &&
+          args[0] === '--version'
+        )
+          return 'claude 1.0.0\n'
         if (command === 'sqlite3') {
           sqliteCalls.push(args.join(' '))
           const sql = args[2] ?? ''
@@ -206,7 +239,10 @@ describe('kanban-backend', () => {
             return JSON.stringify([
               {
                 id: 't_deadbeef',
-                title: readCount === 1 ? 'Created Hermes task' : 'Updated Hermes task',
+                title:
+                  readCount === 1
+                    ? 'Created Hermes task'
+                    : 'Updated Hermes task',
                 body: 'Task body',
                 status: readCount === 1 ? 'queued' : 'done',
                 assignee: 'swarm6',
@@ -221,14 +257,50 @@ describe('kanban-backend', () => {
       },
     })
 
-    const created = await mod.createKanbanCard({ title: 'Created Hermes task', spec: 'Task body', assignedWorker: 'swarm6', status: 'backlog' })
-    const updated = await mod.updateKanbanCard('t_deadbeef', { title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
+    const created = await mod.createKanbanCard({
+      title: 'Created Hermes task',
+      spec: 'Task body',
+      assignedWorker: 'swarm6',
+      status: 'backlog',
+      workspacePath: '/home/takon/hermes-workspace',
+    })
+    const updated = await mod.updateKanbanCard('t_deadbeef', {
+      title: 'Updated Hermes task',
+      status: 'done',
+      assignedWorker: 'swarm6',
+    })
 
-    expect(created).toMatchObject({ id: 't_deadbeef', title: 'Created Hermes task', status: 'backlog', assignedWorker: 'swarm6', createdBy: 'claude-kanban' })
-    expect(updated).toMatchObject({ id: 't_deadbeef', title: 'Updated Hermes task', status: 'done', assignedWorker: 'swarm6' })
-    expect(sqliteCalls.every((call) => call.startsWith('/Users/aurora/.claude/kanban.db '))).toBe(true)
-    expect(sqliteCalls.some((call) => call.includes('insert into tasks'))).toBe(true)
-    expect(sqliteCalls.some((call) => call.includes('update tasks set'))).toBe(true)
+    expect(created).toMatchObject({
+      id: 't_deadbeef',
+      title: 'Created Hermes task',
+      status: 'backlog',
+      assignedWorker: 'swarm6',
+      createdBy: 'claude-kanban',
+    })
+    expect(updated).toMatchObject({
+      id: 't_deadbeef',
+      title: 'Updated Hermes task',
+      status: 'done',
+      assignedWorker: 'swarm6',
+    })
+    expect(
+      sqliteCalls.every((call) =>
+        call.startsWith('/Users/aurora/.claude/kanban.db '),
+      ),
+    ).toBe(true)
+    expect(sqliteCalls.some((call) => call.includes('insert into tasks'))).toBe(
+      true,
+    )
+    expect(
+      sqliteCalls.some(
+        (call) =>
+          call.includes("'worktree'") &&
+          call.includes("'/home/takon/hermes-workspace'"),
+      ),
+    ).toBe(true)
+    expect(sqliteCalls.some((call) => call.includes('update tasks set'))).toBe(
+      true,
+    )
   })
 
   it('projects native Kanban tasks without collapsing statuses or dependency/run metadata', async () => {
@@ -238,7 +310,8 @@ describe('kanban-backend', () => {
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'claude') throw new Error('not found')
+        if (command === 'which' && args[0] === 'claude')
+          throw new Error('not found')
         if (command === 'sqlite3') {
           return JSON.stringify([
             {
@@ -279,12 +352,14 @@ describe('kanban-backend', () => {
     const mod = await loadKanbanBackend({
       existsSync: (target) => target === '/Users/aurora/.claude/kanban.db',
       execFileSync: (command, args = []) => {
-        if (command === 'which' && args[0] === 'claude') throw new Error('not found')
+        if (command === 'which' && args[0] === 'claude')
+          throw new Error('not found')
         if (command === 'sqlite3') {
           sqliteCalls.push(args.join(' '))
           const sql = args[2] ?? ''
           if (sql.includes('where idempotency_key =')) return '[]'
-          if (sql.includes('where id in')) return JSON.stringify([{ id: 't_parent', status: 'done' }])
+          if (sql.includes('where id in'))
+            return JSON.stringify([{ id: 't_parent', status: 'done' }])
           if (sql.includes('where id =')) {
             return JSON.stringify([
               {
@@ -321,9 +396,57 @@ describe('kanban-backend', () => {
       parents: ['t_parent'],
       source: 'native-kanban',
     })
-    expect(sqliteCalls.some((call) => call.includes('begin immediate') && call.includes('commit'))).toBe(true)
-    expect(sqliteCalls.some((call) => call.includes('task_links') && call.includes('t_parent'))).toBe(true)
-    expect(sqliteCalls.some((call) => call.includes('idempotency_key') && call.includes('native-dispatch-1'))).toBe(true)
-    expect(sqliteCalls.every((call) => !call.includes('swarm2-kanban.json'))).toBe(true)
+    expect(
+      sqliteCalls.some(
+        (call) => call.includes('begin immediate') && call.includes('commit'),
+      ),
+    ).toBe(true)
+    expect(
+      sqliteCalls.some(
+        (call) => call.includes('task_links') && call.includes('t_parent'),
+      ),
+    ).toBe(true)
+    expect(
+      sqliteCalls.some(
+        (call) =>
+          call.includes('idempotency_key') &&
+          call.includes('native-dispatch-1'),
+      ),
+    ).toBe(true)
+    expect(
+      sqliteCalls.every((call) => !call.includes('swarm2-kanban.json')),
+    ).toBe(true)
+  })
+
+  it('normalizes auto and auto/coding model overrides to null', async () => {
+    vi.stubEnv('HERMES_HOME', '/Users/aurora/.claude/profiles/swarm2')
+    vi.stubEnv('CLAUDE_HOME', '/Users/aurora/.claude/profiles/swarm2')
+    const mod = await loadKanbanBackend({
+      existsSync: () => false,
+      execFileSync: (command, args = []) => {
+        if (command === 'which' && args[0] === 'claude')
+          return '/Users/aurora/.local/bin/claude\n'
+        if (
+          command === '/Users/aurora/.local/bin/claude' &&
+          args[0] === '--version'
+        )
+          return 'claude 1.0.0\n'
+        throw new Error(`Unexpected command: ${command} ${args.join(' ')}`)
+      },
+    })
+
+    expect(mod.getKanbanBackendMeta().id).toBe('local')
+
+    const created = await mod.createKanbanCard({
+      title: 'Auto model override',
+      modelOverride: 'auto/coding',
+    } as any)
+    const updated = await mod.updateKanbanCard('local-1', {
+      modelOverride: 'auto',
+    } as any)
+
+    expect(created.modelOverride).toBeNull()
+    if (!updated) throw new Error('updateKanbanCard returned null')
+    expect(updated.modelOverride).toBeNull()
   })
 })

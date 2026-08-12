@@ -158,8 +158,7 @@ function parseClaudeToolProgressChunk(payload: string): StreamChunkType | null {
     const parsed = JSON.parse(payload) as unknown
     const record = readRecord(parsed)
     if (!record) return null
-    const name =
-      readString(record.tool) || readString(record.name) || 'tool'
+    const name = readString(record.tool) || readString(record.name) || 'tool'
     const emoji = readString(record.emoji)
     const labelText = readString(record.label)
     const label = [emoji, labelText].filter(Boolean).join(' ').trim()

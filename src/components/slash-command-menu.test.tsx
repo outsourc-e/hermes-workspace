@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_SLASH_COMMANDS, mergeSlashCommands } from './slash-command-menu'
+import {
+  DEFAULT_SLASH_COMMANDS,
+  mergeSlashCommands,
+} from './slash-command-menu'
 
 describe('DEFAULT_SLASH_COMMANDS', () => {
   it('includes /plugins in the slash autocomplete list', () => {
@@ -65,7 +68,9 @@ describe('mergeSlashCommands', () => {
       },
     ])
 
-    expect(merged.filter((entry) => entry.command === '/skills')).toHaveLength(1)
+    expect(merged.filter((entry) => entry.command === '/skills')).toHaveLength(
+      1,
+    )
     expect(
       merged.find((entry) => entry.command === '/skills')?.description,
     ).toBe('Browse and manage skills')

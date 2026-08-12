@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import type { AgentWorkingRow, AgentWorkingStatus } from './agents-working-panel'
+import type {
+  AgentWorkingRow,
+  AgentWorkingStatus,
+} from './agents-working-panel'
 import { AgentOutputPanel } from './agent-output-panel'
 import type { HubTask } from './task-board'
 
@@ -21,32 +24,40 @@ export type LiveActivityPanelProps = {
 type PanelTab = 'activity' | 'output'
 
 const MODEL_BADGE: Record<string, string> = {
-  auto:          'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
-  opus:          'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
-  sonnet:        'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
-  codex:         'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
-  flash:         'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
-  'pc1-planner': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-  'pc1-coder':   'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  'pc1-critic':  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-  'pc1-fast':    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  'pc1-heavy':   'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-  'pc1-fmt':      'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-  'pc1-devstral': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+  auto: 'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+  opus: 'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
+  sonnet: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
+  codex:
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
+  flash:
+    'bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-400',
+  'pc1-planner':
+    'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+  'pc1-coder':
+    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'pc1-critic':
+    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  'pc1-fast':
+    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  'pc1-heavy':
+    'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'pc1-fmt': 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  'pc1-devstral':
+    'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 }
 
 const MODEL_LABEL: Record<string, string> = {
-  auto:          'Auto',
-  opus:          'Opus',
-  sonnet:        'Sonnet',
-  codex:         'Codex',
-  flash:         'Flash',
+  auto: 'Auto',
+  opus: 'Opus',
+  sonnet: 'Sonnet',
+  codex: 'Codex',
+  flash: 'Flash',
   'pc1-planner': 'PC1·Plan',
-  'pc1-coder':   'PC1·Code',
-  'pc1-critic':  'PC1·Critic',
-  'pc1-fast':    'PC1·Fast',
-  'pc1-heavy':   'PC1·Heavy',
-  'pc1-fmt':      'PC1·Fmt',
+  'pc1-coder': 'PC1·Code',
+  'pc1-critic': 'PC1·Critic',
+  'pc1-fast': 'PC1·Fast',
+  'pc1-heavy': 'PC1·Heavy',
+  'pc1-fmt': 'PC1·Fmt',
   'pc1-devstral': 'PC1·Dev',
 }
 
@@ -68,11 +79,18 @@ function statusDotEl(status: AgentWorkingStatus) {
     )
   }
   const dotClass =
-    status === 'idle' || status === 'ready' ? 'bg-amber-500' :
-    status === 'error' ? 'bg-red-500' :
-    status === 'paused' ? 'bg-amber-500' :
-    'bg-neutral-400'
-  return <span className={cn('inline-flex size-2 shrink-0 rounded-full', dotClass)} />
+    status === 'idle' || status === 'ready'
+      ? 'bg-amber-500'
+      : status === 'error'
+        ? 'bg-red-500'
+        : status === 'paused'
+          ? 'bg-amber-500'
+          : 'bg-neutral-400'
+  return (
+    <span
+      className={cn('inline-flex size-2 shrink-0 rounded-full', dotClass)}
+    />
+  )
 }
 
 function AgentCard({
@@ -295,7 +313,9 @@ export function LiveActivityPanel({
   const sessionKey = selectedAgentId
     ? (sessionKeyByAgentId[selectedAgentId] ?? null)
     : null
-  const outputTasks = selectedAgentId ? (tasksByAgentId[selectedAgentId] ?? []) : []
+  const outputTasks = selectedAgentId
+    ? (tasksByAgentId[selectedAgentId] ?? [])
+    : []
 
   function countLabel() {
     if (activeCount > 0 && idleCount > 0) {
@@ -309,7 +329,9 @@ export function LiveActivityPanel({
     }
     if (activeCount > 0) {
       return (
-        <span className="font-mono text-[9px] text-emerald-500">{activeCount} active</span>
+        <span className="font-mono text-[9px] text-emerald-500">
+          {activeCount} active
+        </span>
       )
     }
     return (
@@ -409,13 +431,15 @@ export function LiveActivityPanel({
               {/* Status legend */}
               <div className="mt-1 flex flex-wrap items-center justify-end gap-3 px-1 pt-1">
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
-                  <span className="size-1.5 rounded-full bg-emerald-500" /> Active
+                  <span className="size-1.5 rounded-full bg-emerald-500" />{' '}
+                  Active
                 </span>
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
                   <span className="size-1.5 rounded-full bg-amber-500" /> Idle
                 </span>
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
-                  <span className="size-1.5 rounded-full bg-neutral-400" /> No session
+                  <span className="size-1.5 rounded-full bg-neutral-400" /> No
+                  session
                 </span>
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
                   <span className="size-1.5 rounded-full bg-red-500" /> Error
@@ -445,7 +469,11 @@ export function LiveActivityPanel({
               <button
                 type="button"
                 onClick={() => setPinnedOutput((p) => !p)}
-                title={pinnedOutput ? 'Unpin output tab' : 'Pin output tab (stay here when closing)'}
+                title={
+                  pinnedOutput
+                    ? 'Unpin output tab'
+                    : 'Pin output tab (stay here when closing)'
+                }
                 className={cn(
                   'rounded p-1 text-[11px] transition-colors',
                   pinnedOutput
@@ -473,7 +501,9 @@ export function LiveActivityPanel({
                 <p className="mb-2 text-2xl opacity-40">📡</p>
                 <p className="text-xs text-neutral-500 dark:text-neutral-600">
                   Click{' '}
-                  <strong className="text-neutral-700 dark:text-neutral-400">View</strong>{' '}
+                  <strong className="text-neutral-700 dark:text-neutral-400">
+                    View
+                  </strong>{' '}
                   on an agent to stream their output here.
                 </p>
               </div>

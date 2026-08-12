@@ -14,7 +14,10 @@ import {
   shouldBindMainToPortableSession,
 } from '../../server/session-utils'
 import { isAuthenticated } from '@/server/auth-middleware'
-import { getLocalSession, getLocalMessages } from '../../server/local-session-store'
+import {
+  getLocalSession,
+  getLocalMessages,
+} from '../../server/local-session-store'
 
 export const Route = createFileRoute('/api/history')({
   server: {

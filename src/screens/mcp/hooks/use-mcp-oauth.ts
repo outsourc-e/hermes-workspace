@@ -42,8 +42,8 @@ export function useMcpOauth(): UseMcpOauthResult {
       // it has one. Skip opening a tab on the server during SSR.
       if (typeof window !== 'undefined') {
         const target =
-          (server as McpServer & { authorizationUrl?: string }).authorizationUrl ||
-          server.url
+          (server as McpServer & { authorizationUrl?: string })
+            .authorizationUrl || server.url
         if (target) {
           try {
             window.open(target, '_blank', 'noopener,noreferrer')

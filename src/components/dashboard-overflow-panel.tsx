@@ -15,7 +15,12 @@ import {
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/hooks/use-settings'
-import { getTheme, getThemeVariant, isDarkTheme, setTheme as setThemeFamily } from '@/lib/theme'
+import {
+  getTheme,
+  getThemeVariant,
+  isDarkTheme,
+  setTheme as setThemeFamily,
+} from '@/lib/theme'
 
 type OverflowItem = {
   icon: typeof File01Icon
@@ -101,9 +106,10 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
   }
 
   // Detect actual current theme family from data-theme attribute
-  const currentDataTheme = typeof document !== 'undefined'
-    ? (document.documentElement.getAttribute('data-theme') || 'claude-nous')
-    : 'claude-nous'
+  const currentDataTheme =
+    typeof document !== 'undefined'
+      ? document.documentElement.getAttribute('data-theme') || 'claude-nous'
+      : 'claude-nous'
   const isDark = !currentDataTheme.endsWith('-light')
   const themeIcon = isDark ? Sun02Icon : Moon02Icon
   const themeLabel = isDark ? 'Light mode' : 'Dark mode'

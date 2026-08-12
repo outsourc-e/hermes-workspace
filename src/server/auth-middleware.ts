@@ -24,7 +24,9 @@ interface SessionStore {
 }
 
 const STORE_FILE = join(
-  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
+  process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    join(homedir(), '.hermes'),
   'workspace-sessions.json',
 )
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -55,7 +57,10 @@ function saveStore(store: SessionStore): void {
       mkdirSync(dir, { recursive: true, mode: 0o700 })
     }
     // Write with restrictive permissions — tokens are sensitive.
-    writeFileSync(STORE_FILE, JSON.stringify(store), { encoding: 'utf8', mode: 0o600 })
+    writeFileSync(STORE_FILE, JSON.stringify(store), {
+      encoding: 'utf8',
+      mode: 0o600,
+    })
     // Enforce 0600 even if the file already existed with looser perms.
     try {
       chmodSync(STORE_FILE, 0o600)
@@ -286,7 +291,8 @@ export function requireLocalOrAuth(request: Request): boolean {
 function shouldSetSecureCookie(): boolean {
   const override = (process.env.COOKIE_SECURE || '').trim().toLowerCase()
   if (override === '1' || override === 'true' || override === 'yes') return true
-  if (override === '0' || override === 'false' || override === 'no') return false
+  if (override === '0' || override === 'false' || override === 'no')
+    return false
   return process.env.NODE_ENV === 'production'
 }
 

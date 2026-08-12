@@ -176,7 +176,11 @@ function isHermesInstalled() {
 }
 
 function getTempDir() {
-  return process.env.TEMP || process.env.TMP || (process.platform === 'win32' ? 'C:\\Windows\\Temp' : '/tmp')
+  return (
+    process.env.TEMP ||
+    process.env.TMP ||
+    (process.platform === 'win32' ? 'C:\\Windows\\Temp' : '/tmp')
+  )
 }
 
 async function getBootstrapStatus() {
@@ -228,11 +232,13 @@ async function installHermesInBackground() {
     return { started: false, reason: 'already-running' }
   }
   // Windows: pip install (no curl|bash). macOS/Linux: use install script.
-  const installCmd = process.platform === 'win32'
-    ? 'pip install hermes-agent'
-    : HERMES_INSTALL_SCRIPT
+  const installCmd =
+    process.platform === 'win32'
+      ? 'pip install hermes-agent'
+      : HERMES_INSTALL_SCRIPT
   const shell = process.platform === 'win32' ? 'cmd' : 'bash'
-  const args = process.platform === 'win32' ? ['/c', installCmd] : ['-lc', installCmd]
+  const args =
+    process.platform === 'win32' ? ['/c', installCmd] : ['-lc', installCmd]
   installProcess = spawn(shell, args, {
     detached: false,
     stdio: 'ignore',
@@ -258,9 +264,10 @@ async function ensureHermesBackend() {
     spawnDetached('hermes gateway run', 'gateway')
   }
   if (!dashboardReachable) {
-    const dashboardCmd = process.platform === 'win32'
-      ? 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
-      : 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
+    const dashboardCmd =
+      process.platform === 'win32'
+        ? 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
+        : 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
     spawnDetached(dashboardCmd, 'dashboard')
   }
 

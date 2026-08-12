@@ -14,11 +14,19 @@ export function formatTaskAssigneeLabel(
   assignee: string | null,
   assigneeLabels: Record<string, string>,
 ): string {
-  const resolvedLabel = assignee ? (assigneeLabels[assignee] ?? assignee) : 'Unassigned'
+  const resolvedLabel = assignee
+    ? (assigneeLabels[assignee] ?? assignee)
+    : 'Unassigned'
   return `Assignee: ${resolvedLabel}`
 }
 
-export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDragging }: Props) {
+export function TaskCard({
+  task,
+  assigneeLabels = {},
+  onClick,
+  onDragStart,
+  isDragging,
+}: Props) {
   const overdue = isOverdue(task)
   const priorityColor = PRIORITY_COLORS[task.priority]
   const visibleTags = task.tags.slice(0, 2)
@@ -34,7 +42,9 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
         'relative rounded-lg border p-3 cursor-pointer transition-all select-none',
         'bg-[var(--theme-card)] border-[var(--theme-border)]',
         'hover:border-[var(--theme-accent)]',
-        isDragging ? 'opacity-40 rotate-1 shadow-2xl' : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
+        isDragging
+          ? 'opacity-40 rotate-1 shadow-2xl'
+          : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: priorityColor }}
     >
@@ -84,10 +94,19 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
                 <span className="text-[var(--theme-muted)] mx-0.5">·</span>
               </>
             )}
-            <span className={overdue ? 'text-red-400 font-semibold' : 'text-[var(--theme-muted)]'}>
+            <span
+              className={
+                overdue
+                  ? 'text-red-400 font-semibold'
+                  : 'text-[var(--theme-muted)]'
+              }
+            >
               {(() => {
                 const [y, m, d] = task.due_date!.split('-').map(Number)
-                return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })
               })()}
             </span>
           </div>

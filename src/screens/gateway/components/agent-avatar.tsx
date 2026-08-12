@@ -7,14 +7,28 @@ type AgentAccentColor = {
   hex: string
 }
 
-export const AGENT_AVATARS = ['🔍', '✍️', '📝', '🧪', '🎨', '📊', '🛡️', '⚡', '🔬', '🎯'] as const
+export const AGENT_AVATARS = [
+  '🔍',
+  '✍️',
+  '📝',
+  '🧪',
+  '🎨',
+  '📊',
+  '🛡️',
+  '⚡',
+  '🔬',
+  '🎯',
+] as const
 export const AGENT_AVATAR_COUNT = 10
 
 const LEGACY_AGENT_AVATAR_INDEX = new Map<string, number>(
   AGENT_AVATARS.map((avatar, index) => [avatar, index]),
 )
 
-export function normalizeAgentAvatarIndex(value: unknown, fallbackIndex = 0): number {
+export function normalizeAgentAvatarIndex(
+  value: unknown,
+  fallbackIndex = 0,
+): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     const normalized = Math.trunc(value)
     if (normalized >= 0) return normalized % AGENT_AVATAR_COUNT
@@ -24,17 +38,23 @@ export function normalizeAgentAvatarIndex(value: unknown, fallbackIndex = 0): nu
     if (legacy !== undefined) return legacy
   }
   const fallback = Math.trunc(fallbackIndex)
-  return ((fallback % AGENT_AVATAR_COUNT) + AGENT_AVATAR_COUNT) % AGENT_AVATAR_COUNT
+  return (
+    ((fallback % AGENT_AVATAR_COUNT) + AGENT_AVATAR_COUNT) % AGENT_AVATAR_COUNT
+  )
 }
 
 export function getAgentAvatarForSlot(index: number): number {
   return normalizeAgentAvatarIndex(index, 0)
 }
 
-export function resolveAgentAvatarIndex(member: unknown, index: number): number {
-  const row = member && typeof member === 'object' && !Array.isArray(member)
-    ? (member as Record<string, unknown>)
-    : null
+export function resolveAgentAvatarIndex(
+  member: unknown,
+  index: number,
+): number {
+  const row =
+    member && typeof member === 'object' && !Array.isArray(member)
+      ? (member as Record<string, unknown>)
+      : null
   return normalizeAgentAvatarIndex(row?.avatar, index)
 }
 
@@ -43,7 +63,10 @@ export function darkenHexColor(color: string, amount = 0.2): string {
   const normalized = hex.startsWith('#') ? hex.slice(1) : hex
   const expanded =
     normalized.length === 3
-      ? normalized.split('').map((char) => `${char}${char}`).join('')
+      ? normalized
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
       : normalized
 
   if (!/^[0-9a-fA-F]{6}$/.test(expanded)) return color
@@ -147,17 +170,83 @@ export function AgentAvatar({
   const bodyParts = (
     <>
       {baseParts.head}
-      <rect x={baseParts.body.x} y={baseParts.body.y} width={baseParts.body.w} height={baseParts.body.h} fill={color} />
-      <rect x={baseParts.body.x + baseParts.body.w - 2} y={baseParts.body.y} width="2" height={baseParts.body.h} fill={shade} />
-      <rect x={baseParts.body.x} y={baseParts.body.y + baseParts.body.h - 2} width={baseParts.body.w} height="2" fill={shade} />
-      <rect x={baseParts.arms.leftX} y={baseParts.arms.y} width={baseParts.arms.w} height={baseParts.arms.h} fill={color} />
-      <rect x={baseParts.arms.rightX} y={baseParts.arms.y} width={baseParts.arms.w} height={baseParts.arms.h} fill={color} />
-      <rect x={baseParts.arms.leftX + Math.max(0, baseParts.arms.w - 1)} y={baseParts.arms.y} width="1" height={baseParts.arms.h} fill={shade} />
-      <rect x={baseParts.arms.rightX + Math.max(0, baseParts.arms.w - 1)} y={baseParts.arms.y} width="1" height={baseParts.arms.h} fill={shade} />
-      <rect x={baseParts.legs.leftX} y={baseParts.legs.y} width={baseParts.legs.w} height={baseParts.legs.h} fill={color} />
-      <rect x={baseParts.legs.rightX} y={baseParts.legs.y} width={baseParts.legs.w} height={baseParts.legs.h} fill={color} />
-      <rect x={baseParts.legs.leftX + Math.max(0, baseParts.legs.w - 1)} y={baseParts.legs.y} width="1" height={baseParts.legs.h} fill={shade} />
-      <rect x={baseParts.legs.rightX + Math.max(0, baseParts.legs.w - 1)} y={baseParts.legs.y} width="1" height={baseParts.legs.h} fill={shade} />
+      <rect
+        x={baseParts.body.x}
+        y={baseParts.body.y}
+        width={baseParts.body.w}
+        height={baseParts.body.h}
+        fill={color}
+      />
+      <rect
+        x={baseParts.body.x + baseParts.body.w - 2}
+        y={baseParts.body.y}
+        width="2"
+        height={baseParts.body.h}
+        fill={shade}
+      />
+      <rect
+        x={baseParts.body.x}
+        y={baseParts.body.y + baseParts.body.h - 2}
+        width={baseParts.body.w}
+        height="2"
+        fill={shade}
+      />
+      <rect
+        x={baseParts.arms.leftX}
+        y={baseParts.arms.y}
+        width={baseParts.arms.w}
+        height={baseParts.arms.h}
+        fill={color}
+      />
+      <rect
+        x={baseParts.arms.rightX}
+        y={baseParts.arms.y}
+        width={baseParts.arms.w}
+        height={baseParts.arms.h}
+        fill={color}
+      />
+      <rect
+        x={baseParts.arms.leftX + Math.max(0, baseParts.arms.w - 1)}
+        y={baseParts.arms.y}
+        width="1"
+        height={baseParts.arms.h}
+        fill={shade}
+      />
+      <rect
+        x={baseParts.arms.rightX + Math.max(0, baseParts.arms.w - 1)}
+        y={baseParts.arms.y}
+        width="1"
+        height={baseParts.arms.h}
+        fill={shade}
+      />
+      <rect
+        x={baseParts.legs.leftX}
+        y={baseParts.legs.y}
+        width={baseParts.legs.w}
+        height={baseParts.legs.h}
+        fill={color}
+      />
+      <rect
+        x={baseParts.legs.rightX}
+        y={baseParts.legs.y}
+        width={baseParts.legs.w}
+        height={baseParts.legs.h}
+        fill={color}
+      />
+      <rect
+        x={baseParts.legs.leftX + Math.max(0, baseParts.legs.w - 1)}
+        y={baseParts.legs.y}
+        width="1"
+        height={baseParts.legs.h}
+        fill={shade}
+      />
+      <rect
+        x={baseParts.legs.rightX + Math.max(0, baseParts.legs.w - 1)}
+        y={baseParts.legs.y}
+        width="1"
+        height={baseParts.legs.h}
+        fill={shade}
+      />
     </>
   )
 
@@ -177,7 +266,14 @@ export function AgentAvatar({
       case 1:
         return (
           <>
-            <rect x="17" y="14" width="14" height="5" fill={eye} opacity="0.95" />
+            <rect
+              x="17"
+              y="14"
+              width="14"
+              height="5"
+              fill={eye}
+              opacity="0.95"
+            />
             <rect x="17" y="18" width="14" height="1" fill={shade} />
             <rect x="19" y="28" width="10" height="2" fill={shade} />
             <rect x="13" y="15" width="3" height="2" fill={shade} />
@@ -293,7 +389,15 @@ export function AgentAvatar({
     >
       <rect x="5" y="5" width="38" height="38" fill={color} opacity="0.08" />
       <rect x="7" y="7" width="34" height="34" fill="white" opacity="0.92" />
-      <rect x="7" y="7" width="34" height="34" fill="none" stroke={outline} strokeWidth="1" />
+      <rect
+        x="7"
+        y="7"
+        width="34"
+        height="34"
+        fill="none"
+        stroke={outline}
+        strokeWidth="1"
+      />
       {bodyParts}
       {details}
     </svg>
@@ -301,17 +405,89 @@ export function AgentAvatar({
 }
 
 export const AGENT_ACCENT_COLORS: AgentAccentColor[] = [
-  { bar: 'bg-orange-500', border: 'border-orange-500', avatar: 'bg-orange-100', text: 'text-orange-600', ring: 'ring-orange-500/20' },
-  { bar: 'bg-blue-500', border: 'border-blue-500', avatar: 'bg-blue-100', text: 'text-blue-600', ring: 'ring-blue-500/20' },
-  { bar: 'bg-violet-500', border: 'border-violet-500', avatar: 'bg-violet-100', text: 'text-violet-600', ring: 'ring-violet-500/20' },
-  { bar: 'bg-emerald-500', border: 'border-emerald-500', avatar: 'bg-emerald-100', text: 'text-emerald-600', ring: 'ring-emerald-500/20' },
-  { bar: 'bg-rose-500', border: 'border-rose-500', avatar: 'bg-rose-100', text: 'text-rose-600', ring: 'ring-rose-500/20' },
-  { bar: 'bg-amber-500', border: 'border-amber-500', avatar: 'bg-amber-100', text: 'text-amber-700', ring: 'ring-amber-500/20' },
-  { bar: 'bg-cyan-500', border: 'border-cyan-500', avatar: 'bg-cyan-100', text: 'text-cyan-600', ring: 'ring-cyan-500/20' },
-  { bar: 'bg-fuchsia-500', border: 'border-fuchsia-500', avatar: 'bg-fuchsia-100', text: 'text-fuchsia-600', ring: 'ring-fuchsia-500/20' },
-  { bar: 'bg-lime-500', border: 'border-lime-500', avatar: 'bg-lime-100', text: 'text-lime-700', ring: 'ring-lime-500/20' },
-  { bar: 'bg-sky-500', border: 'border-sky-500', avatar: 'bg-sky-100', text: 'text-sky-600', ring: 'ring-sky-500/20' },
+  {
+    bar: 'bg-orange-500',
+    border: 'border-orange-500',
+    avatar: 'bg-orange-100',
+    text: 'text-orange-600',
+    ring: 'ring-orange-500/20',
+  },
+  {
+    bar: 'bg-blue-500',
+    border: 'border-blue-500',
+    avatar: 'bg-blue-100',
+    text: 'text-blue-600',
+    ring: 'ring-blue-500/20',
+  },
+  {
+    bar: 'bg-violet-500',
+    border: 'border-violet-500',
+    avatar: 'bg-violet-100',
+    text: 'text-violet-600',
+    ring: 'ring-violet-500/20',
+  },
+  {
+    bar: 'bg-emerald-500',
+    border: 'border-emerald-500',
+    avatar: 'bg-emerald-100',
+    text: 'text-emerald-600',
+    ring: 'ring-emerald-500/20',
+  },
+  {
+    bar: 'bg-rose-500',
+    border: 'border-rose-500',
+    avatar: 'bg-rose-100',
+    text: 'text-rose-600',
+    ring: 'ring-rose-500/20',
+  },
+  {
+    bar: 'bg-amber-500',
+    border: 'border-amber-500',
+    avatar: 'bg-amber-100',
+    text: 'text-amber-700',
+    ring: 'ring-amber-500/20',
+  },
+  {
+    bar: 'bg-cyan-500',
+    border: 'border-cyan-500',
+    avatar: 'bg-cyan-100',
+    text: 'text-cyan-600',
+    ring: 'ring-cyan-500/20',
+  },
+  {
+    bar: 'bg-fuchsia-500',
+    border: 'border-fuchsia-500',
+    avatar: 'bg-fuchsia-100',
+    text: 'text-fuchsia-600',
+    ring: 'ring-fuchsia-500/20',
+  },
+  {
+    bar: 'bg-lime-500',
+    border: 'border-lime-500',
+    avatar: 'bg-lime-100',
+    text: 'text-lime-700',
+    ring: 'ring-lime-500/20',
+  },
+  {
+    bar: 'bg-sky-500',
+    border: 'border-sky-500',
+    avatar: 'bg-sky-100',
+    text: 'text-sky-600',
+    ring: 'ring-sky-500/20',
+  },
 ].map((accent, index) => ({
   ...accent,
-  hex: ['#f97316', '#3b82f6', '#8b5cf6', '#10b981', '#f43f5e', '#f59e0b', '#06b6d4', '#d946ef', '#84cc16', '#0ea5e9'][index] ?? '#f97316',
+  hex:
+    [
+      '#f97316',
+      '#3b82f6',
+      '#8b5cf6',
+      '#10b981',
+      '#f43f5e',
+      '#f59e0b',
+      '#06b6d4',
+      '#d946ef',
+      '#84cc16',
+      '#0ea5e9',
+    ][index] ?? '#f97316',
 }))

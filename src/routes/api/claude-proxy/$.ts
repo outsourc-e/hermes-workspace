@@ -28,8 +28,11 @@ async function fallbackAvailableModels(
       .map((m) => {
         const id = typeof m.id === 'string' ? m.id : ''
         if (!id) return null
-        const owned = typeof m.owned_by === 'string' ? m.owned_by.toLowerCase() : ''
-        const idProvider = id.includes('/') ? id.split('/')[0].toLowerCase() : owned
+        const owned =
+          typeof m.owned_by === 'string' ? m.owned_by.toLowerCase() : ''
+        const idProvider = id.includes('/')
+          ? id.split('/')[0].toLowerCase()
+          : owned
         if (wanted && idProvider !== wanted) return null
         return { id }
       })

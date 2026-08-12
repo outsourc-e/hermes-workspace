@@ -45,6 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scri
 ```
 
 After install, restart your shell or run:
+
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 hermes --version
@@ -69,6 +70,7 @@ grep -i "API_SERVER" "$HERMES_ENV" 2>/dev/null || echo "NO API_SERVER KEYS FOUND
 **Pass:** output includes `API_SERVER_ENABLED=true` (with underscores).
 
 **Common failure — wrong env var names:**
+
 ```
 # ❌ WRONG (missing underscores — gateway silently ignores these)
 APISERVERENABLED=true
@@ -149,6 +151,7 @@ curl -sf http://127.0.0.1:8642/health && echo "OK" || echo "NOT REACHABLE"
 Go back to Step 2 and verify the env vars have underscores.
 
 **Fail — port bound by something else:**
+
 ```bash
 # Find what's on the port
 lsof -i :8642   # macOS
@@ -190,6 +193,7 @@ grep HERMES_DASHBOARD_URL .env
 **Pass:** `HERMES_DASHBOARD_URL=http://127.0.0.1:9119`
 
 **Fail or missing:**
+
 ```bash
 # In the hermes-workspace directory
 echo 'HERMES_API_URL=http://127.0.0.1:8642' >> .env
@@ -197,6 +201,7 @@ echo 'HERMES_DASHBOARD_URL=http://127.0.0.1:9119' >> .env
 ```
 
 If `.env` doesn't exist:
+
 ```bash
 cp .env.example .env
 # Then set HERMES_API_URL as above
@@ -212,6 +217,7 @@ pnpm dev
 ```
 
 **Look for this in the startup output:**
+
 ```
 [claude-api] Configured API: http://127.0.0.1:8642
 [gateway] gateway=http://127.0.0.1:8642 ... mode=enhanced-fork core=[health, chatCompletions, models, streaming]

@@ -61,8 +61,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
               // upstream), but cache for a few seconds so a noisy client
               // doesn't hammer the dashboard. Stale-while-revalidate keeps
               // the UI snappy while fresh data lands.
-              'Cache-Control':
-                'private, max-age=5, stale-while-revalidate=20',
+              'Cache-Control': 'private, max-age=5, stale-while-revalidate=20',
             },
           })
         } catch (err) {

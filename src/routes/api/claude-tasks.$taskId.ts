@@ -1,7 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { getClaudeTask, moveClaudeTask, updateClaudeTask } from '../../server/claude-tasks-backend'
-import type { TaskColumn, TaskPriority } from '../../server/claude-tasks-backend'
+import {
+  getClaudeTask,
+  moveClaudeTask,
+  updateClaudeTask,
+} from '../../server/claude-tasks-backend'
+import type {
+  TaskColumn,
+  TaskPriority,
+} from '../../server/claude-tasks-backend'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -47,12 +54,25 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
           const body = (await request.json()) as Record<string, unknown>
           const task = await updateClaudeTask(params.taskId, {
             title: typeof body.title === 'string' ? body.title : undefined,
-            description: typeof body.description === 'string' ? body.description : undefined,
+            description:
+              typeof body.description === 'string'
+                ? body.description
+                : undefined,
             column: isTaskColumn(body.column) ? body.column : undefined,
             priority: isTaskPriority(body.priority) ? body.priority : undefined,
-            assignee: body.assignee === null || typeof body.assignee === 'string' ? body.assignee : undefined,
-            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
-            due_date: body.due_date === null || typeof body.due_date === 'string' ? body.due_date : undefined,
+            assignee:
+              body.assignee === null || typeof body.assignee === 'string'
+                ? body.assignee
+                : undefined,
+            tags: Array.isArray(body.tags)
+              ? body.tags.filter(
+                  (tag): tag is string => typeof tag === 'string',
+                )
+              : undefined,
+            due_date:
+              body.due_date === null || typeof body.due_date === 'string'
+                ? body.due_date
+                : undefined,
           })
 
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
@@ -67,7 +87,12 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
 
-        return jsonResponse({ error: 'Delete is not supported by the shared Agent Kanban backend' }, 405)
+        return jsonResponse(
+          {
+            error: 'Delete is not supported by the shared Agent Kanban backend',
+          },
+          405,
+        )
       },
 
       POST: async ({ request, params }) => {

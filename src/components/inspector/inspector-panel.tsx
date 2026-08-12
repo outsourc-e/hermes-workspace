@@ -89,7 +89,9 @@ function ArtifactsTab() {
         >
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium">{artifact.text}</span>
-            <span style={{ color: 'var(--theme-accent)' }}>{artifact.time}</span>
+            <span style={{ color: 'var(--theme-accent)' }}>
+              {artifact.time}
+            </span>
           </div>
         </div>
       ))}
@@ -507,7 +509,9 @@ function LogsTab() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}) {
+export function InspectorPanel({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const isOpen = useInspectorStore((s) => s.isOpen)
   const memoryAvailable = useFeatureAvailable('memory')
   const skillsAvailable = useFeatureAvailable('skills')

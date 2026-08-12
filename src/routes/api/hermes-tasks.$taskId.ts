@@ -1,8 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { randomUUID } from 'node:crypto'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { deleteTask, getTask, moveTask, updateTask } from '../../server/tasks-store'
-import { ensureLocalSession, appendLocalMessage, getLocalMessages } from '../../server/local-session-store'
+import {
+  deleteTask,
+  getTask,
+  moveTask,
+  updateTask,
+} from '../../server/tasks-store'
+import {
+  ensureLocalSession,
+  appendLocalMessage,
+  getLocalMessages,
+} from '../../server/local-session-store'
 import { getSessionMessages } from '../../server/claude-dashboard-api'
 import type { TaskColumn, TaskPriority } from '../../server/tasks-store'
 
@@ -51,14 +60,31 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
           const body = (await request.json()) as Record<string, unknown>
           const task = updateTask(params.taskId, {
             title: typeof body.title === 'string' ? body.title : undefined,
-            description: typeof body.description === 'string' ? body.description : undefined,
+            description:
+              typeof body.description === 'string'
+                ? body.description
+                : undefined,
             column: isTaskColumn(body.column) ? body.column : undefined,
             priority: isTaskPriority(body.priority) ? body.priority : undefined,
-            assignee: body.assignee === null || typeof body.assignee === 'string' ? body.assignee : undefined,
-            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
-            due_date: body.due_date === null || typeof body.due_date === 'string' ? body.due_date : undefined,
-            position: typeof body.position === 'number' ? body.position : undefined,
-            session_id: body.session_id === null || typeof body.session_id === 'string' ? body.session_id : undefined,
+            assignee:
+              body.assignee === null || typeof body.assignee === 'string'
+                ? body.assignee
+                : undefined,
+            tags: Array.isArray(body.tags)
+              ? body.tags.filter(
+                  (tag): tag is string => typeof tag === 'string',
+                )
+              : undefined,
+            due_date:
+              body.due_date === null || typeof body.due_date === 'string'
+                ? body.due_date
+                : undefined,
+            position:
+              typeof body.position === 'number' ? body.position : undefined,
+            session_id:
+              body.session_id === null || typeof body.session_id === 'string'
+                ? body.session_id
+                : undefined,
           })
 
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
@@ -104,9 +130,16 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
               if (dashResult?.messages?.length) {
                 tail = dashResult.messages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
-                  .filter((m) => typeof m.content === 'string' && m.content.trim().length > 0)
+                  .filter(
+                    (m) =>
+                      typeof m.content === 'string' &&
+                      m.content.trim().length > 0,
+                  )
                   .slice(-20)
-                  .map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' }))
+                  .map((m) => ({
+                    role: m.role,
+                    content: typeof m.content === 'string' ? m.content : '',
+                  }))
               }
             } catch {
               // Dashboard unavailable — fall back to local store
@@ -118,7 +151,10 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
               tail = localMsgs
                 .filter((m) => m.role === 'user' || m.role === 'assistant')
                 .slice(-20)
-                .map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' }))
+                .map((m) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : '',
+                }))
             }
 
             if (tail.length > 0) {
@@ -154,7 +190,11 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             timestamp: Date.now(),
           })
 
-          return jsonResponse({ sessionId, briefing, task: getTask(params.taskId) })
+          return jsonResponse({
+            sessionId,
+            briefing,
+            task: getTask(params.taskId),
+          })
         }
 
         if (action !== 'move') {

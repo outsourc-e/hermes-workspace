@@ -3,12 +3,23 @@ import type { FeedEvent } from './feed-event-bus'
 
 type PushEvent = (event: FeedEvent) => void
 
-const makeId = () => `system-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-const readString = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
-const toRecord = (value: unknown) => (value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null)
+const makeId = () =>
+  `system-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+const readString = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : ''
+const toRecord = (value: unknown) =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
 
 function buildSystemEvent(message: string, agentName?: string): FeedEvent {
-  return { id: makeId(), type: 'system', message, agentName, timestamp: Date.now() }
+  return {
+    id: makeId(),
+    type: 'system',
+    message,
+    agentName,
+    timestamp: Date.now(),
+  }
 }
 
 export function useLiveFeedChatStream(pushEvent: PushEvent) {
@@ -29,7 +40,12 @@ export function useLiveFeedChatStream(pushEvent: PushEvent) {
       if (!payload) return
       const phase = readString(payload.phase) || 'update'
       const name = readString(payload.name) || 'tool'
-      pushEvent(buildSystemEvent(`Tool ${phase}: ${name}`, readString(payload.sessionKey) || undefined))
+      pushEvent(
+        buildSystemEvent(
+          `Tool ${phase}: ${name}`,
+          readString(payload.sessionKey) || undefined,
+        ),
+      )
     })
 
     stream.addEventListener('done', (event) => {
@@ -48,7 +64,9 @@ export function useLiveFeedChatStream(pushEvent: PushEvent) {
               ? 'Run aborted'
               : 'Run update'
 
-      pushEvent(buildSystemEvent(message, readString(payload.sessionKey) || undefined))
+      pushEvent(
+        buildSystemEvent(message, readString(payload.sessionKey) || undefined),
+      )
     })
 
     return () => stream.close()

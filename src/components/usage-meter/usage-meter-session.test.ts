@@ -13,7 +13,9 @@ describe('usage meter session targeting', () => {
   })
 
   it('decodes route params for chat sessions', () => {
-    expect(resolveUsageMeterSessionKey('/chat/local%2Fmirror')).toBe('local/mirror')
+    expect(resolveUsageMeterSessionKey('/chat/local%2Fmirror')).toBe(
+      'local/mirror',
+    )
   })
 
   it('falls back to main outside chat routes', () => {
@@ -23,13 +25,22 @@ describe('usage meter session targeting', () => {
 
   it('only allows context alerts when the usage meter is visible on chat routes', () => {
     expect(
-      shouldShowUsageMeterContextAlert({ pathname: '/chat/main', visible: true }),
+      shouldShowUsageMeterContextAlert({
+        pathname: '/chat/main',
+        visible: true,
+      }),
     ).toBe(true)
     expect(
-      shouldShowUsageMeterContextAlert({ pathname: '/chat/main', visible: false }),
+      shouldShowUsageMeterContextAlert({
+        pathname: '/chat/main',
+        visible: false,
+      }),
     ).toBe(false)
     expect(
-      shouldShowUsageMeterContextAlert({ pathname: '/settings', visible: true }),
+      shouldShowUsageMeterContextAlert({
+        pathname: '/settings',
+        visible: true,
+      }),
     ).toBe(false)
   })
 

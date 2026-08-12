@@ -48,45 +48,48 @@ type AgentsWorkingPanelProps = {
 // Accent colors per agent index (cycled) — must match AGENT_ACCENT_COLORS in agent-hub-layout
 const ACCENT_COLORS = [
   { bar: 'bg-orange-500', text: 'text-orange-600' },
-  { bar: 'bg-blue-500',   text: 'text-blue-600' },
+  { bar: 'bg-blue-500', text: 'text-blue-600' },
   { bar: 'bg-violet-500', text: 'text-violet-600' },
-  { bar: 'bg-emerald-500',text: 'text-emerald-600' },
-  { bar: 'bg-rose-500',   text: 'text-rose-600' },
-  { bar: 'bg-amber-500',  text: 'text-amber-600' },
+  { bar: 'bg-emerald-500', text: 'text-emerald-600' },
+  { bar: 'bg-rose-500', text: 'text-rose-600' },
+  { bar: 'bg-amber-500', text: 'text-amber-600' },
 ]
 
 const MODEL_BADGE: Record<string, string> = {
-  auto:          'border border-neutral-200 bg-neutral-100 text-neutral-600',
-  opus:          'border border-orange-200 bg-orange-50 text-orange-700',
-  sonnet:        'border border-blue-200 bg-blue-50 text-blue-700',
-  codex:         'border border-emerald-200 bg-emerald-50 text-emerald-700',
-  flash:         'border border-violet-200 bg-violet-50 text-violet-700',
+  auto: 'border border-neutral-200 bg-neutral-100 text-neutral-600',
+  opus: 'border border-orange-200 bg-orange-50 text-orange-700',
+  sonnet: 'border border-blue-200 bg-blue-50 text-blue-700',
+  codex: 'border border-emerald-200 bg-emerald-50 text-emerald-700',
+  flash: 'border border-violet-200 bg-violet-50 text-violet-700',
   'pc1-planner': 'border border-teal-200 bg-teal-50 text-teal-700',
-  'pc1-coder':   'border border-purple-200 bg-purple-50 text-purple-700',
-  'pc1-critic':  'border border-indigo-200 bg-indigo-50 text-indigo-700',
-  'pc1-fast':    'border border-slate-200 bg-slate-50 text-slate-700',
-  'pc1-heavy':   'border border-cyan-200 bg-cyan-50 text-cyan-700',
-  'pc1-fmt':      'border border-zinc-200 bg-zinc-50 text-zinc-700',
+  'pc1-coder': 'border border-purple-200 bg-purple-50 text-purple-700',
+  'pc1-critic': 'border border-indigo-200 bg-indigo-50 text-indigo-700',
+  'pc1-fast': 'border border-slate-200 bg-slate-50 text-slate-700',
+  'pc1-heavy': 'border border-cyan-200 bg-cyan-50 text-cyan-700',
+  'pc1-fmt': 'border border-zinc-200 bg-zinc-50 text-zinc-700',
   'pc1-devstral': 'border border-rose-200 bg-rose-50 text-rose-700',
 }
 
 const MODEL_LABEL: Record<string, string> = {
-  auto:          'Auto',
-  opus:          'Opus',
-  sonnet:        'Sonnet',
-  codex:         'Codex',
-  flash:         'Flash',
+  auto: 'Auto',
+  opus: 'Opus',
+  sonnet: 'Sonnet',
+  codex: 'Codex',
+  flash: 'Flash',
   'pc1-planner': 'PC1·Plan',
-  'pc1-coder':   'PC1·Code',
-  'pc1-critic':  'PC1·Critic',
-  'pc1-fast':    'PC1·Fast',
-  'pc1-heavy':   'PC1·Heavy',
-  'pc1-fmt':      'PC1·Fmt',
+  'pc1-coder': 'PC1·Code',
+  'pc1-critic': 'PC1·Critic',
+  'pc1-fast': 'PC1·Fast',
+  'pc1-heavy': 'PC1·Heavy',
+  'pc1-fmt': 'PC1·Fmt',
   'pc1-devstral': 'PC1·Dev',
 }
 
 function getModelBadgeClass(modelId: string): string {
-  return MODEL_BADGE[modelId] ?? 'border border-neutral-200 bg-neutral-50 text-neutral-700'
+  return (
+    MODEL_BADGE[modelId] ??
+    'border border-neutral-200 bg-neutral-50 text-neutral-700'
+  )
 }
 
 function getModelLabel(modelId: string): string {
@@ -95,13 +98,13 @@ function getModelLabel(modelId: string): string {
 }
 
 const STATUS_TEXT: Record<AgentWorkingStatus, string> = {
-  active:            '● working',
-  spawning:          '◌ spawning...',
-  ready:             '○ ready',
-  idle:              '○ idle',
-  paused:            '⏸ paused',
-  error:             '✕ error',
-  none:              '— no session',
+  active: '● working',
+  spawning: '◌ spawning...',
+  ready: '○ ready',
+  idle: '○ idle',
+  paused: '⏸ paused',
+  error: '✕ error',
+  none: '— no session',
   waiting_for_input: '⏳ waiting for input',
 }
 
@@ -113,8 +116,19 @@ function SpinnerIcon({ className }: { className?: string }) {
       fill="none"
       aria-hidden
     >
-      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
+      <circle
+        className="opacity-20"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="3"
+      />
+      <path
+        className="opacity-80"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"
+      />
     </svg>
   )
 }
@@ -147,9 +161,7 @@ function AgentRow({
     agent.status !== 'error' &&
     agent.status !== 'spawning'
 
-  const statusLine = agent.lastLine
-    ? agent.lastLine
-    : STATUS_TEXT[agent.status]
+  const statusLine = agent.lastLine ? agent.lastLine : STATUS_TEXT[agent.status]
 
   return (
     <div
@@ -160,7 +172,8 @@ function AgentRow({
       className={cn(
         'group relative flex cursor-pointer items-stretch overflow-hidden rounded-lg border transition-all',
         'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50',
-        isSelected && 'border-accent-200 bg-accent-50/40 ring-1 ring-accent-200',
+        isSelected &&
+          'border-accent-200 bg-accent-50/40 ring-1 ring-accent-200',
       )}
     >
       {/* Left accent bar */}
@@ -183,10 +196,13 @@ function AgentRow({
               <span
                 className={cn(
                   'inline-flex size-2 rounded-full',
-                  agent.status === 'idle'  ? 'bg-amber-500' :
-                  agent.status === 'ready' ? 'bg-blue-400' :
-                  agent.status === 'error' ? 'bg-red-500' :
-                  'bg-neutral-400',
+                  agent.status === 'idle'
+                    ? 'bg-amber-500'
+                    : agent.status === 'ready'
+                      ? 'bg-blue-400'
+                      : agent.status === 'error'
+                        ? 'bg-red-500'
+                        : 'bg-neutral-400',
                 )}
               />
             )}
@@ -211,7 +227,10 @@ function AgentRow({
           {agent.status === 'error' && onRespawn ? (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onRespawn() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onRespawn()
+              }}
               className="shrink-0 text-xs text-neutral-500 transition-colors hover:text-neutral-700"
               title="Respawn agent"
             >
@@ -224,7 +243,10 @@ function AgentRow({
             <div className="relative">
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setMenuOpen((p) => !p) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMenuOpen((p) => !p)
+                }}
                 className="shrink-0 text-sm text-neutral-500 transition-colors group-hover:text-neutral-700 hover:text-neutral-900"
               >
                 ⋯
@@ -233,7 +255,10 @@ function AgentRow({
                 <>
                   <div
                     className="fixed inset-0 z-10"
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setMenuOpen(false)
+                    }}
                     aria-hidden
                   />
                   <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[110px] rounded-lg border border-neutral-200 bg-white shadow-xl">
@@ -270,7 +295,11 @@ function AgentRow({
                     ) : null}
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onKill() }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setMenuOpen(false)
+                        onKill()
+                      }}
                       className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-red-400 transition-colors hover:bg-red-950/20"
                     >
                       Kill session
@@ -331,9 +360,11 @@ function AgentCompactCard({
           <span
             className={cn(
               'inline-flex size-1.5 shrink-0 rounded-full',
-              agent.status === 'idle' ? 'bg-amber-500' :
-              agent.status === 'error' ? 'bg-red-500' :
-              'bg-neutral-600',
+              agent.status === 'idle'
+                ? 'bg-amber-500'
+                : agent.status === 'error'
+                  ? 'bg-red-500'
+                  : 'bg-neutral-600',
             )}
           />
         )}
@@ -387,7 +418,10 @@ export function AgentsWorkingPanel({
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-neutral-500" style={{ fontVariant: 'small-caps' }}>
+          <h3
+            className="text-[11px] font-bold uppercase tracking-wider text-neutral-500"
+            style={{ fontVariant: 'small-caps' }}
+          >
             Agents Working
           </h3>
           {activeCount > 0 ? (
@@ -407,17 +441,26 @@ export function AgentsWorkingPanel({
             type="button"
             onClick={() => setCollapsed((c) => !c)}
             className="rounded p-0.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-            aria-label={collapsed ? 'Expand agents panel' : 'Collapse agents panel'}
+            aria-label={
+              collapsed ? 'Expand agents panel' : 'Collapse agents panel'
+            }
           >
             <svg
               viewBox="0 0 16 16"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.5}
-              className={cn('size-3.5 transition-transform', collapsed && '-rotate-90')}
+              className={cn(
+                'size-3.5 transition-transform',
+                collapsed && '-rotate-90',
+              )}
               aria-hidden
             >
-              <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M4 6l4 4 4-4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
@@ -441,9 +484,13 @@ export function AgentsWorkingPanel({
                   isSelected={selectedAgentId === agent.id}
                   onSelect={() => onSelectAgent?.(agent.id)}
                   onKill={onKillAgent ? () => onKillAgent(agent.id) : undefined}
-                  onRespawn={onRespawnAgent ? () => onRespawnAgent(agent.id) : undefined}
+                  onRespawn={
+                    onRespawnAgent ? () => onRespawnAgent(agent.id) : undefined
+                  }
                   onPause={
-                    onPauseAgent ? (pause) => onPauseAgent(agent.id, pause) : undefined
+                    onPauseAgent
+                      ? (pause) => onPauseAgent(agent.id, pause)
+                      : undefined
                   }
                   onSteer={
                     onSteerAgent

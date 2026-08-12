@@ -67,9 +67,7 @@ export function formatModelName(raw: string): string {
   if (lower.includes('kimi')) return 'Kimi K2.5'
 
   // Fallback: clean up dashes/underscores and title-case
-  return stripped
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  return stripped.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /**

@@ -99,9 +99,8 @@ export function AchievementsCard({
   achievements: DashboardOverview['achievements']
 }) {
   const [showAll, setShowAll] = useState(false)
-  const [allUnlocks, setAllUnlocks] = useState<
-    Array<DashboardAchievementUnlock> | null
-  >(null)
+  const [allUnlocks, setAllUnlocks] =
+    useState<Array<DashboardAchievementUnlock> | null>(null)
   const [loadingAll, setLoadingAll] = useState(false)
   const [allError, setAllError] = useState<string | null>(null)
 

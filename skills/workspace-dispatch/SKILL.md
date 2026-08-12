@@ -28,11 +28,11 @@ You are an autonomous mission orchestrator. Decompose work into tasks, spawn one
 
 ## Task Types
 
-| Type | Worker Does | Verify With |
-|------|-----------|-------------|
-| coding | Write code, create files | file exists, tsc passes |
-| research | Search, read, synthesize | output file exists with content |
-| review | Read code, check behavior | reviewer outputs PASS verdict |
+| Type     | Worker Does               | Verify With                     |
+| -------- | ------------------------- | ------------------------------- |
+| coding   | Write code, create files  | file exists, tsc passes         |
+| research | Search, read, synthesize  | output file exists with content |
+| review   | Read code, check behavior | reviewer outputs PASS verdict   |
 
 ## Dispatch Loop
 
@@ -74,6 +74,7 @@ Working directory: {cwd}
 ```
 
 On retry, append:
+
 ```
 ## ⚠️ Previous attempt failed (attempt {n}/3)
 Error: {what went wrong}
@@ -97,10 +98,10 @@ Duration: {elapsed}
 
 ## Failure Handling
 
-| Failure | Action |
-|---------|--------|
-| Worker timeout | Retry with simpler scope |
-| Exit criteria fail | Retry with specific error |
+| Failure             | Action                                 |
+| ------------------- | -------------------------------------- |
+| Worker timeout      | Retry with simpler scope               |
+| Exit criteria fail  | Retry with specific error              |
 | 3 retries exhausted | Mark failed, skip dependents, continue |
 
 ## Rules

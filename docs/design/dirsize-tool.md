@@ -12,24 +12,24 @@ python scripts/dirsize.py <path> [options]
 
 ### 参数
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `path` | 位置参数 | 必填 | 目标目录路径 |
-| `--unit`, `-u` | 字符串 | `auto` | 显示单位：`auto`, `B`, `KB`, `MB`, `GB` |
-| `--exclude` | 字符串列表 | 无 | 排除的模式（可多次使用），如 `--exclude node_modules --exclude .git` |
-| `--json` | 标志位 | `false` | 输出 JSON 格式供自动化使用 |
-| `--max-depth` | 整数 | 无限制 | 最大递归深度 |
-| `--ignore-permission-denied` | 标志位 | `false` | 跳过权限不足的目录 |
-| `--disk-usage` | 标志位 | `false` | 使用 `stat.st_blocks` 计算磁盘占用，而非 apparent size |
+| 参数                         | 类型       | 默认值  | 说明                                                                 |
+| ---------------------------- | ---------- | ------- | -------------------------------------------------------------------- |
+| `path`                       | 位置参数   | 必填    | 目标目录路径                                                         |
+| `--unit`, `-u`               | 字符串     | `auto`  | 显示单位：`auto`, `B`, `KB`, `MB`, `GB`                              |
+| `--exclude`                  | 字符串列表 | 无      | 排除的模式（可多次使用），如 `--exclude node_modules --exclude .git` |
+| `--json`                     | 标志位     | `false` | 输出 JSON 格式供自动化使用                                           |
+| `--max-depth`                | 整数       | 无限制  | 最大递归深度                                                         |
+| `--ignore-permission-denied` | 标志位     | `false` | 跳过权限不足的目录                                                   |
+| `--disk-usage`               | 标志位     | `false` | 使用 `stat.st_blocks` 计算磁盘占用，而非 apparent size               |
 
 ### 退出码
 
-| 退出码 | 含义 |
-|--------|------|
-| 0 | 成功 |
-| 1 | 参数错误 |
-| 2 | 路径不存在 |
-| 3 | 权限不足（未使用 `--ignore-permission-denied`） |
+| 退出码 | 含义                                            |
+| ------ | ----------------------------------------------- |
+| 0      | 成功                                            |
+| 1      | 参数错误                                        |
+| 2      | 路径不存在                                      |
+| 3      | 权限不足（未使用 `--ignore-permission-denied`） |
 
 ### 使用示例
 
@@ -55,11 +55,13 @@ python scripts/dirsize.py /some/dir --disk-usage
 ### 输出格式
 
 **默认（人类可读）**：
+
 ```
 Total: 117.7 MB (42 files)
 ```
 
 **JSON 模式**：
+
 ```json
 {
   "path": "/path/to/dir",
@@ -95,16 +97,17 @@ def get_dir_size(path, follow_symlinks=False, disk_usage=False):
 ```
 
 **性能优化**：
+
 - 对大目录可用 `os.scandir` + 递归替代 `os.walk`，减少 stat 调用
 - `--max-depth` 限制递归层数，避免意外遍历过深
 
 ## 4. 性能预期
 
-| 文件数 | 耗时 |
-|--------|------|
-| 1,000 | < 10ms |
-| 100,000 | ~200ms |
-| 1,000,000 | ~2s |
+| 文件数     | 耗时                        |
+| ---------- | --------------------------- |
+| 1,000      | < 10ms                      |
+| 100,000    | ~200ms                      |
+| 1,000,000  | ~2s                         |
 | 10,000,000 | ~20s (建议加 `--max-depth`) |
 
 ## 5. 文件定位

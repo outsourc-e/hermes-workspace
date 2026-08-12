@@ -252,16 +252,16 @@ The UI uses this to render cards, Reports, Inbox, and runtime attach targets.
 
 Important endpoints:
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/swarm-roster` | Return configured Hermes Agents and role metadata. |
-| `GET /api/swarm-runtime` | Return runtime state and tmux attachability. |
-| `GET /api/swarm-missions` | Return mission and assignment history. |
-| `POST /api/swarm-dispatch` | Send work to one or more Hermes Agents. |
-| `POST /api/swarm-tmux-start` | Start a tmux-backed worker session. |
-| `POST /api/swarm-tmux-stop` | Stop a worker tmux session. |
-| `POST /api/swarm-tmux-scroll` | Scroll a tmux session from the UI. |
-| `GET /api/swarm-health` | Summarize local swarm health. |
+| Endpoint                      | Purpose                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `GET /api/swarm-roster`       | Return configured Hermes Agents and role metadata. |
+| `GET /api/swarm-runtime`      | Return runtime state and tmux attachability.       |
+| `GET /api/swarm-missions`     | Return mission and assignment history.             |
+| `POST /api/swarm-dispatch`    | Send work to one or more Hermes Agents.            |
+| `POST /api/swarm-tmux-start`  | Start a tmux-backed worker session.                |
+| `POST /api/swarm-tmux-stop`   | Stop a worker tmux session.                        |
+| `POST /api/swarm-tmux-scroll` | Scroll a tmux session from the UI.                 |
+| `GET /api/swarm-health`       | Summarize local swarm health.                      |
 
 ## Failure philosophy
 

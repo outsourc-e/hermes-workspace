@@ -60,6 +60,7 @@ Wire format is identical to `scripts/playground-ws.mjs`. The client
 (`src/screens/playground/hooks/use-playground-multiplayer.ts`) connects unchanged.
 
 Messages:
+
 - `{ kind: 'presence', id, x, y, z, yaw, name, color, worldId, avatar?, ... }`
 - `{ kind: 'chat', id, text, ts }`
 - `{ kind: 'leave', id }`
@@ -77,6 +78,7 @@ and survives instance hibernation).
 ## Cost ceiling
 
 For 100 concurrent players sending presence at 5 Hz:
+
 - 100 × 5 × 60 × 60 × 24 = 43.2M msgs/day → still inside free tier for outbound
   (Workers count requests, not WS messages). If usage explodes:
   - Workers Paid: $5/mo for 10M req/day baseline.

@@ -9,7 +9,10 @@ import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../../server/gateway-capabilities'
-import { requireJsonContentType, safeErrorMessage } from '../../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import {
   maskSecretsInPlace,
   normalizeMcpServer,
@@ -40,7 +43,11 @@ function readConfigure(raw: unknown): McpConfigureInput | null {
   if (!name) return null
   const out: McpConfigureInput = { name }
   if (typeof r.enabled === 'boolean') out.enabled = r.enabled
-  if (r.toolMode === 'all' || r.toolMode === 'include' || r.toolMode === 'exclude') {
+  if (
+    r.toolMode === 'all' ||
+    r.toolMode === 'include' ||
+    r.toolMode === 'exclude'
+  ) {
     out.toolMode = r.toolMode
   }
   if (Array.isArray(r.includeTools)) {
@@ -74,7 +81,10 @@ export const Route = createFileRoute('/api/mcp/configure')({
           const raw = (await request.json()) as unknown
           const input = readConfigure(raw)
           if (!input) {
-            return json({ ok: false, error: 'Invalid configure payload' }, { status: 400 })
+            return json(
+              { ok: false, error: 'Invalid configure payload' },
+              { status: 400 },
+            )
           }
           if (capabilities.mcp) {
             const response = await mcpFetch('/api/mcp/configure', {
@@ -89,9 +99,13 @@ export const Route = createFileRoute('/api/mcp/configure')({
             )
             if (!response.ok || !server) {
               const errMsg =
-                ((body as Record<string, unknown>).error as string | undefined) ||
-                `MCP configure failed (${response.status})`
-              return json({ ok: false, error: errMsg }, { status: response.status || 502 })
+                ((body as Record<string, unknown>).error as
+                  | string
+                  | undefined) || `MCP configure failed (${response.status})`
+              return json(
+                { ok: false, error: errMsg },
+                { status: response.status || 502 },
+              )
             }
             return json({ ok: true, server: maskSecretsInPlace(server) })
           }
@@ -105,27 +119,46 @@ export const Route = createFileRoute('/api/mcp/configure')({
               : cfg
           const rawServers = root.mcp_servers
           const servers =
-            rawServers && typeof rawServers === 'object' && !Array.isArray(rawServers)
+            rawServers &&
+            typeof rawServers === 'object' &&
+            !Array.isArray(rawServers)
               ? { ...(rawServers as Record<string, unknown>) }
               : {}
           const existing = servers[input.name]
-          if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
-            return json({ ok: false, error: `MCP server not found: ${input.name}` }, { status: 404 })
+          if (
+            !existing ||
+            typeof existing !== 'object' ||
+            Array.isArray(existing)
+          ) {
+            return json(
+              { ok: false, error: `MCP server not found: ${input.name}` },
+              { status: 404 },
+            )
           }
-          const next: Record<string, unknown> = { ...(existing as Record<string, unknown>) }
+          const next: Record<string, unknown> = {
+            ...(existing as Record<string, unknown>),
+          }
           if (typeof input.enabled === 'boolean') next.enabled = input.enabled
           if (input.toolMode) next.tool_mode = input.toolMode
-          if (Array.isArray(input.includeTools)) next.include_tools = input.includeTools
-          if (Array.isArray(input.excludeTools)) next.exclude_tools = input.excludeTools
+          if (Array.isArray(input.includeTools))
+            next.include_tools = input.includeTools
+          if (Array.isArray(input.excludeTools))
+            next.exclude_tools = input.excludeTools
           servers[input.name] = next
           await saveConfig({ mcp_servers: servers })
           const written = normalizeMcpServerFromConfig(input.name, next)
           if (!written) {
-            return json({ ok: false, error: 'MCP configure failed (config write)' }, { status: 500 })
+            return json(
+              { ok: false, error: 'MCP configure failed (config write)' },
+              { status: 500 },
+            )
           }
           return json({ ok: true, server: maskSecretsInPlace(written) })
         } catch (err) {
-          return json({ ok: false, error: safeErrorMessage(err) }, { status: 500 })
+          return json(
+            { ok: false, error: safeErrorMessage(err) },
+            { status: 500 },
+          )
         }
       },
     },

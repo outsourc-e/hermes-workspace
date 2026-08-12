@@ -31,20 +31,36 @@ const SAFE_PATH_ROOTS: ReadonlyArray<string> = [
 
 /** Regex for user-local safe roots: /Users/<name>/.local/bin/ and /Users/<name>/Library/PhpWebStudy/env/node/bin/ */
 const USER_LOCAL_BIN_RE = /^\/Users\/[^/]+\/.local\/bin\//
-const USER_PHPWEBSTUDY_BIN_RE = /^\/Users\/[^/]+\/Library\/PhpWebStudy\/env\/node\/bin\//
+const USER_PHPWEBSTUDY_BIN_RE =
+  /^\/Users\/[^/]+\/Library\/PhpWebStudy\/env\/node\/bin\//
 
 /** Shell interpreters that must not be paired with inline-exec flags */
 const SHELL_INTERPRETERS: ReadonlySet<string> = new Set([
-  'sh', 'bash', 'zsh', 'fish', 'dash', 'csh', 'tcsh', 'ksh',
+  'sh',
+  'bash',
+  'zsh',
+  'fish',
+  'dash',
+  'csh',
+  'tcsh',
+  'ksh',
 ])
 
 /** Inline-exec flags for shell interpreters */
 const SHELL_INLINE_FLAGS: ReadonlySet<string> = new Set([
-  '-c', '-lc', '-ic', '-i', '--command', '-e',
+  '-c',
+  '-lc',
+  '-ic',
+  '-i',
+  '--command',
+  '-e',
 ])
 
 /** Other interpreters with their inline-exec flags */
-const INTERPRETER_INLINE_FLAGS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+const INTERPRETER_INLINE_FLAGS: ReadonlyMap<
+  string,
+  ReadonlySet<string>
+> = new Map([
   ['python', new Set(['-c'])],
   ['python3', new Set(['-c'])],
   ['node', new Set(['-e', '--eval'])],
@@ -92,7 +108,8 @@ export function normalizeTemplate(
   const t = template as Record<string, unknown>
 
   // Transport check
-  const transport = typeof t.transportType === 'string' ? t.transportType : 'stdio'
+  const transport =
+    typeof t.transportType === 'string' ? t.transportType : 'stdio'
   if (!SUPPORTED_TRANSPORTS.has(transport)) {
     return { ok: false, reason: `unsupported transport "${transport}"` }
   }
@@ -111,7 +128,10 @@ export function normalizeTemplate(
 
     // Control-char check on command
     if (CONTROL_CHAR_RE.test(command)) {
-      return { ok: false, reason: `command contains disallowed control characters: "${command}"` }
+      return {
+        ok: false,
+        reason: `command contains disallowed control characters: "${command}"`,
+      }
     }
 
     if (SHELL_METACHAR_RE.test(command)) {
@@ -125,7 +145,10 @@ export function normalizeTemplate(
     if (command.startsWith('/')) {
       // Reject path traversal
       if (command.includes('..')) {
-        return { ok: false, reason: `command contains path traversal: "${command}"` }
+        return {
+          ok: false,
+          reason: `command contains path traversal: "${command}"`,
+        }
       }
       const isSafe =
         SAFE_PATH_ROOTS.some((root) => command.startsWith(root)) ||
@@ -144,7 +167,10 @@ export function normalizeTemplate(
     for (const arg of rawArgs) {
       const s = String(arg)
       if (CONTROL_CHAR_RE.test(s)) {
-        return { ok: false, reason: `args contains disallowed control characters: "${s}"` }
+        return {
+          ok: false,
+          reason: `args contains disallowed control characters: "${s}"`,
+        }
       }
       if (s === '-c' || s.startsWith('-c=') || s.startsWith('-c ')) {
         return {
@@ -209,7 +235,11 @@ export function normalizeTemplate(
         normalized.authType = at
       }
     }
-    if (t.toolMode === 'all' || t.toolMode === 'include' || t.toolMode === 'exclude') {
+    if (
+      t.toolMode === 'all' ||
+      t.toolMode === 'include' ||
+      t.toolMode === 'exclude'
+    ) {
       normalized.toolMode = t.toolMode
     }
 

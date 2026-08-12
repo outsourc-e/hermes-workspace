@@ -114,7 +114,9 @@ export function useVoiceInput(
   const start = useCallback(async () => {
     if (callbacksRef.current.transcribe) {
       if (!supportsRecorderTranscription()) {
-        callbacksRef.current.onError?.('Audio recording not supported in this browser')
+        callbacksRef.current.onError?.(
+          'Audio recording not supported in this browser',
+        )
         setState('error')
         return
       }
@@ -125,7 +127,9 @@ export function useVoiceInput(
       }
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        })
         const mimeType = pickRecorderMimeType()
         recorderMimeTypeRef.current = mimeType
         const recorder = new MediaRecorder(stream, { mimeType })

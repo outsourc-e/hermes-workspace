@@ -698,9 +698,7 @@ export function SkillsScreen() {
               {tab === 'installed' ? (
                 <select
                   value={category}
-                  onChange={(event) =>
-                    handleCategoryChange(event.target.value)
-                  }
+                  onChange={(event) => handleCategoryChange(event.target.value)}
                   className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
                 >
                   {categories.map((item) => (

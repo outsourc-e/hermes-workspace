@@ -40,7 +40,10 @@ describe('APP_CSP', () => {
     const joined = APP_CSP
     for (const needle of expectedOrder) {
       const idx = joined.indexOf(needle, cursor)
-      expect(idx, `directive ${needle} should appear after cursor ${cursor}`).toBeGreaterThanOrEqual(cursor)
+      expect(
+        idx,
+        `directive ${needle} should appear after cursor ${cursor}`,
+      ).toBeGreaterThanOrEqual(cursor)
       cursor = idx + needle.length
     }
   })

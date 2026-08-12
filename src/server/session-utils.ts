@@ -66,9 +66,7 @@ export function shouldBindMainToPortableSession({
   enhancedChat,
 }: PortableMainBindingOptions): boolean {
   return (
-    (sessionKey ?? '').trim() === 'main' &&
-    dashboardAvailable &&
-    !enhancedChat
+    (sessionKey ?? '').trim() === 'main' && dashboardAvailable && !enhancedChat
   )
 }
 

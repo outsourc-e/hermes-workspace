@@ -45,7 +45,9 @@ export const Route = createFileRoute('/api/sessions')({
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
           const localSessions = listLocalSessions()
-          const gatewayIds = new Set(gatewaySessions.map((s: any) => s.key || s.id))
+          const gatewayIds = new Set(
+            gatewaySessions.map((s: any) => s.key || s.id),
+          )
           for (const ls of localSessions) {
             if (!gatewayIds.has(ls.id)) {
               gatewaySessions.push({

@@ -27,9 +27,8 @@ export const Route = createFileRoute('/api/knowledge/sync')({
         }
 
         if (config) {
-          const { writeKnowledgeBaseConfig } = await import(
-            '../../../server/knowledge-config'
-          )
+          const { writeKnowledgeBaseConfig } =
+            await import('../../../server/knowledge-config')
           writeKnowledgeBaseConfig(config)
         }
 

@@ -64,7 +64,13 @@ function Spark({
       aria-hidden
     >
       <defs>
-        <linearGradient id={`spark-grad-${tone.replace('#', '')}`} x1="0" x2="0" y1="0" y2="1">
+        <linearGradient
+          id={`spark-grad-${tone.replace('#', '')}`}
+          x1="0"
+          x2="0"
+          y1="0"
+          y2="1"
+        >
           <stop offset="0%" stopColor={tone} stopOpacity={0.35} />
           <stop offset="100%" stopColor={tone} stopOpacity={0} />
         </linearGradient>
@@ -95,7 +101,15 @@ type HeroTileProps = {
   icon: string
 }
 
-function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps) {
+function HeroTile({
+  label,
+  value,
+  sub,
+  delta,
+  spark,
+  tone,
+  icon,
+}: HeroTileProps) {
   const deltaText = (() => {
     if (delta === null || delta === undefined) return null
     const sign = delta > 0 ? '+' : ''
@@ -218,9 +232,7 @@ export function HeroMetrics({
   const dailySessions = useAnalytics
     ? analytics!.daily.map((d) => d.sessions)
     : []
-  const dailyCalls = useAnalytics
-    ? analytics!.daily.map((d) => d.apiCalls)
-    : []
+  const dailyCalls = useAnalytics ? analytics!.daily.map((d) => d.apiCalls) : []
 
   // Period-over-period deltas: split daily into the latter half vs the prior half.
   const splitSum = (arr: Array<number>): [number, number] => {
@@ -234,15 +246,11 @@ export function HeroMetrics({
   const [sessCurr, sessPrev] = splitSum(dailySessions)
   const [tokCurr, tokPrev] = splitSum(dailyTokens)
 
-  const tokensTotal = useAnalytics
-    ? analytics!.totalTokens
-    : fallback.tokens
+  const tokensTotal = useAnalytics ? analytics!.totalTokens : fallback.tokens
   const sessionsTotal = useAnalytics
     ? analytics!.totalSessions
     : fallback.sessions
-  const apiCalls = useAnalytics
-    ? analytics!.totalApiCalls
-    : fallback.toolCalls
+  const apiCalls = useAnalytics ? analytics!.totalApiCalls : fallback.toolCalls
 
   const window = useAnalytics ? `${analytics!.windowDays}d` : 'all time'
 
@@ -277,7 +285,6 @@ export function HeroMetrics({
         tone: 'var(--theme-success)',
         icon: '🔧',
       },
-
     ],
     [
       analytics,

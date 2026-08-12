@@ -50,7 +50,9 @@ describe('fetchLocalFile', () => {
     expect(entry.trust).toBe('official')
     expect(entry.name).toBe('github')
     expect(entry.id).toBe('local:github')
-    expect(entry.homepage).toBe('https://github.com/modelcontextprotocol/servers')
+    expect(entry.homepage).toBe(
+      'https://github.com/modelcontextprotocol/servers',
+    )
     expect(entry.tags).toEqual(['dev', 'git'])
     expect(entry.installed).toBe(false)
     expect(result.warnings).toBeUndefined()
@@ -79,11 +81,18 @@ describe('fetchLocalFile', () => {
           name: 'myserver',
           description: 'test',
           category: 'Custom',
-          template: { name: 'myserver', transportType: 'stdio', command: 'node', args: [] },
+          template: {
+            name: 'myserver',
+            transportType: 'stdio',
+            command: 'node',
+            args: [],
+          },
         },
       ],
       source: 'user-file',
-      warnings: [{ path: 'presets[0].unknown', message: 'unknown field (ignored)' }],
+      warnings: [
+        { path: 'presets[0].unknown', message: 'unknown field (ignored)' },
+      ],
     })
 
     const result = await fetchLocalFile()
@@ -100,7 +109,12 @@ describe('fetchLocalFile', () => {
           name: 'clean',
           description: 'clean server',
           category: 'Custom',
-          template: { name: 'clean', transportType: 'stdio', command: 'node', args: [] },
+          template: {
+            name: 'clean',
+            transportType: 'stdio',
+            command: 'node',
+            args: [],
+          },
         },
       ],
       source: 'seed',
@@ -118,7 +132,12 @@ describe('fetchLocalFile', () => {
           name: 'nohome',
           description: '',
           category: 'Custom',
-          template: { name: 'nohome', transportType: 'stdio', command: 'node', args: [] },
+          template: {
+            name: 'nohome',
+            transportType: 'stdio',
+            command: 'node',
+            args: [],
+          },
         },
       ],
       source: 'seed',

@@ -66,35 +66,45 @@ Use it as a **rendering / composition / environment-art reference**, not a gamep
 ## 5. Biggest current visual gaps
 
 ### Gap 1 — atmosphere is too flat
+
 The world is readable, but the lighting/air perspective does not yet sell depth, scale, or mood.
 
 ### Gap 2 — biome silhouettes are not distinct enough
+
 Training, Forge, Agora, Grove, Oracle, Arena need stronger instant recognition from one screenshot.
 
 ### Gap 3 — pathing and landmarks need better environmental guidance
+
 The player can move, but the world does not always pull the eye toward the next objective strongly enough.
 
 ### Gap 4 — characters/NPCs need stronger silhouette language
+
 NPCs are good enough to function but not strong enough to become iconic.
 
 ### Gap 5 — HUD still reads partially as tool UI rather than premium game UI
+
 The game layer is improving faster than the UI treatment.
 
 ## 6. Target visual pillars
 
 ### Pillar A — readable stylized wonder
+
 The world should feel magical and premium without becoming visually noisy.
 
 ### Pillar B — strong biome identity
+
 Every zone should be recognizable in one frame.
 
 ### Pillar C — navigation through composition
+
 The world itself should tell the player where to go.
 
 ### Pillar D — iconic agent-fantasy NPCs
+
 Characters should look like classes/archetypes, not just placeholders.
 
 ### Pillar E — cohesive world + HUD language
+
 The interface should feel native to the world.
 
 ## 7. Zone-by-zone direction
@@ -102,11 +112,13 @@ The interface should feel native to the world.
 ## Training Grounds
 
 Intent:
+
 - onboarding
 - clean readability
 - confidence and progression
 
 Upgrade targets:
+
 - stronger path shapes
 - clearer tutorial landmarks
 - richer gate / portal framing
@@ -114,17 +126,20 @@ Upgrade targets:
 - better contrast between playable routes and decorative ground
 
 Visual language:
+
 - heroic academy
 - bright, inviting, polished
 
 ## Forge
 
 Intent:
+
 - creation
 - prompts hardening into tools
 - energy / transformation
 
 Upgrade targets:
+
 - lava / ember channel language
 - glowing lines and hotter contrast
 - stronger angular silhouettes
@@ -132,16 +147,20 @@ Upgrade targets:
 - emissive props around crafting points
 
 Visual language:
+
 - volcanic, angular, industrial-mythic
 
 ## Agora
+
 n
 Intent:
+
 - collaboration
 - multiplayer social density
 - builders everywhere
 
 Upgrade targets:
+
 - denser market / workshop props
 - banners, kiosks, crowd clusters
 - stronger plaza composition
@@ -149,16 +168,19 @@ Upgrade targets:
 - more obvious “many builders live here” feeling
 
 Visual language:
+
 - civic, busy, social, entrepreneurial
 
 ## Grove
 
 Intent:
+
 - memory
 - reflection
 - soft mysticism
 
 Upgrade targets:
+
 - layered canopy depth
 - ruins / stones / ritual circles
 - softer fog and ambient green/teal palette
@@ -166,16 +188,19 @@ Upgrade targets:
 - more dreamlike pathways
 
 Visual language:
+
 - sacred, calm, memory-rich
 
 ## Oracle
 
 Intent:
+
 - routing
 - foresight
 - model choice / system design
 
 Upgrade targets:
+
 - celestial geometry
 - floating rings / observatory elements
 - stronger skyline silhouette
@@ -183,22 +208,26 @@ Upgrade targets:
 - dramatic contrast between floor and sky
 
 Visual language:
+
 - cosmic, precise, elegant
 
 ## Arena
 
 Intent:
+
 - evals
 - proving ground
 - competition
 
 Upgrade targets:
+
 - stronger combat/exam framing
 - bolder symmetry
 - dramatic banners / hazard trim / spotlit center
 - better event focus on challenge targets
 
 Visual language:
+
 - trial, spectacle, prestige
 
 ## 8. Priority upgrade list
@@ -206,9 +235,11 @@ Visual language:
 ## P1 — highest ROI
 
 ### 8.1 Lighting / atmosphere pass
+
 Do first.
 
 Deliverables:
+
 - zone-specific fog color
 - sky gradient improvements
 - better depth tinting
@@ -216,58 +247,74 @@ Deliverables:
 - key emissive accents on interactables and landmarks
 
 Success metric:
+
 - screenshots instantly look more premium
 - the world gains depth even without new geometry
 
 ### 8.2 Landmark pass
+
 Each zone gets 1-3 hero landmarks visible from a distance.
 
 Examples:
+
 - Forge super-furnace / hammer shrine
 - Oracle ring tower
 - Agora central pavilion / builder monument
 - Grove memory tree / ruin arch
 
 Success metric:
+
 - player always has a visual anchor
 
 ### 8.3 Character silhouette pass
+
 NPCs and player archetypes need stronger identity.
 
 Do:
+
 - stronger hats/capes/staffs/tools/back items
 - cleaner role-specific palette sets
 - distinguish mentor / builder / fighter / oracle classes at a glance
 
 Success metric:
+
 - NPCs feel memorable in stills and trailers
 
 ### 8.4 HUD styling pass
+
 Do:
+
 - unify panel materials
 - improve hierarchy of quest/objective elements
 - game-like framing for status/HUD
 - reduce “dev tool” visual residue
 
 Success metric:
+
 - world + HUD feel like one product
 
 ## P2 — medium ROI
 
 ### 8.5 Terrain/path pass
+
 Do:
+
 - improve road edges, steps, elevation, rails
 - make paths more visually intentional
 - reduce flatness in key travel spaces
 
 ### 8.6 Prop density pass
+
 Do:
+
 - add more environmental storytelling props
 - avoid repetitive emptiness between hero landmarks
 - increase perceived richness without clutter
 
 ### 8.7 VFX pass
+
 Do:
+
 - portal polish
 - quest interaction highlights
 - ambient particles per zone
@@ -276,11 +323,13 @@ Do:
 ## P3 — later
 
 ### 8.8 Animation pass
+
 - stronger idle pose personality
 - more expressive NPC facing/attention
 - mild flourish on interactions
 
 ### 8.9 Advanced shader/material polish
+
 - stylized rim/fresnel where helpful
 - better water/lava/glow materials
 - stronger atmosphere transitions
@@ -288,25 +337,31 @@ Do:
 ## 9. UX-specific visual improvements
 
 ### 9.1 World navigation readability
+
 The player should not rely entirely on text prompts.
 
 Add:
+
 - stronger environmental signposting
 - visual framing around objective destinations
 - more useful skyline orientation
 
 ### 9.2 Multiplayer visibility
+
 Other players should feel more alive.
 
 Add:
+
 - slightly better remote-player silhouette recognition
 - subtle status/readiness indicators
 - tasteful presence markers without clutter
 
 ### 9.3 Recording-friendly composition
+
 Assume clips and screenshots matter.
 
 Do:
+
 - cleaner framing zones
 - reduce ugly dead spaces
 - improve title-screen and key landmark shots
@@ -317,12 +372,14 @@ Do:
 Stay lightweight.
 
 ### Preferred asset strategy
+
 - low-poly / stylized assets
 - kitbash where possible
 - custom hero props only where they matter most
 - silhouette-first, texture-second
 
 ### Avoid
+
 - giant asset packs with inconsistent style
 - realistic PBR assets dropped into stylized world
 - complex pipeline overhead that slows shipping
@@ -345,6 +402,7 @@ Stay lightweight.
 - stronger NPC palette/silhouette pass
 
 Expected result:
+
 - major uplift in screenshots and first impression
 
 ## Phase 2 — environment identity (3-5 days)
@@ -355,6 +413,7 @@ Expected result:
 - portal/VFX polish
 
 Expected result:
+
 - zones become memorable and trailer-worthy
 
 ## Phase 3 — character/world richness
@@ -364,6 +423,7 @@ Expected result:
 - minimap / map polish if needed
 
 Expected result:
+
 - world feels more alive and authored
 
 ## 13. Success metrics
@@ -380,30 +440,35 @@ HermesWorld visual pass is successful if:
 ## 14. Concrete task list for swarm / kanban
 
 ### Lighting / atmosphere
+
 - zone fog palettes
 - sky gradient tuning
 - emissive interactable pass
 - landmark rim/accent pass
 
 ### Environment
+
 - landmark hero props per zone
 - path readability pass
 - elevation/step framing pass
 - prop density pass
 
 ### Characters
+
 - NPC silhouette audit
 - palette grouping by role
 - accessory uniqueness pass
 - posture/idle clarity pass
 
 ### HUD
+
 - panel material unification
 - quest/objective visual polish
 - top-level HUD hierarchy cleanup
 - multiplayer presence cue cleanup
 
 ### VFX
+
 - portal upgrade
 - objective highlight polish
 - ambient particles by biome
@@ -414,6 +479,7 @@ HermesWorld visual pass is successful if:
 Do **not** rewrite HermesWorld.
 
 Do a **premium stylized art-direction pass** guided by:
+
 - TinySkies for environment composition and atmosphere
 - HermesWorld’s own product identity for concept and UX
 

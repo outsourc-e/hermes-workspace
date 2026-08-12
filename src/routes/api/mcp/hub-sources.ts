@@ -23,7 +23,10 @@ export const Route = createFileRoute('/api/mcp/hub-sources')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          return Response.json(
+            { ok: false, error: 'Unauthorized' },
+            { status: 401 },
+          )
         }
         try {
           const result = await readHubSources()
@@ -33,7 +36,9 @@ export const Route = createFileRoute('/api/mcp/hub-sources')({
             source: result.source,
             ...(result.error ? { error: result.error } : {}),
             ...(result.errorPath ? { errorPath: result.errorPath } : {}),
-            ...(result.validationErrors ? { validationErrors: result.validationErrors } : {}),
+            ...(result.validationErrors
+              ? { validationErrors: result.validationErrors }
+              : {}),
           })
         } catch (err) {
           return Response.json({
@@ -47,13 +52,19 @@ export const Route = createFileRoute('/api/mcp/hub-sources')({
 
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          return Response.json(
+            { ok: false, error: 'Unauthorized' },
+            { status: 401 },
+          )
         }
         let body: unknown
         try {
           body = await request.json()
         } catch {
-          return Response.json({ ok: false, errors: [{ path: '', message: 'invalid JSON body' }] })
+          return Response.json({
+            ok: false,
+            errors: [{ path: '', message: 'invalid JSON body' }],
+          })
         }
         const result = await addHubSource(body)
         if (!result.ok) {

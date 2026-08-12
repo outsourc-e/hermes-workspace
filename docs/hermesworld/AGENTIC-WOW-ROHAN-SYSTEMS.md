@@ -7,6 +7,7 @@ Last updated: 2026-05-06
 HermesWorld should become the first Agentic WoW: a real MMO-style world where humans and AI agents form parties, guilds, classes, builds, rivalries, raids, events, and prize hunts.
 
 References:
+
 - World of Warcraft: raids, roles, classes, dungeons, social identity, long-term progression
 - Rohan / PlayRohan: races, skill trees, guild wars, weekend war cadence, PvP identity
 - Roblox: creator platform, user-generated rooms/minigames, social play
@@ -45,17 +46,20 @@ Initial class fantasy should be easy to understand and map to agent behaviors.
 Borrow from Rohan-style class depth without overbuilding early.
 
 Each class has:
+
 - 3 branches
 - 5 tiers per branch
 - active skills + passive modifiers
 - unlocks via XP, quests, guild achievements, sigils
 
 Example: Priest
+
 - Restoration: heal, cleanse, revive, sanctuary
 - Blessing: party buffs, XP gain, shield, haste
 - Oracle: reveal hint, prophecy, anti-cheat scan, lore insight
 
 Example: Engineer
+
 - Crafting: item creation, attachments, repair
 - Automation: deploy agent, queue task, build tool
 - Fortress: guild hall upgrades, defenses, traps
@@ -63,6 +67,7 @@ Example: Engineer
 ## Leveling/progression
 
 Progression layers:
+
 - player level
 - class level
 - skill XP
@@ -73,6 +78,7 @@ Progression layers:
 - reputation per zone/faction
 
 Rewards:
+
 - stats
 - skills
 - titles
@@ -85,6 +91,7 @@ Rewards:
 ## Gear/items/attachments
 
 Item slots:
+
 - weapon/tool
 - armor/robe
 - relic
@@ -93,6 +100,7 @@ Item slots:
 - guild banner charm
 
 Item stats:
+
 - HP / MP / SP
 - attack / spell power / defense
 - recall / memory / context
@@ -100,6 +108,7 @@ Item stats:
 - party aura / guild bonus
 
 Attachments:
+
 - gems/sigils
 - agent modules
 - spell modifiers
@@ -111,6 +120,7 @@ Attachments:
 Guilds should be a core differentiator.
 
 Features:
+
 - guild creation + banner
 - guild hall / room
 - guild chat
@@ -125,6 +135,7 @@ Features:
 ## Guild war cadence
 
 Rohan-style scheduled events:
+
 - Weekend guild war window
 - Objective-based map control
 - capture obelisks/sigils
@@ -138,6 +149,7 @@ Important: scheduled events create habit and community drama.
 ## Raids/dungeons
 
 WoW-style party content:
+
 - 3-5 player dungeons first
 - later 10+ player raids
 - agent companions can fill roles
@@ -145,6 +157,7 @@ WoW-style party content:
 - role requirements matter: healer/tank/damage/support/scout
 
 Early raid ideas:
+
 - The Broken Model
 - The Oracle's Fault
 - The Hallucination Engine
@@ -154,6 +167,7 @@ Early raid ideas:
 ## Minigames
 
 Add social/viral minigames:
+
 - boxing arena
 - sports-style guild games
 - racing/speedrun routes
@@ -167,6 +181,7 @@ Add social/viral minigames:
 Every patch should have notes.
 
 Track:
+
 - damage/healing/resource ratios
 - cooldowns
 - item rarity distribution
@@ -176,6 +191,7 @@ Track:
 - agent action power
 
 Publish patch notes:
+
 - buffs
 - nerfs
 - new items
@@ -186,6 +202,7 @@ Publish patch notes:
 ## Desktop/downloadable future
 
 Browser first, but plan for installable clients:
+
 - PWA install
 - Electron/Tauri shell
 - graphics settings

@@ -195,10 +195,18 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
-  const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
-  const isOnHermesWorldLandingRoute = pathname === '/hermes-world' || pathname.startsWith('/hermes-world/') || pathname === '/world' || pathname.startsWith('/world/')
+  const isOnPlaygroundRoute =
+    pathname === '/playground' || pathname.startsWith('/playground/')
+  const isOnHermesWorldLandingRoute =
+    pathname === '/hermes-world' ||
+    pathname.startsWith('/hermes-world/') ||
+    pathname === '/world' ||
+    pathname.startsWith('/world/')
+  const rawSearch = search as Record<string, unknown>
   const isEmbeddedSurface =
-    search?.embed === '1' || search?.embed === 'true' || search?.mode === 'embed'
+    rawSearch?.embed === '1' ||
+    rawSearch?.embed === 'true' ||
+    rawSearch?.mode === 'embed'
   const isChromeFreeSurface = isEmbeddedSurface || isOnHermesWorldLandingRoute
   const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
@@ -350,7 +358,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         <div
           className={cn(
             'grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden',
-            hideChatSidebar || isChromeFreeSurface ? 'md:grid-cols-1' : 'md:grid-cols-[auto_1fr]',
+            hideChatSidebar || isChromeFreeSurface
+              ? 'md:grid-cols-1'
+              : 'md:grid-cols-[auto_1fr]',
           )}
         >
           {/* Activity ticker bar */}
@@ -447,15 +457,21 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           </main>
 
           {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute && !isOnPlaygroundRoute && !isChromeFreeSurface && !isMobile && (
-            <Suspense fallback={null}>
-              <ChatPanel />
-            </Suspense>
-          )}
+          {!isOnChatRoute &&
+            !isOnPlaygroundRoute &&
+            !isChromeFreeSurface &&
+            !isMobile && (
+              <Suspense fallback={null}>
+                <ChatPanel />
+              </Suspense>
+            )}
         </div>
 
         {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
-        {!isChromeFreeSurface && !isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanelToggle />}
+        {!isChromeFreeSurface &&
+          !isOnChatRoute &&
+          !isOnPlaygroundRoute &&
+          !isMobile && <ChatPanelToggle />}
 
         {showDesktopSidebarBackdrop ? (
           <button
@@ -473,10 +489,15 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
       {!isChromeFreeSurface ? <MobileHamburgerMenu /> : null}
       {!isChromeFreeSurface ? <MobileTabBar /> : null}
-      {!isChromeFreeSurface && !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
+      {!isChromeFreeSurface &&
+      !isMobile &&
+      !isOnChatRoute &&
+      settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}
-      {!isChromeFreeSurface ? <CommandPalette pathname={pathname} sessions={sessions} /> : null}
+      {!isChromeFreeSurface ? (
+        <CommandPalette pathname={pathname} sessions={sessions} />
+      ) : null}
     </>
   )
 }

@@ -63,7 +63,8 @@ async function readCpu() {
 
   const busyDelta = end.busy - start.busy
   const totalDelta = busyDelta + (end.idle - start.idle)
-  const loadPercent = totalDelta > 0 ? clampPercent((busyDelta / totalDelta) * 100) : 0
+  const loadPercent =
+    totalDelta > 0 ? clampPercent((busyDelta / totalDelta) * 100) : 0
 
   return {
     loadPercent,
@@ -107,13 +108,12 @@ function readMemory() {
   const totalBytes = os.totalmem()
 
   const availableBytes =
-    process.platform === 'darwin'
-      ? readDarwinAvailableBytes(totalBytes)
-      : null
+    process.platform === 'darwin' ? readDarwinAvailableBytes(totalBytes) : null
 
   const freeBytes = availableBytes ?? os.freemem()
   const usedBytes = Math.max(0, totalBytes - freeBytes)
-  const usedPercent = totalBytes > 0 ? clampPercent((usedBytes / totalBytes) * 100) : 0
+  const usedPercent =
+    totalBytes > 0 ? clampPercent((usedBytes / totalBytes) * 100) : 0
 
   return {
     usedBytes,
@@ -123,14 +123,16 @@ function readMemory() {
 }
 
 function readDisk() {
-  const diskPath = process.env.HERMES_WORKSPACE_METRICS_DISK_PATH || os.homedir()
+  const diskPath =
+    process.env.HERMES_WORKSPACE_METRICS_DISK_PATH || os.homedir()
 
   try {
     const stats = fs.statfsSync(diskPath)
     const totalBytes = stats.blocks * stats.bsize
     const freeBytes = stats.bavail * stats.bsize
     const usedBytes = Math.max(0, totalBytes - freeBytes)
-    const usedPercent = totalBytes > 0 ? clampPercent((usedBytes / totalBytes) * 100) : 0
+    const usedPercent =
+      totalBytes > 0 ? clampPercent((usedBytes / totalBytes) * 100) : 0
 
     return {
       path: diskPath,
@@ -158,7 +160,10 @@ export const Route = createFileRoute('/api/system-metrics')({
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const [caps, cpu] = await Promise.all([ensureGatewayProbed(), readCpu()])
+        const [caps, cpu] = await Promise.all([
+          ensureGatewayProbed(),
+          readCpu(),
+        ])
         const status = getConnectionStatus()
 
         const body: SystemMetricsResponse = {

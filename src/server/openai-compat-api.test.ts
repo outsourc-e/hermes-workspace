@@ -34,12 +34,14 @@ afterEach(() => {
 describe('openaiChat', () => {
   it('sends Hermes session continuity headers with authentication when available', async () => {
     process.env.HERMES_API_TOKEN = 'test-token'
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
     vi.stubGlobal('fetch', fetchMock)
 
     await openaiChat([{ role: 'user', content: 'hello' }], {
@@ -47,7 +49,10 @@ describe('openaiChat', () => {
       sessionId: 'workspace-session-1',
     })
 
-    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<
+      string,
+      string
+    >
     expect(headers.Authorization).toBe('Bearer test-token')
     expect(headers['X-Hermes-Session-Id']).toBe('workspace-session-1')
     expect(headers['X-Claude-Session-Id']).toBe('workspace-session-1')
@@ -55,12 +60,14 @@ describe('openaiChat', () => {
 
   it('sends Hermes session continuity headers even without a bearer token', async () => {
     process.env.HOME = '/tmp/hermes-workspace-test-no-codex-auth'
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
     vi.stubGlobal('fetch', fetchMock)
 
     await openaiChat([{ role: 'user', content: 'hello' }], {
@@ -68,7 +75,10 @@ describe('openaiChat', () => {
       sessionId: 'workspace-session-2',
     })
 
-    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<
+      string,
+      string
+    >
     expect(headers.Authorization).toBeUndefined()
     expect(headers['X-Hermes-Session-Id']).toBe('workspace-session-2')
     expect(headers['X-Claude-Session-Id']).toBe('workspace-session-2')

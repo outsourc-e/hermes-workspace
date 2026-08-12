@@ -34,7 +34,9 @@ const MIME_BY_EXT: Record<string, string> = {
 function allowedPrefixes(): string[] {
   const home = os.homedir()
   const claudeHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? resolvePath(home, '.hermes')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    resolvePath(home, '.hermes')
   return [
     '/tmp',
     `${home}/tmp`,
@@ -82,7 +84,9 @@ export const Route = createFileRoute('/api/preview-file')({
             return new Response('File too large for preview', { status: 413 })
           }
           const body = readFileSync(abs)
-          const mime = MIME_BY_EXT[extname(abs).toLowerCase()] ?? 'application/octet-stream'
+          const mime =
+            MIME_BY_EXT[extname(abs).toLowerCase()] ??
+            'application/octet-stream'
           return new Response(body, {
             status: 200,
             headers: {

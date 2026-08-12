@@ -5,7 +5,11 @@ import {
   normalizeMcpServer,
   payloadContainsString,
 } from '../../server/mcp-normalize'
-import { parseMcpServerInput, toConfigEntry, unavailableListPayload } from './mcp'
+import {
+  parseMcpServerInput,
+  toConfigEntry,
+  unavailableListPayload,
+} from './mcp'
 
 beforeEach(() => {
   vi.resetModules()
@@ -47,7 +51,10 @@ describe('parseMcpServerInput (POST validation)', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.transportType).toBe('stdio')
-    expect(result.value.args).toEqual(['-y', '@modelcontextprotocol/server-filesystem'])
+    expect(result.value.args).toEqual([
+      '-y',
+      '@modelcontextprotocol/server-filesystem',
+    ])
     expect(result.value.env).toEqual({ ROOT: '/tmp', NUMERIC: '42' })
   })
 })
@@ -171,7 +178,8 @@ describe('Phase 1.5 fallback — capability gating shape', () => {
       BEARER_TOKEN: '',
       CLAUDE_API: 'http://127.0.0.1:8642',
       CLAUDE_UPGRADE_INSTRUCTIONS: 'noop',
-      dashboardFetch: () => Promise.resolve(new Response(null, { status: 404 })),
+      dashboardFetch: () =>
+        Promise.resolve(new Response(null, { status: 404 })),
     }))
     vi.doMock('../../server/auth-middleware', () => ({
       isAuthenticated: () => true,
@@ -191,7 +199,9 @@ describe('Phase 1.5 fallback — capability gating shape', () => {
 
     const mod = await import('./mcp')
     const route = mod.Route as unknown as {
-      server: { handlers: { GET: (ctx: { request: Request }) => Promise<Response> } }
+      server: {
+        handlers: { GET: (ctx: { request: Request }) => Promise<Response> }
+      }
     }
     const res = await route.server.handlers.GET({
       request: new Request('http://localhost/api/mcp'),

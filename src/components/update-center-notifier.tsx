@@ -352,7 +352,9 @@ function UpdateCard({
               {product.repoPath}
             </p>
           ) : null}
-          {blocked && product.blockingFiles && product.blockingFiles.length > 0 ? (
+          {blocked &&
+          product.blockingFiles &&
+          product.blockingFiles.length > 0 ? (
             <ul className="mt-1 max-h-24 overflow-auto pr-1">
               {product.blockingFiles.slice(0, 8).map((file) => (
                 <li

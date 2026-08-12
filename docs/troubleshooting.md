@@ -23,11 +23,11 @@ grep -i API_SERVER ~/.hermes/.env
 
 The env var must be **exactly** `API_SERVER_ENABLED=true` — with underscores. Common mistakes:
 
-| Wrong | Right |
-|---|---|
-| `APISERVERENABLED=true` | `API_SERVER_ENABLED=true` |
+| Wrong                   | Right                       |
+| ----------------------- | --------------------------- |
+| `APISERVERENABLED=true` | `API_SERVER_ENABLED=true`   |
 | `APISERVERHOST=0.0.0.0` | `API_SERVER_HOST=127.0.0.1` |
-| `ApiServerEnabled=true` | `API_SERVER_ENABLED=true` |
+| `ApiServerEnabled=true` | `API_SERVER_ENABLED=true`   |
 
 After fixing, restart the gateway: `hermes gateway run --replace`
 

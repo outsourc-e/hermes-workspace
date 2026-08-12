@@ -31,7 +31,10 @@ describe('reconcileSessionDraft', () => {
       'real-key',
     )
 
-    const sessions = queryClient.getQueryData(['chat', 'sessions']) as Array<SessionMeta>
+    const sessions = queryClient.getQueryData([
+      'chat',
+      'sessions',
+    ]) as Array<SessionMeta>
     expect(sessions).toHaveLength(1)
     expect(sessions[0]).toMatchObject({
       key: 'real-key',
@@ -42,31 +45,34 @@ describe('reconcileSessionDraft', () => {
 
   it('merges the optimistic draft into an existing resolved session entry', () => {
     const queryClient = new QueryClient()
-    queryClient.setQueryData(['chat', 'sessions'], [
-      makeSession({
-        key: 'draft-key',
-        friendlyId: 'draft-friendly',
-        updatedAt: 500,
-        lastMessage: {
-          role: 'user',
-          timestamp: 500,
-          content: [{ type: 'text', text: 'fresh draft message' }],
-        },
-        titleStatus: 'generating',
-      }),
-      makeSession({
-        key: 'real-key',
-        friendlyId: 'real-friendly',
-        updatedAt: 100,
-        label: 'Existing Session',
-        titleStatus: 'idle',
-        lastMessage: {
-          role: 'assistant',
-          timestamp: 100,
-          content: [{ type: 'text', text: 'older real message' }],
-        },
-      }),
-    ])
+    queryClient.setQueryData(
+      ['chat', 'sessions'],
+      [
+        makeSession({
+          key: 'draft-key',
+          friendlyId: 'draft-friendly',
+          updatedAt: 500,
+          lastMessage: {
+            role: 'user',
+            timestamp: 500,
+            content: [{ type: 'text', text: 'fresh draft message' }],
+          },
+          titleStatus: 'generating',
+        }),
+        makeSession({
+          key: 'real-key',
+          friendlyId: 'real-friendly',
+          updatedAt: 100,
+          label: 'Existing Session',
+          titleStatus: 'idle',
+          lastMessage: {
+            role: 'assistant',
+            timestamp: 100,
+            content: [{ type: 'text', text: 'older real message' }],
+          },
+        }),
+      ],
+    )
 
     reconcileSessionDraft(
       queryClient,
@@ -76,7 +82,10 @@ describe('reconcileSessionDraft', () => {
       'real-key',
     )
 
-    const sessions = queryClient.getQueryData(['chat', 'sessions']) as Array<SessionMeta>
+    const sessions = queryClient.getQueryData([
+      'chat',
+      'sessions',
+    ]) as Array<SessionMeta>
     expect(sessions).toHaveLength(1)
     expect(sessions[0]).toMatchObject({
       key: 'real-key',

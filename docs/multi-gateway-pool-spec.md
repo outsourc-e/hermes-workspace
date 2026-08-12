@@ -1,4 +1,5 @@
 # Multi-Gateway Pool Architecture
+
 ## Hermes Workspace — Profile-Parallel Agent Execution
 
 ### Status: Design Document — PR Proposal
@@ -10,6 +11,7 @@
 Hermes Workspace currently operates as a **single-gateway, single-profile UI**. The gateway loads one `HERMES_HOME` at startup and all chat sessions, operations, and memory access flow through that one process.
 
 For multi-profile users (the primary Claude use case), this means:
+
 - **No parallel agent execution**: Cannot brainstorm with Nous while Jules orchestrates Architect and Sentinel in Operations
 - **No profile identity in chat**: The "agent" is always whoever the single gateway was launched as
 - **Terminal fragmentation**: Users must open separate terminal windows per profile to achieve true multi-agent workflows
@@ -32,6 +34,7 @@ For multi-profile users (the primary Claude use case), this means:
 **Solution**: The workspace maintains a **gateway pool** — one gateway process per active profile, each on its own port, all health-monitored, all routable from the UI.
 
 **Design principles:**
+
 1. **Profile-count agnostic**: Works for 1 profile or 100. No hardcoded limits, arrays, or switch statements enumerating specific profiles.
 2. **Privacy by design**: No PII, API keys, passwords, or secrets in code, logs, or PRs. All sensitive data stays in profile-local `.env` files.
 3. **Backward compatible**: Single-profile users unaffected. Pool mode is opt-in.
@@ -95,12 +98,12 @@ Profiles are sorted alphabetically to ensure stable port assignment. A persisten
 ### 4.2 Gateway Lifecycle States
 
 ```typescript
-type GatewayState = 
-  | 'spawning'      // Process starting
-  | 'healthy'       // Responded to /health within 5s
-  | 'degraded'      // Slow responses (>2s)
-  | 'dead'          // Failed health check 3x
-  | 'stopped'       // User explicitly stopped
+type GatewayState =
+  | 'spawning' // Process starting
+  | 'healthy' // Responded to /health within 5s
+  | 'degraded' // Slow responses (>2s)
+  | 'dead' // Failed health check 3x
+  | 'stopped' // User explicitly stopped
 ```
 
 ### 4.3 Spawn Protocol
@@ -130,6 +133,7 @@ function spawnGateway(profileName: string, port: number): ChildProcess {
 ### 4.5 Shutdown Protocol
 
 On workspace exit (SIGTERM):
+
 1. Send graceful shutdown to all gateways (`POST /shutdown`)
 2. Wait 10s
 3. SIGKILL any remaining
@@ -162,7 +166,7 @@ All workspace API routes gain **profile context**:
 export async function proxyToGateway(
   profileName: string,
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<Response> {
   const gateway = gatewayPool.get(profileName)
   if (!gateway || gateway.state !== 'healthy') {
@@ -176,6 +180,7 @@ export async function proxyToGateway(
 ### 5.3 Backward Compatibility
 
 When no profile is specified:
+
 - Default to `activeProfile` (from `~/.hermes/active_profile` file)
 - If that file doesn't exist, default to first available profile
 - Single-profile users see **zero behavioral change**
@@ -205,7 +210,7 @@ export async function listAllSessions(): Promise<SessionMeta[]> {
         profile: profile.name,
         profileColor: getProfileColor(profile.name),
       }))
-    })
+    }),
   )
   return allSessions.flat().sort((a, b) => b.updatedAt - a.updatedAt)
 }
@@ -270,6 +275,7 @@ A persistent pill/button in the top-left (next to sidebar toggle):
 ## 8. File Changes Required
 
 ### New Files
+
 ```
 src/server/gateway-pool.ts          # Core pool manager
 src/server/gateway-pool.test.ts     # Pool tests
@@ -282,6 +288,7 @@ src/routes/api/gateway-pool.ts      # Pool status API
 ```
 
 ### Modified Files
+
 ```
 src/server/profiles-browser.ts      # Add gateway port field
 src/routes/api/profiles/list.ts     # Include gateway status
@@ -299,6 +306,7 @@ src/server/local-provider-discovery.ts  # Multi-gateway provider discovery
 ## 9. Configuration
 
 ### Environment Variables
+
 ```bash
 CLAUDE_GATEWAY_POOL_ENABLED=true   # Enable multi-gateway mode
 CLAUDE_GATEWAY_BASE_PORT=8642      # Starting port
@@ -307,6 +315,7 @@ CLAUDE_GATEWAY_HEALTH_INTERVAL=30  # Health check seconds
 ```
 
 ### workspace-overrides.json
+
 ```json
 {
   "gatewayPool": {
@@ -324,15 +333,15 @@ CLAUDE_GATEWAY_HEALTH_INTERVAL=30  # Health check seconds
 
 ## 10. Error Handling & Edge Cases
 
-| Scenario | Behavior |
-|----------|----------|
-| Gateway fails to spawn | Show error toast, allow retry, fallback to active profile |
-| Port already in use | Auto-increment port, log warning |
-| Profile deleted while gateway running | Stop gateway, remove from pool |
-| Workspace crashes | On restart, check for orphaned gateways, adopt or kill |
-| Single-profile user | Pool mode off by default, zero impact |
-| Gateway version mismatch | Log warning, attempt spawn anyway |
-| Memory pressure | Allow user to stop idle gateways, keep active ones |
+| Scenario                              | Behavior                                                  |
+| ------------------------------------- | --------------------------------------------------------- |
+| Gateway fails to spawn                | Show error toast, allow retry, fallback to active profile |
+| Port already in use                   | Auto-increment port, log warning                          |
+| Profile deleted while gateway running | Stop gateway, remove from pool                            |
+| Workspace crashes                     | On restart, check for orphaned gateways, adopt or kill    |
+| Single-profile user                   | Pool mode off by default, zero impact                     |
+| Gateway version mismatch              | Log warning, attempt spawn anyway                         |
+| Memory pressure                       | Allow user to stop idle gateways, keep active ones        |
 
 ---
 
@@ -351,13 +360,13 @@ CLAUDE_GATEWAY_HEALTH_INTERVAL=30  # Health check seconds
 
 ## 12. Performance
 
-| Metric | Target |
-|--------|--------|
-| Gateway spawn time | < 3s |
-| Profile switch latency | < 200ms (no spawn needed) |
-| Health check overhead | < 10ms per gateway |
-| Memory per gateway | ~100-200MB |
-| Max recommended profiles | 10 (configurable) |
+| Metric                   | Target                    |
+| ------------------------ | ------------------------- |
+| Gateway spawn time       | < 3s                      |
+| Profile switch latency   | < 200ms (no spawn needed) |
+| Health check overhead    | < 10ms per gateway        |
+| Memory per gateway       | ~100-200MB                |
+| Max recommended profiles | 10 (configurable)         |
 
 ---
 
@@ -396,5 +405,5 @@ CLAUDE_GATEWAY_HEALTH_INTERVAL=30  # Health check seconds
 
 ---
 
-*Authored by Nous (Vivere Vitalis) for the Hermes Workspace project.*
-*First-principles architecture: if each profile is a distinct agent, the workspace must be an agent orchestrator.*
+_Authored by Nous (Vivere Vitalis) for the Hermes Workspace project._
+_First-principles architecture: if each profile is a distinct agent, the workspace must be an agent orchestrator._

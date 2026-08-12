@@ -9,7 +9,10 @@ import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../../server/gateway-capabilities'
-import { requireJsonContentType, safeErrorMessage } from '../../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import { normalizeTestResult } from '../../../server/mcp-normalize'
 import { parseMcpServerInput } from '../../../server/mcp-input-validate'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
@@ -61,7 +64,11 @@ export const Route = createFileRoute('/api/mcp/discover')({
           const parsed = parseMcpServerInput(raw)
           if (!parsed.ok) {
             return json(
-              { ok: false, error: 'Invalid MCP discover payload', errors: parsed.errors },
+              {
+                ok: false,
+                error: 'Invalid MCP discover payload',
+                errors: parsed.errors,
+              },
               { status: 400 },
             )
           }
@@ -75,11 +82,18 @@ export const Route = createFileRoute('/api/mcp/discover')({
           const payload = (await response.json().catch(() => ({}))) as unknown
           const result = normalizeTestResult(payload)
           return json(
-            { ok: result.ok, tools: result.discoveredTools, error: result.error },
+            {
+              ok: result.ok,
+              tools: result.discoveredTools,
+              error: result.error,
+            },
             { status: response.ok ? 200 : response.status || 502 },
           )
         } catch (err) {
-          return json({ ok: false, tools: [], error: safeErrorMessage(err) }, { status: 500 })
+          return json(
+            { ok: false, tools: [], error: safeErrorMessage(err) },
+            { status: 500 },
+          )
         }
       },
     },

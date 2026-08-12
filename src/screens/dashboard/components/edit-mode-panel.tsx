@@ -124,9 +124,7 @@ function Group({
                     ? 'color-mix(in srgb, var(--theme-success) 60%, transparent)'
                     : 'var(--theme-border)'
                 }`,
-                color: visible
-                  ? 'var(--theme-success)'
-                  : 'var(--theme-muted)',
+                color: visible ? 'var(--theme-success)' : 'var(--theme-muted)',
               }}
               title={w.description}
             >

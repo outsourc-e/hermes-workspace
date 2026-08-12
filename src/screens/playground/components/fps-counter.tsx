@@ -19,8 +19,14 @@ export function FpsCounter({ enabled }: Props) {
       frames.push(fps)
       if (frames.length > 120) frames.shift()
       const sorted = [...frames].sort((a, b) => a - b)
-      const low = sorted[Math.max(0, Math.floor(sorted.length * 0.01) - 1)] ?? fps
-      if (frames.length % 8 === 0) setStats({ fps: Math.round(fps), low: Math.round(low), ms: Number(dt.toFixed(1)) })
+      const low =
+        sorted[Math.max(0, Math.floor(sorted.length * 0.01) - 1)] ?? fps
+      if (frames.length % 8 === 0)
+        setStats({
+          fps: Math.round(fps),
+          low: Math.round(low),
+          ms: Number(dt.toFixed(1)),
+        })
       rafRef.current = window.requestAnimationFrame(loop)
     }
     rafRef.current = window.requestAnimationFrame(loop)
@@ -33,14 +39,22 @@ export function FpsCounter({ enabled }: Props) {
   }, [enabled])
 
   if (!enabled) return null
-  const color = stats.fps > 50 ? '#34d399' : stats.fps >= 30 ? '#fbbf24' : '#fb7185'
+  const color =
+    stats.fps > 50 ? '#34d399' : stats.fps >= 30 ? '#fbbf24' : '#fb7185'
   return (
     <div
       className="pointer-events-none fixed right-3 top-[204px] z-[71] rounded-xl border bg-black/72 px-3 py-2 text-[11px] font-bold text-white shadow-xl backdrop-blur-xl"
-      style={{ borderColor: `${color}66`, boxShadow: `0 0 14px ${color}22, 0 8px 22px rgba(0,0,0,.5)` }}
+      style={{
+        borderColor: `${color}66`,
+        boxShadow: `0 0 14px ${color}22, 0 8px 22px rgba(0,0,0,.5)`,
+      }}
     >
-      <div style={{ color }} className="text-sm leading-none">{stats.fps || '—'} FPS</div>
-      <div className="mt-1 text-white/55">1% low {stats.low || '—'} · {stats.ms || '—'}ms</div>
+      <div style={{ color }} className="text-sm leading-none">
+        {stats.fps || '—'} FPS
+      </div>
+      <div className="mt-1 text-white/55">
+        1% low {stats.low || '—'} · {stats.ms || '—'}ms
+      </div>
     </div>
   )
 }

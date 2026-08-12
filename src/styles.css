@@ -33,17 +33,52 @@
   /* Accent ramp follows Tailwind's 50=lightest → 950=darkest convention,
      derived from the live theme accent; 400/500/600 defer to the theme
      vars the remap blocks target. */
-  --color-accent-50: color-mix(in srgb, var(--theme-accent, #8a8f98) 10%, white);
-  --color-accent-100: color-mix(in srgb, var(--theme-accent, #8a8f98) 20%, white);
-  --color-accent-200: color-mix(in srgb, var(--theme-accent, #8a8f98) 35%, white);
-  --color-accent-300: color-mix(in srgb, var(--theme-accent, #8a8f98) 55%, white);
-  --color-accent-400: var(--theme-accent-secondary, var(--theme-accent, #8a8f98));
+  --color-accent-50: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 10%,
+    white
+  );
+  --color-accent-100: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 20%,
+    white
+  );
+  --color-accent-200: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 35%,
+    white
+  );
+  --color-accent-300: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 55%,
+    white
+  );
+  --color-accent-400: var(
+    --theme-accent-secondary,
+    var(--theme-accent, #8a8f98)
+  );
   --color-accent-500: var(--theme-accent, #8a8f98);
   --color-accent-600: var(--theme-accent, #8a8f98);
-  --color-accent-700: color-mix(in srgb, var(--theme-accent, #8a8f98) 70%, black);
-  --color-accent-800: color-mix(in srgb, var(--theme-accent, #8a8f98) 55%, black);
-  --color-accent-900: color-mix(in srgb, var(--theme-accent, #8a8f98) 40%, black);
-  --color-accent-950: color-mix(in srgb, var(--theme-accent, #8a8f98) 25%, black);
+  --color-accent-700: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 70%,
+    black
+  );
+  --color-accent-800: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 55%,
+    black
+  );
+  --color-accent-900: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 40%,
+    black
+  );
+  --color-accent-950: color-mix(
+    in srgb,
+    var(--theme-accent, #8a8f98) 25%,
+    black
+  );
 }
 
 :root {
@@ -233,20 +268,27 @@
 }
 
 :root {
-  --interface-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --interface-font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
   --interface-density-scale: 1;
 }
 
 [data-interface-font='inter'] {
-  --interface-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --interface-font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
 }
 
 [data-interface-font='serif'] {
-  --interface-font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  --interface-font-family:
+    ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
 }
 
 [data-interface-font='mono'] {
-  --interface-font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  --interface-font-family:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', monospace;
 }
 
 [data-interface-density='compact'] {
@@ -1600,3 +1642,4 @@ code {
    Tailwind oklch values and .system dark mode overrides.
    ═══════════════════════════════════════════════════════════════════ */
 @import './scifi-theme.css';
+@import './coordinator-conductor.css';

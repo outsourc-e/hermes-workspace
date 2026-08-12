@@ -25,7 +25,9 @@ export type StartClaudeAgentResult =
  */
 function readClaudeEnv(): Record<string, string> {
   const envPath = join(
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
+    process.env.HERMES_HOME ??
+      process.env.CLAUDE_HOME ??
+      join(homedir(), '.hermes'),
     '.env',
   )
   try {
@@ -58,17 +60,18 @@ export function resolveClaudeAgentDir(
 ): string | null {
   const candidates: Array<string> = []
 
-  const explicitAgentPath = env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
+  const explicitAgentPath =
+    env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
   if (explicitAgentPath) {
     candidates.push(explicitAgentPath)
   }
 
   const workspaceRoot = dirname(resolve('.'))
   candidates.push(
-    resolve(workspaceRoot, 'hermes-agent'),          // sibling (old README)
-    resolve(workspaceRoot, '..', 'hermes-agent'),    // one level up
-    resolve(homedir(), '.hermes', 'hermes-agent'),   // Nous installer default
-    resolve(homedir(), 'hermes-agent'),              // ~/hermes-agent
+    resolve(workspaceRoot, 'hermes-agent'), // sibling (old README)
+    resolve(workspaceRoot, '..', 'hermes-agent'), // one level up
+    resolve(homedir(), '.hermes', 'hermes-agent'), // Nous installer default
+    resolve(homedir(), 'hermes-agent'), // ~/hermes-agent
   )
 
   for (const candidate of candidates) {
@@ -158,30 +161,28 @@ export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
         return {
           ok: false,
           error:
-            "hermes-agent not found. Run the installer: curl -fsSL https://hermes-workspace.com/install.sh | bash",
+            'hermes-agent not found. Run the installer: curl -fsSL https://hermes-workspace.com/install.sh | bash',
         }
       }
 
-      const child = spawn(
-        command,
-        commandArgs,
-        {
-          cwd,
-          detached: true,
-          stdio: 'ignore',
-          env: {
-            ...process.env,
-            ...claudeEnv,
-            PATH: [
-              resolve(homedir(), '.claude', 'bin'),
-              resolve(homedir(), '.local', 'bin'),
-              agentDir ? resolve(agentDir, '.venv', 'bin') : '',
-              agentDir ? resolve(agentDir, 'venv', 'bin') : '',
-              process.env.PATH || '',
-            ].filter(Boolean).join(':'),
-          },
+      const child = spawn(command, commandArgs, {
+        cwd,
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          ...claudeEnv,
+          PATH: [
+            resolve(homedir(), '.claude', 'bin'),
+            resolve(homedir(), '.local', 'bin'),
+            agentDir ? resolve(agentDir, '.venv', 'bin') : '',
+            agentDir ? resolve(agentDir, 'venv', 'bin') : '',
+            process.env.PATH || '',
+          ]
+            .filter(Boolean)
+            .join(':'),
         },
-      )
+      })
 
       child.unref()
 

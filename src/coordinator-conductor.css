@@ -1,0 +1,138 @@
+/* ════════════════════════════════════════════════════════════════════
+   Coordinator Conductor — visual polish layer
+   Animations and effects that complement the Tailwind utility classes
+   used by the coordinator-conductor component tree.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Pulsing ring around the live status dot */
+@keyframes cc-pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  60%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.cc-live-dot {
+  position: relative;
+  color: var(--theme-success, #22c55e);
+}
+
+.cc-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-color: var(--theme-success, currentColor);
+  animation: cc-pulse-ring 2s ease-out infinite;
+}
+
+/* Slide-in for toast notifications */
+@keyframes cc-slide-in {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.cc-toast-enter {
+  animation: cc-slide-in 0.3s ease-out;
+}
+
+/* Fade-in for panels and cards */
+@keyframes cc-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cc-fade-in {
+  animation: cc-fade-in 0.25s ease-out;
+}
+
+/* Running node pulse — subtle breathing effect for active graph nodes */
+@keyframes cc-node-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.cc-node-running {
+  animation: cc-node-breathe 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--theme-accent, currentColor) 40%, transparent));
+}
+
+/* Card hover lift */
+.cc-card-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.cc-card-lift:hover {
+  transform: translateY(-2px);
+  border-color: var(--theme-accent, var(--color-accent-500, currentColor));
+}
+
+/* Gradient edge for dependency arrows */
+.cc-edge-gradient {
+  stroke: url(#cc-edge-grad);
+}
+
+/* Timeline dot pulse */
+@keyframes cc-timeline-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-accent-500, currentColor);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+    opacity: 0.7;
+  }
+}
+
+.cc-timeline-dot {
+  animation: cc-timeline-pulse 2.5s ease-in-out infinite;
+}
+
+/* Empty state / feature-not-ready surface */
+.cc-empty-state {
+  background: var(--theme-panel, var(--color-surface, #f8fafc));
+  border: 1px dashed var(--theme-border, var(--color-primary-200, #e2e8f0));
+}
+
+/* Graph dependency edges */
+.cc-edge-gradient {
+  stroke: url(#cc-edge-grad);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-live-dot::after,
+  .cc-toast-enter,
+  .cc-fade-in,
+  .cc-node-running,
+  .cc-card-lift,
+  .cc-timeline-dot {
+    animation: none;
+    transition: none;
+  }
+}

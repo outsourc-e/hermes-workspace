@@ -93,7 +93,9 @@ function MetricItem({
 }
 
 function Separator() {
-  return <span className="h-3 w-px shrink-0 bg-[var(--theme-border)]" aria-hidden />
+  return (
+    <span className="h-3 w-px shrink-0 bg-[var(--theme-border)]" aria-hidden />
+  )
 }
 
 function StatusDot({ tone }: { tone: 'ok' | 'warn' | 'critical' | 'muted' }) {
@@ -111,7 +113,11 @@ function StatusDot({ tone }: { tone: 'ok' | 'warn' | 'critical' | 'muted' }) {
   )
 }
 
-export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: number }) {
+export function SystemMetricsFooter({
+  leftOffsetPx = 0,
+}: {
+  leftOffsetPx?: number
+}) {
   const { data, isError } = useQuery({
     queryKey: ['system-metrics-footer'],
     queryFn: fetchSystemMetrics,
@@ -119,9 +125,18 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
     staleTime: 14_000,
   })
 
-  const hermesHealthy = data?.hermes.status === 'connected' || data?.hermes.status === 'enhanced'
-  const hermesTone = hermesHealthy ? 'accent' : data?.hermes.status === 'disconnected' ? 'critical' : 'warn'
-  const hermesDotTone = hermesHealthy ? 'ok' : data?.hermes.status === 'disconnected' ? 'critical' : 'warn'
+  const hermesHealthy =
+    data?.hermes.status === 'connected' || data?.hermes.status === 'enhanced'
+  const hermesTone = hermesHealthy
+    ? 'accent'
+    : data?.hermes.status === 'disconnected'
+      ? 'critical'
+      : 'warn'
+  const hermesDotTone = hermesHealthy
+    ? 'ok'
+    : data?.hermes.status === 'disconnected'
+      ? 'critical'
+      : 'warn'
 
   return (
     <footer
@@ -153,7 +168,11 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
             <Separator />
             <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap">
               <StatusDot tone={hermesDotTone} />
-              <MetricItem label="Hermes" value={data.hermes.status} tone={hermesTone} />
+              <MetricItem
+                label="Hermes"
+                value={data.hermes.status}
+                tone={hermesTone}
+              />
             </span>
             <Separator />
             <MetricItem

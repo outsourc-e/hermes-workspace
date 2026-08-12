@@ -107,13 +107,19 @@ export class PlaygroundHubV2 {
     this.state = state
     this.env = env
     this.state.blockConcurrencyWhile(async () => {
-      const stored = await this.state.storage.get<{ peak: number; day: string }>('peak')
+      const stored = await this.state.storage.get<{
+        peak: number
+        day: string
+      }>('peak')
       if (stored) {
         this.peakToday = stored.peak
         this.peakDay = stored.day
       }
       // Restore presence map from storage so we survive hibernation.
-      const presStored = await this.state.storage.get<Array<[string, PresenceMsg & { ts: number }]>>('presence')
+      const presStored =
+        await this.state.storage.get<
+          Array<[string, PresenceMsg & { ts: number }]>
+        >('presence')
       if (presStored) this.presence = new Map(presStored)
       const chatStored = await this.state.storage.get<any[]>('chatRing')
       if (chatStored) this.chatRing = chatStored
@@ -182,7 +188,11 @@ export class PlaygroundHubV2 {
 
   notePlayer(
     id: string,
-    patch: Partial<PlayerDailySummary> & { name?: string; color?: string; lastWorld?: string },
+    patch: Partial<PlayerDailySummary> & {
+      name?: string
+      color?: string
+      lastWorld?: string
+    },
     ts = Date.now(),
   ) {
     this.ensureAnalyticsDay(ts)
@@ -311,8 +321,15 @@ export class PlaygroundHubV2 {
     const payload = typeof data === 'string' ? data : JSON.stringify(data)
     for (const sock of this.state.getWebSockets()) {
       if (sock === origin) continue
-      if (opts?.world && this.worldOf(sock) && this.worldOf(sock) !== opts.world) continue
-      try { sock.send(payload) } catch {}
+      if (
+        opts?.world &&
+        this.worldOf(sock) &&
+        this.worldOf(sock) !== opts.world
+      )
+        continue
+      try {
+        sock.send(payload)
+      } catch {}
     }
   }
 
@@ -329,7 +346,10 @@ export class PlaygroundHubV2 {
     const live = this.presence.size
     if (live > this.peakToday) {
       this.peakToday = live
-      await this.state.storage.put('peak', { peak: this.peakToday, day: this.peakDay })
+      await this.state.storage.put('peak', {
+        peak: this.peakToday,
+        day: this.peakDay,
+      })
     }
   }
 
@@ -359,7 +379,9 @@ export class PlaygroundHubV2 {
     this.lastBroadcastCount = live
     const payload = this.countMessage()
     for (const sock of this.state.getWebSockets()) {
-      try { sock.send(payload) } catch {}
+      try {
+        sock.send(payload)
+      } catch {}
     }
   }
 
@@ -409,9 +431,12 @@ export class PlaygroundHubV2 {
     }
 
     const adminHeader = request.headers.get('authorization') || ''
-    const adminOk = !!this.env.PLAYGROUND_ADMIN_TOKEN && adminHeader === `Bearer ${this.env.PLAYGROUND_ADMIN_TOKEN}`
+    const adminOk =
+      !!this.env.PLAYGROUND_ADMIN_TOKEN &&
+      adminHeader === `Bearer ${this.env.PLAYGROUND_ADMIN_TOKEN}`
     if (url.pathname === '/admin/stats') {
-      if (!adminOk) return new Response('unauthorized', { status: 401, headers: cors })
+      if (!adminOk)
+        return new Response('unauthorized', { status: 401, headers: cors })
       return Response.json(this.adminStats(), {
         headers: { ...cors, 'cache-control': 'no-cache' },
       })
@@ -422,20 +447,35 @@ export class PlaygroundHubV2 {
     //   Updates presence + returns { presences: [...other-players-in-world], chats: [...recent], count, byWorld, peakToday }
     if (url.pathname === '/presence' && request.method === 'POST') {
       let body: any
-      try { body = await request.json() } catch { return new Response('bad json', { status: 400, headers: cors }) }
-      if (!body || typeof body.id !== 'string') return new Response('missing id', { status: 400, headers: cors })
+      try {
+        body = await request.json()
+      } catch {
+        return new Response('bad json', { status: 400, headers: cors })
+      }
+      if (!body || typeof body.id !== 'string')
+        return new Response('missing id', { status: 400, headers: cors })
       const now = Date.now()
       const world = (body.world || body.worldId) as string | undefined
-      const wire: PresenceMsg & { ts: number } = { ...body, kind: 'presence', ts: now }
+      const wire: PresenceMsg & { ts: number } = {
+        ...body,
+        kind: 'presence',
+        ts: now,
+      }
       const prior = this.presence.get(body.id)
       const wasNew = !prior
       this.presence.set(body.id, wire)
-      this.notePlayer(body.id, {
-        name: typeof body.name === 'string' ? body.name : undefined,
-        color: typeof body.color === 'string' ? body.color : undefined,
-        lastWorld: world,
-        joins: wasNew ? (this.playerDaily.get(body.id)?.joins || 0) + 1 : (this.playerDaily.get(body.id)?.joins || 0),
-      }, now)
+      this.notePlayer(
+        body.id,
+        {
+          name: typeof body.name === 'string' ? body.name : undefined,
+          color: typeof body.color === 'string' ? body.color : undefined,
+          lastWorld: world,
+          joins: wasNew
+            ? (this.playerDaily.get(body.id)?.joins || 0) + 1
+            : this.playerDaily.get(body.id)?.joins || 0,
+        },
+        now,
+      )
       if (wasNew) {
         this.joinsToday += 1
         this.pushEvent({
@@ -471,7 +511,8 @@ export class PlaygroundHubV2 {
         if (world && pw && pw !== world) continue
         presences.push(p)
       }
-      const sinceTs = typeof body.sinceChatTs === 'number' ? body.sinceChatTs : (now - 30000)
+      const sinceTs =
+        typeof body.sinceChatTs === 'number' ? body.sinceChatTs : now - 30000
       const chats = this.chatRing.filter((c: any) => {
         if (typeof c.ts !== 'number' || c.ts <= sinceTs) return false
         if (c.id === body.id) return false
@@ -479,21 +520,32 @@ export class PlaygroundHubV2 {
         if (world && cw && cw !== world) return false
         return true
       })
-      return Response.json({
-        presences,
-        chats,
-        online: this.presence.size,
-        byWorld: this.byWorld(),
-        peakToday: this.peakToday,
-        ts: now,
-      }, { headers: { ...cors, 'cache-control': 'no-cache' } })
+      return Response.json(
+        {
+          presences,
+          chats,
+          online: this.presence.size,
+          byWorld: this.byWorld(),
+          peakToday: this.peakToday,
+          ts: now,
+        },
+        { headers: { ...cors, 'cache-control': 'no-cache' } },
+      )
     }
 
     // POST /chat   body: { id, name, color, world, text, ts }
     if (url.pathname === '/chat' && request.method === 'POST') {
       let body: any
-      try { body = await request.json() } catch { return new Response('bad json', { status: 400, headers: cors }) }
-      if (!body || typeof body.id !== 'string' || typeof body.text !== 'string') {
+      try {
+        body = await request.json()
+      } catch {
+        return new Response('bad json', { status: 400, headers: cors })
+      }
+      if (
+        !body ||
+        typeof body.id !== 'string' ||
+        typeof body.text !== 'string'
+      ) {
         return new Response('missing fields', { status: 400, headers: cors })
       }
       if (body.text.length > 240) body.text = body.text.slice(0, 240)
@@ -502,20 +554,25 @@ export class PlaygroundHubV2 {
       this.chatRing.push(body)
       if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
       this.chatsToday += 1
-      this.notePlayer(body.id, {
-        name: typeof body.name === 'string' ? body.name : undefined,
-        color: typeof body.color === 'string' ? body.color : undefined,
-        lastWorld: (body.world || body.worldId) as string | undefined,
-        lastChatAt: body.ts,
-        chats: (this.playerDaily.get(body.id)?.chats || 0) + 1,
-      }, body.ts)
+      this.notePlayer(
+        body.id,
+        {
+          name: typeof body.name === 'string' ? body.name : undefined,
+          color: typeof body.color === 'string' ? body.color : undefined,
+          lastWorld: (body.world || body.worldId) as string | undefined,
+          lastChatAt: body.ts,
+          chats: (this.playerDaily.get(body.id)?.chats || 0) + 1,
+        },
+        body.ts,
+      )
       this.pushEvent({
         type: 'chat',
         id: body.id,
         name: typeof body.name === 'string' ? body.name : undefined,
         color: typeof body.color === 'string' ? body.color : undefined,
         world: (body.world || body.worldId) as string | undefined,
-        text: typeof body.text === 'string' ? body.text.slice(0, 160) : undefined,
+        text:
+          typeof body.text === 'string' ? body.text.slice(0, 160) : undefined,
         ts: body.ts,
       })
       this.persistChat().catch(() => {})
@@ -528,8 +585,13 @@ export class PlaygroundHubV2 {
     // POST /leave   body: { id }
     if (url.pathname === '/leave' && request.method === 'POST') {
       let body: any
-      try { body = await request.json() } catch { return new Response('bad json', { status: 400, headers: cors }) }
-      if (!body || typeof body.id !== 'string') return new Response('missing id', { status: 400, headers: cors })
+      try {
+        body = await request.json()
+      } catch {
+        return new Response('bad json', { status: 400, headers: cors })
+      }
+      if (!body || typeof body.id !== 'string')
+        return new Response('missing id', { status: 400, headers: cors })
       const prior = this.presence.get(body.id)
       const world = (prior?.world || prior?.worldId) as string | undefined
       this.presence.delete(body.id)
@@ -557,7 +619,10 @@ export class PlaygroundHubV2 {
     if (url.pathname === '/playground') {
       const upgradeHeader = request.headers.get('Upgrade')
       if (upgradeHeader !== 'websocket') {
-        return new Response('expected websocket', { status: 426, headers: cors })
+        return new Response('expected websocket', {
+          status: 426,
+          headers: cors,
+        })
       }
       const pair = new WebSocketPair()
       const [client, server] = [pair[0], pair[1]]
@@ -569,13 +634,23 @@ export class PlaygroundHubV2 {
 
       // Send initial bootstrap (hello + count + presence snapshot + chat ring).
       try {
-        server.send(JSON.stringify({ kind: 'hello', server: 'hermes.playground.cf-worker.v2-hibernation', ts: Date.now() }))
+        server.send(
+          JSON.stringify({
+            kind: 'hello',
+            server: 'hermes.playground.cf-worker.v2-hibernation',
+            ts: Date.now(),
+          }),
+        )
         server.send(this.countMessage())
         for (const p of this.presence.values()) {
-          try { server.send(JSON.stringify(p)) } catch {}
+          try {
+            server.send(JSON.stringify(p))
+          } catch {}
         }
         for (const c of this.chatRing) {
-          try { server.send(JSON.stringify(c)) } catch {}
+          try {
+            server.send(JSON.stringify(c))
+          } catch {}
         }
       } catch {}
 
@@ -594,7 +669,9 @@ export class PlaygroundHubV2 {
     }
     let msg: any
     try {
-      msg = JSON.parse(typeof raw === 'string' ? raw : new TextDecoder().decode(raw))
+      msg = JSON.parse(
+        typeof raw === 'string' ? raw : new TextDecoder().decode(raw),
+      )
     } catch {
       this.saveAttach(socket, meta)
       return
@@ -619,19 +696,39 @@ export class PlaygroundHubV2 {
       const prior = this.presence.get(msg.id)
       const wasNew = !prior
       this.presence.set(msg.id, wire)
-      this.notePlayer(msg.id, {
-        name: typeof msg.name === 'string' ? msg.name : undefined,
-        color: typeof msg.color === 'string' ? msg.color : undefined,
-        lastWorld: world,
-        joins: wasNew ? (this.playerDaily.get(msg.id)?.joins || 0) + 1 : (this.playerDaily.get(msg.id)?.joins || 0),
-      }, now)
+      this.notePlayer(
+        msg.id,
+        {
+          name: typeof msg.name === 'string' ? msg.name : undefined,
+          color: typeof msg.color === 'string' ? msg.color : undefined,
+          lastWorld: world,
+          joins: wasNew
+            ? (this.playerDaily.get(msg.id)?.joins || 0) + 1
+            : this.playerDaily.get(msg.id)?.joins || 0,
+        },
+        now,
+      )
       if (wasNew) {
         this.joinsToday += 1
-        this.pushEvent({ type: 'join', id: msg.id, name: msg.name, color: msg.color, world, ts: now })
+        this.pushEvent({
+          type: 'join',
+          id: msg.id,
+          name: msg.name,
+          color: msg.color,
+          world,
+          ts: now,
+        })
         await this.bumpPeak()
         this.maybeBroadcastCount()
       } else if ((prior.world || prior.worldId) !== world) {
-        this.pushEvent({ type: 'world_change', id: msg.id, name: msg.name, color: msg.color, world, ts: now })
+        this.pushEvent({
+          type: 'world_change',
+          id: msg.id,
+          name: msg.name,
+          color: msg.color,
+          world,
+          ts: now,
+        })
       }
       // Persist periodically (every ~5 presence updates per id is enough).
       // We keep this synchronous-ish for correctness on hibernation.
@@ -645,13 +742,17 @@ export class PlaygroundHubV2 {
       this.chatRing.push(msg)
       if (this.chatRing.length > CHAT_RING_MAX) this.chatRing.shift()
       this.chatsToday += 1
-      this.notePlayer(msg.id, {
-        name: typeof msg.name === 'string' ? msg.name : undefined,
-        color: typeof msg.color === 'string' ? msg.color : undefined,
-        lastWorld: (msg.world || msg.worldId) as string | undefined,
-        lastChatAt: typeof msg.ts === 'number' ? msg.ts : Date.now(),
-        chats: (this.playerDaily.get(msg.id)?.chats || 0) + 1,
-      }, typeof msg.ts === 'number' ? msg.ts : Date.now())
+      this.notePlayer(
+        msg.id,
+        {
+          name: typeof msg.name === 'string' ? msg.name : undefined,
+          color: typeof msg.color === 'string' ? msg.color : undefined,
+          lastWorld: (msg.world || msg.worldId) as string | undefined,
+          lastChatAt: typeof msg.ts === 'number' ? msg.ts : Date.now(),
+          chats: (this.playerDaily.get(msg.id)?.chats || 0) + 1,
+        },
+        typeof msg.ts === 'number' ? msg.ts : Date.now(),
+      )
       this.pushEvent({
         type: 'chat',
         id: msg.id,
@@ -694,7 +795,12 @@ export class PlaygroundHubV2 {
     }
   }
 
-  async webSocketClose(socket: WebSocket, _code: number, _reason: string, _wasClean: boolean) {
+  async webSocketClose(
+    socket: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean,
+  ) {
     // Hibernation API closes don't necessarily mean the user left — they could
     // be the DO hibernating mid-session. Just age the presence; the alarm prune
     // will clean it up after STALE_AFTER_MS if no reconnect happens.
@@ -702,7 +808,7 @@ export class PlaygroundHubV2 {
     if (meta?.playerId && this.presence.has(meta.playerId)) {
       const cur = this.presence.get(meta.playerId)
       if (cur) {
-        ;(cur as any).ts = Date.now() - (STALE_AFTER_MS / 2)
+        ;(cur as any).ts = Date.now() - STALE_AFTER_MS / 2
         this.presence.set(meta.playerId, cur)
         await this.persistPresence()
       }

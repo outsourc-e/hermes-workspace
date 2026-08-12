@@ -45,7 +45,11 @@ function extractText(msg: SessionHistoryMessage): string {
 
 function toChat(msg: SessionHistoryMessage, idx: number): ChatMessage {
   const role =
-    msg.role === 'assistant' ? 'assistant' : msg.role === 'user' ? 'user' : 'system'
+    msg.role === 'assistant'
+      ? 'assistant'
+      : msg.role === 'user'
+        ? 'user'
+        : 'system'
   return {
     id: `hist-${idx}-${msg.timestamp ?? idx}`,
     role,
@@ -114,7 +118,12 @@ export function AgentChatPanel({
     }
 
     function parsePayload(raw: string): Record<string, unknown> | null {
-      try { const v = JSON.parse(raw); return v && typeof v === 'object' ? v : null } catch { return null }
+      try {
+        const v = JSON.parse(raw)
+        return v && typeof v === 'object' ? v : null
+      } catch {
+        return null
+      }
     }
 
     // Streaming chunks — word-by-word text
@@ -132,7 +141,14 @@ export function AgentChatPanel({
         if (last?.id === 'streaming-assistant') {
           return [...prev.slice(0, -1), { ...last, content: streamingText }]
         }
-        return [...prev, { id: 'streaming-assistant', role: 'assistant' as const, content: streamingText }]
+        return [
+          ...prev,
+          {
+            id: 'streaming-assistant',
+            role: 'assistant' as const,
+            content: streamingText,
+          },
+        ]
       })
     })
 
@@ -230,8 +246,12 @@ export function AgentChatPanel({
                 Chat with {agentName}
               </p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {isRunning ? 'Running — messages sent as directives' : 'Idle — direct conversation'}
-                {sessionKey ? ` · ${sessionKey.slice(0, 24)}…` : ' · No session'}
+                {isRunning
+                  ? 'Running — messages sent as directives'
+                  : 'Idle — direct conversation'}
+                {sessionKey
+                  ? ` · ${sessionKey.slice(0, 24)}…`
+                  : ' · No session'}
               </p>
             </div>
           </div>

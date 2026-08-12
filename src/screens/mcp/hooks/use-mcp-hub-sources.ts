@@ -72,9 +72,15 @@ export function useAddHubSource() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       })
-      const body = await res.json() as { ok: boolean; sources?: HubSourceEntry[]; errors?: MutationError[] }
+      const body = (await res.json()) as {
+        ok: boolean
+        sources?: HubSourceEntry[]
+        errors?: MutationError[]
+      }
       if (!body.ok) {
-        throw { errors: body.errors ?? [{ path: '', message: 'Unknown error' }] }
+        throw {
+          errors: body.errors ?? [{ path: '', message: 'Unknown error' }],
+        }
       }
       return { ok: true, sources: body.sources ?? [] }
     },
@@ -93,14 +99,23 @@ export function useUpdateHubSource() {
     { id: string; input: UpdateSourceInput }
   >({
     mutationFn: async ({ id, input }) => {
-      const res = await fetch(`/api/mcp/hub-sources/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-      })
-      const body = await res.json() as { ok: boolean; sources?: HubSourceEntry[]; errors?: MutationError[] }
+      const res = await fetch(
+        `/api/mcp/hub-sources/${encodeURIComponent(id)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      )
+      const body = (await res.json()) as {
+        ok: boolean
+        sources?: HubSourceEntry[]
+        errors?: MutationError[]
+      }
       if (!body.ok) {
-        throw { errors: body.errors ?? [{ path: '', message: 'Unknown error' }] }
+        throw {
+          errors: body.errors ?? [{ path: '', message: 'Unknown error' }],
+        }
       }
       return { ok: true, sources: body.sources ?? [] }
     },
@@ -119,12 +134,21 @@ export function useDeleteHubSource() {
     string
   >({
     mutationFn: async (id) => {
-      const res = await fetch(`/api/mcp/hub-sources/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      })
-      const body = await res.json() as { ok: boolean; sources?: HubSourceEntry[]; errors?: MutationError[] }
+      const res = await fetch(
+        `/api/mcp/hub-sources/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE',
+        },
+      )
+      const body = (await res.json()) as {
+        ok: boolean
+        sources?: HubSourceEntry[]
+        errors?: MutationError[]
+      }
       if (!body.ok) {
-        throw { errors: body.errors ?? [{ path: '', message: 'Unknown error' }] }
+        throw {
+          errors: body.errors ?? [{ path: '', message: 'Unknown error' }],
+        }
       }
       return { ok: true, sources: body.sources ?? [] }
     },

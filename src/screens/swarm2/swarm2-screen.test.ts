@@ -19,8 +19,12 @@ describe('Swarm2 surface contract', () => {
     expect(SWARM2_INFORMATION_HIERARCHY[5]).toContain(
       'Central bottom router chat',
     )
-    expect(SWARM2_INFORMATION_HIERARCHY).toContainEqual(expect.stringContaining('Kanban view'))
-    expect(SWARM2_INFORMATION_HIERARCHY).toContainEqual(expect.stringContaining('Runtime view'))
+    expect(SWARM2_INFORMATION_HIERARCHY).toContainEqual(
+      expect.stringContaining('Kanban view'),
+    )
+    expect(SWARM2_INFORMATION_HIERARCHY).toContainEqual(
+      expect.stringContaining('Runtime view'),
+    )
   })
 
   it('documents the operational surfaces without replacing /swarm', () => {
@@ -75,8 +79,12 @@ describe('Swarm2 surface contract', () => {
   it('keeps the default control plane denser than a terminal wall on laptop screens', () => {
     expect(SWARM2_CARD_DENSITY_CONTRACT.defaultView).toBe('cards')
     expect(SWARM2_CARD_DENSITY_CONTRACT.runtimeView).toBe('separate-mode')
-    expect(SWARM2_CARD_DENSITY_CONTRACT.workerCardMinHeightRem).toBeLessThanOrEqual(30)
-    expect(SWARM2_CARD_DENSITY_CONTRACT.laptopGridColumns).toBeGreaterThanOrEqual(2)
+    expect(
+      SWARM2_CARD_DENSITY_CONTRACT.workerCardMinHeightRem,
+    ).toBeLessThanOrEqual(30)
+    expect(
+      SWARM2_CARD_DENSITY_CONTRACT.laptopGridColumns,
+    ).toBeGreaterThanOrEqual(2)
     expect(SWARM2_CARD_DENSITY_CONTRACT.duplicateEmptyStates).toBe(false)
   })
 })
@@ -139,7 +147,13 @@ describe('Swarm2 runtime tab command resolution', () => {
       terminalKind: 'log-tail',
     })
     expect(result.kind).toBe('log-tail')
-    expect(result.command).toEqual(['tail', '-n', '200', '-F', '/tmp/agent.log'])
+    expect(result.command).toEqual([
+      'tail',
+      '-n',
+      '200',
+      '-F',
+      '/tmp/agent.log',
+    ])
   })
 
   it('falls back to a workspace shell when no tmux and no log file exist', () => {
@@ -209,4 +223,3 @@ describe('Swarm2 runtime tab command resolution', () => {
     expect(result.command[0]).toBe('zsh')
   })
 })
-

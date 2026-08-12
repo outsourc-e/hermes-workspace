@@ -81,8 +81,9 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       showTailscaleIcon: false,
       action: (
         <div className="rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 text-sm text-primary-200">
-          Enhanced Hermes Agent gateway APIs are optional. If core chat already works
-          on desktop, mobile access mainly depends on network reachability.
+          Enhanced Hermes Agent gateway APIs are optional. If core chat already
+          works on desktop, mobile access mainly depends on network
+          reachability.
         </div>
       ),
     },

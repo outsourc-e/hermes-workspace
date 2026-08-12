@@ -15,7 +15,9 @@ export const Route = createFileRoute('/echo-studio')({
           Failed to Load Echo Studio
         </h2>
         <p className="mb-4 max-w-md text-sm text-primary-600">
-          {error instanceof Error ? error.message : 'An unexpected error occurred'}
+          {error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred'}
         </p>
         <button
           type="button"

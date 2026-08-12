@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Conductor } from '@/screens/gateway/conductor'
+import { CoordinatorConductorSurface } from '@/screens/gateway/coordinator-conductor'
 
 function ConductorRoute() {
-  return <Conductor />
+  return <CoordinatorConductorSurface />
 }
 
 export const Route = createFileRoute('/conductor')({

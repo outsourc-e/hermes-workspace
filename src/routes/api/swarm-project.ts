@@ -22,8 +22,7 @@ type ProjectResponse = {
 }
 
 const PORT_CANDIDATES = [
-  3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007,
-  5173, 5174, 5175, 5176, 5177,
+  3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 5173, 5174, 5175, 5176, 5177,
   8000, 8080, 8888, 4173,
 ]
 
@@ -39,13 +38,18 @@ type RuntimeMeta = {
 
 function readRuntimeMeta(profilePath: string): RuntimeMeta {
   const file = join(profilePath, 'runtime.json')
-  if (!existsSync(file)) return { cwd: null, previewUrls: [], previewPort: null }
+  if (!existsSync(file))
+    return { cwd: null, previewUrls: [], previewPort: null }
   try {
-    const raw = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
+    const raw = JSON.parse(readFileSync(file, 'utf-8')) as Record<
+      string,
+      unknown
+    >
     const cwd = typeof raw.cwd === 'string' ? raw.cwd : null
     const previewUrls = Array.isArray(raw.previewUrls)
       ? raw.previewUrls.filter(
-          (value): value is string => typeof value === 'string' && value.trim().length > 0,
+          (value): value is string =>
+            typeof value === 'string' && value.trim().length > 0,
         )
       : []
     const previewPort =
@@ -170,10 +174,14 @@ function listenerPidsForPort(port: number): Array<number> {
 
 function cwdForPid(pid: number): string | null {
   try {
-    const out = execFileSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-F', 'n'], {
-      encoding: 'utf-8',
-      timeout: 800,
-    })
+    const out = execFileSync(
+      'lsof',
+      ['-a', '-p', String(pid), '-d', 'cwd', '-F', 'n'],
+      {
+        encoding: 'utf-8',
+        timeout: 800,
+      },
+    )
     for (const line of out.split('\n')) {
       if (line.startsWith('n')) return line.slice(1).trim() || null
     }
@@ -197,7 +205,9 @@ function portMatchesWorkerCwd(port: number, workerCwd: string): boolean {
   return false
 }
 
-function parsePortFromDevScript(scripts: Record<string, string> | undefined): number | null {
+function parsePortFromDevScript(
+  scripts: Record<string, string> | undefined,
+): number | null {
   if (!scripts) return null
   const candidates = ['dev', 'start:dev', 'start']
   for (const key of candidates) {
@@ -240,7 +250,10 @@ async function detectPreviewUrls(
   if (scriptPort) {
     if (await probePort(scriptPort)) {
       if (portMatchesWorkerCwd(scriptPort, cwd)) {
-        return { urls: [`http://localhost:${scriptPort}`], source: 'script-port' }
+        return {
+          urls: [`http://localhost:${scriptPort}`],
+          source: 'script-port',
+        }
       }
     }
   }

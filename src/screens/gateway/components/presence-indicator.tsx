@@ -13,8 +13,16 @@ type PresenceUser = {
 }
 
 const PRESENCE_COLORS = [
-  '#f43f5e', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b',
-  '#ec4899', '#6366f1', '#14b8a6', '#84cc16', '#ef4444',
+  '#f43f5e',
+  '#8b5cf6',
+  '#06b6d4',
+  '#22c55e',
+  '#f59e0b',
+  '#ec4899',
+  '#6366f1',
+  '#14b8a6',
+  '#84cc16',
+  '#ef4444',
 ]
 
 const STALE_THRESHOLD = 30000 // 30s without heartbeat = gone
@@ -37,7 +45,8 @@ function getPresenceName(): string {
 
 function getPresenceColor(id: string): string {
   let hash = 0
-  for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0
+  for (let i = 0; i < id.length; i++)
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0
   return PRESENCE_COLORS[Math.abs(hash) % PRESENCE_COLORS.length]
 }
 
@@ -70,7 +79,11 @@ export function PresenceIndicator({ currentTab }: { currentTab: string }) {
 
       channel.onmessage = (event) => {
         const data = event.data as { type: string; user?: PresenceUser }
-        if (data.type === 'presence' && data.user && data.user.id !== myId.current) {
+        if (
+          data.type === 'presence' &&
+          data.user &&
+          data.user.id !== myId.current
+        ) {
           setPeers((prev) => {
             const without = prev.filter((p) => p.id !== data.user!.id)
             return [...without, data.user!]
@@ -92,7 +105,9 @@ export function PresenceIndicator({ currentTab }: { currentTab: string }) {
 
       // Cleanup stale peers every 10s
       const cleanupInterval = setInterval(() => {
-        setPeers((prev) => prev.filter((p) => Date.now() - p.lastSeen < STALE_THRESHOLD))
+        setPeers((prev) =>
+          prev.filter((p) => Date.now() - p.lastSeen < STALE_THRESHOLD),
+        )
       }, 10000)
 
       return () => {
@@ -138,10 +153,12 @@ export function PresenceIndicator({ currentTab }: { currentTab: string }) {
       </div>
 
       {/* Label */}
-      <span className={cn(
-        'text-[10px] text-neutral-500 dark:text-neutral-400',
-        peers.length > 0 && 'hidden sm:inline',
-      )}>
+      <span
+        className={cn(
+          'text-[10px] text-neutral-500 dark:text-neutral-400',
+          peers.length > 0 && 'hidden sm:inline',
+        )}
+      >
         {peers.length === 1
           ? `${peers[0].name} is here`
           : `${peers.length} others online`}
