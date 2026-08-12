@@ -588,6 +588,87 @@ async function waitForFreshCheckpoint(
   return null
 }
 
+/**
+ * Post-timeout late pickup (fix d, load-bearing half).
+ *
+ * A worker checkpoint for a long-running task usually lands AFTER the bounded
+ * dispatch poll gives up — the worker writes its reply (including the
+ * checkpoint block) into its own state.db chat log, not into a POST to
+ * /api/checkpoint. This watcher keeps watching that chat log in the
+ * background after the poll timeout and, when a fresh checkpoint tied to this
+ * assignment appears, reconciles the mission (recordMissionCheckpoint) and
+ * updates runtime.json (markCheckpointResult) so the mission advances to
+ * 'checkpointed' instead of staying stuck on the dispatch-time state.
+ *
+ * It is intentionally best-effort and fire-and-forget: bounded to 10 minutes
+ * so a never-finishing worker cannot leak an unbounded watcher, and any
+ * failure just leaves the mission in its (already-recorded) timeout state.
+ */
+async function watchForLateCheckpoint(input: {
+  workerId: string
+  assignmentId: string | null
+  missionId: string | null
+  previousRaw: string | null
+  baselineRuntimeSignature: string
+  dispatchedAt: number
+  notifySessionKey: string
+}): Promise<void> {
+  const { workerId, assignmentId, missionId, previousRaw, baselineRuntimeSignature, dispatchedAt, notifySessionKey } = input
+  const started = Date.now()
+  const profilePath = getProfilePath(workerId)
+  const LATE_WATCH_MS = 10 * 60 * 1000
+  const POLL_MS = 5_000
+
+  while (Date.now() - started < LATE_WATCH_MS) {
+    await sleep(POLL_MS)
+    try {
+      // Prefer the runtime snapshot (worker push or workspace write), then the
+      // worker's own chat log — mirroring waitForFreshCheckpoint's two sources.
+      const runtimeSnapshot = readRuntimeCheckpointSnapshot(profilePath)
+      if (runtimeSnapshotIsFresh(runtimeSnapshot, baselineRuntimeSignature, dispatchedAt)) {
+        if (!assignmentId || runtimeSnapshot.assignmentId === null || runtimeSnapshot.assignmentId === assignmentId) {
+          const runtimeCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
+          if (runtimeCheckpoint && runtimeCheckpoint.raw !== previousRaw) {
+            await reconcileLateCheckpoint(runtimeCheckpoint)
+            return
+          }
+        }
+      }
+
+      const chat = readWorkerMessages(profilePath, 50)
+      if (chat.ok) {
+        const checkpoint = newestCheckpointFromMessages(chat.messages)
+        if (checkpoint && checkpoint.raw !== previousRaw) {
+          await reconcileLateCheckpoint(checkpoint)
+          return
+        }
+      }
+    } catch {
+      // best-effort: transient DB/fs errors just continue the watch
+    }
+  }
+
+  async function reconcileLateCheckpoint(checkpoint: ParsedSwarmCheckpoint): Promise<void> {
+    if (missionId) {
+      recordMissionCheckpoint({
+        missionId,
+        assignmentId,
+        workerId,
+        checkpoint,
+        source: 'swarm-late-pickup',
+      })
+    }
+    markCheckpointResult(workerId, checkpoint, notifySessionKey)
+    publishSwarmCheckpointNotification({
+      workerId,
+      missionId,
+      assignmentId,
+      checkpoint,
+      notifySessionKey,
+    })
+  }
+}
+
 function resolveWorkerCwd(workerId: string): string {
   const wrapperPath = getWrapperPath(workerId)
   if (existsSync(wrapperPath)) {
@@ -902,6 +983,23 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           liveResult.checkpoint = null
           liveResult.checkpointStatus = 'timeout'
           liveResult.output = `${liveResult.output}\nNo fresh checkpoint before poll timeout.`
+          // Post-timeout late pickup (fix d, load-bearing half): the worker's
+          // checkpoint lives in its own state.db chat log, NOT in a POST to
+          // /api/checkpoint. Long tasks reliably outlast the bounded poll
+          // window, so after the poll gives up we keep watching the worker's
+          // chat DB for a fresh checkpoint tied to this assignment and, when
+          // it lands, reconcile the mission in the background. This is what
+          // turns the deterministic timeout into "the mission advanced once
+          // the worker actually finished", instead of leaving it stuck.
+          void watchForLateCheckpoint({
+            workerId,
+            assignmentId: assignment.assignmentId ?? null,
+            missionId: options?.missionId ?? null,
+            previousRaw,
+            baselineRuntimeSignature,
+            dispatchedAt: startedAt,
+            notifySessionKey: options?.notifySessionKey ?? 'main',
+          })
         }
       } else {
         liveResult.checkpointStatus = 'not-requested'
