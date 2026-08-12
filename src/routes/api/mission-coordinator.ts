@@ -24,6 +24,10 @@ import { dispatchNextClaimedNode } from '../../server/mission-coordinator/execut
 import { reconcileMissionFromKanban } from '../../server/mission-coordinator/lifecycle-reconciler'
 import { cancelCoordinatorMission } from '../../server/mission-coordinator/cancel'
 import { reconcileOnce } from '../../server/mission-coordinator/reconciliation-loop'
+import { createCoordinatorMissionForLanggraph, workflowToTemplate } from '../../server/mission-coordinator/langgraph-bridge'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { spawnLanggraphDetached, resolveLanggraphPythonBin } from '../../server/langgraph-orchestrator'
 import { migrateLegacyMissions } from '../../server/mission-coordinator/migration'
 
 const ActionSchema = z.object({
@@ -32,6 +36,7 @@ const ActionSchema = z.object({
     'retry',
     'create',
     'template',
+    'workflow',
     'provision',
     'reconcile',
     'lifecycle',
@@ -119,6 +124,54 @@ export const Route = createFileRoute('/api/mission-coordinator')({
           return result.ok
             ? json(result, { status: 201 })
             : json(result, { status: 400 })
+        }
+        if (input.action === 'workflow') {
+          if (!input.missionId || !input.objective)
+            return json(
+              { ok: false, error: 'missionId and objective required' },
+              { status: 400 },
+            )
+          const workflowId = input.template ?? 'rdi'
+          // Create TS coordinator mission
+          const bridgeResult = createCoordinatorMissionForLanggraph({
+            missionId: input.missionId,
+            goal: input.objective,
+            workflowId,
+          })
+          if (!bridgeResult.ok)
+            return json(bridgeResult, { status: 400 })
+
+          // Check if LangGraph is available
+          const langgraphOverride = process.env.HERMES_LANGGRAPH_PYTHON
+          const pythonBin = langgraphOverride ?? resolveLanggraphPythonBin()
+          const langgraphAvailable = existsSync(pythonBin)
+
+          if (!langgraphAvailable) {
+            return json({
+              ok: true,
+              mission: bridgeResult.mission,
+              langgraph: false,
+              message: 'Mission created in coordinator. LangGraph venv not installed — workflow will not run. Run: cd hermes_langgraph_orchestrator && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt',
+            }, { status: 201 })
+          }
+
+          // Spawn LangGraph workflow
+          const args = [
+            '--execute',
+            '--mission-id', input.missionId,
+            '--goal', input.objective,
+            '--max-iterations', String(input.maxParallelism ?? 5),
+            '--workflow', workflowId,
+          ]
+          const { pid, logFile } = spawnLanggraphDetached(args)
+          return json({
+            ok: true,
+            mission: bridgeResult.mission,
+            langgraph: true,
+            pid,
+            logFile,
+            workflowId,
+          }, { status: 201 })
         }
         if (input.action === 'metrics')
           return json({ ok: true, metrics: getMissionMetrics() })

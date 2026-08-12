@@ -6,6 +6,7 @@ import { buildHandoff, writeHandoff } from './handoff'
 import { getSwarmProfilePath } from './swarm-foundation'
 import { harvestSwarmWorkerCheckpoint } from './swarm-harvest'
 import { getSwarmMission, recordMissionCheckpoint, type SwarmMission } from './swarm-missions'
+import { syncNodeFromCheckpoint } from './mission-coordinator/langgraph-bridge'
 import {
   checkpointFromRuntimeSnapshot,
   readRuntimeCheckpointSnapshot,
@@ -115,6 +116,16 @@ export async function syncSwarmMissionCheckpoints(missionId: string): Promise<{
       checkpoint,
       source: 'mission-sync',
     })
+
+    // Sync the checkpoint to the TS mission coordinator
+    syncNodeFromCheckpoint({
+      missionId,
+      workerId,
+      verdict: checkpoint.stateLabel,
+      checkpointText: checkpoint.raw,
+      resultSummary: checkpoint.result ?? undefined,
+    })
+
     void writeHandoffForCheckpoint(workerId, checkpoint).catch((error) => {
       console.error(`[mission-sync] handoff failed for ${workerId}:`, error)
     })

@@ -6,6 +6,7 @@ import { isAuthenticated } from '../../../server/auth-middleware'
 import { spawnLanggraphDetached, resolveLanggraphPythonBin } from '../../../server/langgraph-orchestrator'
 
 import "../../../server/swarm-background-harvest"
+import { createCoordinatorMissionForLanggraph } from '../../../server/mission-coordinator/langgraph-bridge'
 function isLanggraphAvailable(): boolean {
   const override = process.env.HERMES_LANGGRAPH_PYTHON
   if (override) return existsSync(override)
@@ -77,6 +78,14 @@ export const Route = createFileRoute('/api/swarm-langgraph/run')({
         }
 
         const { pid, logFile } = spawnLanggraphDetached(args)
+
+        // Create a TS coordinator mission to track this LangGraph mission
+        createCoordinatorMissionForLanggraph({
+          missionId,
+          goal: missionGoal,
+          workflowId: workflowId ?? null,
+        })
+
         return json({
           ok: true,
           accepted: true,
