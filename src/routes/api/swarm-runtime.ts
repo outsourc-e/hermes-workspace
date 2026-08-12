@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
@@ -27,6 +26,7 @@ import {
 } from '../../server/swarm-foundation'
 import { formatSwarmWorkerLabel, resolveSwarmWorkerDisplayName, rosterByWorkerId } from '../../server/swarm-roster'
 import { readSwarmMode, writeSwarmMode } from '../../server/swarm-mode'
+import { resolveTmuxBin as sharedResolveTmuxBin } from '../../server/swarm-tmux'
 import type {SwarmArtifactMetadata, SwarmBoundary, SwarmCheckpointStatus, SwarmDispatchMetadata, SwarmLifecycleMetadata, SwarmPreviewMetadata, SwarmRuntimeSource, SwarmSessionMetadata, SwarmTaskMetadata, SwarmTerminalKind, SwarmWorkerState} from '../../server/swarm-foundation';
 
 type RuntimeEntry = {
@@ -96,10 +96,10 @@ function lastLogTail(
 }
 
 function resolveTmuxBin(): string {
-  const override = process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN
-  if (override) return override
-  const local = join(homedir(), '.local', 'bin', 'tmux')
-  return existsSync(local) ? local : 'tmux'
+  // Single shared resolver (see swarm-tmux.ts): must agree with the dispatch
+  // spawn path on the same tmux binary, else probe and spawn diverge (0
+  // workers in the UI while sessions are live, or oneshot fallback).
+  return sharedResolveTmuxBin() ?? 'tmux'
 }
 
 function tmuxHasSession(name: string): Promise<boolean> {

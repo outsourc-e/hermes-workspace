@@ -9,6 +9,7 @@ import { isSwarmWorkerId } from '../../server/swarm-roster'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { checkpointFromRuntimeSnapshot, readRuntimeCheckpointSnapshot } from './swarm-dispatch'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
+import { recordMissionCheckpoint } from '../../server/swarm-missions'
 
 type CheckpointRequest = {
   workerId?: unknown
@@ -143,7 +144,41 @@ export const Route = createFileRoute('/api/swarm-checkpoint')({
             })
           : { published: false, sessionKey: typeof next.notifySessionKey === 'string' ? next.notifySessionKey : 'main' }
 
-        return json({ ok: true, workerId, runtimePath, checkpoint: next, savedAt: Date.now(), notification })
+        // Post-timeout reconciliation (fix d): a worker can legitimately push a
+        // fresh checkpoint AFTER the dispatch poll gave up (long tasks outlast
+        // the bounded 90 s window). The poll path calls recordMissionCheckpoint
+        // only on success; this push path records it too, so the mission
+        // assignment advances to 'checkpointed' instead of staying stuck on the
+        // dispatch-time state. recordMissionCheckpoint is idempotent (it
+        // ignores re-runs of the same checkpoint raw and terminal assignments).
+        let reconciledMissionId: string | null = null
+        let reconciledAssignmentId: string | null = null
+        if (parsedCheckpoint && missionId) {
+          const updated = recordMissionCheckpoint({
+            missionId,
+            assignmentId,
+            workerId,
+            checkpoint: parsedCheckpoint,
+            source: 'swarm-checkpoint-push',
+          })
+          if (updated) {
+            reconciledMissionId = missionId
+            reconciledAssignmentId = assignmentId ?? null
+          }
+        }
+
+        return json({
+          ok: true,
+          workerId,
+          runtimePath,
+          checkpoint: next,
+          savedAt: Date.now(),
+          notification,
+          reconciled: reconciledMissionId ? {
+            missionId: reconciledMissionId,
+            assignmentId: reconciledAssignmentId,
+          } : null,
+        })
       },
     },
   },
