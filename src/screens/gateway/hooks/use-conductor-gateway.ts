@@ -995,7 +995,19 @@ export function useConductorGateway() {
         })
     },
     enabled: phase !== 'idle',
-    refetchInterval: phase === 'decomposing' || phase === 'running' || (phase === 'complete' && Object.keys(workerOutputs).length === 0) ? 3_000 : false,
+    // Keep polling while the mission is live OR any worker is still running.
+    // Previously we stopped at phase==='complete', which froze the Office
+    // view even though swarm workers (e.g. workspace summarizing) were still
+    // active — the user saw "12 workers / 7 live" stuck and no live update.
+    // react-query calls this fn on every tick, by which point data is ready.
+    refetchInterval: (): number | false => {
+      if (phase === 'decomposing' || phase === 'running') return 3_000
+      if (phase === 'complete' && Object.keys(workerOutputs).length === 0) return 3_000
+      const liveWorkers = (sessionsQuery.data ?? []).filter(
+        (w: { status?: string }) => w.status === 'running' || w.status === 'idle',
+      )
+      return liveWorkers.length > 0 ? 3_000 : false
+    },
   })
 
   const recentSessionsQuery = useQuery({
