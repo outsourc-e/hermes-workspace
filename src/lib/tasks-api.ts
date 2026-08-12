@@ -261,3 +261,56 @@ export function isOverdue(task: ClaudeTask): boolean {
   today.setHours(0, 0, 0, 0)
   return due < today
 }
+
+// --- Swarm dispatch integration -------------------------------------------
+
+/** Map a task assignee id to a swarm workerId. Unknown owners fall back to null. */
+export const SWARM_WORKER_BY_ASSIGNEE: Record<string, string> = {
+  builder: 'builder',
+  'km-agent': 'km-agent',
+  'ops-watch': 'ops-watch',
+  orchestrator: 'orchestrator',
+  reviewer: 'reviewer',
+  workspace: 'workspace',
+}
+
+export function resolveSwarmWorker(assignee: string | null | undefined): string | null {
+  if (!assignee) return null
+  return SWARM_WORKER_BY_ASSIGNEE[assignee] ?? null
+}
+
+export type DispatchResult = { ok: boolean; missionId?: string; error?: string }
+
+/**
+ * Dispatch a task to the swarm. The task's assignee (if any) becomes the
+ * workerId; otherwise it is sent to the orchestrator for routing. Returns the
+ * new mission id so callers can link the task and move it to Running.
+ */
+export async function dispatchTaskToSwarm(task: ClaudeTask): Promise<DispatchResult> {
+  const { base: tasksBase } = await resolveBackend()
+  const workerId = resolveSwarmWorker(task.assignee)
+  const assignments = [
+    {
+      workerId: workerId ?? 'orchestrator',
+      task: `${task.title}${task.description ? `\n\n${task.description}` : ''}`,
+      rationale: `Dispatched from Tasks board (task ${task.id})`,
+      reviewRequired: task.column === 'review',
+    },
+  ]
+  // swarm-dispatch lives under the same origin as the tasks API.
+  const swarmUrl = tasksBase.replace(/\/api\/hermes-tasks$/, '') + '/api/swarm-dispatch'
+  const res = await fetch(swarmUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      assignments,
+      missionTitle: `Tasks board: ${task.title}`.slice(0, 120),
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    return { ok: false, error: (body as { error?: string }).error || `HTTP ${res.status}` }
+  }
+  const data = (await res.json()) as { missionId?: string }
+  return { ok: true, missionId: data.missionId }
+}
