@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
@@ -8,6 +9,12 @@ function resolvePythonBin(): string {
   const override = process.env.HERMES_LANGGRAPH_PYTHON
   if (override) return override
   return join(process.cwd(), 'hermes_langgraph_orchestrator', '.venv', 'bin', 'python')
+}
+
+function isLanggraphAvailable(): boolean {
+  const override = process.env.HERMES_LANGGRAPH_PYTHON
+  if (override) return existsSync(override)
+  return existsSync(resolvePythonBin())
 }
 
 function parseJsonFromStdout(stdout: string): unknown {
@@ -26,6 +33,10 @@ export const Route = createFileRoute('/api/orchestrator-active-gates')({
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+
+        if (!isLanggraphAvailable()) {
+          return json({ ok: true, gates: [], available: false })
         }
 
         const python = resolvePythonBin()

@@ -175,3 +175,6 @@ pr-triage-20260505-*/
 
 # Local Treehouse pool configuration
 treehouse.toml
+hermes_langgraph_orchestrator/.venv/
+hermes_langgraph_orchestrator/__pycache__/
+logs/

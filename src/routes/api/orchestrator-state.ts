@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
@@ -8,6 +9,12 @@ function resolvePythonBin(): string {
   const override = process.env.HERMES_LANGGRAPH_PYTHON
   if (override) return override
   return join(process.cwd(), 'hermes_langgraph_orchestrator', '.venv', 'bin', 'python')
+}
+
+function isLanggraphAvailable(): boolean {
+  const override = process.env.HERMES_LANGGRAPH_PYTHON
+  if (override) return existsSync(override)
+  return existsSync(resolvePythonBin())
 }
 
 function parseJsonFromStdout(stdout: string): unknown {
@@ -31,6 +38,10 @@ export const Route = createFileRoute('/api/orchestrator-state')({
         const missionId = url.searchParams.get('missionId')?.trim()
         if (!missionId) {
           return json({ ok: false, error: 'missionId required' }, { status: 400 })
+        }
+
+        if (!isLanggraphAvailable()) {
+          return json({ ok: false, error: 'LangGraph orchestrator not installed', available: false }, { status: 404 })
         }
 
         const python = resolvePythonBin()

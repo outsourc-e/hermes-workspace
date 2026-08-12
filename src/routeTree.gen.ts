@@ -84,6 +84,9 @@ import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-np
 import { Route as ApiPlaygroundAdminRouteImport } from './routes/api/playground-admin'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiOrchestratorStateRouteImport } from './routes/api/orchestrator-state'
+import { Route as ApiOrchestratorResumeRouteImport } from './routes/api/orchestrator-resume'
+import { Route as ApiOrchestratorActiveGatesRouteImport } from './routes/api/orchestrator-active-gates'
 import { Route as ApiOmniroutePolicyRouteImport } from './routes/api/omniroute-policy'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMissionCoordinatorRouteImport } from './routes/api/mission-coordinator'
@@ -126,6 +129,11 @@ import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
 import { Route as ApiSwarmRuntimeResetRouteImport } from './routes/api/swarm-runtime.reset'
 import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
+import { Route as ApiSwarmLanggraphStatusRouteImport } from './routes/api/swarm-langgraph/status'
+import { Route as ApiSwarmLanggraphRunRouteImport } from './routes/api/swarm-langgraph/run'
+import { Route as ApiSwarmLanggraphResumeRouteImport } from './routes/api/swarm-langgraph/resume'
+import { Route as ApiSwarmLanggraphMissionEventRouteImport } from './routes/api/swarm-langgraph/mission-event'
+import { Route as ApiSwarmLanggraphCancelRouteImport } from './routes/api/swarm-langgraph/cancel'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
@@ -563,6 +571,22 @@ const ApiPathsRoute = ApiPathsRouteImport.update({
   path: '/api/paths',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrchestratorStateRoute = ApiOrchestratorStateRouteImport.update({
+  id: '/api/orchestrator-state',
+  path: '/api/orchestrator-state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrchestratorResumeRoute = ApiOrchestratorResumeRouteImport.update({
+  id: '/api/orchestrator-resume',
+  path: '/api/orchestrator-resume',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrchestratorActiveGatesRoute =
+  ApiOrchestratorActiveGatesRouteImport.update({
+    id: '/api/orchestrator-active-gates',
+    path: '/api/orchestrator-active-gates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOmniroutePolicyRoute = ApiOmniroutePolicyRouteImport.update({
   id: '/api/omniroute-policy',
   path: '/api/omniroute-policy',
@@ -772,6 +796,32 @@ const ApiSwarmMemorySearchRoute = ApiSwarmMemorySearchRouteImport.update({
   id: '/search',
   path: '/search',
   getParentRoute: () => ApiSwarmMemoryRoute,
+} as any)
+const ApiSwarmLanggraphStatusRoute = ApiSwarmLanggraphStatusRouteImport.update({
+  id: '/api/swarm-langgraph/status',
+  path: '/api/swarm-langgraph/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmLanggraphRunRoute = ApiSwarmLanggraphRunRouteImport.update({
+  id: '/api/swarm-langgraph/run',
+  path: '/api/swarm-langgraph/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmLanggraphResumeRoute = ApiSwarmLanggraphResumeRouteImport.update({
+  id: '/api/swarm-langgraph/resume',
+  path: '/api/swarm-langgraph/resume',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmLanggraphMissionEventRoute =
+  ApiSwarmLanggraphMissionEventRouteImport.update({
+    id: '/api/swarm-langgraph/mission-event',
+    path: '/api/swarm-langgraph/mission-event',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSwarmLanggraphCancelRoute = ApiSwarmLanggraphCancelRouteImport.update({
+  id: '/api/swarm-langgraph/cancel',
+  path: '/api/swarm-langgraph/cancel',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
   id: '/uninstall',
@@ -1148,6 +1198,9 @@ export interface FileRoutesByFullPath {
   '/api/mission-coordinator': typeof ApiMissionCoordinatorRoute
   '/api/models': typeof ApiModelsRoute
   '/api/omniroute-policy': typeof ApiOmniroutePolicyRoute
+  '/api/orchestrator-active-gates': typeof ApiOrchestratorActiveGatesRoute
+  '/api/orchestrator-resume': typeof ApiOrchestratorResumeRoute
+  '/api/orchestrator-state': typeof ApiOrchestratorStateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1247,6 +1300,11 @@ export interface FileRoutesByFullPath {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/swarm-langgraph/cancel': typeof ApiSwarmLanggraphCancelRoute
+  '/api/swarm-langgraph/mission-event': typeof ApiSwarmLanggraphMissionEventRoute
+  '/api/swarm-langgraph/resume': typeof ApiSwarmLanggraphResumeRoute
+  '/api/swarm-langgraph/run': typeof ApiSwarmLanggraphRunRoute
+  '/api/swarm-langgraph/status': typeof ApiSwarmLanggraphStatusRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
@@ -1326,6 +1384,9 @@ export interface FileRoutesByTo {
   '/api/mission-coordinator': typeof ApiMissionCoordinatorRoute
   '/api/models': typeof ApiModelsRoute
   '/api/omniroute-policy': typeof ApiOmniroutePolicyRoute
+  '/api/orchestrator-active-gates': typeof ApiOrchestratorActiveGatesRoute
+  '/api/orchestrator-resume': typeof ApiOrchestratorResumeRoute
+  '/api/orchestrator-state': typeof ApiOrchestratorStateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1425,6 +1486,11 @@ export interface FileRoutesByTo {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/swarm-langgraph/cancel': typeof ApiSwarmLanggraphCancelRoute
+  '/api/swarm-langgraph/mission-event': typeof ApiSwarmLanggraphMissionEventRoute
+  '/api/swarm-langgraph/resume': typeof ApiSwarmLanggraphResumeRoute
+  '/api/swarm-langgraph/run': typeof ApiSwarmLanggraphRunRoute
+  '/api/swarm-langgraph/status': typeof ApiSwarmLanggraphStatusRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
@@ -1506,6 +1572,9 @@ export interface FileRoutesById {
   '/api/mission-coordinator': typeof ApiMissionCoordinatorRoute
   '/api/models': typeof ApiModelsRoute
   '/api/omniroute-policy': typeof ApiOmniroutePolicyRoute
+  '/api/orchestrator-active-gates': typeof ApiOrchestratorActiveGatesRoute
+  '/api/orchestrator-resume': typeof ApiOrchestratorResumeRoute
+  '/api/orchestrator-state': typeof ApiOrchestratorStateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/playground-admin': typeof ApiPlaygroundAdminRoute
@@ -1605,6 +1674,11 @@ export interface FileRoutesById {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/swarm-langgraph/cancel': typeof ApiSwarmLanggraphCancelRoute
+  '/api/swarm-langgraph/mission-event': typeof ApiSwarmLanggraphMissionEventRoute
+  '/api/swarm-langgraph/resume': typeof ApiSwarmLanggraphResumeRoute
+  '/api/swarm-langgraph/run': typeof ApiSwarmLanggraphRunRoute
+  '/api/swarm-langgraph/status': typeof ApiSwarmLanggraphStatusRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
@@ -1687,6 +1761,9 @@ export interface FileRouteTypes {
     | '/api/mission-coordinator'
     | '/api/models'
     | '/api/omniroute-policy'
+    | '/api/orchestrator-active-gates'
+    | '/api/orchestrator-resume'
+    | '/api/orchestrator-state'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1786,6 +1863,11 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/swarm-langgraph/cancel'
+    | '/api/swarm-langgraph/mission-event'
+    | '/api/swarm-langgraph/resume'
+    | '/api/swarm-langgraph/run'
+    | '/api/swarm-langgraph/status'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
     | '/api/update/agent'
@@ -1865,6 +1947,9 @@ export interface FileRouteTypes {
     | '/api/mission-coordinator'
     | '/api/models'
     | '/api/omniroute-policy'
+    | '/api/orchestrator-active-gates'
+    | '/api/orchestrator-resume'
+    | '/api/orchestrator-state'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -1964,6 +2049,11 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/swarm-langgraph/cancel'
+    | '/api/swarm-langgraph/mission-event'
+    | '/api/swarm-langgraph/resume'
+    | '/api/swarm-langgraph/run'
+    | '/api/swarm-langgraph/status'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
     | '/api/update/agent'
@@ -2044,6 +2134,9 @@ export interface FileRouteTypes {
     | '/api/mission-coordinator'
     | '/api/models'
     | '/api/omniroute-policy'
+    | '/api/orchestrator-active-gates'
+    | '/api/orchestrator-resume'
+    | '/api/orchestrator-state'
     | '/api/paths'
     | '/api/ping'
     | '/api/playground-admin'
@@ -2143,6 +2236,11 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/swarm-langgraph/cancel'
+    | '/api/swarm-langgraph/mission-event'
+    | '/api/swarm-langgraph/resume'
+    | '/api/swarm-langgraph/run'
+    | '/api/swarm-langgraph/status'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
     | '/api/update/agent'
@@ -2224,6 +2322,9 @@ export interface RootRouteChildren {
   ApiMissionCoordinatorRoute: typeof ApiMissionCoordinatorRoute
   ApiModelsRoute: typeof ApiModelsRoute
   ApiOmniroutePolicyRoute: typeof ApiOmniroutePolicyRoute
+  ApiOrchestratorActiveGatesRoute: typeof ApiOrchestratorActiveGatesRoute
+  ApiOrchestratorResumeRoute: typeof ApiOrchestratorResumeRoute
+  ApiOrchestratorStateRoute: typeof ApiOrchestratorStateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPlaygroundAdminRoute: typeof ApiPlaygroundAdminRoute
@@ -2298,6 +2399,11 @@ export interface RootRouteChildren {
   ApiProfilesToggleSkillRoute: typeof ApiProfilesToggleSkillRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
   ApiRunsActiveRoute: typeof ApiRunsActiveRoute
+  ApiSwarmLanggraphCancelRoute: typeof ApiSwarmLanggraphCancelRoute
+  ApiSwarmLanggraphMissionEventRoute: typeof ApiSwarmLanggraphMissionEventRoute
+  ApiSwarmLanggraphResumeRoute: typeof ApiSwarmLanggraphResumeRoute
+  ApiSwarmLanggraphRunRoute: typeof ApiSwarmLanggraphRunRoute
+  ApiSwarmLanggraphStatusRoute: typeof ApiSwarmLanggraphStatusRoute
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
@@ -2830,6 +2936,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPathsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/orchestrator-state': {
+      id: '/api/orchestrator-state'
+      path: '/api/orchestrator-state'
+      fullPath: '/api/orchestrator-state'
+      preLoaderRoute: typeof ApiOrchestratorStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/orchestrator-resume': {
+      id: '/api/orchestrator-resume'
+      path: '/api/orchestrator-resume'
+      fullPath: '/api/orchestrator-resume'
+      preLoaderRoute: typeof ApiOrchestratorResumeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/orchestrator-active-gates': {
+      id: '/api/orchestrator-active-gates'
+      path: '/api/orchestrator-active-gates'
+      fullPath: '/api/orchestrator-active-gates'
+      preLoaderRoute: typeof ApiOrchestratorActiveGatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/omniroute-policy': {
       id: '/api/omniroute-policy'
       path: '/api/omniroute-policy'
@@ -3123,6 +3250,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/swarm-memory/search'
       preLoaderRoute: typeof ApiSwarmMemorySearchRouteImport
       parentRoute: typeof ApiSwarmMemoryRoute
+    }
+    '/api/swarm-langgraph/status': {
+      id: '/api/swarm-langgraph/status'
+      path: '/api/swarm-langgraph/status'
+      fullPath: '/api/swarm-langgraph/status'
+      preLoaderRoute: typeof ApiSwarmLanggraphStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-langgraph/run': {
+      id: '/api/swarm-langgraph/run'
+      path: '/api/swarm-langgraph/run'
+      fullPath: '/api/swarm-langgraph/run'
+      preLoaderRoute: typeof ApiSwarmLanggraphRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-langgraph/resume': {
+      id: '/api/swarm-langgraph/resume'
+      path: '/api/swarm-langgraph/resume'
+      fullPath: '/api/swarm-langgraph/resume'
+      preLoaderRoute: typeof ApiSwarmLanggraphResumeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-langgraph/mission-event': {
+      id: '/api/swarm-langgraph/mission-event'
+      path: '/api/swarm-langgraph/mission-event'
+      fullPath: '/api/swarm-langgraph/mission-event'
+      preLoaderRoute: typeof ApiSwarmLanggraphMissionEventRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-langgraph/cancel': {
+      id: '/api/swarm-langgraph/cancel'
+      path: '/api/swarm-langgraph/cancel'
+      fullPath: '/api/swarm-langgraph/cancel'
+      preLoaderRoute: typeof ApiSwarmLanggraphCancelRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/skills/uninstall': {
       id: '/api/skills/uninstall'
@@ -3849,6 +4011,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMissionCoordinatorRoute: ApiMissionCoordinatorRoute,
   ApiModelsRoute: ApiModelsRoute,
   ApiOmniroutePolicyRoute: ApiOmniroutePolicyRoute,
+  ApiOrchestratorActiveGatesRoute: ApiOrchestratorActiveGatesRoute,
+  ApiOrchestratorResumeRoute: ApiOrchestratorResumeRoute,
+  ApiOrchestratorStateRoute: ApiOrchestratorStateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPlaygroundAdminRoute: ApiPlaygroundAdminRoute,
@@ -3923,6 +4088,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesToggleSkillRoute: ApiProfilesToggleSkillRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
   ApiRunsActiveRoute: ApiRunsActiveRoute,
+  ApiSwarmLanggraphCancelRoute: ApiSwarmLanggraphCancelRoute,
+  ApiSwarmLanggraphMissionEventRoute: ApiSwarmLanggraphMissionEventRoute,
+  ApiSwarmLanggraphResumeRoute: ApiSwarmLanggraphResumeRoute,
+  ApiSwarmLanggraphRunRoute: ApiSwarmLanggraphRunRoute,
+  ApiSwarmLanggraphStatusRoute: ApiSwarmLanggraphStatusRoute,
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,

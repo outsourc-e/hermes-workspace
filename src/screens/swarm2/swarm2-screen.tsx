@@ -33,6 +33,8 @@ import type { CrewMember } from '@/hooks/use-crew-status'
 import { toast } from '@/components/ui/toast'
 import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
 import { RouterChat } from '@/components/swarm/router-chat'
+import { HumanGatePanel } from './components/human-gate-panel'
+import { useHumanGate } from './hooks/use-human-gate'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import { cn } from '@/lib/utils'
@@ -1317,6 +1319,8 @@ export function Swarm2Screen() {
     refetchInterval: 30_000,
   })
 
+  const humanGate = useHumanGate()
+
   const startAgentSession = useCallback(
     async (workerId: string) => {
       setPendingTmux((prev) => new Set(prev).add(workerId))
@@ -2232,6 +2236,17 @@ export function Swarm2Screen() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {humanGate.gate ? (
+        <HumanGatePanel
+          gate={humanGate.gate}
+          open={true}
+          onOpenChange={() => {}}
+          onResume={humanGate.resume}
+          isResuming={humanGate.isResuming}
+          resumeError={humanGate.resumeError}
+        />
       ) : null}
 
       <RouterChat

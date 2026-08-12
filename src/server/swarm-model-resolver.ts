@@ -1,15 +1,14 @@
 /**
- * Resolve a roster `model:` display string (e.g. "Opus 4.7", "GPT-5.5",
- * "PC1 Coder") into the concrete `provider` + `default` model id pair
- * that Hermes Agent's `config.yaml` expects.
+ * Parse a swarm roster `model:` field into the concrete `provider` + `default`
+ * model id pair that Hermes Agent's `config.yaml` expects.
  *
- * The roster YAML carries a human-friendly label so the Swarm UI can
- * render it without a lookup. The runtime needs the precise ids though,
- * because `hermes` invokes its provider plugins by id.
+ * The roster YAML carries a `provider/model-id` string (e.g.
+ * "openai-codex/gpt-5.5", "deepseek/deepseek-v4-pro",
+ * "custom:my-gateway/org/model-id").
+ * This parser extracts the provider and model-id components.
  *
- * This resolver is intentionally string-matching + tolerant: unknown
- * labels return `null` and the caller is expected to leave the existing
- * profile config alone (so a typo in the roster never wedges a worker).
+ * Returns `null` when the label is empty, blank, or does not match the
+ * expected `provider/model-id` format.
  */
 
 export type ResolvedSwarmModel = {
@@ -18,96 +17,73 @@ export type ResolvedSwarmModel = {
 }
 
 /**
- * Map a roster `model:` label to a Hermes Agent provider+model. The label
- * comparison is case-insensitive and ignores extra whitespace. Returns
- * `null` when the label is empty, blank, or unrecognised.
+ * Parse a `provider/model-id` string into { provider, default }.
+ * Splits on the first `/` only so providers may contain `:` and model ids may
+ * contain additional slashes (e.g. upstream ids like `deepseek-ai/deepseek-v4-pro`).
+ * Returns `null` when the label is empty, blank, or unparseable.
  */
-export function resolveSwarmModelLabel(
+export function parseSwarmModelLabel(
   label: string | null | undefined,
 ): ResolvedSwarmModel | null {
   if (!label) return null
-  const normalized = label.trim().toLowerCase().replace(/\s+/g, ' ')
-  if (!normalized || normalized === 'worker') return null
+  const trimmed = label.trim()
+  if (!trimmed) return null
 
-  // Anthropic Claude family
-  if (/^opus\s*4\.7$|^claude\s*opus\s*4\.7$/.test(normalized)) {
-    return { provider: 'anthropic-oauth', default: 'claude-opus-4-7' }
+  const slashIdx = trimmed.indexOf('/')
+  if (slashIdx <= 0) return null
+  return {
+    provider: trimmed.slice(0, slashIdx),
+    default: trimmed.slice(slashIdx + 1),
   }
-  if (/^opus\s*4\.6$|^claude\s*opus\s*4\.6$/.test(normalized)) {
-    return { provider: 'anthropic-oauth', default: 'claude-opus-4-6' }
-  }
-  if (/^opus\s*4\.5$|^claude\s*opus\s*4\.5$/.test(normalized)) {
-    return { provider: 'anthropic-oauth', default: 'claude-opus-4-5' }
-  }
-  if (/^sonnet\s*4\.6$|^claude\s*sonnet\s*4\.6$/.test(normalized)) {
-    return { provider: 'anthropic-oauth', default: 'claude-sonnet-4-6' }
-  }
-  if (/^sonnet\s*4\.5$|^claude\s*sonnet\s*4\.5$/.test(normalized)) {
-    return { provider: 'anthropic', default: 'claude-sonnet-4-5' }
+}
+
+export type SwarmModelOption = {
+  id: string
+  name: string
+  provider: string
+}
+
+/** Build the swarm.yaml `model:` value from a Hermes provider + upstream model id. */
+export function toSwarmModelKey(provider: string, modelId: string): string {
+  const p = provider.trim()
+  const m = modelId.trim()
+  if (!p || p === 'unknown') return m
+  if (!m) return p
+  // Upstream ids like `minimaxai/minimax-m2.7` may already embed an org prefix that
+  // matches a mistaken provider guess — never double-prefix.
+  if (m === p || m.startsWith(`${p}/`)) return m
+  return `${p}/${m}`
+}
+
+export function swarmModelKeyFromOption(m: SwarmModelOption): string {
+  return toSwarmModelKey(m.provider, m.id)
+}
+
+/**
+ * Resolve a roster/profile model string to the canonical swarm.yaml key.
+ * Handles legacy values that stored only the upstream model id.
+ */
+export function resolveSwarmModelKey(
+  model: string | null | undefined,
+  provider: string | null | undefined,
+  options?: Array<SwarmModelOption>,
+): string {
+  const trimmed = (model ?? '').trim()
+  if (!trimmed || trimmed === 'unknown') {
+    const p = (provider ?? '').trim()
+    return p && p !== 'unknown' ? p : ''
   }
 
-  // OpenAI Codex family
-  if (/^gpt[- ]?5\.5$|^codex\s*\(?gpt[- ]?5\.5\)?$/.test(normalized)) {
-    return { provider: 'openai-codex', default: 'gpt-5.5' }
-  }
-  if (/^gpt[- ]?5\.4$|^codex\s*\(?gpt[- ]?5\.4\)?$/.test(normalized)) {
-    return { provider: 'openai-codex', default: 'gpt-5.4' }
-  }
-  if (/^gpt[- ]?5\.3[- ]codex(?:[- ]?spark)?$/.test(normalized)) {
-    return { provider: 'openai-codex', default: 'gpt-5.3-codex-spark' }
-  }
-
-  // MiniMax
-  if (/^minimax(?:\s*m)?\s*3$|^minimax m?3$/.test(normalized)) {
-    return { provider: 'minimax', default: 'MiniMax-M3' }
-  }
-  if (/^minimax(?:\s*m)?\s*2\.7$|^minimax m?2\.7$/.test(normalized)) {
-    return { provider: 'minimax', default: 'MiniMax-M2.7' }
-  }
-  if (/^minimax(?:\s*m)?\s*2\.7[- ]lightning$/.test(normalized)) {
-    return { provider: 'minimax', default: 'MiniMax-M2.7-Lightning' }
-  }
-
-  // Local PC1 / PC2 — match by suffix only because labels include speed
-  // qualifiers ("PC1 Coder (97 TPS)") that we want to ignore.
-  if (/^pc1[\s-]coder/.test(normalized)) {
-    return {
-      provider: 'ollama-pc1',
-      default: 'qwen3-coder-30b-fixed:latest',
+  if (options?.length) {
+    if (options.some((m) => swarmModelKeyFromOption(m) === trimmed)) return trimmed
+    const byId = options.find((m) => m.id === trimmed)
+    if (byId) return swarmModelKeyFromOption(byId)
+    const p = (provider ?? '').trim()
+    if (p && p !== 'unknown') {
+      const combined = toSwarmModelKey(p, trimmed)
+      if (options.some((m) => swarmModelKeyFromOption(m) === combined)) return combined
     }
   }
-  if (/^pc1[\s-]planner/.test(normalized)) {
-    return { provider: 'ollama-pc1', default: 'pc1-planner:latest' }
-  }
-  if (/^pc1[\s-]critic/.test(normalized)) {
-    return { provider: 'ollama-pc1', default: 'pc1-critic:latest' }
-  }
-  if (/^pc1[\s-]score|^pc1[\s-]scorer/.test(normalized)) {
-    return { provider: 'ollama-pc1', default: 'pc1-scorer:latest' }
-  }
-  if (/^pc1[\s-]quality/.test(normalized)) {
-    return {
-      provider: 'ollama-pc1',
-      default: 'hf.co/unsloth/Qwen3.5-27B-GGUF:Q4_K_M',
-    }
-  }
-  if (/^pc1[\s-]fast/.test(normalized)) {
-    return { provider: 'ollama-pc1', default: 'qwen3-14b-fixed:latest' }
-  }
-  if (/^pc1[\s-]think/.test(normalized)) {
-    return { provider: 'ollama-pc1', default: 'deepseek-r1-32b-fixed:latest' }
-  }
-  if (/^pc1[\s-]qwen30b/.test(normalized)) {
-    return { provider: 'ollama-pc1', default: 'qwen3-30b-a3b-fixed:latest' }
-  }
 
-  // Provider-prefixed full id (already in canonical form). Pass through.
-  const slashMatch = label.trim().match(/^([\w.-]+)\/(.+)$/)
-  if (slashMatch) {
-    const provider = slashMatch[1]
-    const defaultModel = slashMatch[2]
-    if (provider && defaultModel) return { provider, default: defaultModel }
-  }
-
-  return null
+  return trimmed
 }

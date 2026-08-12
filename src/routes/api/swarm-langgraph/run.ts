@@ -1,8 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { spawnLanggraphDetached } from '../../../server/langgraph-orchestrator'
+import { spawnLanggraphDetached, resolveLanggraphPythonBin } from '../../../server/langgraph-orchestrator'
+
+import "../../../server/swarm-background-harvest"
+function isLanggraphAvailable(): boolean {
+  const override = process.env.HERMES_LANGGRAPH_PYTHON
+  if (override) return existsSync(override)
+  return existsSync(resolveLanggraphPythonBin())
+}
 
 function resolveWorkflowArg(workflowId: string): string {
   if (workflowId.startsWith('/')) return workflowId
@@ -36,6 +44,10 @@ export const Route = createFileRoute('/api/swarm-langgraph/run')({
           body = (await request.json()) as RunBody
         } catch {
           return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
+        }
+
+        if (!isLanggraphAvailable()) {
+          return json({ ok: false, error: 'LangGraph orchestrator not installed. Run: cd hermes_langgraph_orchestrator && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt' }, { status: 503 })
         }
 
         const missionGoal = cleanString(body.missionGoal)

@@ -29,7 +29,7 @@ vi.mock('../../server/swarm-roster', () => ({
   rosterByWorkerId: () => new Map([['builder', { wrapper: 'builder' }]]),
 }))
 vi.mock('../../server/swarm-model-resolver', () => ({
-  resolveSwarmModelLabel: () => null,
+  parseSwarmModelLabel: () => null,
 }))
 vi.mock('../../server/swarm-profile-config', () => ({
   syncSwarmProfileModel: vi.fn(),

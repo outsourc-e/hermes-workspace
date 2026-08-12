@@ -933,6 +933,25 @@ export function appendMissionContinuation(input: {
   return mission
 }
 
+export function appendSwarmMissionOrchestratorEvent(input: {
+  missionId: string
+  message: string
+  data?: Record<string, unknown>
+}): SwarmMission | null {
+  const store = readStore()
+  const mission = store.missions.find((item) => item.id === input.missionId)
+  if (!mission) return null
+  mission.events.push(event('continuation', input.message, {
+    data: {
+      source: 'langgraph-orchestrator',
+      ...(input.data ?? {}),
+    },
+  }))
+  mission.updatedAt = now()
+  writeStore(store)
+  return mission
+}
+
 export function readyQueuedAssignments(
   missionId: string,
 ): Array<SwarmMissionAssignment> {

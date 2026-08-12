@@ -10,7 +10,7 @@ import {
   resolveExactSessionCardOperationBinding,
 } from '../../server/session-card-operation-binding'
 import { rosterByWorkerId } from '../../server/swarm-roster'
-import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
+import { parseSwarmModelLabel } from '../../server/swarm-model-resolver'
 import { syncSwarmProfileModel } from '../../server/swarm-profile-config'
 
 // Inlined to avoid SSR module-resolution races against freshly-written
@@ -235,7 +235,7 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
         } = { attempted: false, changed: false }
         try {
           const roster = rosterByWorkerId([workerId]).get(workerId)
-          const resolved = resolveSwarmModelLabel(roster?.model ?? null)
+          const resolved = parseSwarmModelLabel(roster?.model ?? null)
           if (resolved) {
             modelSync.attempted = true
             const result = syncSwarmProfileModel(profilePath, resolved)
