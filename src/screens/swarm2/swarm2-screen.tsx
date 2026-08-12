@@ -1337,12 +1337,23 @@ export function Swarm2Screen() {
   }, [])
 
   const routeInboxItemToReviewer = useCallback((item: Swarm2InboxItem) => {
+    // A runtime/inbox item may not carry a real missionId (e.g. free-form
+    // worker output that was never part of a formal mission). Dispatching the
+    // reviewer with a `null` missionId produced the prompt "review ... for
+    // mission unknown mission", which left the reviewer blocked with no real
+    // target. Fall back to the item's own id so the reviewer always gets a
+    // concrete, reviewable reference.
+    const targetRef = item.missionId?.trim() || item.id
+    if (!targetRef) {
+      console.warn('[swarm2] routeInboxItemToReviewer: item has no missionId or id; refusing to dispatch a target-less review.')
+      return
+    }
     setSelectedId('swarm6')
     setRouterSeed({
       key: Date.now(),
       mode: 'manual',
       prompt: [
-        `Review ${item.workerId}'s Swarm control-plane output for mission ${item.missionId ?? 'unknown mission'}. Do not broaden scope. Return the required checkpoint format.`,
+        `Review ${item.workerId}'s Swarm control-plane output for ${targetRef}. Do not broaden scope. Return the required checkpoint format.`,
         '',
         `Task: ${item.title}`,
         `Summary: ${item.summary}`,
