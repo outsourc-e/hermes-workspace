@@ -1020,7 +1020,7 @@ export function Swarm2Screen() {
   const runtimeQuery = useQuery({
     queryKey: ['swarm2', 'runtime'],
     queryFn: fetchRuntime,
-    refetchInterval: 30_000,
+    refetchInterval: 8_000,
   })
   const healthQuery = useQuery({
     queryKey: ['swarm2', 'health'],
@@ -1035,7 +1035,7 @@ export function Swarm2Screen() {
   const missionsQuery = useQuery({
     queryKey: ['swarm2', 'missions'],
     queryFn: fetchMissions,
-    refetchInterval: 30_000,
+    refetchInterval: 8_000,
   })
 
   const startAgentSession = useCallback(

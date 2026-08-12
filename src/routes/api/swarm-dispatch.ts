@@ -490,6 +490,11 @@ function markDispatchStarted(workerId: string, task: string, missionId?: string 
     lastControlMessage: controlMessage,
     nextAction: 'Worker should execute and return the required checkpoint format.',
     notifySessionKey: notifySessionKey ?? 'main',
+    // Clear stale per-mission state so a fresh dispatch is not mistaken for an
+    // already-processed assignment by the orchestrator loop (which compares
+    // orchestratorProcessedRaw against the live checkpoint raw).
+    orchestratorProcessedRaw: null,
+    checkpointRaw: null,
   })
 }
 
