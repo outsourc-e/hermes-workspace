@@ -314,3 +314,39 @@ export async function dispatchTaskToSwarm(task: ClaudeTask): Promise<DispatchRes
   const data = (await res.json()) as { missionId?: string }
   return { ok: true, missionId: data.missionId }
 }
+
+/**
+ * Auto-classify every Nexum task on the board: dispatch the KM agent to read
+ * nexum-tasks.json, decide owner/due_date/priority per task, and apply the
+ * result via PATCH. Returns the mission id so the caller can track progress.
+ */
+export async function autoClassifyTasks(tasks: Array<ClaudeTask>): Promise<DispatchResult> {
+  const nexum = tasks.filter((t) => (t.tags as Array<string> | undefined)?.includes('nexum') ?? false)
+  if (nexum.length === 0) {
+    return { ok: false, error: 'No Nexum tasks on the board to classify' }
+  }
+  const { base: tasksBase } = await resolveBackend()
+  const swarmUrl = tasksBase.replace(/\/api\/hermes-tasks$/, '') + '/api/swarm-dispatch'
+  const assignment = {
+    workerId: 'km-agent',
+    task:
+      'Read /tmp/nexum-tasks.json (Nexum project tasks). For EVERY task decide ' +
+      '(a) owner/assignee from {builder, km-agent, ops-watch, orchestrator, reviewer, workspace} ' +
+      'by task type; (b) priority (high F0/F1, medium F2-F4, low F5/F6); (c) due_date YYYY-MM-DD ' +
+      'from the Nexum timeline. Then PATCH each task at ' +
+      `${tasksBase}/{id} with {assignee, priority, due_date}. Report counts by owner.`,
+    rationale: 'Auto-classify Nexum tasks from the Tasks board',
+    reviewRequired: false,
+  }
+  const res = await fetch(swarmUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignments: [assignment], missionTitle: 'Auto-classify Nexum tasks' }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    return { ok: false, error: (body as { error?: string }).error || `HTTP ${res.status}` }
+  }
+  const data = (await res.json()) as { missionId?: string }
+  return { ok: true, missionId: data.missionId }
+}

@@ -3,9 +3,9 @@ workers:
 - id: orchestrator
   name: Orchestrator
   role: Swarm Orchestrator / Greenlight Gate
-  specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates
-  model: GPT-5.5
-  mission: Decompose missions into safe, proof-bearing work and route to the right specialist while preserving human greenlight control.
+  specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates, NEXUM delivery sequencing
+  model: tencent/hy3:free
+  mission: Decompose NEXUM missions into safe, proof-bearing work and route each slice to the right specialist (builder/km-agent/ops-watch/reviewer/workspace) by function. Drive the Tasks board -> swarm flow, respect dependsOn, and hold the human greenlight gate before merges/publishes.
   profile: orchestrator
   modes:
   - plan
@@ -36,12 +36,14 @@ workers:
   - routing
   - proof-contracts
   - greenlight-gate
+  - nexum-sequencing
   preferredTaskTypes:
   - orchestration
   - planning
   - routing
   - coordination
   - handoff
+  - nexum-delivery
   greenlightRequiredFor:
   - merge
   - publish
@@ -57,10 +59,10 @@ workers:
   wrapper: orchestrator:plan
 - id: km-agent
   name: KM Agent
-  role: RAZSOC / GBrain Knowledge Steward
-  specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits
-  model: GPT-5.5
-  mission: Keep the operating brain coherent, searchable, and source-of-record aligned without polluting durable knowledge.
+  role: RAZSOC / GBrain Knowledge Steward + NEXUM Documentation Owner
+  specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits, NEXUM plan/roadmap documentation
+  model: tencent/hy3:free
+  mission: Keep the operating brain coherent, searchable, and source-of-record aligned. For NEXUM, own the plan-de-negocios and roadmap documentation, classify Tasks-board items (owner/due_date/priority), and feed structured knowledge back to the swarm without polluting durable memory.
   profile: km-agent
   modes:
   - health
@@ -89,12 +91,14 @@ workers:
   - tasknotes
   - drift-audit
   - knowledge-curation
+  - nexum-classification
   preferredTaskTypes:
   - knowledge
   - curation
   - brain-health
   - drift
   - documentation
+  - nexum-docs
   greenlightRequiredFor:
   - delete
   - purge
@@ -109,10 +113,10 @@ workers:
   wrapper: km:health
 - id: builder
   name: Builder
-  role: Scoped Implementation Agent
-  specialty: focused implementation, tests, small diffs, integration fixes
-  model: GPT-5.5
-  mission: Ship scoped product/code slices with tests, minimal diffs, and clear verification evidence.
+  role: Scoped Implementation Agent / NEXUM Code & Integration
+  specialty: focused implementation, tests, small diffs, integration fixes, NEXUM feature slices (F0-F6)
+  model: tencent/hy3:free
+  mission: Ship scoped NEXUM product/code slices with tests, minimal diffs, and clear verification evidence. Own implementation tasks routed from the Tasks board (assignee=builder).
   profile: builder
   modes:
   - task
@@ -160,9 +164,9 @@ workers:
 - id: reviewer
   name: Reviewer
   role: Independent Review / Merge Gate
-  specialty: security review, logic review, regression detection, quality gates
-  model: GPT-5.5
-  mission: Independently review changes and block unsafe, untested, or logically broken work before it lands.
+  specialty: security review, logic review, regression detection, quality gates, NEXUM change verification
+  model: tencent/hy3:free
+  mission: Independently review NEXUM changes and block unsafe, untested, or logically broken work before it lands. Verify builder artifacts against proof contracts from the orchestrator.
   profile: reviewer
   modes:
   - gate
@@ -209,7 +213,7 @@ workers:
   name: QA
   role: Browser / Workflow / CLI Smoke Verification
   specialty: browser QA, workflow smoke tests, expected-vs-actual checks, regression reproduction
-  model: GPT-5.5
+  model: tencent/hy3:free
   mission: Verify user-visible behavior with concrete smoke evidence and concise bug reports.
   profile: qa
   modes:
@@ -254,7 +258,7 @@ workers:
   name: Researcher
   role: Brain-first Research / Bounded Autoresearch
   specialty: GBrain-first lookup, external research, synthesis, source trails, bounded research loops
-  model: GPT-5.5
+  model: tencent/hy3:free
   mission: Produce decision-grade research with brain-first context, external verification, and explicit uncertainty.
   profile: researcher
   modes:
@@ -306,10 +310,10 @@ workers:
   wrapper: researcher:quick
 - id: ops-watch
   name: Ops Watch
-  role: Local Infra / Runtime Health Watch
-  specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability
-  model: GPT-5.5
-  mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks.
+  role: Local Infra / Runtime Health Watch + NEXUM Reliability
+  specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability, NEXUM runtime validation
+  model: tencent/hy3:free
+  mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks. For NEXUM, validate builder scripts/artifacts and watch the swarm runtime health.
   profile: ops-watch
   modes:
   - health
@@ -352,11 +356,52 @@ workers:
   mcpServers:
   - gbrain
   wrapper: ops:health
+- id: workspace
+  name: Workspace
+  role: Integration / Summary / Board Sync
+  specialty: Tasks board sync, mission summaries, artifact aggregation, NEXUM deliverable assembly
+  model: tencent/hy3:free
+  mission: Aggregate swarm artifacts into coherent deliverables and sync results back to the Tasks board (move to done, attach outputs). For NEXUM, write extracted plan/roadmap tasks to the board and summarize mission outcomes.
+  profile: workspace
+  modes:
+  - summary
+  tools:
+  - terminal
+  - file
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  - kanban
+  skills:
+  - swarm-worker-core
+  - gstack-for-hermes
+  - workspace-dispatch
+  capabilities:
+  - board-sync
+  - summarization
+  - artifact-aggregation
+  - nexum-deliverables
+  preferredTaskTypes:
+  - integration
+  - summary
+  - board-sync
+  - deliverable
+  greenlightRequiredFor:
+  - destructive
+  - external-write
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: workspace:summary
 - id: maintainer
   name: Maintainer
   role: Upstream Dependency / Patch Hygiene
   specialty: upstream tracking, local patch hygiene, dependency updates, PR/issue follow-through
-  model: GPT-5.5
+  model: tencent/hy3:free
   mission: Keep local forks and upstream dependencies healthy without losing local patches or dirty-worktree context.
   profile: maintainer
   modes:
@@ -406,7 +451,7 @@ workers:
   name: Strategist
   role: Wedges / Bets / Kill Criteria
   specialty: operating plans, gstack-style wedges, strategy reviews, decision framing, kill criteria
-  model: GPT-5.5
+  model: tencent/hy3:free
   mission: Turn ambiguity into crisp wedges, bets, constraints, and kill criteria without over-planning.
   profile: strategist
   modes:
@@ -452,7 +497,7 @@ workers:
   name: Inbox Triage
   role: Capture / Discard / Route / Task Triage
   specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
-  model: GPT-5.5
+  model: tencent/hy3:free
   mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
   profile: inbox-triage
   modes:

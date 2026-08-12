@@ -209,6 +209,11 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         return
       }
 
+      // Mark connected as soon as the stream responds. Some tmux attaches
+      // (reviewer/km-agent/orchestrator panes) emit no initial byte, so
+      // waiting for the first data chunk left the panel stuck on
+      // "connecting...". The SSE session id arrives immediately; treat that
+      // as connected and let output stream in as it arrives.
       setState('connected')
       // Give xterm a beat to finish mounting, then re-focus so keystrokes land.
       setTimeout(() => focusTerminal(), 50)

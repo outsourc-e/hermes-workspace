@@ -15,6 +15,7 @@ import {
   COLUMN_COLORS,
   COLUMN_LABELS,
   COLUMN_ORDER,
+  autoClassifyTasks,
   createTask,
   deleteTask,
   dispatchTaskToSwarm,
@@ -159,6 +160,23 @@ export function TasksScreen() {
     dispatchMutation.mutate(task)
   }
 
+  const autoClassifyMutation = useMutation({
+    mutationFn: () => autoClassifyTasks(tasks),
+    onSuccess: (result) => {
+      if (result.ok) {
+        invalidate()
+        toast(`KM agent classifying Nexum tasks (mission ${result.missionId ?? '?'})`)
+      } else {
+        toast(result.error ?? 'Failed to auto-classify', { type: 'error' })
+      }
+    },
+    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to auto-classify', { type: 'error' }),
+  })
+
+  function handleAutoClassify() {
+    autoClassifyMutation.mutate()
+  }
+
   function handleDispatchAll() {
     const eligible = tasks.filter((t) => t.assignee && t.column !== 'done' && t.column !== 'in_progress')
     if (eligible.length === 0) {
@@ -286,6 +304,16 @@ export function TasksScreen() {
           >
             <HugeiconsIcon icon={CheckListIcon} size={14} />
             Dispatch to swarm
+          </button>
+          <button
+            onClick={handleAutoClassify}
+            disabled={autoClassifyMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: '#0ea5e9' }}
+            title="Dispatch the KM agent to classify all Nexum tasks (owner/due_date/priority) and apply them"
+          >
+            <HugeiconsIcon icon={CheckListIcon} size={14} />
+            Auto-classify
           </button>
         </div>
       </div>
