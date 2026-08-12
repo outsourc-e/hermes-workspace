@@ -27,6 +27,7 @@ import { Route as FilesRouteImport } from './routes/files'
 import { Route as EchoStudioRouteImport } from './routes/echo-studio'
 import { Route as EarlyAccessRouteImport } from './routes/early-access'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ControlPanelRouteImport } from './routes/control-panel'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as AgoraRouteImport } from './routes/agora'
 import { Route as SplatRouteImport } from './routes/$'
@@ -283,6 +284,11 @@ const EarlyAccessRoute = EarlyAccessRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ControlPanelRoute = ControlPanelRouteImport.update({
+  id: '/control-panel',
+  path: '/control-panel',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConductorRoute = ConductorRouteImport.update({
@@ -1143,6 +1149,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
+  '/control-panel': typeof ControlPanelRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
@@ -1330,6 +1337,7 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
+  '/control-panel': typeof ControlPanelRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
@@ -1517,6 +1525,7 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
+  '/control-panel': typeof ControlPanelRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
   '/echo-studio': typeof EchoStudioRoute
@@ -1706,6 +1715,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/agora'
     | '/conductor'
+    | '/control-panel'
     | '/dashboard'
     | '/early-access'
     | '/echo-studio'
@@ -1893,6 +1903,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/agora'
     | '/conductor'
+    | '/control-panel'
     | '/dashboard'
     | '/early-access'
     | '/echo-studio'
@@ -2079,6 +2090,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/agora'
     | '/conductor'
+    | '/control-panel'
     | '/dashboard'
     | '/early-access'
     | '/echo-studio'
@@ -2267,6 +2279,7 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   AgoraRoute: typeof AgoraRoute
   ConductorRoute: typeof ConductorRoute
+  ControlPanelRoute: typeof ControlPanelRoute
   DashboardRoute: typeof DashboardRoute
   EarlyAccessRoute: typeof EarlyAccessRoute
   EchoStudioRoute: typeof EchoStudioRoute
@@ -2535,6 +2548,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/control-panel': {
+      id: '/control-panel'
+      path: '/control-panel'
+      fullPath: '/control-panel'
+      preLoaderRoute: typeof ControlPanelRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/conductor': {
@@ -3956,6 +3976,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AgoraRoute: AgoraRoute,
   ConductorRoute: ConductorRoute,
+  ControlPanelRoute: ControlPanelRoute,
   DashboardRoute: DashboardRoute,
   EarlyAccessRoute: EarlyAccessRoute,
   EchoStudioRoute: EchoStudioRoute,

@@ -1220,6 +1220,7 @@ function ChatSidebarComponent({
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
+  const isControlPanelActive = pathname === '/control-panel'
   const isOperationsActive = pathname === '/operations'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const echoStudioEnabled = useSettingsStore(
@@ -1489,6 +1490,13 @@ function ChatSidebarComponent({
       icon: Rocket01Icon,
       label: 'Conductor',
       active: isConductorActive,
+    },
+    {
+      kind: 'link',
+      to: '/control-panel',
+      icon: DashboardSquare01Icon,
+      label: 'Control Panel',
+      active: isControlPanelActive,
     },
     {
       kind: 'link',
