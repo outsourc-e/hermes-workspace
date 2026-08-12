@@ -7,7 +7,7 @@ import { getProfilesDir } from '../../server/claude-paths'
 import {  newestCheckpointFromMessages, readRuntimeJson } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { getSwarmProfilePath, listSwarmWorkerIds } from '../../server/swarm-foundation'
-import { appendMissionContinuation, getSwarmMission, markMissionAssignmentsReviewedByWorker, recordMissionCheckpoint } from '../../server/swarm-missions'
+import { appendMissionContinuation, getSwarmMission, markMissionAssignmentsReviewedByWorker, readyQueuedAssignments, recordMissionCheckpoint } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent } from '../../server/swarm-memory'
 import { publishSwarmActionPrompt, publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { applySwarmModeToLoopFlags, readSwarmMode } from '../../server/swarm-mode'
@@ -455,6 +455,16 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
           const hasReviewerDone = results.some((item) => item.status === 'checkpointed' && item.checkpoint?.stateLabel === 'DONE' && isReviewer(item.workerId, workerIds))
           const reviewAssignment = reviewerId && !hasReviewerDone ? buildReviewAssignment(results, reviewerId, workerIds) : null
           if (reviewAssignment && !assignments.some((item) => item.workerId === reviewAssignment.workerId && item.task === reviewAssignment.task)) assignments.push(reviewAssignment)
+          // Dispatch assignments that were deferred at dispatch time because their
+          // dependsOn was not yet satisfied. Now that some workers have checkpointed,
+          // any queued assignment whose dependencies are done becomes ready.
+          if (missionId) {
+            for (const queued of readyQueuedAssignments(missionId)) {
+              if (!assignments.some((item) => item.workerId === queued.workerId && item.task === queued.task)) {
+                assignments.push({ workerId: queued.workerId, task: queued.task, rationale: 'Dependency satisfied; executing deferred assignment.' })
+              }
+            }
+          }
           continuation = await dispatchAssignments(request, assignments, missionId)
         }
 

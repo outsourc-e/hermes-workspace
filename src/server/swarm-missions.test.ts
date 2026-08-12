@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SwarmMissionAssignment } from './swarm-missions'
 
 let tempRoot: string
 
@@ -386,5 +387,30 @@ describe('swarm-missions', () => {
     const persisted = JSON.parse(readFileSync(mod.SWARM_MISSIONS_PATH, 'utf8'))
     expect(persisted.missions[0]?.state).toBe('executing')
     expect(persisted.missions[0]?.events).toHaveLength(0)
+  })
+
+  it('readyQueuedAssignments matches dependsOn by workerId (dispatch format)', async () => {
+    const mod = await loadModule()
+    const mission = mod.createOrUpdateMission({
+      missionId: 'mission-dep-workerid',
+      title: 'dep by workerId',
+      assignments: [
+        { workerId: 'builder', task: 'Build it', reviewRequired: false },
+        { workerId: 'reviewer', task: 'Review it', reviewRequired: true, dependsOn: ['builder'] },
+      ],
+    })
+    // Nothing done yet: builder (no deps) is ready, reviewer (dependsOn builder) is not
+    expect(mod.readyQueuedAssignments(mission.id).map((a: SwarmMissionAssignment) => a.workerId)).toEqual(['builder'])
+    // Mark builder done -> reviewer becomes ready (dependsOn is a workerId)
+    const builder = mission.assignments[0]
+    mod.recordMissionCheckpoint({
+      missionId: mission.id,
+      assignmentId: builder.id,
+      workerId: 'builder',
+      checkpoint: { stateLabel: 'DONE', runtimeState: 'idle', checkpointStatus: 'done', filesChanged: 'x', commandsRun: 'y', result: 'built', blocker: null, nextAction: null, raw: 'STATE: DONE' },
+      source: 'swarm-checkpoint-api',
+    })
+    const ready = mod.readyQueuedAssignments(mission.id)
+    expect(ready.map((a: SwarmMissionAssignment) => a.workerId)).toEqual(['reviewer'])
   })
 })
