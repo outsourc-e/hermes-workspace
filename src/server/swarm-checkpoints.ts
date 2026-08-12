@@ -26,7 +26,7 @@ const STATE_MAP: Record<ParsedSwarmCheckpoint['stateLabel'], Pick<ParsedSwarmChe
 
 function normalizeLabel(value: string): Label | null {
   const upper = value.trim().toUpperCase().replace(/[ -]/g, '_')
-  return (LABELS as readonly string[]).includes(upper) ? upper as Label : null
+  return (LABELS as ReadonlyArray<string>).includes(upper) ? upper as Label : null
 }
 
 function clean(value: string | undefined): string | null {
@@ -56,7 +56,12 @@ export function parseSwarmCheckpoint(text: string): ParsedSwarmCheckpoint | null
     if (current) fields[current] = `${fields[current] ?? ''}\n${line}`
   }
 
+  // BLOCKER and NEXT_ACTION are optional: a checkpoint without them simply
+  // means "no blocker" / "no next action". Requiring all six labels caused
+  // valid DONE checkpoints (where the worker omitted BLOCKER:) to be silently
+  // dropped, leaving missions stuck in `blocked`/`executing` forever.
   for (const label of LABELS) {
+    if (label === 'BLOCKER' || label === 'NEXT_ACTION') continue
     if (!(label in fields)) return null
   }
   const stateRaw = clean(fields.STATE)?.toUpperCase().split(/\s+/)[0]
