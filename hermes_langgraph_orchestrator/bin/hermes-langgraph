@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Run LangGraph orchestrator from any working directory.
+set -euo pipefail
+
+# Follow symlinks (e.g. ~/.local/bin/hermes-langgraph -> .../bin/hermes-langgraph).
+resolve_script_path() {
+  local source="${BASH_SOURCE[0]}"
+  while [[ -L "${source}" ]]; do
+    local dir
+    dir="$(cd "$(dirname "${source}")" && pwd)"
+    source="$(readlink "${source}")"
+    [[ "${source}" != /* ]] && source="${dir}/${source}"
+  done
+  cd "$(dirname "${source}")" && pwd
+}
+
+SCRIPT_DIR="$(resolve_script_path)"
+ORCH_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORKSPACE_ROOT="${HERMES_WORKSPACE_ROOT:-$(cd "${ORCH_DIR}/.." && pwd)}"
+PYTHON="${HERMES_LANGGRAPH_PYTHON:-${ORCH_DIR}/.venv/bin/python}"
+
+if [[ ! -x "${PYTHON}" ]]; then
+  echo "hermes-langgraph: Python not found at ${PYTHON}" >&2
+  echo "Create venv:" >&2
+  echo "  cd ${ORCH_DIR} && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" >&2
+  exit 1
+fi
+
+export PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
+exec "${PYTHON}" -m hermes_langgraph_orchestrator "$@"

@@ -1,0 +1,86 @@
+name: research_design_implement
+version: 1
+entry: researcher
+description: |
+  通用 Research → Design → Implement → Review 循环。
+  researcher 完成调研 → architect 设计/审查 → developer 实现 → architect 复审。
+  适用于任何需要先调研、再设计、再实现的任务。
+
+transitions:
+  - from: researcher
+    "on":
+      verdict: DONE
+    to: architect
+    reason: "调研完成，进入架构设计"
+
+  # Gate H pass — terminal
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+      metadata:
+        harden_outcome: pass
+    to: null
+    reason: "Gate H pass — 任务完成"
+
+  # Gate H fail → developer ≤2
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+      metadata:
+        harden_outcome: fail
+    to: developer
+    max_iterations: 2
+    reason: "Gate H: harden failed → developer revise (≤2)"
+
+  # Gate C: review failed → developer revise ≤3, then Human Gate
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: changes_requested
+    to: developer
+    max_iterations: 3
+    reason: "Gate C: code review failed → developer revise (≤3)"
+
+  - from: architect
+    "on":
+      verdict: DONE
+    to: developer
+    reason: "设计完成，进入实现"
+
+  - from: developer
+    "on":
+      verdict: DONE
+    to: architect
+    reason: "实现完成，交回 architect 审查"
+
+  # 可选：Harden pass 后由 learning 做文档归档（terminal_docs: true 时启用）
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+      metadata:
+        harden_outcome: pass
+    to: learning
+    terminal_docs: true
+    reason: "Gate H pass，进入复盘/文档化"
+
+  - from: learning
+    "on":
+      verdict: DONE
+    to: null
+    reason: "复盘/文档化完成"
+
+blockers:
+  escalate:
+    - architecture_decision
+    - missing_credential
+    - timeout
+  retry:
+    - missing_dependency
+    - test_failure
+
+settings:
+  max_iterations: 8
+  terminal_docs: false

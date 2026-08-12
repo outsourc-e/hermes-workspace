@@ -80,11 +80,15 @@ def main():
 
         signal.signal(signal.SIGWINCH, handle_winch)
 
+        stdin_open = True
         try:
             while True:
-                rlist, _, _ = select.select([master_fd, stdin_fd], [], [], 1.0)
+                rlist = [master_fd]
+                if stdin_open:
+                    rlist.append(stdin_fd)
+                readable, _, _ = select.select(rlist, [], [], 1.0)
                 
-                if master_fd in rlist:
+                if master_fd in readable:
                     try:
                         data = os.read(master_fd, 65536)
                     except OSError:
@@ -93,13 +97,17 @@ def main():
                         break
                     os.write(stdout_fd, data)
 
-                if stdin_fd in rlist:
+                if stdin_open and stdin_fd in readable:
                     try:
                         data = os.read(stdin_fd, 65536)
                     except OSError:
-                        break
+                        stdin_open = False
+                        continue
                     if not data:
-                        break
+                        # Browser input uses /api/terminal-input; keep PTY alive when
+                        # the HTTP stream detaches stdin without meaning "exit".
+                        stdin_open = False
+                        continue
                     os.write(master_fd, data)
         except (IOError, OSError):
             pass

@@ -1,12 +1,5 @@
-import { Suspense, lazy } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
-
-const TerminalWorkspace = lazy(() =>
-  import('@/components/terminal/terminal-workspace').then((m) => ({
-    default: m.TerminalWorkspace,
-  })),
-)
 
 export const Route = createFileRoute('/terminal')({
   ssr: false,

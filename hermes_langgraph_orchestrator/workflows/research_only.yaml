@@ -1,0 +1,42 @@
+name: research_adversarial_review
+version: 2
+entry: researcher
+description: |
+  Research mission with adversarial architect review.
+  researcher completes → architect challenges → researcher revises until approved.
+  After 3 architect→researcher negotiation rounds without approval, human gate.
+
+transitions:
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+    to: null
+    reason: "对抗审查达成一致，调研结论确认"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: changes_requested
+    to: researcher
+    max_iterations: 3
+    reason: "审查存在分歧，researcher 修订后再次提交"
+
+  - from: researcher
+    "on":
+      verdict: DONE
+    to: architect
+    reason: "调研完成/修订完成，提交 architect 对抗审查"
+
+blockers:
+  escalate:
+    - architecture_decision
+    - missing_credential
+  retry:
+    - missing_dependency
+    - test_failure
+    - timeout
+
+settings:
+  max_iterations: 8
+  terminal_docs: false

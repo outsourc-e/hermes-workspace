@@ -1,0 +1,153 @@
+name: research_architect_developer_writer
+version: 1
+entry: researcher
+description: |
+  Research → Architect → Developer or Writer → Architect review → Harden.
+  Architect chooses exactly one build executor via EXECUTOR or DELIVERABLE_TYPE
+  (developer for code; writer for visual/document).
+  Gate C: REVIEW_OUTCOME=changes_requested → same executor ≤3, then Human Gate.
+  Gate H: after approved, HARDEN_OUTCOME=pass required to finish; fail → same
+  executor ≤2; missing harden → Human Gate.
+
+transitions:
+  - from: researcher
+    "on":
+      verdict: DONE
+    to: architect
+    reason: "调研完成，进入架构设计"
+
+  # Gate H pass — terminal (must precede any bare approved / DONE rules)
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+      metadata:
+        harden_outcome: pass
+    to: null
+    reason: "Gate H pass — mission complete"
+
+  # Gate H fail — bounded revise on same lane
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+      metadata:
+        harden_outcome: fail
+        executor: "writer"
+    to: writer
+    max_iterations: 2
+    reason: "Gate H: harden failed → writer revise (≤2)"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+      metadata:
+        harden_outcome: fail
+        deliverable_type: "visual,document"
+    to: writer
+    max_iterations: 2
+    reason: "Gate H: harden failed → writer revise (≤2)"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: approved
+      metadata:
+        harden_outcome: fail
+    to: developer
+    max_iterations: 2
+    reason: "Gate H: harden failed → developer revise (≤2)"
+
+  # Gate C — review failed, retry same lane (≤3), then human.
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: changes_requested
+      metadata:
+        executor: "writer"
+    to: writer
+    max_iterations: 3
+    reason: "Gate C: content review failed → writer revise (≤3)"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: changes_requested
+      metadata:
+        deliverable_type: "visual,document"
+    to: writer
+    max_iterations: 3
+    reason: "Gate C: content review failed → writer revise (≤3)"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      review_outcome: changes_requested
+    to: developer
+    max_iterations: 3
+    reason: "Gate C: code review failed → developer revise (≤3)"
+
+  # Initial design → build (executor lane). Specific metadata before fallback.
+  - from: architect
+    "on":
+      verdict: DONE
+      metadata:
+        executor: "writer"
+    to: writer
+    reason: "设计完成且 EXECUTOR=writer，进入内容创作"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      metadata:
+        deliverable_type: "visual,document"
+    to: writer
+    reason: "设计完成且交付物类型为 visual/document，进入内容创作"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      metadata:
+        executor: "developer"
+    to: developer
+    reason: "设计完成且 EXECUTOR=developer，进入开发"
+
+  - from: architect
+    "on":
+      verdict: DONE
+      metadata:
+        deliverable_type: "code"
+    to: developer
+    reason: "设计完成且交付物类型为 code，进入开发"
+
+  - from: architect
+    "on":
+      verdict: DONE
+    to: developer
+    reason: "设计完成，进入代码实现（默认）"
+
+  - from: developer
+    "on":
+      verdict: DONE
+    to: architect
+    reason: "实现完成，交回 architect 审查 + harden"
+
+  - from: writer
+    "on":
+      verdict: DONE
+    to: architect
+    reason: "内容创作完成，交回 architect 审查 + Harden"
+
+blockers:
+  escalate:
+    - architecture_decision
+    - missing_credential
+    - timeout
+  retry:
+    - missing_dependency
+    - test_failure
+
+settings:
+  max_iterations: 8
+  terminal_docs: false

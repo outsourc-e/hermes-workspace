@@ -1,17 +1,13 @@
-import { Suspense, lazy, useCallback, useEffect, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useNavigate } from '@tanstack/react-router'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { TerminalWorkspaceLazy } from '@/lib/terminal-workspace-lazy'
 import {
   DEFAULT_PANEL_HEIGHT,
   MIN_PANEL_HEIGHT,
   useTerminalPanelStore,
 } from '@/stores/terminal-panel-store'
-
-const TerminalWorkspace = lazy(() =>
-  import('@/components/terminal/terminal-workspace').then((m) => ({
-    default: m.TerminalWorkspace,
-  })),
-)
 
 const MAX_VIEWPORT_RATIO = 0.6
 
@@ -117,21 +113,27 @@ export function TerminalPanel() {
             aria-label="Resize terminal panel"
           />
           <div className="h-full pt-1">
-            <Suspense
-              fallback={
-                <div className="flex h-full items-center justify-center text-xs text-primary-500">
-                  Loading terminal…
-                </div>
-              }
+            <ErrorBoundary
+              className="h-full"
+              title="Terminal failed to load"
+              description="Close the panel and reload the page, or visit /terminal."
             >
-              <TerminalWorkspace
-                mode="panel"
-                panelVisible={isPanelOpen}
-                onMinimizePanel={handleMinimize}
-                onMaximizePanel={handleMaximize}
-                onClosePanel={handleClose}
-              />
-            </Suspense>
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-xs text-primary-500">
+                    Loading terminal…
+                  </div>
+                }
+              >
+                <TerminalWorkspaceLazy
+                  mode="panel"
+                  panelVisible={isPanelOpen}
+                  onMinimizePanel={handleMinimize}
+                  onMaximizePanel={handleMaximize}
+                  onClosePanel={handleClose}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </motion.section>
       ) : null}
