@@ -44,29 +44,26 @@ async function probeBackend(base: string): Promise<number> {
 }
 
 async function resolveBackend(): Promise<BackendResolution> {
-  if (_resolved) return _resolved
-  if (_resolving) return _resolving
+  // NOTE: resolution is intentionally NOT cached across calls. Caching caused
+  // the board to "lose" tasks: after a transient 500/timeout on the hermes
+  // probe, the page stayed pinned to the claude backend (which holds 1 task)
+  // for the whole session. Re-probing each call lets a later successful hermes
+  // probe win. The double-probe cost is negligible for a kanban board.
+  const [hermesCount, claudeCount] = await Promise.all([
+    probeBackend(HERMES_BASE),
+    probeBackend(CLAUDE_BASE),
+  ])
 
-  _resolving = (async () => {
-    const [hermesCount, claudeCount] = await Promise.all([
-      probeBackend(HERMES_BASE),
-      probeBackend(CLAUDE_BASE),
-    ])
-
-    // Prefer hermes if it has real data (> 0); fall back to claude if hermes is
-    // missing (returns -1 for non-JSON / route-not-found) or empty.
-    // Default to claude when both are empty — it is the active backend after the
-    // hermes-tasks → claude-tasks route rename (commit efcb7d14).
-    const useHermes = hermesCount > 0 && hermesCount >= claudeCount
-    _resolved = {
-      base: useHermes ? HERMES_BASE : CLAUDE_BASE,
-      assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',
-      backend: useHermes ? 'hermes' : 'claude',
-    }
-    return _resolved
-  })()
-
-  return _resolving
+  // Prefer hermes whenever it holds real data. It is the canonical agent task
+  // store (~/.hermes/tasks.json) and holds the NEXUM tasks. Only fall back to
+  // claude when hermes is empty (0) or unreachable (-1 for non-JSON / 404).
+  const useHermes = hermesCount > 0
+  _resolved = {
+    base: useHermes ? HERMES_BASE : CLAUDE_BASE,
+    assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',
+    backend: (useHermes ? 'hermes' : 'claude') as TasksBackend,
+  }
+  return _resolved
 }
 
 /** Returns the currently resolved backend id, or null if not yet probed. */
