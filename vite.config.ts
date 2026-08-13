@@ -726,15 +726,16 @@ const config = defineConfig(({ mode, command }) => {
             // swarm executes without needing the conductor UI open.
             const SWARM_MISSION_INTERVAL_MS = 30_000
             setInterval(() => {
-              try {
-                const r = runSwarmMissionLoop()
-                if (r.dispatched > 0)
-                  console.log(
-                    `[swarm-mission-runner] tick: dispatched=${r.dispatched} skipped=${r.skipped}`,
-                  )
-              } catch (e) {
-                console.error('[swarm-mission-runner] tick failed:', e instanceof Error ? e.message : e)
-              }
+              runSwarmMissionLoop()
+                .then((r) => {
+                  if (r.dispatched > 0)
+                    console.log(
+                      `[swarm-mission-runner] tick: dispatched=${r.dispatched} skipped=${r.skipped}`,
+                    )
+                })
+                .catch((e) =>
+                  console.error('[swarm-mission-runner] tick failed:', e instanceof Error ? e.message : e),
+                )
             }, SWARM_MISSION_INTERVAL_MS)
           }
 
