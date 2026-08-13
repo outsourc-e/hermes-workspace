@@ -1052,6 +1052,23 @@ export function useConductorGateway() {
     retryDelay: (attemptIndex: number) => Math.min(2000 * 2 ** attemptIndex, 10_000),
   })
 
+  // Surface the *live local swarm* (tmux workers) in the Office/Conductor view.
+  // The Conductor historically only read gateway sessions, so the Office never
+  // reflected the agents actually running in the local swarm (builder, km-agent,
+  // workspace, ...). We now also poll /api/swarm-runtime and merge those workers
+  // into the roster below.
+  const swarmRuntimeQuery = useQuery({
+    queryKey: ['conductor', 'swarm-runtime'],
+    queryFn: async () => {
+      const res = await fetch('/api/swarm-runtime')
+      if (!res.ok) throw new Error(`swarm-runtime ${res.status}`)
+      const payload = (await res.json()) as { entries?: Array<Record<string, unknown>> }
+      return payload.entries ?? []
+    },
+    refetchInterval: 3_000,
+    staleTime: 1_000,
+  })
+
   const sessionWorkers = sessionsQuery.data ?? []
 
   // For native-swarm missions, build virtual worker cards from the mission
@@ -1094,10 +1111,59 @@ export function useConductorGateway() {
     })
   }, [isNativeSwarm, swarmAssignments])
 
+  // Map a live swarm-runtime entry to a ConductorWorker card so the Office shows
+  // the agents actually running in the local swarm (builder, km-agent, ...).
+  const swarmRuntimeWorkers = useMemo<Array<ConductorWorker>>(() => {
+    const entries = (swarmRuntimeQuery.data ?? []) as Array<Record<string, unknown>>
+    if (entries.length === 0) return []
+    return entries.map((e) => {
+      const workerId = String(e.workerId ?? '')
+      const state = String(e.state ?? 'idle')
+      const stateMap: Record<string, 'running' | 'complete' | 'stale' | 'idle'> = {
+        executing: 'running',
+        dispatched: 'running',
+        checkpointed: 'complete',
+        done: 'complete',
+        blocked: 'stale',
+        idle: 'idle',
+        queued: 'idle',
+      }
+      const status = stateMap[state] ?? 'idle'
+      const displayName = String(e.humanLabel ?? e.displayName ?? workerId)
+      return {
+        key: `swarm-${workerId}`,
+        label: workerId,
+        model: 'native-swarm',
+        status,
+        updatedAt: String(e.lastOutputAt ?? e.lastCheckIn ?? ''),
+        displayName,
+        totalTokens: 0,
+        contextTokens: 0,
+        tokenUsageLabel: state,
+        raw: {
+          key: `swarm-${workerId}`,
+          label: workerId,
+          friendlyId: workerId,
+          status: status === 'complete' ? 'completed' : 'running',
+          model: 'native-swarm',
+          lastMessage: String(e.lastSummary ?? e.currentTask ?? ''),
+          createdAt: String(e.startedAt ?? ''),
+          startedAt: String(e.startedAt ?? ''),
+          updatedAt: String(e.lastOutputAt ?? ''),
+        } as GatewaySession,
+      }
+    })
+  }, [swarmRuntimeQuery.data])
+
   const workers = useMemo(() => {
+    // Prefer gateway/session workers when present, then native-swarm virtual
+    // workers, then the live local swarm runtime roster. This guarantees the
+    // Office reflects the real running agents even when no conductor mission
+    // session exists.
     if (sessionWorkers.length > 0) return sessionWorkers
-    return virtualWorkers
-  }, [sessionWorkers, virtualWorkers])
+    if (virtualWorkers.length > 0) return virtualWorkers
+    return swarmRuntimeWorkers
+  }, [sessionWorkers, virtualWorkers, swarmRuntimeWorkers])
   const activeWorkers = useMemo(() => workers.filter((worker) => worker.status === 'running' || worker.status === 'idle'), [workers])
   const hasPersistedMission = initialMission !== null
 
