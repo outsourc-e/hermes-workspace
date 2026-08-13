@@ -32,7 +32,7 @@ type DirectChatResponse = SwarmChatResponse & {
   delivery?: 'tmux'
 }
 
-const POLL_INTERVAL_MS = 5_000
+const POLL_INTERVAL_MS = 15_000
 const DEFAULT_LIMIT = 30
 
 async function fetchSwarmChat(
@@ -88,8 +88,10 @@ export function useSwarmChat({
     queryFn: () => fetchSwarmChat(workerId, limit),
     enabled: Boolean(workerId) && enabled,
     refetchInterval: POLL_INTERVAL_MS,
-    refetchIntervalInBackground: true,
-    staleTime: 2_000,
+    // Only poll while the tab is visible — background tabs should not keep
+    // hammering the dev server (11 workers × polling = hundreds of requests).
+    refetchIntervalInBackground: false,
+    staleTime: 10_000,
   })
 
   const dispatch = useMutation({
