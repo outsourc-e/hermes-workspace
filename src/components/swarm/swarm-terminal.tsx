@@ -189,7 +189,15 @@ export const SwarmTerminal = memo(function SwarmTerminal({
       terminal.writeln(`\x1b[2mcommand: ${command.join(' ')}\x1b[0m`)
       terminal.writeln('')
 
-      setState('connecting')
+      // Mark connected immediately — the terminal UI is mounted and we are
+      // about to open the stream. Waiting for the fetch/stream response left
+      // panels stuck on "connecting…" when the browser fetch hung (stale tab,
+      // HMR not applied, or a slow SSE). Output streams in as it arrives.
+      setState('connected')
+      setTimeout(() => focusTerminal(), 50)
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15_000)
       const response = await fetch('/api/terminal-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -199,7 +207,9 @@ export const SwarmTerminal = memo(function SwarmTerminal({
           cols: terminal.cols,
           rows: terminal.rows,
         }),
+        signal: controller.signal,
       }).catch(() => null)
+      clearTimeout(timeout)
 
       if (cancelled) return
       if (!response || !response.ok || !response.body) {
@@ -209,14 +219,6 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         return
       }
 
-      // Mark connected as soon as the stream responds. Some tmux attaches
-      // (reviewer/km-agent/orchestrator panes) emit no initial byte, so
-      // waiting for the first data chunk left the panel stuck on
-      // "connecting...". The SSE session id arrives immediately; treat that
-      // as connected and let output stream in as it arrives.
-      setState('connected')
-      // Give xterm a beat to finish mounting, then re-focus so keystrokes land.
-      setTimeout(() => focusTerminal(), 50)
       const reader = response.body.getReader()
       readerRef.current = reader
       const decoder = new TextDecoder()
