@@ -62,6 +62,9 @@ function writeTaskFile(data: TaskFile): void {
 }
 
 function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' | 'created_at' | 'updated_at' | 'created_by'>): TaskRecord {
+  const now = new Date().toISOString()
+  const createdAt = typeof task.created_at === 'string' && task.created_at ? task.created_at : now
+  const updatedAt = typeof task.updated_at === 'string' && task.updated_at ? task.updated_at : createdAt
   return {
     id: task.id,
     title: task.title,
@@ -73,8 +76,8 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     due_date: task.due_date ?? null,
     position: typeof task.position === 'number' ? task.position : 0,
     created_by: task.created_by,
-    created_at: task.created_at,
-    updated_at: task.updated_at,
+    created_at: createdAt,
+    updated_at: updatedAt,
     session_id: task.session_id ?? null,
   }
 }
@@ -93,7 +96,9 @@ export function listTasks(filters: TaskFilters = {}): TaskRecord[] {
   if (filters.priority) {
     tasks = tasks.filter((task) => task.priority === filters.priority)
   }
-  return tasks.sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
+  // Defensive: legacy tasks stored on disk may lack created_at/position.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  return tasks.sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || (a.created_at ?? '').localeCompare(b.created_at ?? ''))
 }
 
 export function getTask(taskId: string): TaskRecord | null {
@@ -128,14 +133,23 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
   if (index === -1) return null
 
   const current = normalizeTask(file.tasks[index] as TaskRecord)
+  // Drop undefined fields so a partial PATCH (e.g. auto-classify sending only
+  // assignee/priority/due_date) preserves the existing values instead of
+  // overwriting them with undefined -> normalized to [] / defaults.
+  const cleanUpdates: Partial<TaskRecord> = {}
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined) {
+      ;(cleanUpdates as Record<string, unknown>)[key] = value
+    }
+  }
   const next = normalizeTask({
     ...current,
-    ...updates,
+    ...cleanUpdates,
     id: current.id,
     created_by: current.created_by,
     created_at: current.created_at,
     updated_at: new Date().toISOString(),
-    title: typeof updates.title === 'string' ? updates.title : current.title,
+    title: typeof cleanUpdates.title === 'string' ? cleanUpdates.title : current.title,
   })
 
   file.tasks[index] = next

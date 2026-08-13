@@ -22,6 +22,21 @@ COMMANDS_RUN: none`)
     expect(parsed).toBeNull()
   })
 
+  it('accepts DONE checkpoints that omit optional BLOCKER/NEXT_ACTION', () => {
+    // Real workers often emit STATE/FILES_CHANGED/COMMANDS_RUN/RESULT without
+    // an explicit BLOCKER: line. The parser must treat missing BLOCKER as
+    // "none", not drop the checkpoint (which left missions stuck in `blocked`).
+    const parsed = parseSwarmCheckpoint(`STATE: DONE
+FILES_CHANGED: none
+COMMANDS_RUN: none (read_file only)
+RESULT: O ficheiro contém 9 workers.
+NEXT_ACTION: Nada — diagnóstico concluído.`)
+    expect(parsed?.stateLabel).toBe('DONE')
+    expect(parsed?.checkpointStatus).toBe('done')
+    expect(parsed?.blocker).toBeNull()
+    expect(parsed?.nextAction).toBe('Nada — diagnóstico concluído.')
+  })
+
   it('maps blocked checkpoints to runtime blocked state', () => {
     const parsed = parseSwarmCheckpoint(`STATE: BLOCKED
 FILES_CHANGED: none
