@@ -323,16 +323,22 @@ export async function autoClassifyTasks(tasks: Array<ClaudeTask>): Promise<Dispa
     return { ok: false, error: 'No Nexum tasks on the board to classify' }
   }
   const { base: tasksBase } = await resolveBackend()
-  const swarmUrl = tasksBase.replace(/\/api\/hermes-tasks$/, '') + '/api/swarm-dispatch'
+  const missionUrl = tasksBase.replace(/\/api\/hermes-tasks$/, '')
+  const swarmUrl = `${missionUrl}/api/swarm-dispatch`
   const assignment = {
     workerId: 'km-agent',
     task:
-      'Read /tmp/nexum-tasks.json (Nexum project tasks). For EVERY task decide ' +
-      '(a) owner/assignee from {builder, km-agent, ops-watch, orchestrator, reviewer, workspace} ' +
-      'by task type; (b) priority (high F0/F1, medium F2-F4, low F5/F6); (c) due_date YYYY-MM-DD ' +
-      'from the Nexum timeline. Then PATCH each task at ' +
-      `${tasksBase}/{id} with {assignee, priority, due_date}. Report counts by owner.`,
-    rationale: 'Auto-classify Nexum tasks from the Tasks board',
+      'CLASSIFICATION-ONLY task. Do NOT implement or research anything.\n' +
+      '1) Read /tmp/nexum-tasks.json (Nexum project tasks, each has id/title/phase/deadline/category/priority).\n' +
+      '2) For EVERY one of the 174 tasks decide:\n' +
+      '   (a) assignee from {builder, km-agent, ops-watch, orchestrator, reviewer, workspace} by task TYPE ' +
+      '(code/platform->builder; docs/knowledge/marketing->km-agent; infra/runtime/health->ops-watch; qa/security/validation->reviewer; integration/summary/board->workspace; planning/governance/gate->orchestrator);\n' +
+      '   (b) priority already in the file (high/medium/low) — keep it;\n' +
+      '   (c) due_date YYYY-MM-DD from the Nexum timeline (M0=2026-08-12, each M = +1 week).\n' +
+      '3) PATCH each task via: PATCH ' + `${tasksBase}/{id}` + ' with JSON body {"assignee":..., "priority":..., "due_date":...} ' +
+      '(do NOT send "tags" — the server preserves existing tags).\n' +
+      '4) Report counts per owner when done.',
+    rationale: 'Auto-classify Nexum tasks from the Tasks board (classification only)',
     reviewRequired: false,
   }
   const res = await fetch(swarmUrl, {

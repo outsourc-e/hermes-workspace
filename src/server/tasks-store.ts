@@ -133,14 +133,23 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
   if (index === -1) return null
 
   const current = normalizeTask(file.tasks[index] as TaskRecord)
+  // Drop undefined fields so a partial PATCH (e.g. auto-classify sending only
+  // assignee/priority/due_date) preserves the existing values instead of
+  // overwriting them with undefined -> normalized to [] / defaults.
+  const cleanUpdates: Partial<TaskRecord> = {}
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined) {
+      ;(cleanUpdates as Record<string, unknown>)[key] = value
+    }
+  }
   const next = normalizeTask({
     ...current,
-    ...updates,
+    ...cleanUpdates,
     id: current.id,
     created_by: current.created_by,
     created_at: current.created_at,
     updated_at: new Date().toISOString(),
-    title: typeof updates.title === 'string' ? updates.title : current.title,
+    title: typeof cleanUpdates.title === 'string' ? cleanUpdates.title : current.title,
   })
 
   file.tasks[index] = next
