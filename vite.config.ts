@@ -13,6 +13,8 @@ import tailwindcss from '@tailwindcss/vite'
 // nitro plugin removed (tanstackStart handles server runtime)
 import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
+import { runSwarmDispatch } from './src/routes/api/tasks-swarm-run'
+import { runSwarmMissionLoop } from './src/server/swarm-mission-runner'
 
 // ---------------------------------------------------------------------------
 // Hermes Agent auto-start helpers
@@ -700,6 +702,41 @@ const config = defineConfig(({ mode, command }) => {
               workspaceDaemonChild = null
             }
           })
+
+          // Auto-dispatch Tasks board → swarm on a timer so the queue drains
+          // on its own (respecting per-worker concurrency). Runs only in serve
+          // mode; one tick every 30s. Failures are logged but never crash the
+          // dev server.
+          if (command === 'serve') {
+            const SWARM_DISPATCH_INTERVAL_MS = 30_000
+            setInterval(() => {
+              runSwarmDispatch({ dryRun: false })
+                .then((r) =>
+                  console.log(
+                    `[swarm-dispatch] tick: scanned=${r.scanned} dispatched=${r.dispatched} rebalanced=${r.rebalancedToTodo}`,
+                  ),
+                )
+                .catch((e) =>
+                  console.error('[swarm-dispatch] tick failed:', e instanceof Error ? e.message : e),
+                )
+            }, SWARM_DISPATCH_INTERVAL_MS)
+
+            // Headless mission runner: sends each eligible mission assignment's
+            // prompt to its worker's tmux pane and marks it dispatched, so the
+            // swarm executes without needing the conductor UI open.
+            const SWARM_MISSION_INTERVAL_MS = 30_000
+            setInterval(() => {
+              try {
+                const r = runSwarmMissionLoop()
+                if (r.dispatched > 0)
+                  console.log(
+                    `[swarm-mission-runner] tick: dispatched=${r.dispatched} skipped=${r.skipped}`,
+                  )
+              } catch (e) {
+                console.error('[swarm-mission-runner] tick failed:', e instanceof Error ? e.message : e)
+              }
+            }, SWARM_MISSION_INTERVAL_MS)
+          }
 
           // Auto-start hermes-agent when dev server launches.
           // Skip when launchd manages the gateway (HERMES_WORKSPACE_AUTO_START_AGENT=false)

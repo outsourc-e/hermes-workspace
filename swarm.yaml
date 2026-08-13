@@ -4,7 +4,7 @@ workers:
   name: Orchestrator
   role: Swarm Orchestrator / Greenlight Gate
   specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates, NEXUM delivery sequencing
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Decompose NEXUM missions into safe, proof-bearing work and route each slice to the right specialist (builder/km-agent/ops-watch/reviewer/workspace) by function. Drive the Tasks board -> swarm flow, respect dependsOn, and hold the human greenlight gate before merges/publishes.
   profile: orchestrator
   modes:
@@ -56,12 +56,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: orchestrator:plan
+  wrapper: orchestrator
 - id: km-agent
   name: KM Agent
   role: RAZSOC / GBrain Knowledge Steward + NEXUM Documentation Owner
   specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits, NEXUM plan/roadmap documentation
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Keep the operating brain coherent, searchable, and source-of-record aligned. For NEXUM, own the plan-de-negocios and roadmap documentation, classify Tasks-board items (owner/due_date/priority), and feed structured knowledge back to the swarm without polluting durable memory.
   profile: km-agent
   modes:
@@ -110,12 +110,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: km:health
+  wrapper: km-agent
 - id: builder
   name: Builder
   role: Scoped Implementation Agent / NEXUM Code & Integration
   specialty: focused implementation, tests, small diffs, integration fixes, NEXUM feature slices (F0-F6)
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Ship scoped NEXUM product/code slices with tests, minimal diffs, and clear verification evidence. Own implementation tasks routed from the Tasks board (assignee=builder).
   profile: builder
   modes:
@@ -160,12 +160,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: builder:task
+  wrapper: builder
 - id: reviewer
   name: Reviewer
   role: Independent Review / Merge Gate
   specialty: security review, logic review, regression detection, quality gates, NEXUM change verification
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Independently review NEXUM changes and block unsafe, untested, or logically broken work before it lands. Verify builder artifacts against proof contracts from the orchestrator.
   profile: reviewer
   modes:
@@ -208,12 +208,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: reviewer:gate
+  wrapper: reviewer
 - id: qa
   name: QA
   role: Browser / Workflow / CLI Smoke Verification
   specialty: browser QA, workflow smoke tests, expected-vs-actual checks, regression reproduction
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Verify user-visible behavior with concrete smoke evidence and concise bug reports.
   profile: qa
   modes:
@@ -253,12 +253,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: qa:smoke
+  wrapper: qa
 - id: researcher
   name: Researcher
   role: Brain-first Research / Bounded Autoresearch
   specialty: GBrain-first lookup, external research, synthesis, source trails, bounded research loops
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Produce decision-grade research with brain-first context, external verification, and explicit uncertainty.
   profile: researcher
   modes:
@@ -307,12 +307,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: researcher:quick
+  wrapper: researcher
 - id: ops-watch
   name: Ops Watch
   role: Local Infra / Runtime Health Watch + NEXUM Reliability
   specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability, NEXUM runtime validation
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks. For NEXUM, validate builder scripts/artifacts and watch the swarm runtime health.
   profile: ops-watch
   modes:
@@ -355,12 +355,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: ops:health
+  wrapper: ops-watch
 - id: workspace
   name: Workspace
   role: Integration / Summary / Board Sync
   specialty: Tasks board sync, mission summaries, artifact aggregation, NEXUM deliverable assembly
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Aggregate swarm artifacts into coherent deliverables and sync results back to the Tasks board (move to done, attach outputs). For NEXUM, write extracted plan/roadmap tasks to the board and summarize mission outcomes.
   profile: workspace
   modes:
@@ -396,12 +396,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: workspace:summary
+  wrapper: workspace
 - id: maintainer
   name: Maintainer
   role: Upstream Dependency / Patch Hygiene
   specialty: upstream tracking, local patch hygiene, dependency updates, PR/issue follow-through
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Keep local forks and upstream dependencies healthy without losing local patches or dirty-worktree context.
   profile: maintainer
   modes:
@@ -446,12 +446,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: maintainer:check
+  wrapper: maintainer
 - id: strategist
   name: Strategist
   role: Wedges / Bets / Kill Criteria
   specialty: operating plans, gstack-style wedges, strategy reviews, decision framing, kill criteria
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Turn ambiguity into crisp wedges, bets, constraints, and kill criteria without over-planning.
   profile: strategist
   modes:
@@ -492,12 +492,12 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: strategist:review
+  wrapper: strategist
 - id: inbox-triage
   name: Inbox Triage
   role: Capture / Discard / Route / Task Triage
   specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
-  model: tencent/hy3:free
+  model: nous/tencent/hy3:free
   mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
   profile: inbox-triage
   modes:
@@ -540,4 +540,4 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: inbox:triage
+  wrapper: inbox-triage
