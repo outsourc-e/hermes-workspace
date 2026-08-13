@@ -196,8 +196,8 @@ export const SwarmTerminal = memo(function SwarmTerminal({
       setState('connected')
       setTimeout(() => focusTerminal(), 50)
 
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 15_000)
+      // TEMP DIAGNOSTIC: capture the real fetch error instead of swallowing it.
+      let fetchError: unknown = null
       const response = await fetch('/api/terminal-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -207,9 +207,15 @@ export const SwarmTerminal = memo(function SwarmTerminal({
           cols: terminal.cols,
           rows: terminal.rows,
         }),
-        signal: controller.signal,
-      }).catch(() => null)
-      clearTimeout(timeout)
+      }).catch((err) => {
+        fetchError = err
+        return null
+      })
+
+      if (fetchError) {
+        // eslint-disable-next-line no-console
+        console.error('[swarm-terminal] fetch failed:', fetchError)
+      }
 
       if (cancelled) return
       if (!response || !response.ok || !response.body) {
