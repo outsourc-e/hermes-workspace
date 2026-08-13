@@ -1186,7 +1186,19 @@ export function Swarm2Screen() {
         cronJobCount: 0,
         assignedTaskCount: 0,
       }))
-    return sortSwarmMembers([...merged, ...extras], roomIds)
+    const all = sortSwarmMembers([...merged, ...extras], roomIds)
+    // Guard against duplicate worker ids (e.g. crew reports `workspace` twice).
+    // Duplicate ids cause React key collisions across worker cards, runtime
+    // terminals and the activity feed, and can remount/abort the SSE terminal
+    // fetch ("Failed to start swarm terminal (no response)").
+    const seenIds = new Set<string>()
+    const deduped: typeof all = []
+    for (const member of all) {
+      if (seenIds.has(member.id)) continue
+      seenIds.add(member.id)
+      deduped.push(member)
+    }
+    return deduped
   }, [crew, roomIds, runtimeByWorker, rosterQuery.data])
 
   useEffect(() => {
