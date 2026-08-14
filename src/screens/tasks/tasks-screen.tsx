@@ -15,8 +15,10 @@ import {
   COLUMN_COLORS,
   COLUMN_LABELS,
   COLUMN_ORDER,
+  autoClassifyTasks,
   createTask,
   deleteTask,
+  dispatchTaskToSwarm,
   fetchAssignees,
   fetchTasks,
   isOverdue,
@@ -139,6 +141,51 @@ export function TasksScreen() {
     onError: (e) => toast(e instanceof Error ? e.message : 'Failed to move task', { type: 'error' }),
   })
 
+  const dispatchMutation = useMutation({
+    mutationFn: (task: ClaudeTask) => dispatchTaskToSwarm(task),
+    onSuccess: (result, task) => {
+      if (result.ok) {
+        // Link the mission and move the task to Running so it reflects live.
+        void updateTask(task.id, { column: 'in_progress' }).catch(() => undefined)
+        invalidate()
+        toast(`Dispatched to swarm (mission ${result.missionId ?? '?'})`)
+      } else {
+        toast(result.error ?? 'Failed to dispatch to swarm', { type: 'error' })
+      }
+    },
+    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to dispatch to swarm', { type: 'error' }),
+  })
+
+  function handleDispatchTask(task: ClaudeTask) {
+    dispatchMutation.mutate(task)
+  }
+
+  const autoClassifyMutation = useMutation({
+    mutationFn: () => autoClassifyTasks(tasks),
+    onSuccess: (result) => {
+      if (result.ok) {
+        invalidate()
+        toast(`KM agent classifying Nexum tasks (mission ${result.missionId ?? '?'})`)
+      } else {
+        toast(result.error ?? 'Failed to auto-classify', { type: 'error' })
+      }
+    },
+    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to auto-classify', { type: 'error' }),
+  })
+
+  function handleAutoClassify() {
+    autoClassifyMutation.mutate()
+  }
+
+  function handleDispatchAll() {
+    const eligible = tasks.filter((t) => t.assignee && t.column !== 'done' && t.column !== 'in_progress')
+    if (eligible.length === 0) {
+      toast('No assigned tasks to dispatch (assign an owner first)', { type: 'error' })
+      return
+    }
+    for (const t of eligible) dispatchMutation.mutate(t)
+  }
+
   function handleDragStart(e: React.DragEvent, taskId: string) {
     e.dataTransfer.setData('text/plain', taskId)
     setDraggingId(taskId)
@@ -248,6 +295,26 @@ export function TasksScreen() {
             <HugeiconsIcon icon={Add01Icon} size={14} />
             New Task
           </button>
+          <button
+            onClick={handleDispatchAll}
+            disabled={dispatchMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: '#a855f7' }}
+            title="Dispatch all assigned (non-running) tasks to the swarm"
+          >
+            <HugeiconsIcon icon={CheckListIcon} size={14} />
+            Dispatch to swarm
+          </button>
+          <button
+            onClick={handleAutoClassify}
+            disabled={autoClassifyMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: '#0ea5e9' }}
+            title="Dispatch the KM agent to classify all Nexum tasks (owner/due_date/priority) and apply them"
+          >
+            <HugeiconsIcon icon={CheckListIcon} size={14} />
+            Auto-classify
+          </button>
         </div>
       </div>
         <p className="mt-3 text-xs text-[var(--theme-muted)]">
@@ -355,6 +422,8 @@ export function TasksScreen() {
                             isDragging={draggingId === task.id}
                             onDragStart={e => handleDragStart(e, task.id)}
                             onClick={() => setEditingTask(task)}
+                            onDelete={(id) => deleteMutation.mutate(id)}
+                            onDispatch={handleDispatchTask}
                           />
                         </motion.div>
                       ))

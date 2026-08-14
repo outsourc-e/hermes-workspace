@@ -15,6 +15,9 @@ export const Route = createFileRoute('/api/terminal-stream')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // TEMP DIAGNOSTIC
+        // eslint-disable-next-line no-console
+        console.error('[terminal-stream] POST received from', getClientIp(request), 'origin=', request.headers.get('origin'))
         if (!requireLocalOrAuth(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),

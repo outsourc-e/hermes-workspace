@@ -44,29 +44,26 @@ async function probeBackend(base: string): Promise<number> {
 }
 
 async function resolveBackend(): Promise<BackendResolution> {
-  if (_resolved) return _resolved
-  if (_resolving) return _resolving
+  // NOTE: resolution is intentionally NOT cached across calls. Caching caused
+  // the board to "lose" tasks: after a transient 500/timeout on the hermes
+  // probe, the page stayed pinned to the claude backend (which holds 1 task)
+  // for the whole session. Re-probing each call lets a later successful hermes
+  // probe win. The double-probe cost is negligible for a kanban board.
+  const [hermesCount, claudeCount] = await Promise.all([
+    probeBackend(HERMES_BASE),
+    probeBackend(CLAUDE_BASE),
+  ])
 
-  _resolving = (async () => {
-    const [hermesCount, claudeCount] = await Promise.all([
-      probeBackend(HERMES_BASE),
-      probeBackend(CLAUDE_BASE),
-    ])
-
-    // Prefer hermes if it has real data (> 0); fall back to claude if hermes is
-    // missing (returns -1 for non-JSON / route-not-found) or empty.
-    // Default to claude when both are empty — it is the active backend after the
-    // hermes-tasks → claude-tasks route rename (commit efcb7d14).
-    const useHermes = hermesCount > 0 && hermesCount >= claudeCount
-    _resolved = {
-      base: useHermes ? HERMES_BASE : CLAUDE_BASE,
-      assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',
-      backend: useHermes ? 'hermes' : 'claude',
-    }
-    return _resolved
-  })()
-
-  return _resolving
+  // Prefer hermes whenever it holds real data. It is the canonical agent task
+  // store (~/.hermes/tasks.json) and holds the NEXUM tasks. Only fall back to
+  // claude when hermes is empty (0) or unreachable (-1 for non-JSON / 404).
+  const useHermes = hermesCount > 0
+  _resolved = {
+    base: useHermes ? HERMES_BASE : CLAUDE_BASE,
+    assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',
+    backend: (useHermes ? 'hermes' : 'claude') as TasksBackend,
+  }
+  return _resolved
 }
 
 /** Returns the currently resolved backend id, or null if not yet probed. */
@@ -260,4 +257,99 @@ export function isOverdue(task: ClaudeTask): boolean {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return due < today
+}
+
+// --- Swarm dispatch integration -------------------------------------------
+
+/** Map a task assignee id to a swarm workerId. Unknown owners fall back to null. */
+export const SWARM_WORKER_BY_ASSIGNEE: Record<string, string> = {
+  builder: 'builder',
+  'km-agent': 'km-agent',
+  'ops-watch': 'ops-watch',
+  orchestrator: 'orchestrator',
+  reviewer: 'reviewer',
+  workspace: 'workspace',
+}
+
+export function resolveSwarmWorker(assignee: string | null | undefined): string | null {
+  if (!assignee) return null
+  return SWARM_WORKER_BY_ASSIGNEE[assignee] ?? null
+}
+
+export type DispatchResult = { ok: boolean; missionId?: string; error?: string }
+
+/**
+ * Dispatch a task to the swarm. The task's assignee (if any) becomes the
+ * workerId; otherwise it is sent to the orchestrator for routing. Returns the
+ * new mission id so callers can link the task and move it to Running.
+ */
+export async function dispatchTaskToSwarm(task: ClaudeTask): Promise<DispatchResult> {
+  const { base: tasksBase } = await resolveBackend()
+  const workerId = resolveSwarmWorker(task.assignee)
+  const assignments = [
+    {
+      workerId: workerId ?? 'orchestrator',
+      task: `${task.title}${task.description ? `\n\n${task.description}` : ''}`,
+      rationale: `Dispatched from Tasks board (task ${task.id})`,
+      reviewRequired: task.column === 'review',
+    },
+  ]
+  // swarm-dispatch lives under the same origin as the tasks API.
+  const swarmUrl = tasksBase.replace(/\/api\/hermes-tasks$/, '') + '/api/swarm-dispatch'
+  const res = await fetch(swarmUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      assignments,
+      missionTitle: `Tasks board: ${task.title}`.slice(0, 120),
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    return { ok: false, error: (body as { error?: string }).error || `HTTP ${res.status}` }
+  }
+  const data = (await res.json()) as { missionId?: string }
+  return { ok: true, missionId: data.missionId }
+}
+
+/**
+ * Auto-classify every Nexum task on the board: dispatch the KM agent to read
+ * nexum-tasks.json, decide owner/due_date/priority per task, and apply the
+ * result via PATCH. Returns the mission id so the caller can track progress.
+ */
+export async function autoClassifyTasks(tasks: Array<ClaudeTask>): Promise<DispatchResult> {
+  const nexum = tasks.filter((t) => (t.tags as Array<string> | undefined)?.includes('nexum') ?? false)
+  if (nexum.length === 0) {
+    return { ok: false, error: 'No Nexum tasks on the board to classify' }
+  }
+  const { base: tasksBase } = await resolveBackend()
+  const missionUrl = tasksBase.replace(/\/api\/hermes-tasks$/, '')
+  const swarmUrl = `${missionUrl}/api/swarm-dispatch`
+  const assignment = {
+    workerId: 'km-agent',
+    task:
+      'CLASSIFICATION-ONLY task. Do NOT implement or research anything.\n' +
+      '1) Read /tmp/nexum-tasks.json (Nexum project tasks, each has id/title/phase/deadline/category/priority).\n' +
+      '2) For EVERY one of the 174 tasks decide:\n' +
+      '   (a) assignee from {builder, km-agent, ops-watch, orchestrator, reviewer, workspace} by task TYPE ' +
+      '(code/platform->builder; docs/knowledge/marketing->km-agent; infra/runtime/health->ops-watch; qa/security/validation->reviewer; integration/summary/board->workspace; planning/governance/gate->orchestrator);\n' +
+      '   (b) priority already in the file (high/medium/low) — keep it;\n' +
+      '   (c) due_date YYYY-MM-DD from the Nexum timeline (M0=2026-08-12, each M = +1 week).\n' +
+      '3) PATCH each task via: PATCH ' + `${tasksBase}/{id}` + ' with JSON body {"assignee":..., "priority":..., "due_date":...} ' +
+      '(do NOT send "tags" — the server preserves existing tags).\n' +
+      '4) Report counts per owner when done.',
+    rationale: 'Auto-classify Nexum tasks from the Tasks board (classification only)',
+    reviewRequired: false,
+  }
+  const res = await fetch(swarmUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignments: [assignment], missionTitle: 'Auto-classify Nexum tasks' }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    return { ok: false, error: (body as { error?: string }).error || `HTTP ${res.status}` }
+  }
+  const data = (await res.json()) as { missionId?: string }
+  return { ok: true, missionId: data.missionId }
 }

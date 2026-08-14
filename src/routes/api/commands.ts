@@ -22,10 +22,11 @@ export const Route = createFileRoute('/api/commands')({
           const res = await gatewayFetch('/v1/commands')
 
           if (!res.ok) {
-            return json(
-              { error: `Gateway responded with status ${res.status}` },
-              { status: res.status },
-            )
+            // The gateway may not expose /v1/commands (e.g. local dev).
+            // Return an empty list so the composer falls back to
+            // DEFAULT_SLASH_COMMANDS instead of spamming the browser
+            // console with a 404 on every mount.
+            return Response.json({ commands: [] })
           }
 
           const body = await res.json()

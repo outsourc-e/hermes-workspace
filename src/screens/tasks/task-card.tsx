@@ -1,12 +1,16 @@
-import { cn } from '@/lib/utils'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Delete02Icon } from '@hugeicons/core-free-icons'
 import type { ClaudeTask } from '@/lib/tasks-api'
 import { PRIORITY_COLORS, isOverdue } from '@/lib/tasks-api'
+import { cn } from '@/lib/utils'
 
 type Props = {
   task: ClaudeTask
   assigneeLabels?: Record<string, string>
   onClick: () => void
   onDragStart: (e: React.DragEvent) => void
+  onDelete?: (id: string) => void
+  onDispatch?: (task: ClaudeTask) => void
   isDragging?: boolean
 }
 
@@ -18,7 +22,7 @@ export function formatTaskAssigneeLabel(
   return `Assignee: ${resolvedLabel}`
 }
 
-export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDragging }: Props) {
+export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, onDelete, onDispatch, isDragging }: Props) {
   const overdue = isOverdue(task)
   const priorityColor = PRIORITY_COLORS[task.priority]
   const visibleTags = task.tags.slice(0, 2)
@@ -38,12 +42,28 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: priorityColor }}
     >
-      {/* Priority dot in top-right */}
-      <span
-        className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full shrink-0"
-        style={{ background: priorityColor }}
-        title={`Priority: ${task.priority}`}
-      />
+      {/* Priority dot + delete button in top-right */}
+      <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ background: priorityColor }}
+          title={`Priority: ${task.priority}`}
+        />
+        {onDelete && (
+          <button
+            type="button"
+            aria-label="Delete task"
+            title="Delete task"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(task.id)
+            }}
+            className="rounded p-0.5 transition-colors hover:bg-[var(--theme-hover)] hover:text-red-400 text-[var(--theme-muted)]"
+          >
+            <HugeiconsIcon icon={Delete02Icon} size={13} />
+          </button>
+        )}
+      </div>
 
       <p className="text-sm font-medium text-[var(--theme-text)] leading-snug mb-1 line-clamp-2 pr-4">
         {task.title}
@@ -86,13 +106,28 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
             )}
             <span className={overdue ? 'text-red-400 font-semibold' : 'text-[var(--theme-muted)]'}>
               {(() => {
-                const [y, m, d] = task.due_date!.split('-').map(Number)
+                const [y, m, d] = task.due_date.split('-').map(Number)
                 return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               })()}
             </span>
           </div>
         )}
       </div>
+
+      {onDispatch && task.assignee && task.column !== 'done' && task.column !== 'in_progress' && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDispatch(task)
+          }}
+          className="mt-2 w-full rounded-md py-1 text-[10px] font-medium uppercase tracking-wide text-white transition-opacity hover:opacity-90"
+          style={{ background: '#a855f7' }}
+          title={`Dispatch to swarm worker: ${task.assignee}`}
+        >
+          Dispatch → {task.assignee}
+        </button>
+      )}
     </div>
   )
 }
