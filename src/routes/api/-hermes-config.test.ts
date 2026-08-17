@@ -13,7 +13,7 @@ vi.mock('../../server/auth-middleware', () => ({
 
 vi.mock('../../server/gateway-capabilities', () => ({
   ensureGatewayProbed: vi.fn(),
-  getCapabilities: () => ({ config: true }),
+  getCapabilities: vi.fn(() => ({ config: true })),
 }))
 
 vi.mock('../../server/local-provider-discovery', () => ({
@@ -132,10 +132,15 @@ describe('canonical /api/hermes-config route', () => {
   })
 
   it('PATCH returns 503 when the gateway capability is unavailable', async () => {
-    vi.doMock('../../server/gateway-capabilities', () => ({
-      ensureGatewayProbed: vi.fn(),
-      getCapabilities: () => ({ config: false }),
-    }))
+    // Scoped to this test only: a fresh `getCapabilities` vi.fn() is created
+    // by the top-level mock factory every time `vi.resetModules()` runs in
+    // `beforeEach`, so `mockReturnValueOnce` here can't leak into later tests
+    // the way a `vi.doMock`/`vi.doUnmock` pair around a dynamic import did
+    // (that previously left `config: false` active for whichever test ran
+    // next in this file — see the "legacy /api/claude-config alias" test).
+    const { getCapabilities } = await import('../../server/gateway-capabilities')
+    vi.mocked(getCapabilities).mockReturnValueOnce({ config: false } as any)
+
     const handlers = await loadHandlers('./hermes-config')
     const res = await handlers.PATCH({
       request: new Request('http://localhost/api/hermes-config', {
@@ -144,7 +149,6 @@ describe('canonical /api/hermes-config route', () => {
       }),
     })
     expect(res.status).toBe(503)
-    vi.doUnmock('../../server/gateway-capabilities')
   })
 })
 
@@ -165,5 +169,38 @@ describe('legacy /api/claude-config alias', () => {
 
     expect(openrouter.maskedKeys).toEqual(openrouter.maskedCredentials)
     expect(openrouter.maskedKeys.OPENROUTER_API_KEY).toBeTruthy()
+  })
+})
+
+describe('unauthenticated requests', () => {
+  it('GET /api/hermes-config returns a 401 Response instead of crashing', async () => {
+    vi.doMock('../../server/auth-middleware', () => ({
+      isAuthenticated: () => false,
+    }))
+    const handlers = await loadHandlers('./hermes-config')
+    const res = await handlers.GET({
+      request: new Request('http://localhost/api/hermes-config'),
+    })
+    expect(res).toBeInstanceOf(Response)
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body).toEqual({ ok: false, error: 'Unauthorized' })
+    vi.doUnmock('../../server/auth-middleware')
+  })
+
+  it('PATCH /api/claude-config returns a 401 Response instead of crashing', async () => {
+    vi.doMock('../../server/auth-middleware', () => ({
+      isAuthenticated: () => false,
+    }))
+    const handlers = await loadHandlers('./claude-config')
+    const res = await handlers.PATCH({
+      request: new Request('http://localhost/api/claude-config', {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'set-default-model', providerId: 'x', modelId: 'y' }),
+      }),
+    })
+    expect(res).toBeInstanceOf(Response)
+    expect(res.status).toBe(401)
+    vi.doUnmock('../../server/auth-middleware')
   })
 })

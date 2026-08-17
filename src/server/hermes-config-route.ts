@@ -72,8 +72,9 @@ const LegacyPatchSchema = z.object({
 })
 
 async function authorize(request: Request): Promise<AuthResult> {
-  const result = isAuthenticated(request) as AuthResult
-  if (result !== true) return result
+  if (!isAuthenticated(request)) {
+    return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
   await ensureGatewayProbed()
   return true
 }
