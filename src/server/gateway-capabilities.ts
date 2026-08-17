@@ -262,6 +262,83 @@ let dashboardTokenCache = ''
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
 
 /**
+ * Credentials for a dashboard behind Hermes Agent's login-form auth gate
+ * (`HERMES_DASHBOARD_BASIC_AUTH_USERNAME`/`_PASSWORD` on the Agent side —
+ * same var names here so operators can copy the pair straight across).
+ * Optional: unset by default, which preserves the original ephemeral-token
+ * scrape below for dashboards with no auth gate (the common loopback case).
+ */
+function getDashboardLoginCredentials(): { username: string; password: string } | null {
+  const username = (process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME || '').trim()
+  const password = process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD || ''
+  if (!username || !password) return null
+  return { username, password }
+}
+
+let dashboardSessionCookiePromise: Promise<string> | null = null
+let dashboardSessionCookieCache = ''
+
+/**
+ * Despite the "basic auth" naming on the Agent side, the dashboard's gate is
+ * a cookie-session login form (`POST /auth/password-login`), not RFC 7617
+ * HTTP Basic — a raw `Authorization: Basic ...` header is silently ignored
+ * and the request still gets redirected to /login. Log in once, cache the
+ * `Set-Cookie` values, and replay them as a `Cookie` header on every
+ * dashboard request until one comes back 401 (session expired / dashboard
+ * restarted), same invalidate-and-retry-once shape as the token cache above.
+ */
+async function loginToDashboard(options?: { force?: boolean }): Promise<string> {
+  const creds = getDashboardLoginCredentials()
+  if (!creds) return ''
+
+  const force = options?.force === true
+  if (!force && dashboardSessionCookieCache) return dashboardSessionCookieCache
+  if (!force && dashboardSessionCookiePromise) return dashboardSessionCookiePromise
+
+  dashboardSessionCookiePromise = (async () => {
+    try {
+      const res = await fetch(`${CLAUDE_DASHBOARD_URL}/auth/password-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'basic',
+          username: creds.username,
+          password: creds.password,
+          next: '',
+        }),
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        console.warn(`[gateway] Dashboard login rejected (${res.status}) — check HERMES_DASHBOARD_BASIC_AUTH_USERNAME/_PASSWORD`)
+        return ''
+      }
+      const setCookie =
+        typeof res.headers.getSetCookie === 'function'
+          ? res.headers.getSetCookie()
+          : (res.headers.get('set-cookie') ? [res.headers.get('set-cookie') as string] : [])
+      const cookie = setCookie.map((c) => c.split(';')[0]).filter(Boolean).join('; ')
+      if (!cookie) {
+        console.warn('[gateway] Dashboard login succeeded but returned no session cookie')
+        return ''
+      }
+      dashboardSessionCookieCache = cookie
+      return cookie
+    } catch (err) {
+      console.warn(
+        `[gateway] Failed to log in to dashboard: ${err instanceof Error ? err.message : err}`,
+      )
+      return ''
+    }
+  })()
+
+  try {
+    return await dashboardSessionCookiePromise
+  } finally {
+    dashboardSessionCookiePromise = null
+  }
+}
+
+/**
  * Dashboard API auth uses the ephemeral session token injected into the
  * dashboard root HTML at startup. Do not reuse gateway bearer tokens here and
  * do not trust a manually copied dashboard token env var — it goes stale every
@@ -334,6 +411,14 @@ export async function getDashboardToken(options?: {
 export async function dashboardAuthHeaders(options?: {
   force?: boolean
 }): Promise<Record<string, string>> {
+  if (getDashboardLoginCredentials()) {
+    const cookie = await loginToDashboard(options)
+    if (cookie) return { Cookie: cookie }
+    // Login itself failed (bad creds, dashboard unreachable) — fall through
+    // to the token-scrape path below rather than sending an unauthenticated
+    // request outright; it will also fail, but with the original error
+    // shape callers already handle.
+  }
   const token = await getDashboardToken(options)
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
@@ -361,7 +446,7 @@ export async function dashboardFetch(
       !requestPath.endsWith('/api/dashboard/plugins') &&
       !requestPath.endsWith('/api/dashboard/plugins/rescan')
 
-    if (isProtected && !headers.has('Authorization')) {
+    if (isProtected && !headers.has('Authorization') && !headers.has('Cookie')) {
       const auth = await dashboardAuthHeaders({ force: forceToken })
       for (const [key, value] of Object.entries(auth)) {
         headers.set(key, value)
@@ -378,6 +463,7 @@ export async function dashboardFetch(
   let res = await doFetch(false)
   if (res.status === 401) {
     dashboardTokenCache = ''
+    dashboardSessionCookieCache = ''
     res = await doFetch(true)
   }
   return res
