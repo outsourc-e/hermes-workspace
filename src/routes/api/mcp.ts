@@ -123,7 +123,7 @@ export const Route = createFileRoute('/api/mcp')({
 
           let servers: ReturnType<typeof normalizeMcpList>
           if (capabilities.mcp) {
-            const response = await mcpFetch('/api/mcp', {
+            const response = await mcpFetch('/api/mcp/servers', {
               signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
             })
             if (!response.ok) {
@@ -209,7 +209,7 @@ export const Route = createFileRoute('/api/mcp')({
           }
           const input = parsed.value
           if (capabilities.mcp) {
-            const response = await mcpFetch('/api/mcp', {
+            const response = await mcpFetch('/api/mcp/servers', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(input),
