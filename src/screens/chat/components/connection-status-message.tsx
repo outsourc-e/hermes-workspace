@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Alert02Icon, WifiDisconnected01Icon } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
+import { getConnectionErrorInfo } from '@/lib/connection-errors'
 
 type ConnectionStatusMessageProps = {
   state: 'checking' | 'error'
@@ -11,6 +12,14 @@ type ConnectionStatusMessageProps = {
   className?: string
 }
 
+// Classification previously duplicated an inline copy of this logic that
+// treated any message containing "auth" or "token" as a Hermes-Agent gateway
+// rejection — including a plain 401 from /api/ping, which only ever reflects
+// this Workspace's own password-session cookie, never the gateway token. That
+// misrouted users to "Settings -> Advanced -> Hermes Agent" for a problem
+// solved by just logging back in. `getConnectionErrorInfo` (src/lib/connection-errors.ts)
+// already disambiguates this correctly (and is unit-tested for it) but was
+// never wired into this component — use it instead of re-deriving locally.
 function classifyConnectionError(
   error?: string | null,
   status?: number | null,
@@ -19,10 +28,7 @@ function classifyConnectionError(
   description: string
   action: string
 } {
-  const normalizedError = error?.trim()
-  const lower = normalizedError?.toLowerCase() ?? ''
-
-  if (!normalizedError && !status) {
+  if (!error?.trim() && !status) {
     return {
       title: 'Not connected',
       description: "Hermes Workspace can't reach Hermes Agent.",
@@ -30,57 +36,11 @@ function classifyConnectionError(
     }
   }
 
-  if (
-    status === 401 ||
-    lower.includes('auth') ||
-    lower.includes('token') ||
-    lower.includes('unauthorized')
-  ) {
-    return {
-      title: 'Authentication required',
-      description: 'Hermes Agent rejected the connection token.',
-      action: 'Go to Settings -> Advanced -> Hermes Agent to update your token.',
-    }
-  }
-
-  if (
-    status === 403 ||
-    lower.includes('pair') ||
-    lower.includes('not paired')
-  ) {
-    return {
-      title: 'Pairing required',
-      description: "This device isn't paired with Hermes Agent yet.",
-      action: 'Check Hermes Agent connection.',
-    }
-  }
-
-  if (lower.includes('econnrefused') && lower.includes('8642')) {
-    return {
-      title: 'Hermes Agent gateway not running',
-      description: 'The Hermes Agent gateway is not running on port 8642.',
-      action: 'Run the official Hermes installer, then start the gateway with: hermes gateway run',
-    }
-  }
-
-  if (
-    lower.includes('econnrefused') ||
-    lower.includes('fetch') ||
-    lower.includes('failed to fetch') ||
-    lower.includes('timed out') ||
-    lower.includes('timeout')
-  ) {
-    return {
-      title: 'Hermes Agent unreachable',
-      description: "Can't connect to Hermes Agent at the configured URL.",
-      action: 'Make sure Hermes is running and the URL is correct.',
-    }
-  }
-
+  const info = getConnectionErrorInfo(error, status)
   return {
-    title: 'Connection error',
-    description: normalizedError || 'Something went wrong.',
-    action: 'Try refreshing or check Settings -> Advanced -> Hermes.',
+    title: info.title,
+    description: info.description,
+    action: info.action ?? 'Try again, or review the gateway settings.',
   }
 }
 
