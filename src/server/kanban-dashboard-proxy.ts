@@ -183,6 +183,24 @@ export async function updateDashboardKanbanTask(
   return wrapped.task
 }
 
+/** Delete a task on the dashboard board. Returns true on success, false on 404. */
+export async function deleteDashboardKanbanTask(
+  taskId: string,
+  board?: string,
+): Promise<boolean> {
+  try {
+    await dashboardFetch(
+      `/api/plugins/kanban/tasks/${encodeURIComponent(taskId)}`,
+      { method: 'DELETE' },
+      board ? { board } : {},
+    )
+    return true
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('→ 404')) return false
+    throw err
+  }
+}
+
 /**
  * List boards. The dashboard kanban plugin supports multi-board (project
  * scoping); each board is a separate SQLite file under

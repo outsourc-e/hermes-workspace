@@ -191,13 +191,14 @@ export const SwarmTerminal = memo(function SwarmTerminal({
 
       // Mark connected immediately — the terminal UI is mounted and we are
       // about to open the stream. Waiting for the fetch/stream response left
-      // panels stuck on "connecting…" when the browser fetch hung (stale tab,
-      // HMR not applied, or a slow SSE). Output streams in as it arrives.
+      // panels stuck on "connecting…" when the browser fetch hung (e.g. host
+      // mismatch, preflight, or a slow SSE). The user sees output as it streams.
       setState('connected')
+      // Give xterm a beat to finish mounting, then re-focus so keystrokes land.
       setTimeout(() => focusTerminal(), 50)
 
-      // TEMP DIAGNOSTIC: capture the real fetch error instead of swallowing it.
-      let fetchError: unknown = null
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15_000)
       const response = await fetch('/api/terminal-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -207,15 +208,9 @@ export const SwarmTerminal = memo(function SwarmTerminal({
           cols: terminal.cols,
           rows: terminal.rows,
         }),
-      }).catch((err) => {
-        fetchError = err
-        return null
-      })
-
-      if (fetchError) {
-        // eslint-disable-next-line no-console
-        console.error('[swarm-terminal] fetch failed:', fetchError)
-      }
+        signal: controller.signal,
+      }).catch(() => null)
+      clearTimeout(timeout)
 
       if (cancelled) return
       if (!response || !response.ok || !response.body) {
@@ -224,7 +219,6 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         terminal.writeln('\r\n\x1b[31m[swarm] failed to start terminal\x1b[0m')
         return
       }
-
       const reader = response.body.getReader()
       readerRef.current = reader
       const decoder = new TextDecoder()

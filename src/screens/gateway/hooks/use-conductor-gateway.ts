@@ -1000,10 +1000,11 @@ export function useConductorGateway() {
     // view even though swarm workers (e.g. workspace summarizing) were still
     // active — the user saw "12 workers / 7 live" stuck and no live update.
     // react-query calls this fn on every tick, by which point data is ready.
-    refetchInterval: (): number | false => {
+    refetchInterval: (query): number | false => {
       if (phase === 'decomposing' || phase === 'running') return 3_000
       if (phase === 'complete' && Object.keys(workerOutputs).length === 0) return 3_000
-      const liveWorkers = (sessionsQuery.data ?? []).filter(
+      const data = (query?.state?.data ?? []) as Array<{ status?: string }>
+      const liveWorkers = data.filter(
         (w: { status?: string }) => w.status === 'running' || w.status === 'idle',
       )
       return liveWorkers.length > 0 ? 3_000 : false

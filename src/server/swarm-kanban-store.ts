@@ -174,3 +174,12 @@ export function updateSwarmKanbanCard(cardId: string, updates: UpdateSwarmKanban
   writeKanbanFile(file)
   return next
 }
+
+export function deleteSwarmKanbanCard(cardId: string): boolean {
+  const file = readKanbanFile()
+  const index = file.cards.findIndex((card) => card.id === cardId)
+  if (index === -1) return false
+  file.cards.splice(index, 1)
+  writeKanbanFile(file)
+  return true
+}

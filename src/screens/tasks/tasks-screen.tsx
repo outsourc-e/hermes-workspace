@@ -5,7 +5,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, CheckListIcon, RefreshIcon } from '@hugeicons/core-free-icons'
+import { Add01Icon, CheckListIcon, PlayIcon, RefreshIcon } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn } from '@/lib/tasks-api'
@@ -177,6 +177,38 @@ export function TasksScreen() {
     autoClassifyMutation.mutate()
   }
 
+  // Dynamic board → swarm runner: dispatch every assigned (non-running) task
+  // to its swarm worker and mark Running.
+  const runSwarmMutation = useMutation({
+    mutationFn: () => fetch('/api/tasks-swarm-run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ onlyReady: false }) }).then((r) => r.json()),
+    onSuccess: (data) => {
+      invalidate()
+      if (data?.ok) {
+        toast(`Swarm run: ${data.dispatched?.length ?? 0} tasks dispatched, ${data.skipped ?? 0} skipped`)
+        // Start syncing progress in the background.
+        void syncSwarmMutation.mutate()
+      } else {
+        toast(data?.error ?? 'Swarm run failed', { type: 'error' })
+      }
+    },
+    onError: (e) => toast(e instanceof Error ? e.message : 'Swarm run failed', { type: 'error' }),
+  })
+
+  // Pull swarm completions back into the board (mission done → task done).
+  const syncSwarmMutation = useMutation({
+    mutationFn: () => fetch('/api/tasks-swarm-sync', { method: 'POST' }).then((r) => r.json()),
+    onSuccess: (data) => {
+      if (data?.ok && data.synced > 0) {
+        invalidate()
+        toast(`${data.synced} task(s) marked done from swarm`)
+      }
+    },
+  })
+
+  function handleRunSwarm() {
+    runSwarmMutation.mutate()
+  }
+
   function handleDispatchAll() {
     const eligible = tasks.filter((t) => t.assignee && t.column !== 'done' && t.column !== 'in_progress')
     if (eligible.length === 0) {
@@ -314,6 +346,16 @@ export function TasksScreen() {
           >
             <HugeiconsIcon icon={CheckListIcon} size={14} />
             Auto-classify
+          </button>
+          <button
+            onClick={handleRunSwarm}
+            disabled={runSwarmMutation.isPending || syncSwarmMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: '#22c55e' }}
+            title="Dynamically run the swarm on all assigned board tasks (dispatch → in_progress → done as missions complete)"
+          >
+            <HugeiconsIcon icon={PlayIcon} size={14} />
+            Run swarm
           </button>
         </div>
       </div>
