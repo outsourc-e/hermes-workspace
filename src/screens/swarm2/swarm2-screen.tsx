@@ -932,7 +932,7 @@ function ControlPlaneStage({
                           {cmd.kind === 'tmux' ? 'tmux' : cmd.kind === 'log-tail' ? 'logs' : 'shell'}
                         </span>
                       </div>
-                      <SwarmTerminal workerId={member.id} command={cmd.command} cwd={runtime?.cwd ?? undefined} height={420} active={viewMode === 'runtime'} />
+                      <SwarmTerminal workerId={member.id} command={cmd.command} cwd={runtime?.cwd ?? undefined} height={360} active={viewMode === 'runtime'} />
                     </div>
                   )
                 })
@@ -1020,7 +1020,7 @@ export function Swarm2Screen() {
   const runtimeQuery = useQuery({
     queryKey: ['swarm2', 'runtime'],
     queryFn: fetchRuntime,
-    refetchInterval: 30_000,
+    refetchInterval: 8_000,
   })
   const healthQuery = useQuery({
     queryKey: ['swarm2', 'health'],
@@ -1035,7 +1035,7 @@ export function Swarm2Screen() {
   const missionsQuery = useQuery({
     queryKey: ['swarm2', 'missions'],
     queryFn: fetchMissions,
-    refetchInterval: 30_000,
+    refetchInterval: 8_000,
   })
 
   const startAgentSession = useCallback(
@@ -1186,7 +1186,19 @@ export function Swarm2Screen() {
         cronJobCount: 0,
         assignedTaskCount: 0,
       }))
-    return sortSwarmMembers([...merged, ...extras], roomIds)
+    const all = sortSwarmMembers([...merged, ...extras], roomIds)
+    // Guard against duplicate worker ids (e.g. crew reports `workspace` twice).
+    // Duplicate ids cause React key collisions across worker cards, runtime
+    // terminals and the activity feed, and can remount/abort the SSE terminal
+    // fetch ("Failed to start swarm terminal (no response)").
+    const seenIds = new Set<string>()
+    const deduped: typeof all = []
+    for (const member of all) {
+      if (seenIds.has(member.id)) continue
+      seenIds.add(member.id)
+      deduped.push(member)
+    }
+    return deduped
   }, [crew, roomIds, runtimeByWorker, rosterQuery.data])
 
   useEffect(() => {
@@ -1337,12 +1349,23 @@ export function Swarm2Screen() {
   }, [])
 
   const routeInboxItemToReviewer = useCallback((item: Swarm2InboxItem) => {
+    // A runtime/inbox item may not carry a real missionId (e.g. free-form
+    // worker output that was never part of a formal mission). Dispatching the
+    // reviewer with a `null` missionId produced the prompt "review ... for
+    // mission unknown mission", which left the reviewer blocked with no real
+    // target. Fall back to the item's own id so the reviewer always gets a
+    // concrete, reviewable reference.
+    const targetRef = item.missionId?.trim() || item.id
+    if (!targetRef) {
+      console.warn('[swarm2] routeInboxItemToReviewer: item has no missionId or id; refusing to dispatch a target-less review.')
+      return
+    }
     setSelectedId('swarm6')
     setRouterSeed({
       key: Date.now(),
       mode: 'manual',
       prompt: [
-        `Review ${item.workerId}'s Swarm control-plane output for mission ${item.missionId ?? 'unknown mission'}. Do not broaden scope. Return the required checkpoint format.`,
+        `Review ${item.workerId}'s Swarm control-plane output for ${targetRef}. Do not broaden scope. Return the required checkpoint format.`,
         '',
         `Task: ${item.title}`,
         `Summary: ${item.summary}`,

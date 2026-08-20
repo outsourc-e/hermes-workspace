@@ -40,8 +40,11 @@ export const Route = createFileRoute('/api/terminal-resize')({
         }
         const session = getTerminalSession(sessionId)
         if (!session) {
-          return new Response(JSON.stringify({ ok: false }), {
-            status: 404,
+          // Session may not be initialized yet (resize fires before the
+          // terminal tab is fully mounted). Treat as a no-op rather than 404
+          // so the client console stays clean.
+          return new Response(JSON.stringify({ ok: true, skipped: true }), {
+            status: 200,
             headers: { 'Content-Type': 'application/json' },
           })
         }

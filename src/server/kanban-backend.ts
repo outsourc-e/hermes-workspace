@@ -4,21 +4,25 @@ import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { getClaudeRoot, getWorkspaceClaudeHome } from './claude-paths'
 import {
+  
   SWARM_KANBAN_FILE,
-  type CreateSwarmKanbanCardInput,
+  
+  
   createSwarmKanbanCard,
+  deleteSwarmKanbanCard,
   listSwarmKanbanCards,
-  type SwarmKanbanCard,
-  updateSwarmKanbanCard,
-  type UpdateSwarmKanbanCardInput,
+  updateSwarmKanbanCard
 } from './swarm-kanban-store'
 import { CLAUDE_DASHBOARD_URL, getCapabilities } from './gateway-capabilities'
 import {
-  fetchDashboardKanbanBoard,
+  
   createDashboardKanbanTask,
-  updateDashboardKanbanTask,
-  type DashboardKanbanTask,
+  deleteDashboardKanbanTask,
+  fetchDashboardKanbanBoard,
+  updateDashboardKanbanTask
 } from './kanban-dashboard-proxy'
+import type {CreateSwarmKanbanCardInput, SwarmKanbanCard, UpdateSwarmKanbanCardInput} from './swarm-kanban-store';
+import type {DashboardKanbanTask} from './kanban-dashboard-proxy';
 
 export type KanbanBackendId = 'local' | 'claude' | 'hermes-proxy'
 
@@ -32,13 +36,14 @@ export type KanbanBackendMeta = {
 }
 
 type KanbanBackend = {
-  meta(): KanbanBackendMeta
-  list(): SwarmKanbanCard[] | Promise<SwarmKanbanCard[]>
-  create(input: CreateSwarmKanbanCardInput): SwarmKanbanCard | Promise<SwarmKanbanCard>
-  update(
+  meta: () => KanbanBackendMeta
+  list: () => Array<SwarmKanbanCard> | Promise<Array<SwarmKanbanCard>>
+  create: (input: CreateSwarmKanbanCardInput) => SwarmKanbanCard | Promise<SwarmKanbanCard>
+  update: (
     cardId: string,
     updates: UpdateSwarmKanbanCardInput,
-  ): SwarmKanbanCard | null | Promise<SwarmKanbanCard | null>
+  ) => SwarmKanbanCard | null | Promise<SwarmKanbanCard | null>
+  delete: (cardId: string) => boolean | Promise<boolean>
 }
 
 // Map upstream Hermes kanban statuses (triage/todo/ready/running/done/blocked
@@ -235,7 +240,7 @@ function claudeTaskProjection(): string {
   ].join(' ')
 }
 
-function readClaudeTasks(): ClaudeTaskRow[] {
+function readClaudeTasks(): Array<ClaudeTaskRow> {
   const detection = detectClaudeKanban()
   if (!detection.available) return []
   const query = [
@@ -245,7 +250,7 @@ function readClaudeTasks(): ClaudeTaskRow[] {
     'order by tasks.created_at desc, tasks.id desc;',
   ].join(' ')
   const raw = runSqlite(detection.dbPath, query)
-  const parsed = raw ? (JSON.parse(raw) as ClaudeTaskRow[]) : []
+  const parsed = raw ? (JSON.parse(raw) as Array<ClaudeTaskRow>) : []
   return Array.isArray(parsed) ? parsed : []
 }
 
@@ -256,7 +261,7 @@ function readClaudeTask(taskId: string): ClaudeTaskRow | null {
     detection.dbPath,
     `select ${claudeTaskProjection()} from tasks where id = ${sqliteQuote(taskId)} limit 1;`,
   )
-  const parsed = raw ? (JSON.parse(raw) as ClaudeTaskRow[]) : []
+  const parsed = raw ? (JSON.parse(raw) as Array<ClaudeTaskRow>) : []
   return Array.isArray(parsed) && parsed[0] ? parsed[0] : null
 }
 
@@ -273,7 +278,7 @@ function normalizeTimestamp(value: unknown): number {
   return Date.now()
 }
 
-function parseJsonStringArray(value: string | null | undefined): string[] {
+function parseJsonStringArray(value: string | null | undefined): Array<string> {
   if (!value) return []
   try {
     const parsed = JSON.parse(value)
@@ -333,7 +338,7 @@ function mapBoardStatus(status: SwarmKanbanCard['status'] | null | undefined): s
   }
 }
 
-function validateNativeParents(dbPath: string, parentIds: string[]): Map<string, string> {
+function validateNativeParents(dbPath: string, parentIds: Array<string>): Map<string, string> {
   const uniqueParentIds = [...new Set(parentIds.map((parentId) => parentId.trim()).filter(Boolean))]
   if (uniqueParentIds.length === 0) return new Map()
   const raw = runSqlite(
@@ -412,6 +417,9 @@ const localBackend: KanbanBackend = {
   update(cardId, updates) {
     return updateSwarmKanbanCard(cardId, updates)
   },
+  delete(cardId) {
+    return deleteSwarmKanbanCard(cardId)
+  },
 }
 
 const claudeBackend: KanbanBackend = {
@@ -446,7 +454,7 @@ const claudeBackend: KanbanBackend = {
         detection.dbPath,
         `select ${claudeTaskProjection()} from tasks where idempotency_key = ${sqliteQuote(idempotencyKey)} and status != 'archived' order by created_at desc, id desc limit 1;`,
       )
-      const parsed = existing ? (JSON.parse(existing) as ClaudeTaskRow[]) : []
+      const parsed = existing ? (JSON.parse(existing) as Array<ClaudeTaskRow>) : []
       if (Array.isArray(parsed) && parsed[0]) return claudeTaskToCard(parsed[0])
     }
     const parentStatuses = validateNativeParents(detection.dbPath, parentIds)
@@ -485,7 +493,7 @@ const claudeBackend: KanbanBackend = {
   update(cardId, updates) {
     const detection = detectClaudeKanban()
     if (!detection.available) return null
-    const assignments: string[] = []
+    const assignments: Array<string> = []
     if (typeof updates.title === 'string' && updates.title.trim()) assignments.push(`title = ${sqliteQuote(updates.title.trim())}`)
     if (typeof updates.spec === 'string') assignments.push(`body = ${sqliteQuote(updates.spec)}`)
     if (updates.assignedWorker !== undefined) assignments.push(`assignee = ${updates.assignedWorker?.trim() ? sqliteQuote(updates.assignedWorker.trim()) : 'NULL'}`)
@@ -503,6 +511,12 @@ const claudeBackend: KanbanBackend = {
     runSqlite(detection.dbPath, `update tasks set ${assignments.join(', ')} where id = ${sqliteQuote(cardId)};`)
     const updated = readClaudeTask(cardId)
     return updated ? claudeTaskToCard(updated) : null
+  },
+  delete(cardId) {
+    const detection = detectClaudeKanban()
+    if (!detection.available) return false
+    runSqlite(detection.dbPath, `delete from tasks where id = ${sqliteQuote(cardId)};`)
+    return true
   },
 }
 
@@ -528,7 +542,7 @@ const dashboardProxyBackend: KanbanBackend = {
   },
   async list() {
     const board = await fetchDashboardKanbanBoard()
-    const cards: SwarmKanbanCard[] = []
+    const cards: Array<SwarmKanbanCard> = []
     for (const column of board.columns) {
       for (const task of column.tasks) {
         cards.push(dashboardTaskToCard(task))
@@ -574,6 +588,9 @@ const dashboardProxyBackend: KanbanBackend = {
       throw err
     }
   },
+  async delete(cardId) {
+    return deleteDashboardKanbanTask(cardId)
+  },
 }
 
 /**
@@ -611,7 +628,7 @@ export function getKanbanBackendMeta(): KanbanBackendMeta {
   return resolveKanbanBackend().meta()
 }
 
-export async function listKanbanCards(): Promise<SwarmKanbanCard[]> {
+export async function listKanbanCards(): Promise<Array<SwarmKanbanCard>> {
   return Promise.resolve(resolveKanbanBackend().list())
 }
 
@@ -626,4 +643,8 @@ export async function updateKanbanCard(
   updates: UpdateSwarmKanbanCardInput,
 ): Promise<SwarmKanbanCard | null> {
   return Promise.resolve(resolveKanbanBackend().update(cardId, updates))
+}
+
+export async function deleteKanbanCard(cardId: string): Promise<boolean> {
+  return Promise.resolve(resolveKanbanBackend().delete(cardId))
 }

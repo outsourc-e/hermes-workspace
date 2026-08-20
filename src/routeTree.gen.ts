@@ -45,6 +45,8 @@ import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-str
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
+import { Route as ApiTasksSwarmSyncRouteImport } from './routes/api/tasks-swarm-sync'
+import { Route as ApiTasksSwarmRunRouteImport } from './routes/api/tasks-swarm-run'
 import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
 import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-stop'
 import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
@@ -348,6 +350,16 @@ const ApiTerminalInputRoute = ApiTerminalInputRouteImport.update({
 const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
   id: '/api/terminal-close',
   path: '/api/terminal-close',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksSwarmSyncRoute = ApiTasksSwarmSyncRouteImport.update({
+  id: '/api/tasks-swarm-sync',
+  path: '/api/tasks-swarm-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksSwarmRunRoute = ApiTasksSwarmRunRouteImport.update({
+  id: '/api/tasks-swarm-run',
+  path: '/api/tasks-swarm-run',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
@@ -1071,6 +1083,8 @@ export interface FileRoutesByFullPath {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
+  '/api/tasks-swarm-run': typeof ApiTasksSwarmRunRoute
+  '/api/tasks-swarm-sync': typeof ApiTasksSwarmSyncRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1232,6 +1246,8 @@ export interface FileRoutesByTo {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
+  '/api/tasks-swarm-run': typeof ApiTasksSwarmRunRoute
+  '/api/tasks-swarm-sync': typeof ApiTasksSwarmSyncRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1395,6 +1411,8 @@ export interface FileRoutesById {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
+  '/api/tasks-swarm-run': typeof ApiTasksSwarmRunRoute
+  '/api/tasks-swarm-sync': typeof ApiTasksSwarmSyncRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1559,6 +1577,8 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/system-metrics'
+    | '/api/tasks-swarm-run'
+    | '/api/tasks-swarm-sync'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -1720,6 +1740,8 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/system-metrics'
+    | '/api/tasks-swarm-run'
+    | '/api/tasks-swarm-sync'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -1882,6 +1904,8 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/system-metrics'
+    | '/api/tasks-swarm-run'
+    | '/api/tasks-swarm-sync'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -2045,6 +2069,8 @@ export interface RootRouteChildren {
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
   ApiSwarmTmuxStopRoute: typeof ApiSwarmTmuxStopRoute
   ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
+  ApiTasksSwarmRunRoute: typeof ApiTasksSwarmRunRoute
+  ApiTasksSwarmSyncRoute: typeof ApiTasksSwarmSyncRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
@@ -2337,6 +2363,20 @@ declare module '@tanstack/react-router' {
       path: '/api/terminal-close'
       fullPath: '/api/terminal-close'
       preLoaderRoute: typeof ApiTerminalCloseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-swarm-sync': {
+      id: '/api/tasks-swarm-sync'
+      path: '/api/tasks-swarm-sync'
+      fullPath: '/api/tasks-swarm-sync'
+      preLoaderRoute: typeof ApiTasksSwarmSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-swarm-run': {
+      id: '/api/tasks-swarm-run'
+      path: '/api/tasks-swarm-run'
+      fullPath: '/api/tasks-swarm-run'
+      preLoaderRoute: typeof ApiTasksSwarmRunRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/system-metrics': {
@@ -3514,6 +3554,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
   ApiSwarmTmuxStopRoute: ApiSwarmTmuxStopRoute,
   ApiSystemMetricsRoute: ApiSystemMetricsRoute,
+  ApiTasksSwarmRunRoute: ApiTasksSwarmRunRoute,
+  ApiTasksSwarmSyncRoute: ApiTasksSwarmSyncRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,

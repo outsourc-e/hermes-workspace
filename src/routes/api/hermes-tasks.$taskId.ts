@@ -55,7 +55,13 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             column: isTaskColumn(body.column) ? body.column : undefined,
             priority: isTaskPriority(body.priority) ? body.priority : undefined,
             assignee: body.assignee === null || typeof body.assignee === 'string' ? body.assignee : undefined,
-            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
+            // Only touch tags when the caller explicitly sends them as an
+            // array. Omitting `tags` from the body now PRESERVES existing tags
+            // instead of wiping them to [] (regression that deleted the
+            // 'nexum' tag during auto-classify bulk PATCHes).
+            tags: Array.isArray(body.tags)
+              ? body.tags.filter((tag): tag is string => typeof tag === 'string')
+              : undefined,
             due_date: body.due_date === null || typeof body.due_date === 'string' ? body.due_date : undefined,
             position: typeof body.position === 'number' ? body.position : undefined,
             session_id: body.session_id === null || typeof body.session_id === 'string' ? body.session_id : undefined,

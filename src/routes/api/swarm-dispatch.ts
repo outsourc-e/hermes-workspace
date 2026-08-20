@@ -1,17 +1,20 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { newestCheckpointFromMessages, parseSwarmCheckpoint, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
+import {  newestCheckpointFromMessages, parseSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
-import { createOrUpdateMission, getSwarmMission, markMissionAssignmentDispatched, recordMissionAssignmentBlocked, recordMissionCheckpoint } from '../../server/swarm-missions'
+import {  createOrUpdateMission, getSwarmMission, markMissionAssignmentDispatched, readStore, recordMissionAssignmentBlocked, recordMissionCheckpoint, writeStore } from '../../server/swarm-missions'
 import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/swarm-memory'
-import { rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
+import {  rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import type {SwarmRosterWorker} from '../../server/swarm-roster';
+import type {SwarmMissionAssignment} from '../../server/swarm-missions';
+import type {ParsedSwarmCheckpoint} from '../../server/swarm-checkpoints';
 
 const HERMES_BIN_CANDIDATES = [
   process.env.HERMES_CLI_BIN,
@@ -458,12 +461,29 @@ export function buildWorkerPrompt(input: {
     '- If context pressure is high, write a structured handoff to your handoffs/ directory before /new and continue from it on resume.',
     '',
     '## Required Checkpoint Format',
+    '',
+    'You MUST finish your response with EXACTLY these 6 labelled lines, in this',
+    'order, with NO other text after them. Do NOT omit any line. If you changed',
+    'nothing, write "none" — never skip the line.',
+    '',
     'STATE: DONE | BLOCKED | NEEDS_INPUT | HANDOFF | IN_PROGRESS',
-    'FILES_CHANGED: exact paths or none',
-    'COMMANDS_RUN: exact commands or none',
-    'RESULT: concrete result/proof',
-    'BLOCKER: blocker or none',
-    'NEXT_ACTION: exact recommended next action',
+    'FILES_CHANGED: <exact file paths you created or edited, or "none">',
+    'COMMANDS_RUN: <exact shell commands you ran, or "none">',
+    'RESULT: <concrete result or proof of what landed>',
+    'BLOCKER: <what is missing / smallest unblock action, or "none">',
+    'NEXT_ACTION: <exact recommended next step, or "none">',
+    '',
+    'Example (a task that only summarised):',
+    'STATE: DONE',
+    'FILES_CHANGED: none',
+    'COMMANDS_RUN: none',
+    'RESULT: wrote the NEXUM Q3 summary to /tmp/nexum-q3-summary.md (2144 bytes)',
+    'BLOCKER: none',
+    'NEXT_ACTION: none',
+    '',
+    'The orchestrator parses these labels mechanically. Omitting FILES_CHANGED or',
+    'COMMANDS_RUN means your checkpoint is silently dropped and the mission stays',
+    'stuck in "waiting" forever. Always emit all six lines.',
   )
   return lines.filter(Boolean).join('\n')
 }
@@ -487,6 +507,11 @@ function markDispatchStarted(workerId: string, task: string, missionId?: string 
     lastControlMessage: controlMessage,
     nextAction: 'Worker should execute and return the required checkpoint format.',
     notifySessionKey: notifySessionKey ?? 'main',
+    // Clear stale per-mission state so a fresh dispatch is not mistaken for an
+    // already-processed assignment by the orchestrator loop (which compares
+    // orchestratorProcessedRaw against the live checkpoint raw).
+    orchestratorProcessedRaw: null,
+    checkpointRaw: null,
   })
 }
 
@@ -784,7 +809,7 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   }
 }
 
-export function buildHermesChatQueryArgs(prompt: string): string[] {
+export function buildHermesChatQueryArgs(prompt: string): Array<string> {
   // `hermes chat -q` requires the query as the *immediate* next argv item.
   // Keeping the prompt adjacent to -q prevents argparse from interpreting
   // following flags (for example -Q) as a missing query and failing with:
@@ -1122,9 +1147,36 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     assignmentId: assignmentIdByKey.get(`${assignment.workerId}\n${assignment.task}`),
   }))
 
+  const latestMissionPre = getSwarmMission(mission.id) ?? mission
+  // Respect dependsOn: only dispatch assignments whose dependencies are already
+  // done; leave the rest queued so the orchestrator-loop picks them up once
+  // their prerequisites checkpoint. Without this, every assignment runs in
+  // parallel and dependents race ahead of the workers they depend on.
+  const doneWorkerIds = new Set(
+    latestMissionPre.assignments
+      .filter((item: SwarmMissionAssignment) => ['checkpointed', 'done'].includes(item.state))
+      .map((item: SwarmMissionAssignment) => item.workerId),
+  )
+  const ready = assignments.filter((assignment) => {
+    const deps = assignment.dependsOn ?? []
+    return deps.every((dep) => doneWorkerIds.has(dep))
+  })
+  const deferred = assignments.filter((assignment) => !(assignment.dependsOn ?? []).every((dep) => doneWorkerIds.has(dep)))
+  if (deferred.length) {
+    const store = readStore()
+    const live = store.missions.find((item) => item.id === mission.id)
+    if (live) {
+      for (const d of deferred) {
+        const a = live.assignments.find((item) => item.id === d.assignmentId)
+        if (a && a.state === 'dispatched') a.state = 'queued'
+      }
+      writeStore(store)
+    }
+  }
+
   const dispatchedAt = Date.now()
   const roster = rosterByWorkerId(assignments.map((assignment) => assignment.workerId))
-  const results = await Promise.all(assignments.map((assignment) => runWorker(
+  const results = await Promise.all(ready.map((assignment) => runWorker(
     assignment,
     timeoutMs,
     roster.get(assignment.workerId),

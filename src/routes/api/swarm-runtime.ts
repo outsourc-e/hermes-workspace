@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -182,7 +182,7 @@ async function buildEntry(
     lastSummary: runtime.lastSummary,
     lastResult: runtime.lastResult,
     nextAction: runtime.nextAction,
-    pid: readPid(profilePath),
+    pid: readLivePid(workerId, profilePath),
     tmuxSession: matched,
     tmuxAttachable,
     terminalKind,
@@ -233,7 +233,40 @@ async function buildEntry(
   }
 }
 
-function readPid(profilePath: string): number | null {
+function readLivePid(workerId: string, profilePath: string): number | null {
+  // Prefer the live process PID over the stale runtime.json `pid` field, which
+  // workers only patch on lifecycle events (start/stop/handoff) — not every
+  // turn — so it stays `None` even while the agent is actively running. This is
+  // what made the runtime view report `pid: None` for live tmux-backed workers.
+  const session = `swarm-${workerId}`
+  try {
+    const panePid = execFileSync(resolveTmuxBin(), ['list-panes', '-t', session, '-F', '#{pane_pid}'], {
+      encoding: 'utf8',
+      timeout: 3_000,
+    })
+      .trim()
+      .split('\n')[0]
+    if (panePid && /^\d+$/.test(panePid)) {
+      const pid = Number.parseInt(panePid, 10)
+      if (pid > 0) return pid
+    }
+  } catch {
+    // tmux session not present or tmux unavailable — fall through to pgrep.
+  }
+  try {
+    const out = execFileSync('pgrep', ['-f', `hermes.*--profile\\s+${workerId}`], {
+      encoding: 'utf8',
+      timeout: 3_000,
+    }).trim()
+    const first = out.split('\n')[0]
+    if (first && /^\d+$/.test(first)) {
+      const pid = Number.parseInt(first, 10)
+      if (pid > 0) return pid
+    }
+  } catch {
+    // No matching process — fall through to runtime.json.
+  }
+  // Fallback: whatever the worker last persisted (may be stale/None).
   const runtimePath = join(profilePath, 'runtime.json')
   if (!existsSync(runtimePath)) return null
   try {

@@ -72,7 +72,7 @@ function shortId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function readStore(): SwarmMissionStore {
+export function readStore(): SwarmMissionStore {
   if (!existsSync(SWARM_MISSIONS_PATH)) return { version: 1, missions: [] }
   try {
     const parsed = JSON.parse(readFileSync(SWARM_MISSIONS_PATH, 'utf8')) as SwarmMissionStore
@@ -82,7 +82,7 @@ function readStore(): SwarmMissionStore {
   }
 }
 
-function writeStore(store: SwarmMissionStore): void {
+export function writeStore(store: SwarmMissionStore): void {
   mkdirSync(dirname(SWARM_MISSIONS_PATH), { recursive: true })
   const tmp = `${SWARM_MISSIONS_PATH}.${process.pid}.${Date.now()}.tmp`
   writeFileSync(tmp, JSON.stringify(store, null, 2) + '\n')
@@ -397,8 +397,9 @@ export function appendMissionContinuation(input: {
 export function readyQueuedAssignments(missionId: string): Array<SwarmMissionAssignment> {
   const mission = getSwarmMission(missionId)
   if (!mission) return []
-  const doneIds = new Set(mission.assignments.filter((item) => ['checkpointed', 'done'].includes(item.state)).map((item) => item.id))
-  return mission.assignments.filter((item) => item.state === 'queued' && item.dependsOn.every((id) => doneIds.has(id)))
+  const doneWorkerIds = new Set(mission.assignments.filter((item) => ['checkpointed', 'done'].includes(item.state)).map((item) => item.workerId))
+  const doneAssignmentIds = new Set(mission.assignments.filter((item) => ['checkpointed', 'done'].includes(item.state)).map((item) => item.id))
+  return mission.assignments.filter((item) => item.state === 'queued' && item.dependsOn.every((id) => doneWorkerIds.has(id) || doneAssignmentIds.has(id)))
 }
 
 export function cancelSwarmAssignment(input: {

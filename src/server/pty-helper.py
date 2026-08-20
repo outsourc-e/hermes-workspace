@@ -59,6 +59,14 @@ def main():
         # Parent: bridge stdin <-> master_fd <-> stdout
         os.close(slave_fd)
 
+        # Force an initial flush so tmux attach panes that would otherwise
+        # stay silent (reviewer/km-agent/orchestrator) emit their current
+        # content immediately instead of waiting for the first keypress.
+        try:
+            os.write(master_fd, b'\x0c')  # Ctrl-L: redraw/refresh pane
+        except OSError:
+            pass
+
         # Make stdin non-blocking
         import io
         stdin_fd = sys.stdin.fileno()
