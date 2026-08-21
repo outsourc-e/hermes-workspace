@@ -4,7 +4,26 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.expanduser("~/hermes-agent"))
+def _resolve_hermes_agent_dir() -> str:
+    """Locate the hermes-agent source checkout that ships tools/skills_hub.py.
+
+    Resolution order: HERMES_AGENT_HOME env (explicit operator override) →
+    ~/.hermes/hermes-agent (standard install layout) → ~/hermes-agent (legacy
+    outsourc-e dev layout). Returns the best candidate even if none exists so
+    the subsequent import raises a clear error instead of a silent fallback.
+    """
+    env_dir = os.environ.get("HERMES_AGENT_HOME", "").strip()
+    if env_dir:
+        return env_dir
+    for candidate in (
+        os.path.expanduser("~/.hermes/hermes-agent"),
+        os.path.expanduser("~/hermes-agent"),
+    ):
+        if os.path.isdir(candidate):
+            return candidate
+    return os.path.expanduser("~/.hermes/hermes-agent")
+
+sys.path.insert(0, _resolve_hermes_agent_dir())
 
 from tools.skills_hub import GitHubAuth, create_source_router, unified_search
 
