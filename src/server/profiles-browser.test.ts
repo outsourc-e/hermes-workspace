@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   listProfiles,
+  listProfilesWithFallback,
   readProfile,
   updateProfileConfig,
 } from './profiles-browser'
@@ -205,5 +206,76 @@ describe('listProfiles', () => {
       'You are Leelo, executive assistant.',
     )
     expect(readProfile('ops').systemPrompt).toBe('Config prompt wins')
+  })
+})
+
+describe('listProfilesWithFallback (dashboard path)', () => {
+  let tempHome: string
+
+  beforeEach(() => {
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-profiles-fb-'),
+    )
+    vi.spyOn(os, 'homedir').mockReturnValue(tempHome)
+    delete process.env.HERMES_HOME
+    delete process.env.CLAUDE_HOME
+    delete process.env.HERMES_API_TOKEN
+    delete process.env.CLAUDE_API_TOKEN
+    process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    delete process.env.HERMES_DASHBOARD_URL
+    fs.rmSync(tempHome, { recursive: true, force: true })
+  })
+
+  it('marks the LOCAL active_profile as active, not the dashboard is_default', async () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const profilesRoot = path.join(hermesRoot, 'profiles')
+    const investRoot = path.join(profilesRoot, 'invest')
+    fs.mkdirSync(investRoot, { recursive: true })
+    fs.writeFileSync(path.join(hermesRoot, 'active_profile'), 'invest\n', 'utf-8')
+
+    // Dashboard payload: `is_default` only names the default-named profile —
+    // it must NOT be treated as the active profile.
+    const dashboardPayload = {
+      profiles: [
+        {
+          name: 'default',
+          path: hermesRoot,
+          is_default: true,
+          model: 'm',
+          provider: 'p',
+          has_env: true,
+          skill_count: 10,
+          updated_at: '2026-08-21T00:00:00.000Z',
+        },
+        {
+          name: 'invest',
+          path: investRoot,
+          is_default: false,
+          model: 'm',
+          provider: 'p',
+          has_env: true,
+          skill_count: 20,
+          updated_at: '2026-08-21T01:00:00.000Z',
+        },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => dashboardPayload,
+      }),
+    )
+
+    const { profiles, activeProfile } = await listProfilesWithFallback()
+
+    expect(activeProfile).toBe('invest')
+    expect(profiles.find((p) => p.name === 'invest')?.active).toBe(true)
+    expect(profiles.find((p) => p.name === 'default')?.active).toBe(false)
   })
 })

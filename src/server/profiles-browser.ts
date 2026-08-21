@@ -284,8 +284,14 @@ async function fetchDashboardProfiles(): Promise<{
 
     if (!data.profiles || !Array.isArray(data.profiles)) return null
 
-    const activeProfile =
-      data.profiles.find((p) => p.is_default)?.name || 'default'
+    // The dashboard API does NOT report which profile is currently active —
+    // `is_default` merely names the default-named profile (always 'default').
+    // Treating it as active mislabels the whole UI (e.g. the skills screen's
+    // profile selector pins 'default' while chat/gateway run invest). The
+    // authoritative source is the local <hermes root>/active_profile marker;
+    // on split-host deployments without one, getActiveProfileName() falls
+    // back to 'default' (matching the previous behavior).
+    const activeProfile = getActiveProfileName()
 
     const profiles: Array<ProfileSummary> = data.profiles.map((p) => {
       const profilePath = p.is_default
