@@ -133,6 +133,18 @@ Reviewer verdicts should be one of:
 - CHANGES_REQUESTED
 - BLOCKED
 
+For HIGH-blast-radius changes (release branches, generated-file ships, naming that
+breaks public APIs, anything a wrong merge cannot be walked back cheaply), the review
+gate asks TWO independent questions in separate passes, not one:
+
+1. **Correctness** — does it pass tests/build/smoke? Is the diff behaviorally sound?
+2. **Provenance** — are the claims, artifacts, and generated files real and intentional?
+   Is the diff actually what the checkpoint says it is?
+
+Each pass runs in a separate reviewer context with a different question. Diverse
+skeptics catch what identical ones cannot. For ordinary PRs a single Reviewer pass
+remains the default — the two-question gate is the escalation path, not the baseline.
+
 ## Triage
 
 Specialty: autonomous PR/issues processor.

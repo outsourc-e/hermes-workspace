@@ -53,6 +53,30 @@ The key rule: workers do not free-style message Eric. They checkpoint. The orche
 7. The orchestrator decides whether to continue, repair, hand off, review, or escalate.
 8. Reports and Inbox make the state inspectable.
 
+## The non-dispatch rule (when NOT to swarm)
+
+The swarm is a graph. Graphs are for work that splits, verifies, resumes, or needs
+controlled authority. They are not for every request. Routing simple work through the
+full graph is the one configuration the research says always loses: in the Google
+DeepMind × MIT study of 180 agent configurations, every multi-agent setup degraded
+39-70% on sequential work where each step needs the full picture.
+
+Aurora applies this rule BEFORE framing a SwarmBrief:
+
+| If the request is... | Route it to... |
+|---|---|
+| Short (< ~15 min of agent time) | Main session, single agent. Do NOT dispatch. |
+| One context can hold all relevant info | Main session, single agent. Do NOT dispatch. |
+| No independent branches (pure sequential) | Main session, single agent. Do NOT dispatch. |
+| Failure is cheap and reversible | Main session, single agent. Do NOT dispatch. |
+| Needs parallel work, separate tools/permissions, independent verification, resumable execution, shared state, or gated authority | SwarmBrief → orchestrator → workers |
+
+Any request that fails all four "keep it single" tests may still be dispatched, but
+the dispatch must be justified in the SwarmBrief `why_now` field ("requires 3 parallel
+research lanes" beats "seemed like a good idea").
+
+Rule of thumb: **more agents is not a strategy. The shape of the work decides.**
+
 ## SwarmBrief shape
 
 The canonical YAML lives in `SWARM_SPEC.md` section 3. This is the public shape:
@@ -83,7 +107,18 @@ escalation:
   on_done: route
 budget:
   wall_clock_hours: 2
+  max_tokens: 200000        # token ceiling for the whole brief
+fanout:
+  max_workers: 4            # hard cap on simultaneously dispatched workers
+  max_parallel_same_repo: 1 # one writer per file/repo (guardrail)
 ```
+
+The `fanout` block is a hard cap, not a suggestion. The orchestrator must not exceed
+`max_workers` concurrent workers per brief, and must never run two workers against the
+same repo simultaneously (one writer per file). If a brief's natural decomposition
+needs more than `max_workers`, it must be split into sequenced batches with a merge
+checkpoint between them — the orchestrator owns the merge, and a single owner cannot
+reconcile 10 simultaneous writers.
 
 A brief is not a prompt dump. It is the smallest operating contract that lets a worker execute without inventing scope.
 
@@ -98,9 +133,19 @@ COMMANDS_RUN: exact commands or none
 RESULT: concrete result/proof
 BLOCKER: blocker or none
 NEXT_ACTION: exact recommended next action
+HANDOFF_PAYLOAD:
+  type: diff | artifact | report | test_result | review_verdict | none
+  path: <exact path to the artifact>   # or "inline"
+  schema_version: 1
 ```
 
 Good checkpoints contain evidence. Bad checkpoints contain adjectives. The swarm optimizes for evidence.
+
+`HANDOFF_PAYLOAD` is the edge contract. It tells the downstream node exactly what data
+crosses the boundary and where to find it, so the orchestrator and reviewers read
+structured artifacts instead of re-interpreting prose. Rule: `RESULT` may summarize,
+but `HANDOFF_PAYLOAD.path` must be precise enough that the next node opens the file
+without asking. If a node produces no consumable artifact, use `type: none` explicitly.
 
 ## Notification routing
 
@@ -144,6 +189,21 @@ Examples:
 - "Reproduce issue #17 and write a minimal failing test."
 
 The system should treat ad-hoc dispatches as missions with smaller blast radius, not as casual chat requests.
+
+## Two-path routing (cost model)
+
+Not every request earns the full graph. The topology is the cost model:
+
+```text
+SIMPLE REQUEST  → main agent → quick check → done        (cheap path)
+COMPLEX REQUEST → SwarmBrief → orchestrator → workers → review → gate  (deep path)
+```
+
+Use cheap models and the short path for bounded extraction, classification, formatting,
+and single-shot asks. Reserve the full graph — and the strong models it routes to — for
+work that earns it: parallel branches, independent verification, multi-tool authority,
+or resumable state. If a request does not clear the non-dispatch rule above AND does not
+need the graph's guarantees, it still does not belong in the swarm.
 
 ## The three permanent lanes
 
