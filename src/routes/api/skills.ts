@@ -80,6 +80,21 @@ async function buildLocalSkillPathMap(): Promise<Map<string, LocalSkillMeta>> {
   for (const cat of categoryEntries) {
     if (!cat.isDirectory() || cat.name.startsWith('.')) continue
     const catPath = path.join(root, cat.name)
+    // Flat-layout skills: SKILL.md lives DIRECTLY in the category dir
+    // (e.g. profile role skills like invest-orchestrator), not in a
+    // skill subdir. Treat those as skills named after the category.
+    try {
+      const flatStat = await fs.stat(path.join(catPath, 'SKILL.md'))
+      if (flatStat.isFile() && !map.has(cat.name)) {
+        collect.push(
+          readSkillAuthor(catPath).then((author) => {
+            map.set(cat.name, { path: catPath, author })
+          }),
+        )
+      }
+    } catch {
+      // no flat SKILL.md — normal category layout, walk subdirs below
+    }
     let skillEntries: Array<{
       name: string
       isDirectory: () => boolean

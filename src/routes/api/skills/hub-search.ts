@@ -175,7 +175,10 @@ async function searchPythonSkillsHub(
     resolveSkillsSearchPython(),
     [scriptPath, query, String(limit), source],
     {
-      timeout: 30_000,
+      // The bridge probes multiple registries (GitHub rate-limit retries can
+      // add ~30s on top of a normal run); keep the timeout generous so the
+      // marketplace doesn't silently degrade to the bundled fallback.
+      timeout: 90_000,
       maxBuffer: 1024 * 1024 * 2,
     },
   )
