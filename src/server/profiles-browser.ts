@@ -1,7 +1,10 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import YAML from 'yaml'
+
+const _nodeRequire = createRequire(import.meta.url)
 
 export type ProfileSummary = {
   name: string
@@ -143,6 +146,46 @@ function countFilesRecursive(
   return count
 }
 
+/**
+ * Count real hermes sessions for a profile.
+ *
+ * Hermes stores sessions as ROWS in the profile's `state.db` (SQLite), not as
+ * per-session files in `sessions/`. Counting files under `sessions/` therefore
+ * under-reports badly (usually 0, or the count of legacy dump files). Count
+ * the `sessions` table rows instead; fall back to the legacy file count when
+ * no `state.db` exists (older installs / pre-seeded profiles).
+ */
+function countSessionsInProfile(profilePath: string): number {
+  const dbPath = path.join(profilePath, 'state.db')
+  if (fs.existsSync(dbPath)) {
+    try {
+      const Database = _nodeRequire('node:sqlite') as {
+        DatabaseSync?: new (
+          p: string,
+          o?: unknown,
+        ) => {
+          prepare: (s: string) => { get: () => { count?: number } }
+          close: () => void
+        }
+      }
+      if (Database.DatabaseSync) {
+        const db = new Database.DatabaseSync(dbPath, { readOnly: true })
+        try {
+          const row = db.prepare('SELECT COUNT(*) AS count FROM sessions').get()
+          return Number(row.count ?? 0)
+        } finally {
+          db.close()
+        }
+      }
+    } catch {
+      // fall through to file-count fallback
+    }
+  }
+  return countFilesRecursive(path.join(profilePath, 'sessions'), (full) =>
+    /\.(jsonl|json|sqlite|db)$/i.test(full),
+  )
+}
+
 function latestMtime(paths: Array<string>): string | undefined {
   let latest = 0
   for (const target of paths) {
@@ -244,21 +287,31 @@ async function fetchDashboardProfiles(): Promise<{
     const activeProfile =
       data.profiles.find((p) => p.is_default)?.name || 'default'
 
-    const profiles: Array<ProfileSummary> = data.profiles.map((p) => ({
-      name: p.name,
-      path: p.is_default
+    const profiles: Array<ProfileSummary> = data.profiles.map((p) => {
+      const profilePath = p.is_default
         ? getClaudeRoot()
-        : path.join(getProfilesRoot(), p.name),
-      active: p.name === activeProfile,
-      exists: true,
-      model: p.model,
-      provider: p.provider,
-      description: p.description,
-      skillCount: p.skill_count ?? 0,
-      sessionCount: p.session_count ?? 0,
-      hasEnv: p.has_env ?? false,
-      updatedAt: p.updated_at,
-    }))
+        : path.join(getProfilesRoot(), p.name)
+      // The dashboard API does not report per-profile session counts
+      // (session_count is always null), so compute them from each profile's
+      // state.db directly. Falls back to the dashboard's value (or 0).
+      const sessionCount =
+        typeof p.session_count === 'number' && p.session_count > 0
+          ? p.session_count
+          : countSessionsInProfile(profilePath)
+      return {
+        name: p.name,
+        path: profilePath,
+        active: p.name === activeProfile,
+        exists: true,
+        model: p.model,
+        provider: p.provider,
+        description: p.description,
+        skillCount: p.skill_count ?? 0,
+        sessionCount,
+        hasEnv: p.has_env ?? false,
+        updatedAt: p.updated_at,
+      }
+    })
 
     profiles.sort((a, b) => {
       if (a.active && !b.active) return -1
@@ -333,7 +386,8 @@ export async function readProfileWithFallback(
           }>
         }
         const match = data.profiles?.find(
-          (p) => p.name === normalized || (normalized === 'default' && p.is_default),
+          (p) =>
+            p.name === normalized || (normalized === 'default' && p.is_default),
         )
         if (match) {
           const active = getActiveProfileName()
@@ -406,9 +460,7 @@ export function listProfiles(): Array<ProfileSummary> {
         skillsDir,
         (full) => path.basename(full) === 'SKILL.md',
       )
-      const sessionCount = countFilesRecursive(sessionsDir, (full) =>
-        /\.(jsonl|json|sqlite|db)$/i.test(full),
-      )
+      const sessionCount = countSessionsInProfile(profilePath)
       // Resolve model/provider from nested or flat config structure
       let modelName: string | undefined
       let providerName: string | undefined
@@ -481,9 +533,7 @@ export function listProfiles(): Array<ProfileSummary> {
       path.join(root, 'skills'),
       (full) => path.basename(full) === 'SKILL.md',
     ),
-    sessionCount: countFilesRecursive(path.join(root, 'sessions'), (full) =>
-      /\.(jsonl|json|sqlite|db)$/i.test(full),
-    ),
+    sessionCount: countSessionsInProfile(root),
     hasEnv: fs.existsSync(path.join(root, '.env')),
     updatedAt: latestMtime([root, path.join(root, 'config.yaml')]),
   })
