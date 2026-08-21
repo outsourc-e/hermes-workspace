@@ -79,6 +79,7 @@ describe('gateway-capabilities', () => {
             jobs: true,
             mcp: false,
             mcpFallback: false,
+            runtimeModelSwitch: false,
             conductor: false,
             kanban: false,
             dashboard: {
@@ -109,6 +110,7 @@ describe('gateway-capabilities', () => {
             jobs: false,
             mcp: false,
             mcpFallback: false,
+            runtimeModelSwitch: false,
             conductor: false,
             kanban: false,
             dashboard: {
