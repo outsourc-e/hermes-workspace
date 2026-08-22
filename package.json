@@ -7,6 +7,7 @@
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
+  "packageManager": "pnpm@11.17.0",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
