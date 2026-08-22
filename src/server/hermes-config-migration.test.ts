@@ -71,4 +71,35 @@ describe('normalizeHermesConfigState', () => {
       source: 'nested',
     })
   })
+
+  it('recognizes Atlas Cloud API key config and default model', () => {
+    const state = normalizeHermesConfigState({
+      paths,
+      config: {
+        model: { provider: 'atlascloud', default: 'qwen/qwen3.5-flash' },
+        custom_providers: [
+          {
+            name: 'atlascloud',
+            base_url: 'https://api.atlascloud.ai/v1',
+            api_mode: 'openai',
+          },
+        ],
+      },
+      env: { ATLASCLOUD_API_KEY: 'atlas-test-key-123456' },
+      authProfiles: {},
+      localProviders: [],
+      localModels: [],
+    })
+
+    expect(state.activeProvider).toBe('atlascloud')
+    expect(state.activeModel).toBe('qwen/qwen3.5-flash')
+    const atlascloud = state.providers.find((p) => p.id === 'atlascloud')
+    expect(atlascloud?.configured).toBe(true)
+    expect(atlascloud?.authenticated).toBe(true)
+    expect(atlascloud?.isDefault).toBe(true)
+    expect(atlascloud?.authSource).toBe('env')
+    expect(atlascloud?.envKeys).toContain('ATLASCLOUD_API_KEY')
+    expect(atlascloud?.models.map((model) => model.id)).toContain('qwen/qwen3.5-flash')
+    expect(atlascloud?.models.map((model) => model.id)).toContain('deepseek-ai/deepseek-v4-pro')
+  })
 })
