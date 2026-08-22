@@ -207,6 +207,106 @@ describe('Phase 1.5 fallback — capability gating shape', () => {
   })
 })
 
+describe('mcp capability mode — hits the real Agent endpoint (/api/mcp/servers)', () => {
+  // Regression: this code (and the gateway-capabilities.ts probe) called the
+  // bare /api/mcp path, which doesn't exist on Hermes-Agent — confirmed live,
+  // it 404s with "No such API endpoint: /api/mcp". The real, working
+  // endpoints are GET/POST /api/mcp/servers and DELETE /api/mcp/servers/{name}
+  // (also verified live with a real create+list+delete round trip). Calling
+  // the wrong path meant the capability probe always reported mcp:false, so
+  // the whole MCP page permanently showed "Not available on this backend"
+  // even when the Agent fully supported it.
+  it('GET calls dashboardFetch with /api/mcp/servers, not the bare /api/mcp', async () => {
+    const dashboardFetchMock = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify({ servers: [] }), { status: 200 })),
+    )
+    const fakeCaps = {
+      mcp: true,
+      mcpFallback: false,
+      dashboard: { available: true, url: 'http://127.0.0.1:9119' },
+    }
+    vi.doMock('../../server/gateway-capabilities', () => ({
+      ensureGatewayProbed: () => Promise.resolve(fakeCaps),
+      getCapabilities: () => fakeCaps,
+      BEARER_TOKEN: '',
+      CLAUDE_API: 'http://127.0.0.1:8642',
+      CLAUDE_UPGRADE_INSTRUCTIONS: 'noop',
+      dashboardFetch: dashboardFetchMock,
+    }))
+    vi.doMock('../../server/auth-middleware', () => ({
+      isAuthenticated: () => true,
+    }))
+    vi.doMock('@tanstack/react-router', () => ({
+      createFileRoute: () => (cfg: unknown) => cfg,
+    }))
+
+    const mod = await import('./mcp')
+    const route = mod.Route as unknown as {
+      server: { handlers: { GET: (ctx: { request: Request }) => Promise<Response> } }
+    }
+    await route.server.handlers.GET({
+      request: new Request('http://localhost/api/mcp'),
+    })
+
+    expect(dashboardFetchMock).toHaveBeenCalledWith(
+      '/api/mcp/servers',
+      expect.anything(),
+    )
+    expect(dashboardFetchMock).not.toHaveBeenCalledWith('/api/mcp', expect.anything())
+  })
+
+  it('POST calls dashboardFetch with /api/mcp/servers, not the bare /api/mcp', async () => {
+    const dashboardFetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ name: 'fs', transportType: 'stdio', command: 'npx', args: [] }), {
+          status: 200,
+        }),
+      ),
+    )
+    const fakeCaps = {
+      mcp: true,
+      mcpFallback: false,
+      dashboard: { available: true, url: 'http://127.0.0.1:9119' },
+    }
+    vi.doMock('../../server/gateway-capabilities', () => ({
+      ensureGatewayProbed: () => Promise.resolve(fakeCaps),
+      getCapabilities: () => fakeCaps,
+      BEARER_TOKEN: '',
+      CLAUDE_API: 'http://127.0.0.1:8642',
+      CLAUDE_UPGRADE_INSTRUCTIONS: 'noop',
+      dashboardFetch: dashboardFetchMock,
+    }))
+    vi.doMock('../../server/auth-middleware', () => ({
+      isAuthenticated: () => true,
+    }))
+    vi.doMock('@tanstack/react-router', () => ({
+      createFileRoute: () => (cfg: unknown) => cfg,
+    }))
+
+    const mod = await import('./mcp')
+    const route = mod.Route as unknown as {
+      server: { handlers: { POST: (ctx: { request: Request }) => Promise<Response> } }
+    }
+    await route.server.handlers.POST({
+      request: new Request('http://localhost/api/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'linear',
+          transportType: 'http',
+          url: 'https://mcp.linear.app/sse',
+        }),
+      }),
+    })
+
+    expect(dashboardFetchMock).toHaveBeenCalledWith(
+      '/api/mcp/servers',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(dashboardFetchMock).not.toHaveBeenCalledWith('/api/mcp', expect.anything())
+  })
+})
+
 describe('secret echo guard (PR4 acceptance contract)', () => {
   it('round-trip server payload never echoes the submitted bearerToken', () => {
     // 1. User submits an input with a bearer token.
