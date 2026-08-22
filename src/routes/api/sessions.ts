@@ -21,6 +21,37 @@ import {
   updateLocalSessionTitle,
 } from '../../server/local-session-store'
 
+const WORKSPACE_CONTEXT_PREFIX_RE = /^\s*<workspace_context\b/i
+
+function cleanSessionDisplayText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (WORKSPACE_CONTEXT_PREFIX_RE.test(trimmed)) return undefined
+  return trimmed
+}
+
+function cleanGatewaySessionSummary<T extends Record<string, unknown>>(session: T): T {
+  const cleanLabel = cleanSessionDisplayText(session.label)
+  const cleanTitle = cleanSessionDisplayText(session.title)
+  const cleanDerivedTitle = cleanSessionDisplayText(session.derivedTitle)
+  const cleanPreview = cleanSessionDisplayText(session.preview)
+
+  const fallbackId =
+    cleanSessionDisplayText(session.friendlyId) ||
+    cleanSessionDisplayText(session.key) ||
+    cleanSessionDisplayText(session.id) ||
+    'Session'
+
+  return {
+    ...session,
+    label: cleanLabel,
+    title: cleanTitle,
+    derivedTitle: cleanDerivedTitle || cleanTitle || cleanLabel || fallbackId,
+    preview: cleanPreview ?? null,
+  }
+}
+
 export const Route = createFileRoute('/api/sessions')({
   server: {
     handlers: {
@@ -41,7 +72,7 @@ export const Route = createFileRoute('/api/sessions')({
 
         try {
           const sessions = await listSessions(50, 0)
-          const gatewaySessions = sessions.map(toSessionSummary)
+          const gatewaySessions = sessions.map(toSessionSummary).map(cleanGatewaySessionSummary)
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
           const localSessions = listLocalSessions()
@@ -141,7 +172,7 @@ export const Route = createFileRoute('/api/sessions')({
             ok: true,
             sessionKey: session.id,
             friendlyId: session.id,
-            entry: toSessionSummary(session),
+            entry: cleanGatewaySessionSummary(toSessionSummary(session)),
             modelApplied: true,
           })
         } catch (err) {
@@ -248,7 +279,7 @@ export const Route = createFileRoute('/api/sessions')({
           return json({
             ok: true,
             sessionKey,
-            entry: toSessionSummary(session),
+            entry: cleanGatewaySessionSummary(toSessionSummary(session)),
           })
         } catch (err) {
           return json(

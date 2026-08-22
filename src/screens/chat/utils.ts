@@ -183,6 +183,20 @@ export function getMessageTimestamp(message: ChatMessage): number {
   return Date.now()
 }
 
+function cleanTitleCandidate(raw: string): string | undefined {
+  const trimmed = raw.trim()
+  if (!trimmed) return undefined
+
+  if (trimmed.includes('<workspace_context')) {
+    const cleaned = cleanUserText(trimmed)
+    if (cleaned && !cleaned.includes('<workspace_context')) return cleaned
+    return undefined
+  }
+
+  const cleaned = cleanUserText(trimmed)
+  return cleaned || trimmed
+}
+
 function deriveTitleStatus(
   label?: string,
   explicitTitle?: string,
@@ -226,16 +240,14 @@ export function normalizeSessions(
         ? session.label.trim()
         : undefined
     const explicitTitle =
-      typeof session.title === 'string' && session.title.trim().length > 0
-        ? cleanUserText(session.title.trim()) || session.title.trim()
+      typeof session.title === 'string'
+        ? cleanTitleCandidate(session.title)
         : undefined
     const derivedTitle =
-      typeof session.derivedTitle === 'string' &&
-        session.derivedTitle.trim().length > 0
-        ? cleanUserText(session.derivedTitle.trim()) || session.derivedTitle.trim()
-        : typeof session.preview === 'string' &&
-          session.preview.trim().length > 0
-          ? cleanUserText(session.preview.trim()) || session.preview.trim()
+      typeof session.derivedTitle === 'string'
+        ? cleanTitleCandidate(session.derivedTitle)
+        : typeof session.preview === 'string'
+          ? cleanTitleCandidate(session.preview)
           : undefined
     const titleStatus = deriveTitleStatus(
       label,
@@ -264,7 +276,7 @@ export function normalizeSessions(
       titleError: session.titleError ?? null,
       preview:
         typeof session.preview === 'string'
-          ? cleanUserText(session.preview) || session.preview.trim() || null
+          ? cleanTitleCandidate(session.preview) ?? null
           : session.preview ?? null,
     }
   })
