@@ -101,7 +101,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
     name: 'MiniMax',
     description: 'MiniMax foundation models and multimodal APIs.',
     authTypes: ['api-key'],
-    docsUrl: 'https://www.minimax.io/platform',
+    docsUrl: 'https://platform.minimax.io/docs/api-reference/api-overview',
     configExample: JSON.stringify(
       {
         auth: {
