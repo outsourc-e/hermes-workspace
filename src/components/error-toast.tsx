@@ -5,20 +5,30 @@ import { cn } from '@/lib/utils'
 
 const AUTO_DISMISS_MS = 8_000
 
+// 'critical' errors require the user to act (auth/config/rate-limit/context
+// desync) — they must NOT auto-dismiss, or the actionable detail vanishes
+// before it can be read. 'transient' errors (network/model blips) keep the
+// 8s auto-dismiss since they're informational and self-healing.
+type Severity = 'critical' | 'transient'
+
 type ErrorEntry = {
   id: string
   message: string
+  severity: Severity
   raw?: string
 }
 
-function classifyError(raw: string): string {
+function classifyError(raw: string): { message: string; severity: Severity } {
   const lower = raw.toLowerCase()
   if (
     lower.includes('429') ||
     lower.includes('rate limit') ||
     lower.includes('too many')
   ) {
-    return 'Rate limited — try again in a moment'
+    return {
+      message: 'Rate limited — wait a moment before retrying',
+      severity: 'critical',
+    }
   }
   if (
     lower.includes('401') ||
@@ -27,14 +37,27 @@ function classifyError(raw: string): string {
     lower.includes('invalid api key') ||
     lower.includes('api key')
   ) {
-    return 'Authentication error — check your API key in Settings'
+    return {
+      message: 'Authentication error — check your API key in Settings',
+      severity: 'critical',
+    }
+  }
+  if (lower.includes('tool_use') && lower.includes('tool_result')) {
+    return {
+      message:
+        'Tool call context error — conversation history got out of sync. Start a new session to continue.',
+      severity: 'critical',
+    }
   }
   if (
     lower.includes('500') ||
     lower.includes('server error') ||
     lower.includes('model error')
   ) {
-    return 'Model error — the provider is having issues'
+    return {
+      message: 'Model error — the provider is having issues',
+      severity: 'transient',
+    }
   }
   if (
     lower.includes('network') ||
@@ -42,20 +65,19 @@ function classifyError(raw: string): string {
     lower.includes('failed to fetch') ||
     lower.includes('connection')
   ) {
-    return 'Connection lost — retrying…'
+    return { message: 'Connection lost — retrying…', severity: 'transient' }
   }
-  if (lower.includes('tool_use') && lower.includes('tool_result')) {
-    return 'Tool call context error — conversation history got out of sync. Start a new session to continue.'
-  }
-  // Return original message if no pattern matched
-  return raw
+  // Unmatched: surface the raw text and keep it until dismissed (don't let an
+  // unrecognized — possibly important — error slip away after 8s).
+  return { message: raw, severity: 'critical' }
 }
 
-let externalPush: ((msg: string) => void) | null = null
+let externalPush: ((msg: string, severity: Severity) => void) | null = null
 
 /** Call this from anywhere to show an error toast */
 export function showErrorToast(message: string): void {
-  externalPush?.(classifyError(message))
+  const { message: msg, severity } = classifyError(message)
+  externalPush?.(msg, severity)
 }
 
 type ToastItemProps = {
@@ -67,11 +89,14 @@ function ToastItem({ entry, onDismiss }: ToastItemProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    // Critical errors stay until the user dismisses them; only transient ones
+    // auto-expire.
+    if (entry.severity !== 'transient') return
     timerRef.current = setTimeout(() => onDismiss(entry.id), AUTO_DISMISS_MS)
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [entry.id, onDismiss])
+  }, [entry.id, entry.severity, onDismiss])
 
   return (
     <div
@@ -106,9 +131,9 @@ export function ErrorToastContainer() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  const push = useCallback((message: string) => {
+  const push = useCallback((message: string, severity: Severity) => {
     const id = `${Date.now()}-${Math.random()}`
-    setToasts((prev) => [...prev.slice(-4), { id, message }])
+    setToasts((prev) => [...prev.slice(-4), { id, message, severity }])
   }, [])
 
   useEffect(() => {

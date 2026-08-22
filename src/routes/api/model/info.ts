@@ -1,9 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import {
-  deriveFallbackModelInfoFromGateway,
-  normalizeModelInfoResponse,
-} from '@/lib/model-info'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
   dashboardFetch,
@@ -11,6 +7,10 @@ import {
   getCapabilities,
   getGatewayMode,
 } from '../../../server/gateway-capabilities'
+import {
+  deriveFallbackModelInfoFromGateway,
+  normalizeModelInfoResponse,
+} from '@/lib/model-info'
 
 export const Route = createFileRoute('/api/model/info')({
   server: {
@@ -33,12 +33,13 @@ export const Route = createFileRoute('/api/model/info')({
           rawPayload = null
         }
 
+        const capabilities = getCapabilities()
         const normalized = normalizeModelInfoResponse(rawPayload)
         const shouldUseFallback =
           normalized.supportsRuntimeSwitching === null &&
           normalized.vanillaAgent === null
         const resolved = shouldUseFallback
-          ? deriveFallbackModelInfoFromGateway(gatewayMode, getCapabilities())
+          ? deriveFallbackModelInfoFromGateway(gatewayMode, capabilities)
           : normalized
 
         if (shouldUseFallback) {
@@ -51,10 +52,18 @@ export const Route = createFileRoute('/api/model/info')({
           rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
             ? (rawPayload as Record<string, unknown>)
             : {}
+        // Per-request model switching (#D1): when the gateway itself
+        // advertises runtime_model_switch, it validates the requested model
+        // server-side — so the picker must be unblocked even if a (stale)
+        // dashboard payload reported switching as unsupported.
+        const supportsRuntimeSwitching = capabilities.runtimeModelSwitch
+          ? true
+          : resolved.supportsRuntimeSwitching
 
         return json({
           ...passthrough,
           ...resolved,
+          supportsRuntimeSwitching,
           gatewayMode,
         })
       },

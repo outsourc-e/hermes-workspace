@@ -39,6 +39,7 @@ export function ChatPanel() {
     friendlyId: string
     sessionKey: string
   } | null>(null)
+  const [panelFresh, setPanelFresh] = useState(0)
 
   const isNewChat = sessionKey === 'new'
   const activeFriendlyId = sessionKey || 'main'
@@ -110,6 +111,7 @@ export function ChatPanel() {
   const handleNewChat = useCallback(() => {
     setForcedSession(null)
     setChatPanelSessionKey('new')
+    setPanelFresh((n) => n + 1)
   }, [setChatPanelSessionKey])
 
   const handleSelectSession = useCallback(
@@ -255,7 +257,7 @@ export function ChatPanel() {
             {/* Chat content */}
             <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
               <ChatScreen
-                key={activeFriendlyId}
+                key={isNewChat ? `new-${panelFresh}` : activeFriendlyId}
                 activeFriendlyId={activeFriendlyId}
                 isNewChat={isNewChat}
                 forcedSessionKey={forcedSessionKey}

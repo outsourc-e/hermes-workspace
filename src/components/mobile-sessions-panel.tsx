@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, Chat01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Chat01Icon, RefreshIcon } from '@hugeicons/core-free-icons'
 import type { SessionMeta } from '@/screens/chat/types'
 import { cn } from '@/lib/utils'
 
@@ -11,6 +11,9 @@ type Props = {
   activeFriendlyId: string
   onSelectSession: (key: string) => void
   onNewChat: () => void
+  sessionsLoading?: boolean
+  sessionsError?: string | null
+  onRetrySessions?: () => void
 }
 
 function normalizeLabel(value: string | undefined): string {
@@ -56,6 +59,9 @@ export function MobileSessionsPanel({
   activeFriendlyId,
   onSelectSession,
   onNewChat,
+  sessionsLoading,
+  sessionsError,
+  onRetrySessions,
 }: Props) {
   useEffect(() => {
     if (!open) return
@@ -108,7 +114,28 @@ export function MobileSessionsPanel({
           </div>
 
           <div className="flex-1 overflow-y-auto p-2">
-            {sessions.length === 0 ? (
+            {sessionsError ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-primary-500">
+                <HugeiconsIcon icon={Chat01Icon} size={24} strokeWidth={1.6} />
+                <p className="text-sm text-red-500">Failed to load sessions.</p>
+                <p className="text-xs text-primary-400">{sessionsError}</p>
+                {onRetrySessions && (
+                  <button
+                    type="button"
+                    onClick={onRetrySessions}
+                    className="mt-1 inline-flex items-center gap-1 rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-medium text-primary-700 hover:border-accent-300 hover:text-accent-600 transition-colors"
+                  >
+                    <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.8} />
+                    Retry
+                  </button>
+                )}
+              </div>
+            ) : sessionsLoading && sessions.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-primary-400">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                <p className="text-xs">Loading sessions…</p>
+              </div>
+            ) : sessions.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-primary-500">
                 <HugeiconsIcon icon={Chat01Icon} size={24} strokeWidth={1.6} />
                 <p className="text-sm">No sessions yet.</p>
