@@ -1,5 +1,5 @@
-# Phase 2.5-002: Build + lint workflow
-# Runs on all PRs and pushes to main
+# Build + lint + test workflow
+# Runs on all PRs and pushes to main/production
 
 name: CI
 
@@ -9,6 +9,10 @@ on:
   pull_request:
     branches: [main, production]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build & Lint
@@ -16,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -24,20 +28,28 @@ jobs:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'pnpm'
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
       - name: Run linter
-        run: pnpm run lint || echo "⚠️ Lint not configured, skipping"
+        run: pnpm run lint || echo "::notice::Lint not configured, skipping"
         continue-on-error: true
 
       - name: Type check
-        run: pnpm run typecheck || pnpm exec tsc --noEmit || echo "⚠️ Typecheck not configured"
+        run: pnpm run typecheck || pnpm exec tsc --noEmit || echo "::notice::Typecheck not configured"
         continue-on-error: true
 
       - name: Build
@@ -60,7 +72,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -68,14 +80,22 @@ jobs:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'pnpm'
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
       - name: Run tests
-        run: pnpm test || echo "⚠️ No tests configured"
+        run: pnpm test || echo "::notice::No tests configured"
         continue-on-error: true

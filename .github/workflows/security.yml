@@ -1,4 +1,4 @@
-# Phase 2.5-001: Secrets scanning CI
+# Secrets scanning CI
 # Scans for leaked secrets on PR and push to main
 
 name: Security Scan
@@ -8,6 +8,10 @@ on:
     branches: [main, production]
   pull_request:
     branches: [main, production]
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -27,14 +31,12 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # No additional secrets required - uses built-in GITHUB_TOKEN
 
       - name: Grep for common patterns (fallback)
         if: always()
         run: |
           echo "🔍 Scanning for common secret patterns..."
 
-          # Patterns that indicate secrets
           PATTERNS=(
             "sk-[a-zA-Z0-9]{20,}"
             "sk-ant-"
@@ -57,7 +59,7 @@ jobs:
               | grep -v "placeholder" \
               | grep -v "# pragma: allowlist secret" \
               | grep -v "example\|sample\|fake\|dummy\|test\|mock" ; then
-              echo "⚠️ Potential secret found matching: $pattern"
+              echo "::warning::Potential secret found matching: $pattern"
               FOUND=1
             fi
           done
@@ -68,3 +70,20 @@ jobs:
           fi
 
           echo "✅ No obvious secret patterns found"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## 🔒 Security Scan Result"
+            echo ""
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            if [ $FOUND -eq 1 ]; then
+              echo "| Gitleaks + grep | ⚠️ Issues found |"
+            else
+              echo "| Gitleaks + grep | ✅ Clean |"
+            fi
+            echo ""
+            echo "Scanned for: API keys, SSH keys, GitHub tokens, and other credential patterns."
+          } >> "$GITHUB_STEP_SUMMARY"
