@@ -123,6 +123,34 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
     updatedAt: 0,
     isBuiltIn: true,
   },
+  {
+    id: 'tpl-waba-winback',
+    name: 'WhatsApp Win-Back (Bonvoice)',
+    description: 'Recurring 5-day WABA win-back for newly-lost Bitrix leads. Human approval required before any send.',
+    icon: '💬',
+    goal: [
+      'Run the recurring WhatsApp (WABA) win-back campaign for Bonvoice on newly-lost Bitrix leads, executed every 5 days via Pinnacle (dashboard msg.bonvoice.com, API api.msg.bonvoice.com).',
+      'Scope: NEWLY-lost leads only each run (not the backlog, not a re-blast) across 5 segments by lost-reason field UF_CRM_1741004117:',
+      'Not Interested (131), Future DP (129), Custom Requirements (139), Pricing Issue (133), Taken from competitor (135). EXCLUDE Bad Data (141) and Duplicate (137).',
+      'HARD SAFETY RULES: (1) Never send any WhatsApp message without explicit human approval — stop at the approval gate and present the batch. (2) Confirm opt-in / compliance before any send. (3) Dedup so no lead is ever messaged twice. (4) Never write secret values into notes.',
+      'Open dependencies to confirm before sending: Pinnacle API creds (or UI-only); live sender number (confirm +91 9567855779 vs +91 79 4635 0518); 5 approved WABA marketing templates; 5 posters + final copy; opt-in confirmation.',
+    ].join('\n'),
+    tags: ['whatsapp', 'winback', 'campaign', 'bonvoice', 'lifecycle'],
+    tasks: [
+      { title: 'Strategy: confirm segments (131/129/139/133/135), newly-lost-only cadence, kill criteria, and the opt-in/compliance gate; freeze scope before execution', description: 'Routes to marketing-strategy. Human sign-off required. No sends result from this task.' },
+      { title: 'Lifecycle: pull newly-lost leads from Bitrix (crm.lead.list, STATUS_SEMANTIC_ID=F, UF_CRM_1741004117 in [131,129,139,133,135], modified within last 5 days); select PHONE+NAME+reason; dedup against the messaged store', description: 'Live Bitrix pull each cycle — NO manual export. Build/maintain the dedup store.' },
+      { title: 'Content: draft 5 WABA marketing templates (image header + body + buttons) and 5 posters + copy, one per segment; queue for WhatsApp template approval', description: 'Draft only (Tier 0). Brand assets needed. Approve templates once, then reuse.' },
+      { title: 'Lifecycle: route each lead lost-reason to its matching approved Pinnacle template; assemble the sendable batch per segment — DO NOT SEND', description: 'Produces the batch manifest for review. No external send.' },
+      { title: 'APPROVAL GATE (human): present per-segment batch + templates + posters + counts for sign-off; block until approved', description: 'external-send is greenlight-gated. Nothing sends before this passes.' },
+      { title: 'Lifecycle: on approval only, send via Pinnacle API (fallback UI automation); track sent + retry failures; update dedup/messaged store', description: 'Runs strictly after the approval gate. Idempotent against the dedup store.' },
+      { title: 'Revenue Enablement: phase-2 enrichment — pull VOXIMPLANT_CALL recordings (crm.activity.list, FILES[].url), STT transcribe, mine objections to sharpen lost-reason segmentation', description: 'voximplant.statistic.get is empty — use crm.activity.list. STT choice is an open dependency.' },
+      { title: 'Lifecycle: wire inbound-reply webhook to AI-draft response (Hermes) then human approve before any reply is sent', description: 'AI-draft-then-approve. No autonomous public replies.' },
+      { title: 'KM: write a handoff/status note — what ran, counts sent per segment, blockers, next-cycle actions; expose no secrets', description: 'Routes to km-agent. Knowledge hygiene for the recurring cycle.' },
+    ],
+    createdAt: 0,
+    updatedAt: 0,
+    isBuiltIn: true,
+  },
 ]
 
 export function loadCustomTemplates(): WorkflowTemplate[] {

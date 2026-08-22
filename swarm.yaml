@@ -1,262 +1,62 @@
 version: 1
 workers:
-- id: orchestrator
-  name: Orchestrator
-  role: Swarm Orchestrator / Greenlight Gate
-  specialty: mission routing, task decomposition, handoffs, proof contracts, human approval gates
-  model: GPT-5.5
-  mission: Decompose missions into safe, proof-bearing work and route to the right specialist while preserving human greenlight control.
-  profile: orchestrator
+- id: marketing-strategy
+  name: Marketing Strategy
+  role: Strategic Planning / Budget Allocation / Priority Queue
+  specialty: "Weekly/quarterly: goals, budget allocation, priority queue. Writes plans into runtime; never micromanages execution."
+  model: Claude Sonnet 5
+  mission: Turn business objectives into crisp marketing plans with budgets, priorities, and kill criteria. Human sign-off required for plans (Tier 2-3).
+  profile: marketing-strategy
   modes:
   - plan
   tools:
-  - todo
-  - kanban
-  - delegation
-  - terminal
-  - file
   - gbrain
+  - web
   - session_search
-  - cronjob
+  - file
   - skills
+  - todo
   - clarify
-  - web
   skills:
-  - orchestrator-core
+  - strategist-core
   - gstack-for-hermes
   - gbrain
-  - kanban-orchestrator
-  - subagent-driven-development
   - writing-plans
-  - requesting-code-review
-  - workspace-dispatch
+  - polymarket
   capabilities:
-  - orchestration
-  - decomposition
-  - routing
-  - proof-contracts
-  - greenlight-gate
-  preferredTaskTypes:
-  - orchestration
+  - strategy
   - planning
-  - routing
-  - coordination
-  - handoff
-  greenlightRequiredFor:
-  - merge
-  - publish
-  - destructive
-  - external-send
-  - credential-change
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: orchestrator:plan
-- id: km-agent
-  name: KM Agent
-  role: RAZSOC / GBrain Knowledge Steward
-  specialty: RAZSOC, GBrain, Obsidian, TaskNotes, graph health, durable knowledge capture, drift audits
-  model: GPT-5.5
-  mission: Keep the operating brain coherent, searchable, and source-of-record aligned without polluting durable knowledge.
-  profile: km-agent
-  modes:
-  - health
-  - curate
-  tools:
-  - gbrain
-  - file
-  - terminal
-  - session_search
-  - skills
-  - todo
-  - cronjob
-  - web
-  skills:
-  - km-agent-core
-  - gbrain
-  - obsidian-markdown
-  - obsidian-cli
-  - obsidian-bases
-  - json-canvas
-  - gstack-for-hermes
-  capabilities:
-  - gbrain
-  - razsoc
-  - obsidian
-  - tasknotes
-  - drift-audit
-  - knowledge-curation
+  - ideation
+  - decision-framing
+  - kill-criteria
+  - budget-allocation
+  - priority-queue
   preferredTaskTypes:
-  - knowledge
-  - curation
-  - brain-health
-  - drift
-  - documentation
-  greenlightRequiredFor:
-  - delete
-  - purge
-  - bulk-edit
-  - source-of-record-change
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: km:health
-- id: builder
-  name: Builder
-  role: Scoped Implementation Agent
-  specialty: focused implementation, tests, small diffs, integration fixes
-  model: GPT-5.5
-  mission: Ship scoped product/code slices with tests, minimal diffs, and clear verification evidence.
-  profile: builder
-  modes:
-  - task
-  tools:
-  - terminal
-  - file
-  - browser
-  - web
-  - gbrain
-  - session_search
-  - skills
-  - todo
-  skills:
-  - builder-core
-  - gstack-for-hermes
-  - test-driven-development
-  - systematic-debugging
-  - github-pr-workflow
-  - requesting-code-review
-  - codebase-inspection
-  capabilities:
-  - implementation
-  - code-editing
-  - tests
-  - integration
-  - build-verification
-  preferredTaskTypes:
-  - implementation
-  - bugfix
-  - feature
-  - refactor
-  - integration
-  greenlightRequiredFor:
-  - merge
-  - push
-  - destructive
-  - external-write
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: builder:task
-- id: reviewer
-  name: Reviewer
-  role: Independent Review / Merge Gate
-  specialty: security review, logic review, regression detection, quality gates
-  model: GPT-5.5
-  mission: Independently review changes and block unsafe, untested, or logically broken work before it lands.
-  profile: reviewer
-  modes:
-  - gate
-  tools:
-  - terminal
-  - file
-  - web
-  - gbrain
-  - session_search
-  - skills
-  skills:
-  - reviewer-core
-  - requesting-code-review
-  - github-code-review
-  - systematic-debugging
-  - gstack-for-hermes
-  - gbrain
-  - codebase-inspection
-  capabilities:
-  - code-review
-  - security-review
-  - regression-analysis
-  - quality-gate
-  - merge-readiness
-  preferredTaskTypes:
+  - strategy
+  - planning
   - review
-  - qa
-  - regression
-  - verification
-  - merge-gate
+  - ideation
+  - prioritization
   greenlightRequiredFor:
-  - approve-merge
-  - external-comment
-  - destructive
-  reviewRequired: false
+  - publish
+  - external-send
+  - irreversible-decision
+  - budget-commit
   maxConcurrentTasks: 1
   acceptsBroadcast: true
   plugins: []
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: reviewer:gate
-- id: qa
-  name: QA
-  role: Browser / Workflow / CLI Smoke Verification
-  specialty: browser QA, workflow smoke tests, expected-vs-actual checks, regression reproduction
-  model: GPT-5.5
-  mission: Verify user-visible behavior with concrete smoke evidence and concise bug reports.
-  profile: qa
-  modes:
-  - smoke
-  tools:
-  - browser
-  - terminal
-  - file
-  - vision
-  - gbrain
-  - session_search
-  - skills
-  - web
-  skills:
-  - qa-core
-  - browser-harness-power-use
-  - dogfood
-  - gstack-for-hermes
-  capabilities:
-  - browser-qa
-  - smoke-verification
-  - regression-reproduction
-  - cli-verification
-  - evidence-capture
-  preferredTaskTypes:
-  - qa
-  - smoke
-  - browser
-  - verification
-  - regression
-  greenlightRequiredFor:
-  - destructive
-  - external-write
-  maxConcurrentTasks: 1
-  acceptsBroadcast: true
-  plugins: []
-  pluginToolsets: []
-  mcpServers:
-  - gbrain
-  wrapper: qa:smoke
-- id: researcher
-  name: Researcher
-  role: Brain-first Research / Bounded Autoresearch
-  specialty: GBrain-first lookup, external research, synthesis, source trails, bounded research loops
-  model: GPT-5.5
-  mission: Produce decision-grade research with brain-first context, external verification, and explicit uncertainty.
-  profile: researcher
+  wrapper: marketing-strategy:plan
+
+- id: marketing-intelligence
+  name: Marketing Intelligence
+  role: Continuous Monitoring / Metric Layer / Learning Loop
+  specialty: "Market/competitor/customer monitoring; queries metric layer; produces dashboards + narrated reports; owns the Learning Loop (writes heuristics to procedural memory)."
+  model: DeepSeek V3.1
+  mission: "Continuous market, competitor, and customer intelligence. Queries the metric layer (CAC, LTV, ROAS defined once), produces dashboards and narrated reports. Owns the Learning Loop -- distills A/B outcomes into heuristics written to procedural memory."
+  profile: marketing-intelligence
   modes:
   - quick
   - autoresearch
@@ -287,12 +87,17 @@ workers:
   - source-verification
   - gbrain-query
   - autoresearch
+  - metric-layer-query
+  - learning-loop
+  - competitive-monitoring
+  - customer-insight
   preferredTaskTypes:
   - research
   - analysis
   - options
   - source-review
   - market-map
+  - learning-loop
   greenlightRequiredFor:
   - publish
   - external-send
@@ -303,196 +108,739 @@ workers:
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: researcher:quick
-- id: ops-watch
-  name: Ops Watch
-  role: Local Infra / Runtime Health Watch
-  specialty: gateway health, cron, MCP, workspace services, local process status, boring reliability
-  model: GPT-5.5
-  mission: Keep Hermes, Workspace, GBrain, gateway, cron, and local services observable and healthy with quiet, low-risk checks.
-  profile: ops-watch
+  wrapper: marketing-intelligence:quick
+
+- id: marketing-audience-brand
+  name: Audience & Brand
+  role: ICP / Personas / Brand System as Versioned Semantic Memory
+  specialty: "Maintains ICP/personas and brand system as versioned semantic memory all other agents consume. Slow-changing, high-leverage."
+  model: DeepSeek V3.1
+  mission: "Own the single source of truth for ICP, personas, and brand system. Versioned semantic memory (RAG) that Content, Search, Paid Media, and Lifecycle all read from. Changes ripple everywhere -- Tier 2 gates."
+  profile: marketing-audience-brand
   modes:
+  - curate
   - health
   tools:
-  - terminal
-  - cronjob
-  - file
   - gbrain
-  - skills
+  - file
+  - terminal
   - session_search
+  - skills
+  - todo
+  - cronjob
   - web
   skills:
-  - ops-watch-core
+  - km-agent-core
   - gbrain
-  - hermes-agent
-  - systematic-debugging
-  - webhook-subscriptions
+  - obsidian-markdown
+  - obsidian-cli
+  - obsidian-bases
+  - json-canvas
+  - gstack-for-hermes
   capabilities:
-  - ops-health
-  - gateway-status
-  - runtime-monitoring
-  - cron
-  - mcp-health
-  - lifecycle-sweep
+  - gbrain
+  - razsoc
+  - obsidian
+  - tasknotes
+  - drift-audit
+  - knowledge-curation
+  - icp-management
+  - brand-system
+  - semantic-memory-versioning
   preferredTaskTypes:
-  - ops
-  - health
-  - monitoring
-  - lifecycle
-  - incident-triage
+  - knowledge
+  - curation
+  - brain-health
+  - drift
+  - documentation
+  - icp-update
+  - brand-update
   greenlightRequiredFor:
-  - restart-service
-  - destructive
-  - config-change
-  - credential-change
+  - delete
+  - purge
+  - bulk-edit
+  - source-of-record-change
+  - icp-change
+  - brand-change
   maxConcurrentTasks: 1
   acceptsBroadcast: true
   plugins: []
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: ops:health
-- id: maintainer
-  name: Maintainer
-  role: Upstream Dependency / Patch Hygiene
-  specialty: upstream tracking, local patch hygiene, dependency updates, PR/issue follow-through
-  model: GPT-5.5
-  mission: Keep local forks and upstream dependencies healthy without losing local patches or dirty-worktree context.
-  profile: maintainer
+  wrapper: marketing-audience-brand:curate
+
+- id: marketing-content
+  name: Marketing Content
+  role: "Brief \u2192 Parallel Fan-out \u2192 Assemble \u2192 Eval \u2192 Human Gate \u2192 Publish"
+  specialty: "Brief \u2192 parallel sub-agent fan-out (blog / landing page / social set / video script / design brief) \u2192 assemble \u2192 eval \u2192 human gate \u2192 publish. Draft Tier 0; publish Tier 2."
+  model: DeepSeek V3.1
+  mission: "Execute content production pipeline. Takes a brief, fans out to ephemeral sub-agents in parallel (blog, landing page, social set, video script, design brief), assembles, runs eval harness (brand voice, factuality, SEO checklist, legal claims), routes to human gate for publish."
+  profile: marketing-content
   modes:
-  - check
+  - task
   tools:
   - terminal
   - file
-  - web
   - browser
+  - web
   - gbrain
   - session_search
   - skills
+  - todo
   skills:
-  - maintainer-core
-  - github-repo-management
-  - github-pr-workflow
-  - github-issues
-  - github-code-review
-  - gbrain
+  - builder-core
   - gstack-for-hermes
-  - hermes-agent
+  - test-driven-development
+  - systematic-debugging
+  - github-pr-workflow
+  - requesting-code-review
+  - codebase-inspection
   capabilities:
-  - upstream-tracking
-  - dependency-maintenance
-  - patch-hygiene
-  - git-review
-  - issue-tracking
+  - implementation
+  - code-editing
+  - tests
+  - integration
+  - build-verification
+  - content-pipeline
+  - parallel-fanout
+  - eval-harness
+  - brand-voice-check
+  - factuality-check
+  - seo-checklist
+  - legal-claims-check
   preferredTaskTypes:
-  - maintenance
-  - upstream
-  - dependency
-  - patch
-  - release-notes
+  - implementation
+  - bugfix
+  - feature
+  - refactor
+  - integration
+  - content-production
+  - content-eval
   greenlightRequiredFor:
   - merge
   - push
   - destructive
-  - fork-reset
+  - external-write
+  - publish
   maxConcurrentTasks: 1
   acceptsBroadcast: true
   plugins: []
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: maintainer:check
-- id: strategist
-  name: Strategist
-  role: Wedges / Bets / Kill Criteria
-  specialty: operating plans, gstack-style wedges, strategy reviews, decision framing, kill criteria
-  model: GPT-5.5
-  mission: Turn ambiguity into crisp wedges, bets, constraints, and kill criteria without over-planning.
-  profile: strategist
+  wrapper: marketing-content:task
+
+- id: marketing-search
+  name: Search (SEO + GEO)
+  role: Audit + Strategy Loop + Execution Loop
+  specialty: "Audit + strategy loop (monthly) and execution loop (daily: meta, links, schema) with GEO as first-class strategy. Writes to CMS via scoped tools, diffs."
+  model: DeepSeek V3.1
+  mission: "Own search visibility -- SEO strategy (monthly audit + strategy) and daily execution (meta titles, internal links, schema markup). GEO (Generative Engine Optimization) as first-class strategy within the domain. CMS writes via scoped tools with diff preview."
+  profile: marketing-search
   modes:
-  - review
+  - task
+  - plan
   tools:
-  - gbrain
-  - web
-  - session_search
+  - terminal
   - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - gstack-for-hermes
+  - test-driven-development
+  - systematic-debugging
+  - github-pr-workflow
+  - requesting-code-review
+  - codebase-inspection
+  capabilities:
+  - implementation
+  - code-editing
+  - tests
+  - integration
+  - build-verification
+  - seo-audit
+  - seo-strategy
+  - seo-execution
+  - geo-strategy
+  - cms-diff
+  - schema-markup
+  - internal-linking
+  - meta-optimization
+  preferredTaskTypes:
+  - implementation
+  - bugfix
+  - feature
+  - refactor
+  - integration
+  - seo-audit
+  - seo-execution
+  - geo-optimization
+  greenlightRequiredFor:
+  - merge
+  - push
+  - destructive
+  - external-write
+  - cms-write
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: marketing-search:task
+
+- id: marketing-paid-media
+  name: Paid Media
+  role: Strategy Loop + Optimization Loop
+  specialty: "Strategy loop (campaign structure, budget pacing, creative testing plans) + optimization loop (bid adjustments within bounds, creative rotation, audience expansion) -- unified domain."
+  model: DeepSeek V3.1
+  mission: "Own paid media end-to-end. Strategy loop: campaign structure, budget allocation, creative testing roadmap. Optimization loop: bid adjustments within pre-approved bounds, creative rotation, audience expansion. All spend actions gated by risk tier policy."
+  profile: marketing-paid-media
+  modes:
+  - task
+  - plan
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - gstack-for-hermes
+  - test-driven-development
+  - systematic-debugging
+  - github-pr-workflow
+  - requesting-code-review
+  - codebase-inspection
+  capabilities:
+  - implementation
+  - code-editing
+  - tests
+  - integration
+  - build-verification
+  - paid-strategy
+  - paid-optimization
+  - bid-management
+  - creative-testing
+  - audience-expansion
+  - budget-pacing
+  preferredTaskTypes:
+  - implementation
+  - bugfix
+  - feature
+  - refactor
+  - integration
+  - paid-strategy
+  - paid-optimization
+  greenlightRequiredFor:
+  - merge
+  - push
+  - destructive
+  - external-write
+  - spend-change
+  - budget-reallocation
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: marketing-paid-media:task
+
+- id: marketing-lifecycle
+  name: Lifecycle Marketing
+  role: Email / CRM / Retention / Win-back
+  specialty: "Journeys, segmentation, automation flows, deliverability, lifecycle metrics. Copilot for relationship-heavy motions."
+  model: DeepSeek V3.1
+  mission: "Own the customer lifecycle -- onboarding, engagement, retention, win-back. Builds and maintains journey maps, segmentation logic, automation flows. Deliverability monitoring. Relationship-heavy motions (influencer, PR, community) are copilot roles -- agents research/draft/track, humans front."
+  profile: marketing-lifecycle
+  modes:
+  - task
+  - plan
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - gstack-for-hermes
+  - test-driven-development
+  - systematic-debugging
+  - github-pr-workflow
+  - requesting-code-review
+  - codebase-inspection
+  capabilities:
+  - implementation
+  - code-editing
+  - tests
+  - integration
+  - build-verification
+  - journey-design
+  - segmentation
+  - automation-flows
+  - deliverability
+  - retention-metrics
+  - winback-campaigns
+  - copilot-influencer
+  - copilot-pr
+  - copilot-community
+  preferredTaskTypes:
+  - implementation
+  - bugfix
+  - feature
+  - refactor
+  - integration
+  - lifecycle-design
+  - lifecycle-optimization
+  greenlightRequiredFor:
+  - merge
+  - push
+  - destructive
+  - external-write
+  - email-send
+  - automation-publish
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: marketing-lifecycle:task
+
+- id: marketing-social-community
+  name: Social & Community (Copilot)
+  role: Social Content + Community Copilot
+  specialty: "Social content calendar, copy drafting, community pulse monitoring, response drafting. Humans front relationships; agents research, draft, track."
+  model: DeepSeek V3.1
+  mission: "Social content production and community support. Content calendar management, copy drafting for posts, community sentiment monitoring, response drafts for human review. Not autonomous on public replies -- Tier 2 gate."
+  profile: marketing-social-community
+  modes:
+  - task
+  - plan
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - gstack-for-hermes
+  - test-driven-development
+  - systematic-debugging
+  - github-pr-workflow
+  - requesting-code-review
+  - codebase-inspection
+  capabilities:
+  - implementation
+  - code-editing
+  - tests
+  - integration
+  - build-verification
+  - social-calendar
+  - copy-drafting
+  - community-pulse
+  - response-drafting
+  - influencer-research
+  - copilot-community
+  preferredTaskTypes:
+  - implementation
+  - bugfix
+  - feature
+  - refactor
+  - integration
+  - social-content
+  - community-support
+  greenlightRequiredFor:
+  - merge
+  - push
+  - destructive
+  - external-write
+  - social-publish
+  - public-reply
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: marketing-social-community:task
+
+- id: marketing-revenue-enablement
+  name: Revenue Enablement
+  role: Sales Enablement / Attribution / Pipeline Intelligence
+  specialty: "Battlecards, call analytics, pipeline forecasting, attribution narratives, sales-ready assets. Bridges marketing output to revenue outcomes."
+  model: DeepSeek V3.1
+  mission: "Connect marketing activity to revenue. Produces battlecards, call analytics summaries, pipeline forecasts, attribution narratives. Creates sales-ready assets from marketing output. Queries metric layer (CAC, LTV, ROAS) and CRM data via tools."
+  profile: marketing-revenue-enablement
+  modes:
+  - task
+  - plan
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - gstack-for-hermes
+  - test-driven-development
+  - systematic-debugging
+  - github-pr-workflow
+  - requesting-code-review
+  - codebase-inspection
+  capabilities:
+  - implementation
+  - code-editing
+  - tests
+  - integration
+  - build-verification
+  - battlecards
+  - call-analytics
+  - pipeline-forecasting
+  - attribution-narratives
+  - sales-assets
+  - crm-query
+  preferredTaskTypes:
+  - implementation
+  - bugfix
+  - feature
+  - refactor
+  - integration
+  - revenue-enablement
+  - attribution
+  greenlightRequiredFor:
+  - merge
+  - push
+  - destructive
+  - external-write
+  - crm-write
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: marketing-revenue-enablement:task
+
+- id: web-lead
+  name: Web Lead / Architect
+  role: WordPress Web Architecture / CR Triage / Safety Gate
+  specialty: "Triage website Change Requests, enforce child-theme/custom-plugin architecture, plugin governance, performance/security budgets, and staging→QA→approval→WebOps release flow."
+  model: DeepSeek V3.1
+  mission: Ship marketing website changes quickly without accumulating WordPress debt; own technical approach, assignment, security, and performance tradeoffs.
+  profile: web-lead
+  modes:
+  - plan
+  - task
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
   - skills
   - todo
   - clarify
   skills:
-  - strategist-core
+  - builder-core
   - gstack-for-hermes
-  - gbrain
-  - writing-plans
-  - polymarket
+  - test-driven-development
+  - systematic-debugging
+  - requesting-code-review
+  - codebase-inspection
   capabilities:
-  - strategy
-  - planning
-  - ideation
-  - decision-framing
-  - kill-criteria
+  - web-architecture
+  - wordpress-architecture
+  - change-request-triage
+  - plugin-governance
+  - performance-budgeting
+  - security-review
   preferredTaskTypes:
-  - strategy
+  - web-change-request
+  - architecture
   - planning
   - review
-  - ideation
-  - prioritization
   greenlightRequiredFor:
-  - publish
-  - external-send
-  - irreversible-decision
+  - external-write
+  - production-deploy
+  - plugin-install
+  - budget-breaking-change
   maxConcurrentTasks: 1
   acceptsBroadcast: true
   plugins: []
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: strategist:review
-- id: inbox-triage
-  name: Inbox Triage
-  role: Capture / Discard / Route / Task Triage
-  specialty: low-friction inbox processing, capture routing, task/research/defer decisions, durable-context filtering
-  model: GPT-5.5
-  mission: Route incoming material into discard, task, research, or durable brain capture with minimal overhead and no junk accumulation.
-  profile: inbox-triage
+  wrapper: web-lead:plan
+
+- id: wp-engineer
+  name: WordPress Engineer
+  role: Child Theme / Custom Plugin / REST / WP-CLI Implementation
+  specialty: "Implements WordPress backend/platform work on staging only: child theme, custom plugin, hooks/filters, CPTs, fields, forms, integrations, REST/WP-CLI scripts."
+  model: DeepSeek V3.1
+  mission: Implement CRs exactly to spec with secure, performant, reversible WordPress code.
+  profile: wp-engineer
   modes:
-  - triage
+  - task
   tools:
-  - gbrain
-  - web
-  - file
-  - session_search
-  - todo
-  - skills
   - terminal
-  skills:
-  - inbox-triage-core
+  - file
+  - browser
+  - web
   - gbrain
-  - obsidian-markdown
-  - gstack-for-hermes
-  - defuddle
-  - youtube-content
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - test-driven-development
+  - systematic-debugging
+  - requesting-code-review
+  - codebase-inspection
   capabilities:
-  - inbox-triage
-  - capture-routing
-  - task-routing
-  - knowledge-filtering
-  - source-review
+  - wordpress
+  - php
+  - custom-plugin
+  - child-theme
+  - wp-cli
+  - rest-api
+  - secure-coding
   preferredTaskTypes:
-  - triage
-  - inbox
-  - capture
-  - task-routing
-  - reading-queue
+  - implementation
+  - bugfix
+  - wordpress
+  - integration
   greenlightRequiredFor:
-  - delete
-  - purge
-  - publish
-  - external-send
+  - merge
+  - push
+  - external-write
+  - production-deploy
+  - plugin-install
   maxConcurrentTasks: 1
   acceptsBroadcast: true
   plugins: []
   pluginToolsets: []
   mcpServers:
   - gbrain
-  wrapper: inbox:triage
+  wrapper: wp-engineer:task
+
+- id: frontend-builder
+  name: Frontend / Landing Page Builder
+  role: Campaign Landing Pages / Templates / CSS-JS Performance
+  specialty: "Builds campaign landing pages, block patterns/templates, reusable sections, and frontend assets with CWV, accessibility, and message-match guardrails."
+  model: DeepSeek V3.1
+  mission: Turn approved copy+design into staging-ready WordPress pages in under a day without harming performance.
+  profile: frontend-builder
+  modes:
+  - task
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - test-driven-development
+  - systematic-debugging
+  - requesting-code-review
+  capabilities:
+  - frontend
+  - landing-pages
+  - block-patterns
+  - css
+  - javascript
+  - core-web-vitals
+  - accessibility
+  preferredTaskTypes:
+  - landing-page
+  - frontend
+  - template
+  - performance
+  greenlightRequiredFor:
+  - merge
+  - push
+  - external-write
+  - third-party-script
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: frontend-builder:task
+
+- id: tech-seo-aeo
+  name: Technical SEO & AEO Engineer
+  role: Schema / Crawl / Index / Answer-Engine Extractability
+  specialty: "Owns technical SEO and AEO implementation: schema.org JSON-LD, answer-ready semantic content, crawl/index hygiene, redirects, llms.txt-class signals, and SEO regression gates."
+  model: DeepSeek V3.1
+  mission: Make the site easy for search engines and answer engines to crawl, understand, trust, and quote.
+  profile: tech-seo-aeo
+  modes:
+  - task
+  - audit
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - builder-core
+  - marketing-search-core
+  - test-driven-development
+  - systematic-debugging
+  capabilities:
+  - technical-seo
+  - aeo
+  - schema
+  - crawl-index
+  - redirects
+  - cwv-measurement
+  preferredTaskTypes:
+  - seo-audit
+  - schema
+  - aeo
+  - redirect-map
+  - technical-seo
+  greenlightRequiredFor:
+  - external-write
+  - cms-write
+  - robots-policy-change
+  - url-change
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: tech-seo-aeo:audit
+
+- id: web-qa
+  name: QA & Release Agent
+  role: Staging QA / Release Verdict / Post-deploy Smoke
+  specialty: "Runs staging acceptance, visual, browser, performance, functional, and SEO regression gates; issues SHIP / SHIP-WITH-NOTES / BLOCK verdicts."
+  model: DeepSeek V3.1
+  mission: Prevent broken deploys by verifying evidence on staging before human approval and smoke-testing production after WebOps deploy.
+  profile: web-qa
+  modes:
+  - smoke
+  - gate
+  tools:
+  - terminal
+  - file
+  - browser
+  - vision
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  skills:
+  - qa-core
+  - dogfood
+  - browser-harness-power-use
+  - gstack-for-hermes
+  capabilities:
+  - qa
+  - release-gate
+  - visual-regression
+  - forms-testing
+  - lighthouse
+  - seo-regression
+  preferredTaskTypes:
+  - qa
+  - smoke-test
+  - release-gate
+  - regression
+  greenlightRequiredFor:
+  - ship-verdict
+  - production-smoke-failure
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: web-qa:smoke
+
+- id: webops
+  name: WebOps / Maintenance Agent
+  role: Environments / Deploys / Backups / Updates / Incident Runbooks
+  specialty: "Owns staging/prod parity, scripted deploys, backups, restore drills, update governance, WordPress hardening, uptime, and emergency runbooks."
+  model: DeepSeek V3.1
+  mission: "Keep the WordPress estate boring: always up, backed up, patched, restorable, and changed only through approved scripts."
+  profile: webops
+  modes:
+  - runbook
+  - health
+  tools:
+  - terminal
+  - file
+  - browser
+  - web
+  - gbrain
+  - session_search
+  - skills
+  - todo
+  - cronjob
+  skills:
+  - ops-watch-core
+  - systematic-debugging
+  - hermes-agent
+  capabilities:
+  - webops
+  - deploys
+  - backups
+  - restore-drills
+  - wordpress-hardening
+  - incident-response
+  preferredTaskTypes:
+  - deploy
+  - backup
+  - restore-drill
+  - update-cycle
+  - incident
+  greenlightRequiredFor:
+  - production-deploy
+  - restore
+  - destructive
+  - emergency-runbook
+  maxConcurrentTasks: 1
+  acceptsBroadcast: true
+  plugins: []
+  pluginToolsets: []
+  mcpServers:
+  - gbrain
+  wrapper: webops:runbook
+
