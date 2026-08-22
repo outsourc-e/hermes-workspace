@@ -1,4 +1,16 @@
 version: 1
+# Global graph-engineering limits (see docs/swarm/ARCHITECTURE.md):
+# - non_dispatch_rule: Aurora keeps short/sequential/cheap work in the main session
+# - fanout.max_workers: hard cap on concurrent workers per brief
+# - fanout.max_parallel_same_repo: one writer per file/repo
+non_dispatch_rule:
+  enabled: true
+  keep_single_when: [short, single_context, no_branches, cheap_failure]
+  max_single_agent_minutes: 15
+fanout:
+  max_workers: 4
+  max_parallel_same_repo: 1
+  max_tokens_per_brief: 200000
 workers:
 - id: orchestrator
   name: Orchestrator
