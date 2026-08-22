@@ -10,7 +10,7 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { useChatStore } from '@/stores/chat-store'
 
 const searchSchema = z.object({
-  fresh: z.number().optional(),
+  fresh: z.coerce.number().optional(),
 })
 
 const ChatScreen = lazy(async () => {
