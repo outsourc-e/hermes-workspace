@@ -139,6 +139,12 @@ export function parseModelAuthEventsFromText(text: string): {
   let fallbackModel: string | null = null
   for (const line of text.split('\n')) {
     if (!line.trim()) continue
+    // Auxiliary client (side-task) provider probes are NOT the worker's primary
+    // model auth. Lines like "agent.auxiliary_client: Auxiliary Nous client
+    // unavailable: no Nous authentication found" or "Auxiliary: marking openrouter
+    // unhealthy (payment / credit error)" must not count as primary-auth failures
+    // (otherwise a Kimi-only worker is falsely flagged BLOCKED). See swarm-health.
+    if (/auxiliary/i.test(line)) continue
     const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:,\d{3})?/)
     const ts = tsMatch?.[1] ?? null
     if (authPatterns.some((pattern) => pattern.test(line))) {
