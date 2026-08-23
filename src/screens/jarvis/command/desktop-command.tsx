@@ -1,5 +1,17 @@
 /**
- * JARVIS Desktop Command board — artboard 01, fixed 1440×900.
+ * JARVIS Command — the routed screen, plus the Desktop Command board itself
+ * (artboard 01, fixed 1440×900).
+ *
+ * Slice 5 makes the ROUTE responsive without touching the board. At `lg` and
+ * above the screen renders `DesktopCommandBoard` exactly as slice 3 drew it;
+ * below `lg` it renders `MobileCommandBoard` — artboard 03, a different
+ * composition that leads with the gate — rather than reflowing a 1440 board
+ * into 390. The swap is CSS (`hidden` / `flex`), not a media-query hook, so
+ * there is no viewport read to get wrong on first paint.
+ *
+ * `DesktopCommandScreen` keeps its slice-3 name because `src/routes/
+ * jarvis-command.tsx` imports it and routes are out of scope for this slice.
+ * It is the Command screen at every width, not the desktop one.
  *
  * Top bar over a three-zone body: workers/threads rail (220) · conversation
  * (flex) · work trail (320). Composed entirely from the Slice 2 primitives and
@@ -20,14 +32,24 @@
  * hook rather than importing it: sharing it would mean editing an existing
  * screen, which is out of scope for this slice.
  *
+ * One class needs explaining: the roots below carry `tracking-normal`. The app
+ * sets `letter-spacing: -0.15px` on `html, body` in `styles.css`, which every
+ * descendant inherits; the artboard's text is untracked. Without this the whole
+ * board renders a hair tight and the drift compounds across a long mono line.
+ * The Conductor board has had this reset since slice 4 — this board inherited
+ * the bleed until now, so the two were a hair apart. Resetting at the root is
+ * local and additive: the explicit `tracking-jv-*` on labels still wins.
+ *
  * Token discipline: no raw colour, size, spacing or radius in this directory.
- * Structural dimensions come from `JV_BOARD` (multiples of `--jv-space-4`).
+ * Structural dimensions come from `JV_BOARD` / `JV_MOBILE` (multiples of
+ * `--jv-space-4`).
  */
 import { useEffect } from 'react'
 import { CommandTopbar } from './command-topbar'
 import { Composer } from './composer'
 import { Conversation } from './conversation'
-import { JV_BOARD } from './geometry'
+import { JV_BOARD, JV_MOBILE } from './geometry'
+import { MobileCommandBoard } from './mobile-command'
 import { WorkTrail } from './work-trail'
 import { WorkerRail } from './worker-rail'
 import {
@@ -48,6 +70,7 @@ import {
   commandWorkerCounts,
   commandWorkerFixtures,
   disagreeLabel,
+  mobileFixtureNotice,
 } from '@/components/jarvis/fixtures'
 
 const THEME_ATTRIBUTE = 'data-theme'
@@ -74,7 +97,7 @@ export function DesktopCommandBoard() {
   return (
     <div
       data-jv-board="desktop-command"
-      className="flex flex-none flex-col overflow-hidden border border-jv-border bg-jv-surface-1 font-jv-sans text-jv-text"
+      className="flex flex-none flex-col overflow-hidden border border-jv-border bg-jv-surface-1 font-jv-sans tracking-normal text-jv-text"
       style={{
         width: JV_BOARD.frameWidth,
         height: JV_BOARD.frameHeight,
@@ -112,13 +135,19 @@ export function DesktopCommandBoard() {
   )
 }
 
-/** The dev route's page: the honesty banner, then the frame. */
+/**
+ * The dev route's page. One route, two compositions: the desktop board at `lg`
+ * and above, the mobile board below it. Both are mounted and CSS picks one —
+ * they are inert fixture boards, so nothing is paid for the hidden one beyond
+ * its markup, and a CSS swap cannot mismatch on first paint the way a
+ * `matchMedia` read can.
+ */
 export function DesktopCommandScreen() {
   useJarvisThemeAttribute()
 
   return (
-    <div className="min-h-screen bg-jv-bg font-jv-sans text-jv-text">
-      <div className="flex flex-col items-center gap-jv-16 p-jv-24">
+    <div className="min-h-screen bg-jv-bg font-jv-sans tracking-normal text-jv-text">
+      <div className="hidden flex-col items-center gap-jv-16 p-jv-24 lg:flex">
         <header
           className="flex w-full flex-col gap-jv-6"
           style={{ maxWidth: JV_BOARD.frameWidth }}
@@ -140,6 +169,30 @@ export function DesktopCommandScreen() {
         </header>
 
         <DesktopCommandBoard />
+      </div>
+
+      <div className="flex flex-col items-center gap-jv-12 p-jv-14 lg:hidden">
+        <header
+          className="flex w-full flex-col gap-jv-6"
+          style={{ maxWidth: JV_MOBILE.frameWidth }}
+        >
+          <div className="flex items-baseline gap-jv-9">
+            <span className="font-jv-mono text-jv-sm leading-jv-none font-semibold tracking-jv-wider-2 text-jv-live">
+              03 · MOBILE COMMAND
+            </span>
+            <span className="font-jv-mono text-jv-sm leading-jv-none text-jv-label-dim">
+              390 × 844
+            </span>
+          </div>
+          <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-text-caption">
+            {mobileFixtureNotice}
+          </p>
+          <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-blocked-dim">
+            {commandNoSourceNotice}
+          </p>
+        </header>
+
+        <MobileCommandBoard />
       </div>
     </div>
   )

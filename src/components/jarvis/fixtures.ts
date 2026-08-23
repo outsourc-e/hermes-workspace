@@ -1014,3 +1014,330 @@ export const conductorFixtureNotice =
 
 export const conductorNoSourceNotice =
   'Rendered from fixtures because they have NO SOURCE today (mapping §3.5): the cron PARTIAL badge as a structured state · the launchd "not loaded" diagnostic · run-log history beyond the latest run · the delegation chain as a real parent→child edge graph.'
+
+/* ══════════════════════════════════════════════════════════════════════
+   SLICE 5 — Mobile Command (artboard 03) and Mobile Conductor (artboard 04).
+
+   Appended below the Slice 3 and Slice 4 fixtures; nothing above is changed.
+
+   Mobile is a RECOMPOSITION, not a scaled desktop board — so these fixtures
+   are a deliberate SUBSET of the same story, re-cut for a 390pt column. The
+   gate body, the worker roster, the failing certs job and the run history are
+   the ones already declared above and are re-used verbatim wherever the mobile
+   artboard shows the same value; the entries below exist only where mobile
+   shows something the desktop fixtures do not already carry (a phone status
+   bar, a four-stat glance strip, a condensed thread, an abbreviated run list).
+
+   EVERY VALUE BELOW IS INVENTED, on the same terms as the blocks above: no
+   store, no gateway, no `/api/`, no fetch. The NO SOURCE items
+   (`docs/design/jarvis-ui-mapping.md` §3.5) carry `noSource` here and are
+   marked `data-jv-fixture="no-source"` in the DOM by the mobile boards.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared phone chrome ─────────────────────────────────────────────── */
+
+/**
+ * The phone status bar. `glyphs` are the artboard's SF Symbols for signal and
+ * battery, kept as literal text: they are drawn characters in the artboard,
+ * not iconography this slice is entitled to introduce.
+ */
+export interface MobileStatusBarFixture {
+  time: string
+  wordmark: string
+  glyphs: string
+}
+
+export const mobileStatusBarFixture: MobileStatusBarFixture = {
+  time: '9:47',
+  wordmark: 'JARVIS',
+  glyphs: '􀙇 􀛨',
+}
+
+/* ── Artboard 03 — Mobile Command ────────────────────────────────────── */
+
+/**
+ * The slim alert strip under the status bar. Amber gate count on the left,
+ * the fleet tally on the right — the two things that decide whether you keep
+ * reading or act.
+ */
+export interface MobileAlertStripFixture {
+  gateLabel: string
+  counts: string
+}
+
+export const mobileCommandAlertStrip: MobileAlertStripFixture = {
+  gateLabel: '1 GATE WAITING',
+  counts: '2 running · 1 blocked',
+}
+
+/**
+ * The hero gate. Same body as `commandGateFixture` — mobile leads with the
+ * gate rather than burying it in the thread, but it must not lead with a
+ * DIFFERENT gate. Only the desktop header sublabel is dropped: at 390pt the
+ * label / sublabel / waiting row cannot hold all three, and `waiting` is the
+ * one that decays.
+ */
+export const mobileCommandGateFixture: Omit<ApprovalGateCardProps, 'caveat'> = {
+  title: commandGateFixture.title,
+  command: commandGateFixture.command,
+  waiting: commandGateFixture.waiting,
+  state: commandGateFixture.state,
+  blastRadius: commandGateFixture.blastRadius,
+  undoPath: commandGateFixture.undoPath,
+  actions: commandGateFixture.actions,
+}
+
+/** NO SOURCE — §3.5 item 7. The mobile artboard states the caveat shorter. */
+export const mobileCommandGateCaveatFixture: GateCaveatFixture = {
+  lead: 'Note: ',
+  mark: 'known',
+  claim: 'qa has not verified the fix',
+  trail: ' — approving publishes notes for a claim, not a check.',
+}
+
+/** `YOU 09:44` / `JARVIS 09:44 · DISAGREES` — the condensed thread's turns. */
+export interface MobileThreadTurnFixture {
+  id: string
+  speaker: string
+  time: string
+  /** The DISAGREES stance. NO SOURCE — §3.5 item 4. */
+  stance?: string
+  body: Array<RichSpan>
+}
+
+export interface MobileThreadFixture {
+  label: string
+  turns: Array<MobileThreadTurnFixture>
+  /** `→ builder running 04:18` — the delegation the thread handed off to. */
+  delegation: string
+  /** The compact CLAIMED strip. NO SOURCE on a chat turn — §3.5 items 2–3. */
+  evidence: VerificationBadgeProps
+}
+
+export const mobileCommandThreadFixture: MobileThreadFixture = {
+  label: 'THREAD · VAULT FRONTMATTER',
+  turns: [
+    {
+      id: 'm-you-0944',
+      speaker: 'YOU',
+      time: '09:44',
+      body: [text('Wrap the dump in a try/catch and ship it.')],
+    },
+    {
+      id: 'm-jvs-0944',
+      speaker: 'JARVIS',
+      time: '09:44',
+      stance: 'DISAGREES',
+      body: [
+        text('A try/catch hides it again — the '),
+        mark('known', code('dump'), text(' already swallows the error')),
+        text(', which is why you got silent loss. '),
+        mark('recalled', text('Same shape as the May incident')),
+        text('. Failing the write is eleven lines and one test, '),
+        mark('assumed', text('~twenty minutes')),
+        text(' to reviewer.'),
+      ],
+    },
+  ],
+  delegation: '→ builder running 04:18',
+  evidence: {
+    state: 'claimed',
+    title: '41 notes restorable from vault git',
+    actions: ['VERIFY'],
+  },
+}
+
+/**
+ * The legend the desktop board has room to omit. Each row is the underline
+ * STYLE named, then the kind itself wearing that style via `EpistemicMark` —
+ * so the legend is drawn by the same component it documents and cannot drift.
+ */
+export interface MobileLegendFixture {
+  mark: EpistemicMarkKind
+  style: string
+  label: string
+}
+
+export const mobileCommandLegendFixtures: Array<MobileLegendFixture> = [
+  { mark: 'known', style: 'solid', label: 'known' },
+  { mark: 'recalled', style: 'dotted', label: 'recalled' },
+  { mark: 'assumed', style: 'dashed', label: 'assumed' },
+]
+
+/**
+ * The mobile composer. Distinct from `ComposerFixture`: the desktop chip row
+ * and the `⇧⏎ newline` hint are both dropped on a phone, and the target
+ * abbreviates to `→ ORCH`, so sharing the type would mean four optional
+ * fields that only ever mean "desktop".
+ */
+export interface MobileComposerFixture {
+  target: string
+  slashHint: string
+  placeholder: string
+  sendLabel: string
+}
+
+export const mobileCommandComposerFixture: MobileComposerFixture = {
+  target: '→ ORCH',
+  slashHint: '/verify /hold /status',
+  placeholder: 'Instruct JARVIS',
+  sendLabel: 'SEND',
+}
+
+/* ── Artboard 04 — Mobile Conductor ──────────────────────────────────── */
+
+/** The four glance stats. `tone` hue-codes the NUMBER, not the label. */
+export type MobileStatTone = 'live' | 'blocked' | 'failed' | 'idle'
+
+export interface MobileStatFixture {
+  label: string
+  value: string
+  tone: MobileStatTone
+}
+
+/**
+ * Kept verbatim from the artboard rather than tallied from
+ * `conductorWorkerCardFixtures` — the same reason `commandWorkerCounts` is.
+ * Slice 6 derives these from the live session list.
+ */
+export const mobileConductorStatFixtures: Array<MobileStatFixture> = [
+  { label: 'RUNNING', value: '2', tone: 'live' },
+  { label: 'BLOCKED', value: '1', tone: 'blocked' },
+  { label: 'FAILED', value: '1', tone: 'failed' },
+  { label: 'IDLE', value: '7', tone: 'idle' },
+]
+
+/**
+ * NEEDS YOU — the blocked `km-agent` card from the desktop worker board, re-cut
+ * as the one thing on this screen that cannot wait. Deliberately NOT the full
+ * `ApprovalGateCard`: on the Conductor this is a POINTER to a gate, and drawing
+ * the honest blast-radius panel here would imply you can decide from a glance
+ * surface. The gate itself lives on Command.
+ */
+export interface MobileGateSummaryFixture {
+  heading: string
+  label: string
+  title: string
+  actions: Array<string>
+}
+
+export const mobileConductorNeedsYouFixture: MobileGateSummaryFixture = {
+  heading: 'NEEDS YOU',
+  label: 'GATE · km-agent',
+  title: 'Write 41 restored notes to Vault/Published/',
+  actions: ['APPROVE', 'REVIEW'],
+}
+
+/** RUNNING NOW — the two live workers, as `WorkerStatusLine` rows. */
+export const mobileConductorRunningFixtures: Array<WorkerStatusLineProps> = [
+  { name: 'builder', status: 'running', detail: 'vitest --watch · 04:18' },
+  { name: 'orchestrator', status: 'running', detail: 'routing · live' },
+]
+
+export interface MobileRunningChainFixture {
+  heading: string
+  /** NO SOURCE — §3.5 item 14: the chain is a layout convention. */
+  chain: string
+  holdLabel: string
+}
+
+export const mobileConductorRunningChain: MobileRunningChainFixture = {
+  heading: 'RUNNING NOW',
+  chain: 'chain: orchestrator → builder → reviewer → qa · step 2 of 4',
+  holdLabel: 'HOLD ⌥',
+}
+
+/**
+ * SCHEDULE HEALTH. Only the two unhealthy jobs get a row; the healthy six
+ * collapse into one footer line, because the point of the section on a phone
+ * is what is broken, not the roster.
+ */
+export type MobileJobTone = 'failed' | 'silent'
+
+export interface MobileJobFixture {
+  name: string
+  tone: MobileJobTone
+  badge: string
+  detail: string
+  /** Marks the DETAIL as having no source at all. */
+  noSource?: boolean
+}
+
+export const mobileConductorJobFixtures: Array<MobileJobFixture> = [
+  {
+    name: 'ops-watch:certs',
+    tone: 'failed',
+    badge: 'FAIL',
+    detail: 'certbot exit 1 · DNS-01 timeout',
+  },
+  {
+    name: 'maintainer:dep-audit',
+    tone: 'silent',
+    badge: 'SILENT',
+    // NO SOURCE — §3.5 item 12: the client cannot introspect launchd.
+    detail: 'no run in 23d · launchd unloaded',
+    noSource: true,
+  },
+]
+
+export interface MobileScheduleHealthFixture {
+  heading: string
+  /** `4 other jobs healthy`. */
+  healthy: string
+  /**
+   * `researcher:feed-scan partial`. NO SOURCE — §3.5 item 11: PARTIAL only
+   * ever exists as free text inside `last_run_error`.
+   */
+  partial: string
+}
+
+export const mobileConductorScheduleHealth: MobileScheduleHealthFixture = {
+  heading: 'SCHEDULE HEALTH',
+  healthy: '4 other jobs healthy',
+  partial: 'researcher:feed-scan partial',
+}
+
+/**
+ * LAST NIGHT — the unattended window, abbreviated. Same runs as
+ * `conductorRunLogFixtures`, cut to the five the artboard lists and shortened
+ * to a job stem, because a 390pt column cannot hold `TIME / JOB / WORKER /
+ * RESULT / OUTCOME / DURATION`.
+ *
+ * NO SOURCE as a list — §3.5 item 13: `ClaudeJob` exposes only the LATEST run
+ * of each job, so no per-run history can be assembled from today's API at all.
+ */
+export interface MobileRunFixture {
+  time: string
+  job: string
+  outcome: ConductorRunOutcome
+}
+
+export interface MobileLastNightFixture {
+  heading: string
+  /** `00:00 – 09:00 · 9 runs`. */
+  window: string
+  runs: Array<MobileRunFixture>
+}
+
+export const mobileConductorLastNightFixture: MobileLastNightFixture = {
+  heading: 'LAST NIGHT',
+  window: '00:00 – 09:00 · 9 runs',
+  runs: [
+    { time: '07:00', job: 'feed-scan', outcome: 'partial' },
+    { time: '06:00', job: 'vault-index', outcome: 'success' },
+    { time: '05:00', job: 'certs', outcome: 'failed' },
+    { time: '02:14', job: 'typecheck', outcome: 'success' },
+    { time: '00:00', job: 'daily-note', outcome: 'partial' },
+  ],
+}
+
+/* ── Honesty banner ──────────────────────────────────────────────────── */
+
+/**
+ * Stated above the mobile frames. The NO SOURCE list is the SAME list the
+ * desktop boards state — mobile recomposes the layout, not the honesty — so
+ * `commandNoSourceNotice` and `conductorNoSourceNotice` are re-used as-is and
+ * only the "this is the mobile cut" lede is new.
+ */
+export const mobileFixtureNotice =
+  'Fixture board — nothing here is wired to a store, the gateway, or an API. Every value is invented. Mobile is a recomposition of the same fixtures, not the desktop board scaled down.'

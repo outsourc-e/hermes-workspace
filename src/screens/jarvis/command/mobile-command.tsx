@@ -1,0 +1,137 @@
+/**
+ * JARVIS Mobile Command board — artboard 03, 390 × 844.
+ *
+ * A DIFFERENT COMPOSITION, not the desktop board reflowed. Board 01 is a
+ * three-zone workspace that answers "show me everything about this mission";
+ * board 03 is approval-led and answers one question — "what is blocked on me,
+ * and can I unblock it from here" — so the gate is the FIRST thing on the
+ * screen rather than the fourth thing in a conversation, and the two rails
+ * (workers, work trail) are gone entirely rather than stacked underneath. What
+ * survives from board 01 survives because the gate needs it: the thread that
+ * produced the disagreement, the claim the gate turns on, and the legend that
+ * makes the marks readable.
+ *
+ * COMPOSES the Slice 2 primitives and re-styles none of them. The hero gate is
+ * the real `ApprovalGateCard` — the primitive is already fluid (it declares no
+ * width of its own), so the mobile board hands it a 390pt column and it lays
+ * out correctly without a variant. Composing a second gate card here would
+ * have meant two components owning the honest BLAST RADIUS / UNDO PATH panel,
+ * which is the one thing on this board that must not be able to drift.
+ *
+ * FIXTURES ONLY. This file imports no store, no gateway client and no HTTP
+ * endpoint, and opens no request or event stream of any kind — every value
+ * comes from `src/components/jarvis/fixtures.ts`. The NO SOURCE rows from
+ * `docs/design/jarvis-ui-mapping.md` §3.5 are drawn to prove the layout and are
+ * labelled both in the banner above the frame and via `data-jv-fixture=
+ * "no-source"` in the DOM. Nothing on this board is live.
+ *
+ * Fluid, not a 390px box: the frame is `w-full` with 390 as a MAX and 844 as a
+ * MIN, so on a real phone it fills the viewport and on a wider narrow window it
+ * stops at the artboard measure instead of stretching the prose.
+ *
+ * Token discipline: no raw colour, size, spacing or radius. Structural
+ * dimensions come from `JV_MOBILE` (multiples of `--jv-space-4`).
+ */
+import { JV_MOBILE } from './geometry'
+import { MobileComposer } from './mobile-composer'
+import { MobileStatusBar } from './mobile-status-bar'
+import { MobileThread } from './mobile-thread'
+import type {
+  MobileAlertStripFixture,
+  MobileLegendFixture,
+} from '@/components/jarvis/fixtures'
+import {
+  mobileCommandAlertStrip,
+  mobileCommandComposerFixture,
+  mobileCommandGateCaveatFixture,
+  mobileCommandGateFixture,
+  mobileCommandLegendFixtures,
+  mobileCommandThreadFixture,
+  mobileStatusBarFixture,
+} from '@/components/jarvis/fixtures'
+import { ApprovalGateCard } from '@/components/jarvis/approval-gate-card'
+import { EpistemicMark } from '@/components/jarvis/epistemic-mark'
+
+/** `1 GATE WAITING · 2 running · 1 blocked` — the strip under the status bar. */
+function AlertStrip({ data }: { data: MobileAlertStripFixture }) {
+  return (
+    <div className="flex flex-none items-center gap-jv-8 border-b border-jv-blocked-line bg-jv-blocked-bg px-jv-14 py-jv-8">
+      <span
+        aria-hidden="true"
+        className="h-jv-5 w-jv-5 flex-none rounded-jv-full bg-jv-blocked"
+      />
+      <span className="font-jv-mono text-jv-xs leading-jv-none font-semibold tracking-jv-wider text-jv-blocked">
+        {data.gateLabel}
+      </span>
+      <div className="flex-1" />
+      <span className="font-jv-mono text-jv-sm leading-jv-none whitespace-nowrap text-jv-label">
+        {data.counts}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * `solid known · dotted recalled · dashed assumed`.
+ *
+ * The kind word wears its own underline via `EpistemicMark`, so the legend is
+ * drawn by the very component it documents — it cannot describe a rule the
+ * marks above it do not actually use.
+ */
+function MarkLegend({ marks }: { marks: Array<MobileLegendFixture> }) {
+  return (
+    <div className="flex flex-none flex-wrap items-baseline gap-jv-9 border-t border-jv-line-soft bg-jv-surface-0 px-jv-14 py-jv-9 font-jv-sans text-jv-md leading-jv-loose text-jv-label">
+      {marks.map((entry, index) => (
+        <span key={entry.mark}>
+          {index > 0 ? (
+            <span aria-hidden="true" className="text-jv-label-ghost">
+              {'· '}
+            </span>
+          ) : null}
+          {`${entry.style} `}
+          <EpistemicMark mark={entry.mark}>{entry.label}</EpistemicMark>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** The mobile frame on its own — what artboard 03 shows, fluid to the viewport. */
+export function MobileCommandBoard() {
+  return (
+    <div
+      data-jv-board="mobile-command"
+      className="flex w-full flex-col overflow-hidden border border-jv-border bg-jv-surface-1 font-jv-sans tracking-normal text-jv-text"
+      style={{
+        maxWidth: JV_MOBILE.frameWidth,
+        minHeight: JV_MOBILE.frameHeight,
+      }}
+    >
+      <MobileStatusBar data={mobileStatusBarFixture} />
+      <AlertStrip data={mobileCommandAlertStrip} />
+
+      <main className="flex min-h-0 flex-1 flex-col gap-jv-16 overflow-y-auto px-jv-14 pt-jv-14 pb-jv-16">
+        {/* The hero: the gate leads the screen, it is not buried in the thread. */}
+        <div data-jv-fixture="no-source">
+          <ApprovalGateCard
+            {...mobileCommandGateFixture}
+            caveat={
+              <>
+                {mobileCommandGateCaveatFixture.lead}
+                <EpistemicMark mark={mobileCommandGateCaveatFixture.mark}>
+                  {mobileCommandGateCaveatFixture.claim}
+                </EpistemicMark>
+                {mobileCommandGateCaveatFixture.trail}
+              </>
+            }
+          />
+        </div>
+
+        <MobileThread thread={mobileCommandThreadFixture} />
+      </main>
+
+      <MarkLegend marks={mobileCommandLegendFixtures} />
+      <MobileComposer data={mobileCommandComposerFixture} />
+    </div>
+  )
+}

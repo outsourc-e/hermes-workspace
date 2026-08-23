@@ -1,5 +1,18 @@
 /**
- * JARVIS Desktop Conductor board — artboard 02, fixed 1440×900.
+ * JARVIS Conductor — the routed screen, plus the Desktop Conductor board itself
+ * (artboard 02, fixed 1440×900).
+ *
+ * Slice 5 makes the ROUTE responsive without touching the board. At `lg` and
+ * above the screen renders `DesktopConductorBoard` exactly as slice 4 drew it;
+ * below `lg` it renders `MobileConductorBoard` — artboard 04, a glance surface
+ * that collapses the survey into four numbers and the two things that are
+ * broken — rather than reflowing a 1440 board into 390. The swap is CSS
+ * (`hidden` / `flex`), not a media-query hook, so there is no viewport read to
+ * get wrong on first paint.
+ *
+ * `DesktopConductorScreen` keeps its slice-4 name because `src/routes/
+ * jarvis-conductor.tsx` imports it and routes are out of scope for this slice.
+ * It is the Conductor screen at every width, not the desktop one.
  *
  * Top bar (COMMAND/CONDUCTOR tabs) over three stacked sections: WORKER BOARD,
  * SCHEDULED JOBS, RUN LOG · UNATTENDED. Where the Command board answers "what
@@ -42,8 +55,9 @@
  * `--jv-space-4`).
  */
 import { useEffect } from 'react'
-import { JV_BOARD } from '../command/geometry'
+import { JV_BOARD, JV_MOBILE } from '../command/geometry'
 import { ConductorTopbar } from './conductor-topbar'
+import { MobileConductorBoard } from './mobile-conductor'
 import { RunLog } from './run-log'
 import { ScheduledJobs } from './scheduled-jobs'
 import { WorkerBoard } from './worker-board'
@@ -57,6 +71,7 @@ import {
   conductorTopbarFixture,
   conductorWorkerBoardHeading,
   conductorWorkerCardFixtures,
+  mobileFixtureNotice,
 } from '@/components/jarvis/fixtures'
 
 const THEME_ATTRIBUTE = 'data-theme'
@@ -106,13 +121,19 @@ export function DesktopConductorBoard() {
   )
 }
 
-/** The dev route's page: the honesty banner, then the frame. */
+/**
+ * The dev route's page. One route, two compositions: the desktop board at `lg`
+ * and above, the mobile board below it. Both are mounted and CSS picks one —
+ * they are inert fixture boards, so nothing is paid for the hidden one beyond
+ * its markup, and a CSS swap cannot mismatch on first paint the way a
+ * `matchMedia` read can.
+ */
 export function DesktopConductorScreen() {
   useJarvisThemeAttribute()
 
   return (
     <div className="min-h-screen bg-jv-bg font-jv-sans tracking-normal text-jv-text">
-      <div className="flex flex-col items-center gap-jv-16 p-jv-24">
+      <div className="hidden flex-col items-center gap-jv-16 p-jv-24 lg:flex">
         <header
           className="flex w-full flex-col gap-jv-6"
           style={{ maxWidth: JV_BOARD.frameWidth }}
@@ -137,6 +158,30 @@ export function DesktopConductorScreen() {
         </header>
 
         <DesktopConductorBoard />
+      </div>
+
+      <div className="flex flex-col items-center gap-jv-12 p-jv-14 lg:hidden">
+        <header
+          className="flex w-full flex-col gap-jv-6"
+          style={{ maxWidth: JV_MOBILE.frameWidth }}
+        >
+          <div className="flex items-baseline gap-jv-9">
+            <span className="font-jv-mono text-jv-sm leading-jv-none font-semibold tracking-jv-wider-2 text-jv-live">
+              04 · MOBILE CONDUCTOR
+            </span>
+            <span className="font-jv-mono text-jv-sm leading-jv-none text-jv-label-dim">
+              390 × 844
+            </span>
+          </div>
+          <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-text-caption">
+            {mobileFixtureNotice}
+          </p>
+          <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-blocked-dim">
+            {conductorNoSourceNotice}
+          </p>
+        </header>
+
+        <MobileConductorBoard />
       </div>
     </div>
   )
