@@ -57,6 +57,7 @@ const VALID_THEMES = [
   'claude-classic-light',
   'claude-slate',
   'claude-slate-light',
+  'jarvis',
 ]
 
 const themeScript = `
@@ -98,6 +99,7 @@ const themeColorScript = `
       'claude-classic-light': '#F5F2ED',
       'claude-slate': '#0d1117',
       'claude-slate-light': '#F6F8FA',
+      'jarvis': '#07090B',
     }
     const nextColor = colors[theme] || colors['${DEFAULT_THEME}']
     const isDark = !['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light'].includes(String(theme))

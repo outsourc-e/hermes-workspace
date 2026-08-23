@@ -1,0 +1,463 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+/* ════════════════════════════════════════════════════════════════════
+  JARVIS Theme — token layer (Slice 1)
+
+  Source of truth: `docs/design/jarvis-ui-mapping.md` §1. Every value below
+  was extracted programmatically from the `JARVIS Interface.dc.html`
+  artboard (65 distinct hexes, 17 font sizes, 3 weights, 10 tracking steps,
+  12 line-heights, 3 radii, 4 keyframes) — not eyeballed.
+
+  Layout of this file:
+    1. `@theme`  — canonical values, exposed to Tailwind v4 utilities
+                   (`bg-jv-surface-1`, `text-jv-live`, `border-jv-line`, …)
+    2. `[data-theme='jarvis']` — the `--jv-*` namespace, aliased to (1) so
+                   there is exactly ONE place a value is written down.
+    3. keyframes — file scope, so `animate-jv-*` works anywhere.
+
+  Additive only: this file defines NOTHING in the shared `--theme-*` /
+  `--color-primary-*` namespaces and therefore cannot disturb the other
+  12 themes or the `--color-*` remaps in `scifi-theme.css`.
+
+  NOTE on the font @import above / where this file is imported from:
+  `styles.css` pulls this file in from its import prologue (line 2), NOT
+  from the bottom next to `@import './scifi-theme.css'`. That position is
+  load-bearing: CSS requires `@import` to precede all other rules, so when
+  this file was imported at the bottom of `styles.css` the bundler silently
+  DROPPED the IBM Plex `@import url(...)` and the fonts never loaded. From
+  the prologue the bundler merges it into the emitted font import instead.
+  Cascade-neutral either way — nothing else defines `--jv-*`/`--color-jv-*`.
+
+  TOKEN-DISCIPLINE RULE for later slices: no JARVIS component may contain a
+  raw hex, px font-size, or px spacing value. Everything resolves through
+  `--jv-*` / `*-jv-*` utilities.
+  ═══════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* ── Fonts ──────────────────────────────────────────────────────── */
+  --font-jv-sans: 'IBM Plex Sans', sans-serif;
+  --font-jv-mono: 'IBM Plex Mono', monospace;
+
+  /* ── Surfaces (near-black, layered) ─────────────────────────────── */
+  --color-jv-bg: #07090b; /* page background (body) */
+  --color-jv-surface-0: #0a0e12; /* rails, composer background */
+  --color-jv-surface-1: #0c1014; /* board body */
+  --color-jv-surface-2: #0e1317; /* top bar, cards */
+  --color-jv-surface-3: #0f161b; /* active row highlight */
+  --color-jv-surface-4: #101820; /* worker chain card */
+  --color-jv-surface-5: #181f26; /* active tab */
+
+  /* ── Hairlines / borders ────────────────────────────────────────── */
+  --color-jv-line: #1a2128;
+  --color-jv-line-soft: #141a20;
+  --color-jv-line-faint: #131a20;
+  --color-jv-line-rule: #171e24; /* table row rules */
+  --color-jv-border: #1c242b;
+  --color-jv-border-muted: #1f272e;
+  --color-jv-border-input: #232c34;
+  --color-jv-border-chip: #262f37;
+  --color-jv-border-btn: #2a333b;
+  --color-jv-border-btn-2: #3a444d;
+
+  /* ── Text ramp ──────────────────────────────────────────────────── */
+  --color-jv-text-bright: #f2f6f9;
+  --color-jv-text: #e9eef2;
+  --color-jv-text-body: #d6dee5;
+  --color-jv-text-evidence: #c3cdd5; /* evidence body under a verified card */
+  --color-jv-text-muted: #b7c2cb;
+  --color-jv-text-dim: #a9b5bf;
+  --color-jv-text-dim-2: #98a6b2;
+  --color-jv-text-faint: #8b98a3;
+  --color-jv-text-caption: #7e8c97; /* board lede / caption */
+  --color-jv-text-detail: #6d7a84; /* worker + run-log detail lines */
+  --color-jv-label: #64727d;
+  --color-jv-label-dim: #5a6771;
+  --color-jv-label-faint: #4e5a63;
+  --color-jv-label-ghost: #3f4a53;
+  --color-jv-dot-idle: #2e3a43;
+
+  /* ── RESERVED HUE: live · running · streaming ───────────────────── */
+  /* Semantic. Never reuse for decoration. */
+  --color-jv-live: #35d6e8; /* live · running · streaming (JARVIS identity) */
+  --color-jv-live-bright: #7fe9f5; /* hover */
+  --color-jv-live-line: #1d4a52; /* running border */
+  --color-jv-live-bg: #0a1a1d; /* running tint */
+  --color-jv-live-bg-2: #0c171b; /* running card fill */
+
+  /* ── RESERVED HUE: blocked · waiting on human ───────────────────── */
+  /* Semantic. Never reuse for decoration. */
+  --color-jv-blocked: #f0a340; /* blocked · waiting on human */
+  --color-jv-blocked-text: #c08c3e; /* claimed text / amber text */
+  --color-jv-blocked-soft: #c9a96b; /* stale / silent detail */
+  --color-jv-blocked-dim: #8b7a55; /* gate sublabels */
+  --color-jv-blocked-line-2: #6b5326; /* CLAIMED · UNVERIFIED dashed border */
+  --color-jv-blocked-line: #4a3a1c; /* amber border */
+  --color-jv-blocked-divider: #3a2e16; /* 1px amber separator */
+  --color-jv-blocked-line-soft: #2a2214; /* gate grid gutter */
+  --color-jv-blocked-bg-chip: #191308; /* amber chip fill */
+  --color-jv-blocked-bg-2: #171309; /* gate cell fill */
+  --color-jv-blocked-bg: #12100a; /* gate background */
+  --color-jv-blocked-bg-row: #131009; /* blocked row tint */
+
+  /* ── RESERVED HUE: failed ───────────────────────────────────────── */
+  /* Semantic. Never reuse for decoration. */
+  --color-jv-failed: #ff4d6d; /* failed · plus filled block */
+  --color-jv-failed-text: #ff8fa3; /* failed detail text */
+  --color-jv-failed-muted: #b5556c; /* stale-worker red */
+  --color-jv-failed-line: #5a2434; /* failed border */
+  --color-jv-failed-bg: #170b0f; /* failed background */
+  --color-jv-failed-bg-row: #140a0e; /* failed row tint */
+
+  /* ── RESULT STATE: verified ─────────────────────────────────────── */
+  --color-jv-verified: #7fd1a8; /* verified / success / greenlight text */
+  --color-jv-verified-line: #2c5745; /* verified border */
+  --color-jv-verified-bg: #12271e; /* verified fill */
+  --color-jv-verified-bg-2: #0e1b16; /* verified card fill */
+
+  /* ── RESULT STATE: claimed (aliases into the amber ramp) ────────── */
+  --color-jv-claimed-line: #6b5326; /* == --color-jv-blocked-line-2 */
+  --color-jv-claimed-text: #c08c3e; /* == --color-jv-blocked-text */
+
+  /* ── EPISTEMIC MARKS ────────────────────────────────────────────── */
+  /* Bindings are from the artboard's own legend — do not swap them:
+       Known    → SOLID  underline
+       Recalled → DOTTED underline
+       Assumed  → DASHED underline
+     Each underline is `1px <style> var(--jv-*-rule)` on border-bottom. */
+  --color-jv-known-rule: #55666f; /* Known: solid underline */
+  --color-jv-known-sup: #93a3af; /* Known: `KN` superscript */
+  --color-jv-recalled-rule: #9a7434; /* Recalled: dotted underline */
+  --color-jv-recalled-sup: #d89a4a; /* Recalled: `RC` superscript */
+  --color-jv-assumed-rule: #7a6e90; /* Assumed: dashed underline */
+  --color-jv-assumed-sup: #a294be; /* Assumed: `AS` superscript */
+
+  /* ── Type scale (all 17 sizes present in the artboard) ──────────── */
+  --text-jv-4xs: 8px;
+  --text-jv-3xs: 8.5px;
+  --text-jv-2xs: 9px;
+  --text-jv-xs: 9.5px;
+  --text-jv-sm: 10px;
+  --text-jv-base: 10.5px;
+  --text-jv-md: 11px;
+  --text-jv-lg: 11.5px;
+  --text-jv-xl: 12px;
+  --text-jv-2xl: 12.5px;
+  --text-jv-3xl: 13px;
+  --text-jv-4xl: 13.5px;
+  --text-jv-5xl: 14px;
+  --text-jv-6xl: 16px;
+  --text-jv-7xl: 17px;
+  --text-jv-8xl: 20px;
+  --text-jv-9xl: 26px;
+
+  /* ── Line heights (all 12 present in the artboard) ──────────────── */
+  --leading-jv-none: 1;
+  --leading-jv-tight: 1.15;
+  --leading-jv-snug: 1.2;
+  --leading-jv-snug-2: 1.25;
+  --leading-jv-normal: 1.3;
+  --leading-jv-normal-2: 1.35;
+  --leading-jv-relaxed: 1.4;
+  --leading-jv-relaxed-2: 1.45;
+  --leading-jv-loose: 1.5;
+  --leading-jv-loose-2: 1.55;
+  --leading-jv-loose-3: 1.6;
+  --leading-jv-max: 1.75;
+
+  /* ── Tracking (all 10 steps present in the artboard) ────────────── */
+  --tracking-jv-tight: -0.01em;
+  --tracking-jv-label: 0.06em;
+  --tracking-jv-label-2: 0.08em;
+  --tracking-jv-wide: 0.09em;
+  --tracking-jv-wide-2: 0.1em;
+  --tracking-jv-wider: 0.12em;
+  --tracking-jv-wider-2: 0.14em;
+  --tracking-jv-widest: 0.16em;
+  --tracking-jv-ultra: 0.2em;
+  --tracking-jv-ultra-2: 0.22em;
+
+  /* ── Radii ──────────────────────────────────────────────────────── */
+  --radius-jv-sm: 2px;
+  --radius-jv: 3px;
+  --radius-jv-full: 9999px;
+
+  /* ── Spacing — 4px grid, with the sub-grid steps the artboard uses  */
+  --spacing-jv-0: 0px;
+  --spacing-jv-1: 1px;
+  --spacing-jv-2: 2px;
+  --spacing-jv-3: 3px;
+  --spacing-jv-4: 4px;
+  --spacing-jv-5: 5px;
+  --spacing-jv-6: 6px;
+  --spacing-jv-7: 7px;
+  --spacing-jv-8: 8px;
+  --spacing-jv-9: 9px;
+  --spacing-jv-10: 10px;
+  --spacing-jv-11: 11px;
+  --spacing-jv-12: 12px;
+  --spacing-jv-13: 13px;
+  --spacing-jv-14: 14px;
+  --spacing-jv-16: 16px;
+  --spacing-jv-20: 20px;
+  --spacing-jv-24: 24px;
+  --spacing-jv-28: 28px;
+  --spacing-jv-32: 32px;
+  --spacing-jv-40: 40px;
+  --spacing-jv-48: 48px;
+
+  /* ── Motion (bodies defined in the keyframes at the end of file) ── */
+  --animate-jv-pulse: jv-pulse 1.8s ease-in-out infinite;
+  --animate-jv-pulse-fast: jv-pulse 1.6s ease-in-out infinite;
+  --animate-jv-ring: jv-ring 2s ease-out infinite;
+  --animate-jv-caret: jv-caret 1s step-end infinite;
+  --animate-jv-flow: jv-flow 2.4s linear infinite;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+  The `--jv-*` namespace.
+
+  Scoped to `[data-theme='jarvis']`, matching how every other theme in this
+  repo declares its variables. Values alias the `@theme` block above so a
+  colour is written down exactly once.
+
+  JARVIS is DARK-ONLY — there is no light artboard, and therefore no
+  `jarvis-light` theme id.
+  ═══════════════════════════════════════════════════════════════════ */
+
+[data-theme='jarvis'] {
+  color-scheme: dark;
+
+  /* Fonts */
+  --jv-font-sans: var(--font-jv-sans);
+  --jv-font-mono: var(--font-jv-mono);
+
+  /* Surfaces */
+  --jv-bg: var(--color-jv-bg);
+  --jv-surface-0: var(--color-jv-surface-0);
+  --jv-surface-1: var(--color-jv-surface-1);
+  --jv-surface-2: var(--color-jv-surface-2);
+  --jv-surface-3: var(--color-jv-surface-3);
+  --jv-surface-4: var(--color-jv-surface-4);
+  --jv-surface-5: var(--color-jv-surface-5);
+
+  /* Hairlines / borders */
+  --jv-line: var(--color-jv-line);
+  --jv-line-soft: var(--color-jv-line-soft);
+  --jv-line-faint: var(--color-jv-line-faint);
+  --jv-line-rule: var(--color-jv-line-rule);
+  --jv-border: var(--color-jv-border);
+  --jv-border-muted: var(--color-jv-border-muted);
+  --jv-border-input: var(--color-jv-border-input);
+  --jv-border-chip: var(--color-jv-border-chip);
+  --jv-border-btn: var(--color-jv-border-btn);
+  --jv-border-btn-2: var(--color-jv-border-btn-2);
+
+  /* Text ramp */
+  --jv-text-bright: var(--color-jv-text-bright);
+  --jv-text: var(--color-jv-text);
+  --jv-text-body: var(--color-jv-text-body);
+  --jv-text-evidence: var(--color-jv-text-evidence);
+  --jv-text-muted: var(--color-jv-text-muted);
+  --jv-text-dim: var(--color-jv-text-dim);
+  --jv-text-dim-2: var(--color-jv-text-dim-2);
+  --jv-text-faint: var(--color-jv-text-faint);
+  --jv-text-caption: var(--color-jv-text-caption);
+  --jv-text-detail: var(--color-jv-text-detail);
+  --jv-label: var(--color-jv-label);
+  --jv-label-dim: var(--color-jv-label-dim);
+  --jv-label-faint: var(--color-jv-label-faint);
+  --jv-label-ghost: var(--color-jv-label-ghost);
+  --jv-dot-idle: var(--color-jv-dot-idle);
+
+  /* Reserved hue — live · running · streaming */
+  --jv-live: var(--color-jv-live);
+  --jv-live-bright: var(--color-jv-live-bright);
+  --jv-live-line: var(--color-jv-live-line);
+  --jv-live-bg: var(--color-jv-live-bg);
+  --jv-live-bg-2: var(--color-jv-live-bg-2);
+
+  /* Reserved hue — blocked · waiting on human */
+  --jv-blocked: var(--color-jv-blocked);
+  --jv-blocked-text: var(--color-jv-blocked-text);
+  --jv-blocked-soft: var(--color-jv-blocked-soft);
+  --jv-blocked-dim: var(--color-jv-blocked-dim);
+  --jv-blocked-line-2: var(--color-jv-blocked-line-2);
+  --jv-blocked-line: var(--color-jv-blocked-line);
+  --jv-blocked-divider: var(--color-jv-blocked-divider);
+  --jv-blocked-line-soft: var(--color-jv-blocked-line-soft);
+  --jv-blocked-bg-chip: var(--color-jv-blocked-bg-chip);
+  --jv-blocked-bg-2: var(--color-jv-blocked-bg-2);
+  --jv-blocked-bg: var(--color-jv-blocked-bg);
+  --jv-blocked-bg-row: var(--color-jv-blocked-bg-row);
+
+  /* Reserved hue — failed */
+  --jv-failed: var(--color-jv-failed);
+  --jv-failed-text: var(--color-jv-failed-text);
+  --jv-failed-muted: var(--color-jv-failed-muted);
+  --jv-failed-line: var(--color-jv-failed-line);
+  --jv-failed-bg: var(--color-jv-failed-bg);
+  --jv-failed-bg-row: var(--color-jv-failed-bg-row);
+
+  /* Result state — verified */
+  --jv-verified: var(--color-jv-verified);
+  --jv-verified-line: var(--color-jv-verified-line);
+  --jv-verified-bg: var(--color-jv-verified-bg);
+  --jv-verified-bg-2: var(--color-jv-verified-bg-2);
+
+  /* Result state — claimed */
+  --jv-claimed-line: var(--color-jv-claimed-line);
+  --jv-claimed-text: var(--color-jv-claimed-text);
+
+  /* Epistemic marks — colour + the underline style each one is bound to */
+  --jv-known-rule: var(--color-jv-known-rule);
+  --jv-known-rule-style: solid;
+  --jv-known-sup: var(--color-jv-known-sup);
+  --jv-recalled-rule: var(--color-jv-recalled-rule);
+  --jv-recalled-rule-style: dotted;
+  --jv-recalled-sup: var(--color-jv-recalled-sup);
+  --jv-assumed-rule: var(--color-jv-assumed-rule);
+  --jv-assumed-rule-style: dashed;
+  --jv-assumed-sup: var(--color-jv-assumed-sup);
+
+  /* Type scale */
+  --jv-text-4xs: var(--text-jv-4xs);
+  --jv-text-3xs: var(--text-jv-3xs);
+  --jv-text-2xs: var(--text-jv-2xs);
+  --jv-text-xs: var(--text-jv-xs);
+  --jv-text-sm: var(--text-jv-sm);
+  --jv-text-base: var(--text-jv-base);
+  --jv-text-md: var(--text-jv-md);
+  --jv-text-lg: var(--text-jv-lg);
+  --jv-text-xl: var(--text-jv-xl);
+  --jv-text-2xl: var(--text-jv-2xl);
+  --jv-text-3xl: var(--text-jv-3xl);
+  --jv-text-4xl: var(--text-jv-4xl);
+  --jv-text-5xl: var(--text-jv-5xl);
+  --jv-text-6xl: var(--text-jv-6xl);
+  --jv-text-7xl: var(--text-jv-7xl);
+  --jv-text-8xl: var(--text-jv-8xl);
+  --jv-text-9xl: var(--text-jv-9xl);
+
+  /* Weights */
+  --jv-weight-normal: 400;
+  --jv-weight-medium: 500;
+  --jv-weight-semibold: 600;
+
+  /* Line heights */
+  --jv-leading-none: var(--leading-jv-none);
+  --jv-leading-tight: var(--leading-jv-tight);
+  --jv-leading-snug: var(--leading-jv-snug);
+  --jv-leading-snug-2: var(--leading-jv-snug-2);
+  --jv-leading-normal: var(--leading-jv-normal);
+  --jv-leading-normal-2: var(--leading-jv-normal-2);
+  --jv-leading-relaxed: var(--leading-jv-relaxed);
+  --jv-leading-relaxed-2: var(--leading-jv-relaxed-2);
+  --jv-leading-loose: var(--leading-jv-loose);
+  --jv-leading-loose-2: var(--leading-jv-loose-2);
+  --jv-leading-loose-3: var(--leading-jv-loose-3);
+  --jv-leading-max: var(--leading-jv-max);
+
+  /* Tracking */
+  --jv-tracking-tight: var(--tracking-jv-tight);
+  --jv-tracking-label: var(--tracking-jv-label);
+  --jv-tracking-label-2: var(--tracking-jv-label-2);
+  --jv-tracking-wide: var(--tracking-jv-wide);
+  --jv-tracking-wide-2: var(--tracking-jv-wide-2);
+  --jv-tracking-wider: var(--tracking-jv-wider);
+  --jv-tracking-wider-2: var(--tracking-jv-wider-2);
+  --jv-tracking-widest: var(--tracking-jv-widest);
+  --jv-tracking-ultra: var(--tracking-jv-ultra);
+  --jv-tracking-ultra-2: var(--tracking-jv-ultra-2);
+
+  /* Radii */
+  --jv-radius-sm: var(--radius-jv-sm);
+  --jv-radius: var(--radius-jv);
+  --jv-radius-full: var(--radius-jv-full);
+
+  /* Spacing — 4px grid plus the sub-grid steps the artboard uses */
+  --jv-space-0: var(--spacing-jv-0);
+  --jv-space-1: var(--spacing-jv-1);
+  --jv-space-2: var(--spacing-jv-2);
+  --jv-space-3: var(--spacing-jv-3);
+  --jv-space-4: var(--spacing-jv-4);
+  --jv-space-5: var(--spacing-jv-5);
+  --jv-space-6: var(--spacing-jv-6);
+  --jv-space-7: var(--spacing-jv-7);
+  --jv-space-8: var(--spacing-jv-8);
+  --jv-space-9: var(--spacing-jv-9);
+  --jv-space-10: var(--spacing-jv-10);
+  --jv-space-11: var(--spacing-jv-11);
+  --jv-space-12: var(--spacing-jv-12);
+  --jv-space-13: var(--spacing-jv-13);
+  --jv-space-14: var(--spacing-jv-14);
+  --jv-space-16: var(--spacing-jv-16);
+  --jv-space-20: var(--spacing-jv-20);
+  --jv-space-24: var(--spacing-jv-24);
+  --jv-space-28: var(--spacing-jv-28);
+  --jv-space-32: var(--spacing-jv-32);
+  --jv-space-40: var(--spacing-jv-40);
+  --jv-space-48: var(--spacing-jv-48);
+
+  /* Motion */
+  --jv-anim-pulse: var(--animate-jv-pulse);
+  --jv-anim-pulse-fast: var(--animate-jv-pulse-fast);
+  --jv-anim-ring: var(--animate-jv-ring);
+  --jv-anim-caret: var(--animate-jv-caret);
+  --jv-anim-flow: var(--animate-jv-flow);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+  Motion — the four artboard keyframes, reproduced verbatim.
+  File scope (not inside the data-theme block) so `animate-jv-*` resolves.
+  ═══════════════════════════════════════════════════════════════════ */
+
+/* running dot (also a 1.6s variant; .4s / .5s stagger delays) */
+@keyframes jv-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+/* active chain-node halo */
+@keyframes jv-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(53, 214, 232, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(53, 214, 232, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(53, 214, 232, 0);
+  }
+}
+
+/* streaming caret */
+@keyframes jv-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* delegation-chain flow line (also a .8s delay variant) */
+@keyframes jv-flow {
+  0% {
+    left: -3px;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
