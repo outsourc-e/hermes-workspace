@@ -25,6 +25,7 @@ import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as JarvisGalleryRouteImport } from './routes/jarvis-gallery'
+import { Route as JarvisCommandRouteImport } from './routes/jarvis-command'
 import { Route as HermesWorldRouteImport } from './routes/hermes-world'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EarlyAccessRouteImport } from './routes/early-access'
@@ -238,6 +239,11 @@ const JobsRoute = JobsRouteImport.update({
 const JarvisGalleryRoute = JarvisGalleryRouteImport.update({
   id: '/jarvis-gallery',
   path: '/jarvis-gallery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JarvisCommandRoute = JarvisCommandRouteImport.update({
+  id: '/jarvis-command',
+  path: '/jarvis-command',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HermesWorldRoute = HermesWorldRouteImport.update({
@@ -925,6 +931,7 @@ export interface FileRoutesByFullPath {
   '/early-access': typeof EarlyAccessRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
+  '/jarvis-command': typeof JarvisCommandRoute
   '/jarvis-gallery': typeof JarvisGalleryRoute
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
@@ -1077,6 +1084,7 @@ export interface FileRoutesByTo {
   '/early-access': typeof EarlyAccessRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
+  '/jarvis-command': typeof JarvisCommandRoute
   '/jarvis-gallery': typeof JarvisGalleryRoute
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
@@ -1229,6 +1237,7 @@ export interface FileRoutesById {
   '/early-access': typeof EarlyAccessRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
+  '/jarvis-command': typeof JarvisCommandRoute
   '/jarvis-gallery': typeof JarvisGalleryRoute
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
@@ -1383,6 +1392,7 @@ export interface FileRouteTypes {
     | '/early-access'
     | '/files'
     | '/hermes-world'
+    | '/jarvis-command'
     | '/jarvis-gallery'
     | '/jobs'
     | '/mcp'
@@ -1535,6 +1545,7 @@ export interface FileRouteTypes {
     | '/early-access'
     | '/files'
     | '/hermes-world'
+    | '/jarvis-command'
     | '/jarvis-gallery'
     | '/jobs'
     | '/mcp'
@@ -1686,6 +1697,7 @@ export interface FileRouteTypes {
     | '/early-access'
     | '/files'
     | '/hermes-world'
+    | '/jarvis-command'
     | '/jarvis-gallery'
     | '/jobs'
     | '/mcp'
@@ -1839,6 +1851,7 @@ export interface RootRouteChildren {
   EarlyAccessRoute: typeof EarlyAccessRoute
   FilesRoute: typeof FilesRoute
   HermesWorldRoute: typeof HermesWorldRoute
+  JarvisCommandRoute: typeof JarvisCommandRoute
   JarvisGalleryRoute: typeof JarvisGalleryRoute
   JobsRoute: typeof JobsRoute
   McpRoute: typeof McpRoute
@@ -2065,6 +2078,13 @@ declare module '@tanstack/react-router' {
       path: '/jarvis-gallery'
       fullPath: '/jarvis-gallery'
       preLoaderRoute: typeof JarvisGalleryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/jarvis-command': {
+      id: '/jarvis-command'
+      path: '/jarvis-command'
+      fullPath: '/jarvis-command'
+      preLoaderRoute: typeof JarvisCommandRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hermes-world': {
@@ -3227,6 +3247,7 @@ const rootRouteChildren: RootRouteChildren = {
   EarlyAccessRoute: EarlyAccessRoute,
   FilesRoute: FilesRoute,
   HermesWorldRoute: HermesWorldRoute,
+  JarvisCommandRoute: JarvisCommandRoute,
   JarvisGalleryRoute: JarvisGalleryRoute,
   JobsRoute: JobsRoute,
   McpRoute: McpRoute,
