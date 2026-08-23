@@ -353,6 +353,22 @@ function RootLayout() {
 
   const rootSurfaceState = getRootSurfaceState(onboardingComplete, authStatus)
 
+  // DEV-ONLY: the JARVIS design-review surfaces (/jarvis-*) are self-contained,
+  // fixtures-only pages that must be reachable without backend onboarding or the
+  // workspace shell. Hard-gated on import.meta.env.DEV so it can never ship in a
+  // production build, and scoped to the /jarvis path prefix so no other route is
+  // affected. Each /jarvis-* route sets its own data-theme and is a full-page
+  // surface, so it renders directly through the Outlet with no chrome.
+  const isJarvisDevSurface =
+    import.meta.env.DEV && pathname.startsWith('/jarvis')
+  if (isJarvisDevSurface) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
+    )
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
