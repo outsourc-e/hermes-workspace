@@ -42,6 +42,8 @@ beforeEach(() => {
   delete process.env.HERMES_DASHBOARD_URL
   delete process.env.HERMES_DASHBOARD_TOKEN
   delete process.env.CLAUDE_DASHBOARD_TOKEN
+  delete process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+  delete process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
   delete process.env.HOST
 })
 
@@ -216,6 +218,140 @@ describe('gateway-capabilities', () => {
         '[gateway] Dashboard index returned 500 — token unavailable',
       )
       warnSpy.mockRestore()
+    })
+  })
+
+  describe('dashboard login-form auth (basic-auth gated dashboards)', () => {
+    // The Agent's "basic auth" dashboard gate is actually a cookie-session
+    // login form (POST /auth/password-login), not RFC 7617 HTTP Basic — see
+    // hermes-claude-integration-summary.md in the vault for the live repro
+    // that found this. These tests cover the login-and-cache path added to
+    // dashboardFetch/dashboardAuthHeaders for that case.
+
+    function loginResponse(cookies: Array<string>) {
+      return {
+        ok: true,
+        status: 200,
+        headers: { getSetCookie: () => cookies },
+        json: async () => ({ ok: true, next: '/' }),
+      }
+    }
+
+    it('logs in and reuses the session cookie for dashboard requests', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'admin'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 'secret'
+
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url === 'http://127.0.0.1:9119/auth/password-login') {
+          return loginResponse(['hermes_session_at=abc; HttpOnly; Path=/', 'hermes_session_provider=basic; HttpOnly; Path=/'])
+        }
+        return { ok: true, status: 200, json: async () => ({ sessions: [] }) }
+      })
+
+      const mod = await loadMod()
+      // The module's own background auto-probe (`void ensureGatewayProbed()`
+      // at the bottom of gateway-capabilities.ts, fired on import) runs
+      // independently of the calls under test and, once credentials are
+      // configured, legitimately exercises this same login path itself.
+      // Let it settle and clear the call log before asserting, so these
+      // assertions only see the two dashboardFetch calls being tested.
+      await mod.ensureGatewayProbed()
+      fetchMock.mockClear()
+
+      const r1 = await mod.dashboardFetch('/api/sessions')
+      const r2 = await mod.dashboardFetch('/api/sessions')
+
+      expect(r1.status).toBe(200)
+      expect(r2.status).toBe(200)
+      // The probe above already logged in and cached a session cookie —
+      // neither call here should need to log in again.
+      expect(
+        fetchMock.mock.calls.some(([u]) => u === 'http://127.0.0.1:9119/auth/password-login'),
+      ).toBe(false)
+
+      const sessionCalls = fetchMock.mock.calls.filter(([u]) => u === 'http://127.0.0.1:9119/api/sessions')
+      expect(sessionCalls).toHaveLength(2)
+      for (const [, init] of sessionCalls) {
+        const headers = init.headers as Headers
+        expect(headers.get('Cookie')).toBe('hermes_session_at=abc; hermes_session_provider=basic')
+      }
+    })
+
+    it('sends the configured credentials in the login POST body', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'admin'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 'secret'
+
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url === 'http://127.0.0.1:9119/auth/password-login') {
+          return loginResponse(['hermes_session_at=abc; Path=/'])
+        }
+        return { ok: true, status: 200, json: async () => ({}) }
+      })
+
+      const mod = await loadMod()
+      await mod.ensureGatewayProbed()
+
+      const loginCalls = fetchMock.mock.calls.filter(
+        ([u]) => u === 'http://127.0.0.1:9119/auth/password-login',
+      )
+      expect(loginCalls.length).toBeGreaterThan(0)
+      const body = JSON.parse(loginCalls[0][1].body)
+      expect(body).toEqual({ provider: 'basic', username: 'admin', password: 'secret', next: '' })
+    })
+
+    it('re-logs in after a 401 (expired/rotated session)', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'admin'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 'secret'
+
+      let loginCount = 0
+      let sessionCallCount = 0
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url === 'http://127.0.0.1:9119/auth/password-login') {
+          loginCount++
+          return loginResponse([`hermes_session_at=token-${loginCount}; Path=/`])
+        }
+        if (url === 'http://127.0.0.1:9119/api/sessions') {
+          sessionCallCount++
+          // First attempt: stale/expired cookie rejected. Second: fresh login succeeds.
+          return sessionCallCount === 1
+            ? { ok: false, status: 401, json: async () => ({ ok: false }) }
+            : { ok: true, status: 200, json: async () => ({ sessions: [] }) }
+        }
+        return { ok: true, status: 200, json: async () => ({}) }
+      })
+
+      const mod = await loadMod()
+      // Settle the background auto-probe first (see comment above) so the
+      // cache starts warm, simulating "this cookie is already stale" —
+      // which is exactly the scenario this test exercises.
+      await mod.ensureGatewayProbed()
+      fetchMock.mockClear()
+      sessionCallCount = 0
+
+      const res = await mod.dashboardFetch('/api/sessions')
+
+      expect(res.status).toBe(200)
+      expect(sessionCallCount).toBe(2)
+      const loginCallsAfterRetry = fetchMock.mock.calls.filter(
+        ([u]) => u === 'http://127.0.0.1:9119/auth/password-login',
+      )
+      expect(loginCallsAfterRetry).toHaveLength(1)
+    })
+
+    it('does not attempt a login POST when credentials are not configured', async () => {
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url === 'http://127.0.0.1:9119/') {
+          return { ok: true, status: 200, text: async () => '<html></html>' }
+        }
+        return { ok: true, status: 200, json: async () => ({ sessions: [] }) }
+      })
+
+      const mod = await loadMod()
+      await mod.dashboardFetch('/api/sessions')
+
+      expect(
+        fetchMock.mock.calls.some(([u]) => u === 'http://127.0.0.1:9119/auth/password-login'),
+      ).toBe(false)
     })
   })
 
