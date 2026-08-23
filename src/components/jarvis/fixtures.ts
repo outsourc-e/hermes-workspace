@@ -574,3 +574,443 @@ export const commandFixtureNotice =
 
 export const commandNoSourceNotice =
   'Rendered from fixtures because they have NO SOURCE today (mapping §3.5): epistemic marks · verified/claimed on chat · the disagreement stance · blast radius · undo path · gate caveat · files touched · per-tool-call duration · ctx % · the delegation chain as a graph.'
+
+/* ══════════════════════════════════════════════════════════════════════
+   SLICE 4 — Desktop Conductor board (artboard 02) fixtures.
+
+   Appended below the Slice 3 Command fixtures; nothing above is changed.
+
+   EVERY VALUE BELOW IS INVENTED. The Conductor board is composed from these
+   fixtures alone — no store, no gateway, no `/api/`, no fetch. Real wiring is
+   slice 6.
+
+   Honesty note specific to this board. Per `docs/design/jarvis-ui-mapping.md`
+   §3.3–§3.4 several Conductor states DO have real sources today — worker
+   running/idle/failed/stale (`SwarmSession.swarmStatus`, `ConductorWorker`),
+   and job name/cadence/last-run success/error/next-run (`ClaudeJob` via
+   `/api/claude-jobs`). This slice still does NOT read them: it renders
+   fixtures so slice 6 has one file to replace. The values that have NO source
+   at all — §3.5 items 11 (cron PARTIAL as a structured badge), 12 (the launchd
+   "not loaded" diagnostic), 13 (run-log history beyond the latest run) and 14
+   (the delegation chain as a real edge graph) — carry `noSource` here and are
+   marked `data-jv-fixture="no-source"` in the DOM as well as being named in
+   the banner above the frame.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+
+/**
+ * The status line is written as three parts because two of its counts are
+ * hue-coded in the artboard: `1 job failed` in `--jv-failed`, `1 job stale 23d`
+ * in `--jv-blocked`. Splitting it here keeps the colour decision out of the
+ * component and the copy out of the markup.
+ */
+export interface ConductorTopbarFixture {
+  /** COMMAND / CONDUCTOR. `href` is optional and purely navigational. */
+  tabs: Array<{ label: string; active: boolean; href?: string }>
+  /** DERIVE in slice 6 — counts over the live session list. */
+  statusLead: string
+  /** REAL in slice 6 — `ClaudeJob.last_run_success === false`. */
+  statusFailed: string
+  /** DERIVE in slice 6 — `last_run_at` age ≫ cadence. */
+  statusStale: string
+  date: string
+}
+
+export const conductorTopbarFixture: ConductorTopbarFixture = {
+  tabs: [
+    { label: 'COMMAND', active: false, href: '/jarvis-command' },
+    { label: 'CONDUCTOR', active: true },
+  ],
+  statusLead: '2 running · 1 blocked · ',
+  statusFailed: '1 job failed',
+  statusStale: '1 job stale 23d',
+  date: 'Sat 23 Aug · 09:47',
+}
+
+/* ── Worker board ────────────────────────────────────────────────────── */
+
+/**
+ * Card frame + dot + name treatment. Deliberately NOT `WorkerStatus` from
+ * `./types`: the artboard's grid cards separate the frame from the badge (an
+ * idle-looking `ops-watch` card still carries an `ERR` badge for its LAST RUN),
+ * so one enum cannot drive both without lying about one of them.
+ *
+ * `queued` and `idle` differ only in frame weight — the chain row is drawn a
+ * step brighter than the fleet below it, exactly as the artboard has it.
+ */
+export type ConductorCardTone =
+  | 'running'
+  | 'active'
+  | 'queued'
+  | 'blocked'
+  | 'idle'
+
+/** Step number (01–04) or a state word (BLK / ERR / STALE). */
+export type ConductorBadgeTone = 'live' | 'muted' | 'blocked' | 'failed'
+
+/** Second detail line — independent of the card tone, see `ConductorCardTone`. */
+export type ConductorSubTone = 'default' | 'blocked' | 'failed'
+
+/**
+ * `hold` and `outline` are both outlined chips but are NOT the same chip: the
+ * artboard draws the worker-board HOLD affordance a step quieter (dimmer text,
+ * softer border, tighter padding) than a job's FULL LOG. Kept distinct rather
+ * than averaged, since the whole point of HOLD is that it recedes until wanted.
+ */
+export type ConductorChipTone = 'hold' | 'outline' | 'blocked' | 'failed'
+
+export interface ConductorChipFixture {
+  label: string
+  tone: ConductorChipTone
+}
+
+/**
+ * `connector` draws the chain edge to the card on its right:
+ *   `flow` — static rule + the `jv-flow` travelling dot (an in-flight hand-off)
+ *   `line` — static rule only (the next node has not been reached yet)
+ * NO SOURCE either way (§3.5 item 14): the edge is a layout convention.
+ */
+export type ConductorConnector = 'flow' | 'line'
+
+export interface ConductorWorkerCardFixture {
+  name: string
+  tone: ConductorCardTone
+  badge?: { label: string; tone: ConductorBadgeTone }
+  detail: string
+  sub: string
+  subTone?: ConductorSubTone
+  action?: ConductorChipFixture
+  connector?: ConductorConnector
+  /** Marks the card's sub-line as having no source at all. */
+  noSource?: boolean
+}
+
+/**
+ * Row 1 (the first five) is the active chain; the rest is the fleet.
+ * Same roster as `commandWorkerFixtures`, re-expressed as cards — the rail
+ * carries one detail string per worker, a card carries two lines, a badge and
+ * an action, so the shapes cannot be shared without padding one of them out.
+ */
+export const conductorWorkerCardFixtures: Array<ConductorWorkerCardFixture> = [
+  {
+    name: 'orchestrator',
+    tone: 'running',
+    badge: { label: '01', tone: 'live' },
+    detail: 'routing · enforcing greenlight',
+    sub: '3 gates today · 1 open',
+    connector: 'flow',
+  },
+  {
+    name: 'builder',
+    tone: 'active',
+    badge: { label: '02', tone: 'live' },
+    detail: 'running 04:18 · vitest --watch',
+    sub: 'wt/vault-frontmatter · 3 files',
+    action: { label: 'HOLD ⌥ TO INTERVENE', tone: 'hold' },
+    connector: 'flow',
+  },
+  {
+    name: 'reviewer',
+    tone: 'queued',
+    badge: { label: '03', tone: 'muted' },
+    detail: 'queued · gates the diff',
+    sub: 'last verdict 08:12 · pass',
+    connector: 'line',
+  },
+  {
+    name: 'qa',
+    tone: 'queued',
+    badge: { label: '04', tone: 'muted' },
+    detail: 'queued · behaviour check',
+    sub: 'turns claimed → verified',
+  },
+  {
+    name: 'km-agent',
+    tone: 'blocked',
+    badge: { label: 'BLK', tone: 'blocked' },
+    detail: 'blocked 00:42 · needs approval',
+    sub: 'write to Vault/Published/',
+    action: { label: 'OPEN GATE', tone: 'blocked' },
+  },
+  {
+    name: 'researcher',
+    tone: 'idle',
+    detail: 'idle 2h 11m',
+    sub: 'last: pricing scan → vault',
+  },
+  {
+    name: 'ops-watch',
+    tone: 'idle',
+    badge: { label: 'ERR', tone: 'failed' },
+    detail: 'idle · next 05:00',
+    sub: 'last run failed · certbot',
+    subTone: 'failed',
+  },
+  {
+    name: 'maintainer',
+    tone: 'idle',
+    badge: { label: 'STALE', tone: 'blocked' },
+    detail: 'no run in 23d',
+    // NO SOURCE — §3.5 item 12: the client cannot introspect launchd.
+    sub: 'launchd job not loaded',
+    subTone: 'blocked',
+    noSource: true,
+  },
+  {
+    name: 'strategist',
+    tone: 'idle',
+    detail: 'idle 6d',
+    sub: 'next: monthly scan Sep 1',
+  },
+  {
+    name: 'inbox-triage',
+    tone: 'idle',
+    detail: 'ran 14m ago · 0.9s',
+    sub: '31 mail → 4 actionable',
+  },
+]
+
+export interface ConductorSectionHeadingFixture {
+  label: string
+  /** The dim caption beside the label. */
+  note: string
+  /** Highlighted tail of the caption, if the artboard brightens one. */
+  noteAccent?: string
+}
+
+export const conductorWorkerBoardHeading: ConductorSectionHeadingFixture = {
+  label: 'WORKER BOARD',
+  note: 'chain: orchestrator → builder → reviewer → qa · thread ',
+  noteAccent: 'vault frontmatter loss',
+}
+
+/* ── Scheduled jobs ──────────────────────────────────────────────────── */
+
+/**
+ * `failed` and `silent` are the loud cards: a red frame with a hazard-stripe
+ * edge, and an amber frame. `partial` shares the `ok` frame and differs only in
+ * badge hue — the artboard treats it as a note on an otherwise healthy job.
+ */
+export type ConductorJobTone = 'ok' | 'failed' | 'silent' | 'partial'
+
+/** Per-line override; `default` follows the card tone. */
+export type ConductorJobLineTone = 'default' | 'failed' | 'dim'
+
+export interface ConductorJobLineFixture {
+  text: string
+  tone?: ConductorJobLineTone
+  /** Nothing in `ClaudeJob` produces this line. */
+  noSource?: boolean
+}
+
+export interface ConductorJobFixture {
+  name: string
+  tone: ConductorJobTone
+  badge: string
+  /** `every 6h · km-agent` — cadence and owning worker. */
+  cadence: string
+  detail: Array<ConductorJobLineFixture>
+  actions?: Array<ConductorChipFixture>
+  /** Marks the BADGE itself as unsourced (the PARTIAL case, §3.5 item 11). */
+  badgeNoSource?: boolean
+}
+
+export const conductorJobFixtures: Array<ConductorJobFixture> = [
+  {
+    name: 'vault-index-rebuild',
+    tone: 'ok',
+    badge: 'OK',
+    cadence: 'every 6h · km-agent',
+    detail: [{ text: 'last 06:00 · 41s · 3,209 notes' }],
+  },
+  {
+    name: 'inbox-triage:sweep',
+    tone: 'ok',
+    badge: 'OK',
+    cadence: 'hourly · inbox-triage',
+    detail: [{ text: 'last 09:33 · 0.9s · 4 actionable' }],
+  },
+  {
+    name: 'ops-watch:certs',
+    tone: 'failed',
+    badge: 'FAILED',
+    cadence: 'daily 05:00 · ops-watch · 3 runs failed',
+    detail: [
+      {
+        text: 'certbot renew → exit 1: DNS-01 challenge timeout (_acme-challenge.hexley.dev)',
+        tone: 'failed',
+      },
+    ],
+    actions: [
+      { label: 'TRIAGE', tone: 'failed' },
+      { label: 'FULL LOG', tone: 'outline' },
+    ],
+  },
+  {
+    name: 'maintainer:dep-audit',
+    tone: 'silent',
+    badge: 'SILENT 23d',
+    cadence: 'weekly Mon 03:00 · maintainer',
+    detail: [
+      { text: 'expected 4 runs · got 0 · never errored' },
+      // NO SOURCE — §3.5 item 12.
+      {
+        text: 'launchd: com.jarvis.maintainer not loaded',
+        tone: 'dim',
+        noSource: true,
+      },
+    ],
+    actions: [{ label: 'RELOAD & RUN', tone: 'blocked' }],
+  },
+  {
+    name: 'weekly-review-digest',
+    tone: 'ok',
+    badge: 'OK',
+    cadence: 'Sun 18:00 · strategist',
+    detail: [{ text: 'last Aug 17 · 2m 04s · gate cleared' }],
+  },
+  {
+    name: 'researcher:feed-scan',
+    tone: 'partial',
+    badge: 'PARTIAL',
+    // NO SOURCE — §3.5 item 11: PARTIAL is free text inside `last_run_error`,
+    // never a structured job status.
+    badgeNoSource: true,
+    cadence: 'daily 07:00 · researcher',
+    detail: [{ text: 'last 07:00 · 58s · 2 of 14 feeds 403' }],
+  },
+]
+
+export const conductorJobsHeading: ConductorSectionHeadingFixture = {
+  label: 'SCHEDULED JOBS',
+  note: '6 registered · health is last-run, not next-run',
+}
+
+/* ── Run log ─────────────────────────────────────────────────────────── */
+
+export type ConductorRunOutcome = 'success' | 'partial' | 'failed'
+
+export interface ConductorRunFixture {
+  time: string
+  job: string
+  worker: string
+  /** Free-text result summary — what the run actually did. */
+  result: string
+  outcome: ConductorRunOutcome
+  duration: string
+}
+
+/**
+ * NO SOURCE as a list (§3.5 item 13): `ClaudeJob` exposes only the LATEST run,
+ * so a multi-row history cannot be assembled from today's API at all. The whole
+ * table is therefore fixture data and says so.
+ */
+export const conductorRunLogFixtures: Array<ConductorRunFixture> = [
+  {
+    time: '09:33',
+    job: 'inbox-triage:sweep',
+    worker: 'inbox-triage',
+    result: '31 mail · 4 actionable · 2 vault notes written',
+    outcome: 'success',
+    duration: '0.9s',
+  },
+  {
+    time: '08:33',
+    job: 'inbox-triage:sweep',
+    worker: 'inbox-triage',
+    result: '18 mail · 1 actionable',
+    outcome: 'success',
+    duration: '0.7s',
+  },
+  {
+    time: '07:00',
+    job: 'researcher:feed-scan',
+    worker: 'researcher',
+    result: '12/14 feeds · 2 × HTTP 403 (substack)',
+    outcome: 'partial',
+    duration: '58s',
+  },
+  {
+    time: '06:00',
+    job: 'vault-index-rebuild',
+    worker: 'km-agent',
+    result: '3,209 notes · 118 links repaired',
+    outcome: 'success',
+    duration: '41s',
+  },
+  {
+    time: '05:00',
+    job: 'ops-watch:certs',
+    worker: 'ops-watch',
+    result: 'certbot renew → exit 1 · DNS-01 timeout after 120s',
+    outcome: 'failed',
+    duration: '2m 01s',
+  },
+  {
+    time: '05:00',
+    job: 'ops-watch:disk',
+    worker: 'ops-watch',
+    result: 'SSD 71% · 3 worktrees pruned',
+    outcome: 'success',
+    duration: '4.4s',
+  },
+  {
+    time: '02:14',
+    job: 'builder:nightly-typecheck',
+    worker: 'builder',
+    result: 'tsc --noEmit clean · 0 errors',
+    outcome: 'success',
+    duration: '1m 12s',
+  },
+  {
+    time: '00:00',
+    job: 'km-agent:daily-note',
+    worker: 'km-agent',
+    result: 'note created · frontmatter dropped (see 09:41 thread)',
+    outcome: 'partial',
+    duration: '0.3s',
+  },
+]
+
+export interface ConductorRunLogChromeFixture {
+  label: string
+  note: string
+  /**
+   * The artboard's literal tally. It counts the full 12h window (14 runs),
+   * which is deliberately MORE than the eight rows the table has room for —
+   * kept verbatim rather than tallied from `conductorRunLogFixtures`, which
+   * would silently restate a fixture as if it were derived.
+   */
+  summary: string
+  columns: {
+    time: string
+    job: string
+    worker: string
+    result: string
+    outcome: string
+    duration: string
+  }
+}
+
+export const conductorRunLogChrome: ConductorRunLogChromeFixture = {
+  label: 'RUN LOG · UNATTENDED',
+  note: 'last 12h · one entry per run',
+  summary: '14 runs · 11 success · 2 partial · 1 failed',
+  columns: {
+    time: 'TIME',
+    job: 'JOB',
+    worker: 'WORKER',
+    result: 'RESULT',
+    outcome: 'OUTCOME',
+    duration: 'DURATION',
+  },
+}
+
+/* ── Honesty banner ──────────────────────────────────────────────────── */
+
+export const conductorFixtureNotice =
+  'Fixture board — nothing here is wired to a store, the gateway, or an API. Every value is invented. Worker status and job last-run health DO have real sources (mapping §3.3–§3.4); this slice deliberately does not read them, so slice 6 has one file to replace.'
+
+export const conductorNoSourceNotice =
+  'Rendered from fixtures because they have NO SOURCE today (mapping §3.5): the cron PARTIAL badge as a structured state · the launchd "not loaded" diagnostic · run-log history beyond the latest run · the delegation chain as a real parent→child edge graph.'
