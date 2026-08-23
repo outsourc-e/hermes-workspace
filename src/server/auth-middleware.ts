@@ -27,7 +27,20 @@ const STORE_FILE = join(
   process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
   'workspace-sessions.json',
 )
-const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+/** Durée de vie d'une session, source unique de vérité (store ET cookie). */
+export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60 // 30 jours
+const TOKEN_TTL_MS = SESSION_TTL_SECONDS * 1000
+
+/**
+ * Fenêtre de renouvellement : on ne prolonge (et on ne réémet le cookie) qu'une
+ * fois par heure au maximum. Évite une écriture disque + un en-tête Set-Cookie
+ * sur *chaque* requête (cf. pièges P3/P4).
+ * Surchargeable par SESSION_RENEW_INTERVAL_SECONDS pour les tests manuels.
+ */
+export function getSessionRenewIntervalMs(): number {
+  const raw = Number(process.env.SESSION_RENEW_INTERVAL_SECONDS)
+  return Number.isFinite(raw) && raw > 0 ? raw * 1000 : 60 * 60 * 1000
+}
 
 function loadStore(): SessionStore {
   try {
@@ -127,6 +140,39 @@ export function isValidSessionToken(token: string): boolean {
     return false
   }
   return true
+}
+
+/**
+ * Prolonge la durée de vie d'un token valide (expiration glissante).
+ *
+ * @returns `true` si le token a effectivement été prolongé (donc si l'appelant
+ *          doit réémettre le cookie), `false` si le token est inconnu/expiré
+ *          OU si la fenêtre de renouvellement n'est pas atteinte.
+ *
+ * Persistance : n'écrit sur disque que lors d'une prolongation réelle, soit au
+ * plus une fois par heure et par session.
+ */
+export function touchSessionToken(token: string): boolean {
+  const expiry = _tokens.get(token)
+  if (expiry === undefined) return false
+  const now = Date.now()
+  if (expiry <= now) {
+    _tokens.delete(token)
+    _persist()
+    return false
+  }
+  // Prolongation seulement si la session a « vieilli » d'au moins une fenêtre.
+  const elapsedSinceIssue = TOKEN_TTL_MS - (expiry - now)
+  if (elapsedSinceIssue < getSessionRenewIntervalMs()) return false
+  _tokens.set(token, now + TOKEN_TTL_MS)
+  _persist()
+  return true
+}
+
+/** Expiration absolue courante d'un token (unix-ms), ou `null`. */
+export function getSessionExpiry(token: string): number | null {
+  const expiry = _tokens.get(token)
+  return expiry !== undefined && expiry > Date.now() ? expiry : null
 }
 
 /**
@@ -291,18 +337,55 @@ function shouldSetSecureCookie(): boolean {
 }
 
 /**
- * Create a Set-Cookie header for the session token.
- *
- * Attributes:
- *   - HttpOnly    — blocks JS access, mitigates XSS session theft
- *   - Secure      — HTTPS only (production default, overridable)
- *   - SameSite=Strict — CSRF protection
- *   - Path=/      — available across the whole app
- *   - Max-Age     — 30 days
+ * `Strict` par défaut (comportement actuel, cf. #123). Derrière un IdP externe
+ * (oauth2-proxy/Keycloak), le retour de redirection est une navigation
+ * cross-site : un cookie Strict n'est PAS renvoyé sur cette première requête →
+ * faux « déconnecté ». Les opérateurs concernés doivent poser
+ * COOKIE_SAMESITE=Lax. Cf. piège P5.
  */
-export function createSessionCookie(token: string): string {
+function getCookieSameSite(): 'Strict' | 'Lax' | 'None' {
+  const v = (process.env.COOKIE_SAMESITE || '').trim().toLowerCase()
+  if (v === 'lax') return 'Lax'
+  if (v === 'none') return 'None'
+  return 'Strict'
+}
+
+/**
+ * Attributs communs HttpOnly/Secure/SameSite/Path partagés par le cookie de
+ * session et le cookie d'expiration. `SameSite=None` impose `Secure` : si
+ * l'opérateur n'a pas activé `COOKIE_SECURE`, on force `Secure` quand même et
+ * on journalise un avertissement (sinon le navigateur rejette le cookie).
+ */
+function buildCookieAttrs(): Array<string> {
+  const sameSite = getCookieSameSite()
+  let secure = shouldSetSecureCookie()
+  if (sameSite === 'None' && !secure) {
+    console.warn(
+      '[auth] COOKIE_SAMESITE=none requires Secure — forcing Secure on session cookies.',
+    )
+    secure = true
+  }
   const attrs = ['HttpOnly']
-  if (shouldSetSecureCookie()) attrs.push('Secure')
-  attrs.push('SameSite=Strict', 'Path=/', `Max-Age=${30 * 24 * 60 * 60}`)
+  if (secure) attrs.push('Secure')
+  attrs.push(`SameSite=${sameSite}`, 'Path=/')
+  return attrs
+}
+
+/**
+ * Attributs :
+ *   HttpOnly · Secure (prod par défaut, COOKIE_SECURE=0/1) · SameSite (voir
+ *   getCookieSameSite) · Path=/ · Max-Age=SESSION_TTL_SECONDS
+ */
+export function createSessionCookie(
+  token: string,
+  maxAgeSeconds: number = SESSION_TTL_SECONDS,
+): string {
+  const attrs = [...buildCookieAttrs(), `Max-Age=${maxAgeSeconds}`]
   return `claude-auth=${token}; ${attrs.join('; ')}`
+}
+
+/** Cookie d'expiration immédiate (déconnexion / token révoqué). */
+export function createExpiredSessionCookie(): string {
+  const attrs = [...buildCookieAttrs(), 'Max-Age=0']
+  return `claude-auth=; ${attrs.join('; ')}`
 }

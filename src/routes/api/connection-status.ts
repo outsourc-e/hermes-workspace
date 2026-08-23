@@ -14,6 +14,7 @@ import {
   getChatMode,
 } from '../../server/gateway-capabilities'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { withRenewedSession } from '../../server/session-renewal'
 
 const CONFIG_PATH = path.join(
   process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes'),
@@ -138,7 +139,7 @@ export const Route = createFileRoute('/api/connection-status')({
           claudeUrl: CLAUDE_API,
         }
 
-        return Response.json(body)
+        return withRenewedSession(request, Response.json(body))
       },
     },
   },

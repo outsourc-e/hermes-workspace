@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { withRenewedSession } from '../../server/session-renewal'
 import {
   CLAUDE_API,
   CLAUDE_DASHBOARD_URL,
@@ -18,7 +19,7 @@ export const Route = createFileRoute('/api/gateway-status')({
         }
 
         const capabilities = await ensureGatewayProbed()
-        return json({
+        return withRenewedSession(request, json({
           capabilities,
           mode: getGatewayMode(),
           claudeUrl: CLAUDE_API,
@@ -28,7 +29,7 @@ export const Route = createFileRoute('/api/gateway-status')({
             url: CLAUDE_API,
           },
           dashboard: capabilities.dashboard,
-        })
+        }))
       },
     },
   },

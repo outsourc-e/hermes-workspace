@@ -9,8 +9,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { getRootSurfaceState } from './-root-layout-state'
-import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
-import type {AuthStatus} from '@/lib/claude-auth';
+import { useAuthSession } from '@/hooks/use-auth-session'
+import { installAuthFetchInterceptor } from '@/lib/auth-fetch-interceptor'
+import { markSessionExpired, probeAuthSession } from '@/lib/auth-session-store'
 import { SearchModal } from '@/components/search/search-modal'
 import { UsageMeter } from '@/components/usage-meter'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
@@ -263,7 +264,7 @@ function RootLayout() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
-  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+  const authSession = useAuthSession()
   const [mounted, setMounted] = useState(false)
   useApplyChatWidth()
 
@@ -328,33 +329,25 @@ function RootLayout() {
       cachesApi: 'caches' in window ? caches : undefined,
     })
 
+    // Seul endroit qui connaît à la fois l'intercepteur (§4.1) et le store
+    // (§3.1) : c'est ici que se fait le câblage, pas par un import croisé
+    // entre les deux modules.
+    const uninstallAuthInterceptor = installAuthFetchInterceptor({
+      onSessionExpired: markSessionExpired,
+      onAuthProbe: probeAuthSession,
+    })
+
     return () => {
       window.removeEventListener('storage', handleStorage)
       window.removeEventListener(
         ONBOARDING_COMPLETE_EVENT,
         handleOnboardingCompleteChanged,
       )
+      uninstallAuthInterceptor()
     }
   }, [])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined
-    let cancelled = false
-    fetchClaudeAuthStatus()
-      .then((status) => {
-        if (!cancelled) setAuthStatus(status)
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAuthStatus({ authenticated: true, authRequired: false })
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const rootSurfaceState = getRootSurfaceState(onboardingComplete, authStatus)
+  const rootSurfaceState = getRootSurfaceState(onboardingComplete, authSession.status)
 
   return (
     <QueryClientProvider client={queryClient}>

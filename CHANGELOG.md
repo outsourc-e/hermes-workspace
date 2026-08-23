@@ -5,8 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Sliding session expiration + global 401 handling** — password-protected sessions now renew on activity instead of hard-expiring after a fixed 30 days (`SESSION_RENEW_INTERVAL_SECONDS`-throttled, one write/`Set-Cookie` per hour max); a new `POST /api/auth/refresh` endpoint lets the client proactively renew every 10 minutes; a shared frontend auth-session store + `fetch` interceptor detect session expiration (marked `X-Hermes-Auth: required` responses) and IdP-redirect situations (reverse-proxy/oauth2-proxy deployments) and recover automatically instead of looping on 400/401 errors. See `docs/docker.md` for reverse-proxy configuration notes.
+
 ### Changed
 - **`docker compose up` now pulls pre-built images by default** (#82) — `nousresearch/hermes-agent:latest` for the gateway and `ghcr.io/outsourc-e/hermes-workspace:latest` for the UI. Agent state persists in the `claude-data` named volume. Adds `docker-compose.dev.yml` overlay for building from source.
+
+### Notes
+- Sessions issued before this change keep their original fixed 30-day expiration until the first renewal touches them; already-issued browser cookies keep their original `Max-Age` until a response re-issues them. Practically: the oldest existing sessions may still expire once on schedule after upgrading, then behave with sliding expiration from then on.
 
 ## [2.0.0] — 2026-04-20
 

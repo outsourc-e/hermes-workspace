@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { primeAuthSession } from '@/lib/auth-session-store'
 
 const POLL_INTERVAL_MS = 2_000
 const FAILURE_REVEAL_MS = 5_000
@@ -133,6 +134,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         clearTimeout(failureTimer)
         if (autoStartTimer) clearTimeout(autoStartTimer)
         if (pollTimer) clearTimeout(pollTimer)
+        primeAuthSession(status)
         onConnectedRef.current(status)
       } catch {
         if (isDone.current) return

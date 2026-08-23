@@ -4,6 +4,7 @@ import {
   isAuthenticated,
   isPasswordProtectionEnabled,
 } from '../../server/auth-middleware'
+import { withRenewedSession } from '../../server/session-renewal'
 import { ensureGatewayProbed } from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/auth-check')({
@@ -46,10 +47,10 @@ export const Route = createFileRoute('/api/auth-check')({
         const authRequired = isPasswordProtectionEnabled()
         const authenticated = isAuthenticated(request)
 
-        return json({
+        return withRenewedSession(request, json({
           authenticated,
           authRequired,
-        })
+        }))
       },
     },
   },
