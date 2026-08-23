@@ -1056,6 +1056,109 @@ export async function fetchGeminiUsage(): Promise<ProviderUsageResult> {
   }
 }
 
+// ── Kimi / Moonshot (API Key) ────────────────────────────────────────────────
+
+export async function fetchKimiUsage(): Promise<ProviderUsageResult> {
+  const now = Date.now()
+  const apiKey = (
+    process.env.KIMI_API_KEY ?? process.env.MOONSHOT_API_KEY
+  )?.trim()
+
+  if (!apiKey) {
+    return {
+      provider: 'kimi',
+      displayName: 'Kimi (Moonshot)',
+      status: 'missing_credentials',
+      message: 'Missing KIMI_API_KEY',
+      lines: [],
+      updatedAt: now,
+    }
+  }
+
+  // International (sk-ax…) keys live on api.moonshot.ai; mainland keys on .cn.
+  // Allow override, else probe .ai then fall back to .cn.
+  const override = process.env.MOONSHOT_API_BASE?.trim().replace(/\/+$/, '')
+  const bases = override
+    ? [override]
+    : ['https://api.moonshot.ai', 'https://api.moonshot.cn']
+
+  let lastStatus = 0
+  let lastErr = ''
+  for (const base of bases) {
+    let res: Response
+    try {
+      res = await fetch(`${base}/v1/users/me/balance`, {
+        headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+      })
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      continue
+    }
+    if (res.status === 401 || res.status === 403) {
+      lastStatus = res.status
+      continue // wrong region for this key — try next base
+    }
+    if (!res.ok) {
+      lastStatus = res.status
+      continue
+    }
+
+    const payload = (await res.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null
+    const data = (payload?.data ?? payload) as Record<string, unknown> | null
+
+    const available = readNumber(data?.available_balance)
+    const cash = readNumber(data?.cash_balance)
+    const voucher = readNumber(data?.voucher_balance)
+
+    const lines: UsageLine[] = []
+    if (available !== undefined) {
+      lines.push({
+        type: 'text',
+        label: 'Balance',
+        value: `$${available.toFixed(2)}`,
+      })
+    }
+    if (voucher !== undefined && voucher > 0) {
+      lines.push({
+        type: 'text',
+        label: 'Voucher',
+        value: `$${voucher.toFixed(2)}`,
+      })
+    }
+    if (cash !== undefined && (available === undefined || cash !== available)) {
+      lines.push({ type: 'text', label: 'Cash', value: `$${cash.toFixed(2)}` })
+    }
+    if (lines.length === 0) {
+      lines.push({
+        type: 'badge',
+        label: 'Status',
+        value: 'API key active',
+        color: '#10b981',
+      })
+    }
+
+    return {
+      provider: 'kimi',
+      displayName: 'Kimi (Moonshot)',
+      status: 'ok',
+      lines,
+      updatedAt: now,
+    }
+  }
+
+  return {
+    provider: 'kimi',
+    displayName: 'Kimi (Moonshot)',
+    status: lastStatus === 401 || lastStatus === 403 ? 'auth_expired' : 'error',
+    message: lastErr || `HTTP ${lastStatus || 'unreachable'}`,
+    lines: [],
+    updatedAt: now,
+  }
+}
+
 // ── Aggregate ────────────────────────────────────────────────────────────────
 
 const CACHE_TTL_MS = 30_000
@@ -1070,6 +1173,7 @@ export async function getProviderUsage(
   }
 
   const results = await Promise.allSettled([
+    fetchKimiUsage(),
     fetchClaudeUsage(),
     fetchCodexUsage(),
     fetchOpenAIUsage(),
@@ -1079,8 +1183,8 @@ export async function getProviderUsage(
 
   const providers: ProviderUsageResult[] = results.map((r, i) => {
     if (r.status === 'fulfilled') return r.value
-    const names = ['Claude (OAuth)', 'Codex', 'OpenAI', 'OpenRouter', 'Gemini']
-    const ids = ['claude', 'codex', 'openai', 'openrouter', 'gemini']
+    const names = ['Kimi (Moonshot)', 'Claude (OAuth)', 'Codex', 'OpenAI', 'OpenRouter', 'Gemini']
+    const ids = ['kimi', 'claude', 'codex', 'openai', 'openrouter', 'gemini']
     return {
       provider: ids[i],
       displayName: names[i],
