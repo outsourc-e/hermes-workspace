@@ -21,25 +21,37 @@
  * job wears a hazard-striped red frame and the silent one an amber frame, both
  * carrying the diagnostic and the chip you would actually reach for.
  *
- * ONE SECTION IS LIVE (slice 6a). SCHEDULED JOBS reads real `ClaudeJob` records
- * through `useScheduledJobs` — the same `['claude','jobs']` query the product
- * jobs screen runs, GET only, no mutation anywhere on this board. Everything
- * else (worker board, run log, top bar) is still fixtures, and worker status
- * has a real source it does not yet read (§3.3) — that is slice 6b.
+ * TWO SECTIONS ARE LIVE. SCHEDULED JOBS reads real `ClaudeJob` records through
+ * `useScheduledJobs` (slice 6a) — the same `['claude','jobs']` query the product
+ * jobs screen runs. The WORKER BOARD reads real swarm sessions through
+ * `useWorkers` (slice 6b), with `blocked` joined from the pending approvals
+ * queue. Both are GET only; no mutation anywhere on this board. The RUN LOG and
+ * the top bar are still fixtures.
+ *
+ * The two wires are INDEPENDENT: jobs can be live while workers fall back, or
+ * the reverse, so the banner reports each separately rather than declaring the
+ * whole board live off one of them.
  *
  * When the gateway is unreachable — the normal case for an offline design
- * review — the hook returns the slice-4 fixtures and `isLive: false`, and the
+ * review — the hooks return the slice-4 fixtures and `isLive: false`, and the
  * board renders exactly as it did before. The banner above the frame says which
  * of the two you are looking at; it is never left claiming "every value is
  * invented" over live data, or the reverse.
  *
  * Live cards carry no `data-jv-fixture="no-source"` marks, because nothing
- * unsourced is drawn for a real job: no PARTIAL badge (§3.5 item 11), no
- * launchd diagnostic (item 12), no invented duration or payload count, and no
- * action chips at all — TRIAGE / FULL LOG / RELOAD & RUN each imply a write
- * this read-only slice cannot do. Those elements survive only on the fixture
- * fallback, where they stay labelled as fixtures both in the banner and via
- * `data-jv-fixture="no-source"` in the DOM.
+ * unsourced is drawn for a real job or a real worker: no PARTIAL badge (§3.5
+ * item 11), no launchd diagnostic (item 12), no invented duration, payload count
+ * or per-worker narrative, no chain connector between real workers (item 14),
+ * and no action chips at all — TRIAGE / FULL LOG / RELOAD & RUN, HOLD ⌥ and
+ * OPEN GATE each imply a write this read-only slice cannot do. Those elements
+ * survive only on the fixture fallback, where they stay labelled as fixtures
+ * both in the banner and via `data-jv-fixture="no-source"` in the DOM.
+ *
+ * One over-mark is deliberate. `worker-board.tsx` renders its caption inside a
+ * `data-jv-fixture="no-source"` span unconditionally, so the live caption — a
+ * real roster count — keeps that mark; changing it would mean editing that
+ * file's rendering, which is out of scope here. Over-marking under-claims, which
+ * is the safe direction to be wrong.
  *
  * Theme handling: the `--jv-*` tokens only resolve under `[data-theme='jarvis']`,
  * so the board sets that attribute on <html> for as long as it is mounted and
@@ -66,8 +78,10 @@ import { MobileConductorBoard } from './mobile-conductor'
 import { RunLog } from './run-log'
 import { ScheduledJobs } from './scheduled-jobs'
 import { useScheduledJobs } from './use-scheduled-jobs'
+import { useWorkers } from './use-workers'
 import { WorkerBoard } from './worker-board'
 import type { ScheduledJobsData } from './use-scheduled-jobs'
+import type { WorkersData } from './use-workers'
 import {
   conductorFixtureNotice,
   conductorJobFixtures,
@@ -101,17 +115,68 @@ function useJarvisThemeAttribute() {
 }
 
 /**
- * The honesty banner has two readings now, and the board must not show the
- * wrong one. `conductorFixtureNotice` says every value is invented — true only
- * while the fallback is up. These say what is actually on screen when SCHEDULED
- * JOBS is live; the NO SOURCE notice below them is printed either way, because
- * that list is about the design, not about the connection.
+ * The honesty banner now has FOUR readings, because the two wires fail
+ * independently: jobs live, workers live, both, or neither.
+ * `conductorFixtureNotice` says every value is invented — true only when
+ * neither is up — so the banner is assembled per section instead of picked from
+ * a pair of constants. The NO SOURCE notice below it is printed either way,
+ * because that list is about the design, not about the connection.
  */
-const conductorLiveJobsNotice =
-  'SCHEDULED JOBS is LIVE — real ClaudeJob records read from the gateway (GET /api/claude-jobs, the same query the jobs screen runs). Read-only: this board issues no write of any kind, so live cards carry no action chips and nothing without a source is drawn on them. Every other section — worker board, run log, top bar — is still invented fixtures.'
+const LIVE_WORKERS_CLAUSE =
+  'The WORKER BOARD is LIVE — real swarm sessions (GET /api/gateway/sessions), with BLOCKED joined from the pending approvals queue (GET /api/gateway/approvals). Status is the swarm store’s heuristic, not an authoritative gateway signal, and a real card draws no per-worker narrative and no chain connector, because neither has a source.'
 
-const mobileLiveJobsNotice =
-  'SCHEDULE HEALTH is LIVE — the same real ClaudeJob records as the desktop board, collapsed to what is unhealthy. Read-only. Every other section on this frame is still invented fixtures.'
+const LIVE_JOBS_CLAUSE =
+  'SCHEDULED JOBS is LIVE — real ClaudeJob records read from the gateway (GET /api/claude-jobs, the same query the jobs screen runs).'
+
+const READ_ONLY_CLAUSE =
+  'Read-only: this board issues no write of any kind, so live cards carry no action chips and nothing without a source is drawn on them.'
+
+const MOBILE_LIVE_WORKERS_CLAUSE =
+  'The stat strip and RUNNING NOW are LIVE — counted from the same real swarm sessions as the desktop board, BLOCKED joined from pending approvals.'
+
+const MOBILE_LIVE_JOBS_CLAUSE =
+  'SCHEDULE HEALTH is LIVE — the same real ClaudeJob records as the desktop board, collapsed to what is unhealthy.'
+
+function buildNotice(
+  fallback: string,
+  clauses: Array<string>,
+  stillFixture: Array<string>,
+): string {
+  if (clauses.length === 0) return fallback
+  return `${clauses.join(' ')} ${READ_ONLY_CLAUSE} Still invented fixtures: ${stillFixture.join(' · ')}.`
+}
+
+function buildConductorNotice(
+  workersLive: boolean,
+  jobsLive: boolean,
+): string {
+  const clauses: Array<string> = []
+  const stillFixture: Array<string> = []
+
+  if (workersLive) clauses.push(LIVE_WORKERS_CLAUSE)
+  else stillFixture.push('the worker board')
+  if (jobsLive) clauses.push(LIVE_JOBS_CLAUSE)
+  else stillFixture.push('scheduled jobs')
+  stillFixture.push('the run log', 'the top bar')
+
+  return buildNotice(conductorFixtureNotice, clauses, stillFixture)
+}
+
+function buildMobileConductorNotice(
+  workersLive: boolean,
+  jobsLive: boolean,
+): string {
+  const clauses: Array<string> = []
+  const stillFixture: Array<string> = []
+
+  if (workersLive) clauses.push(MOBILE_LIVE_WORKERS_CLAUSE)
+  else stillFixture.push('the stat strip', 'RUNNING NOW')
+  if (jobsLive) clauses.push(MOBILE_LIVE_JOBS_CLAUSE)
+  else stillFixture.push('SCHEDULE HEALTH')
+  stillFixture.push('NEEDS YOU', 'LAST NIGHT')
+
+  return buildNotice(mobileFixtureNotice, clauses, stillFixture)
+}
 
 /**
  * The board frame on its own — 1440×900, exactly what the artboard shows.
@@ -123,9 +188,13 @@ const mobileLiveJobsNotice =
 export function DesktopConductorBoard({
   jobs = conductorJobFixtures,
   jobsHeading = conductorJobsHeading,
+  workers = conductorWorkerCardFixtures,
+  workerHeading = conductorWorkerBoardHeading,
 }: {
   jobs?: ScheduledJobsData['jobs']
   jobsHeading?: ScheduledJobsData['heading']
+  workers?: WorkersData['cards']
+  workerHeading?: WorkersData['heading']
 } = {}) {
   return (
     <div
@@ -138,10 +207,7 @@ export function DesktopConductorBoard({
     >
       <ConductorTopbar data={conductorTopbarFixture} />
 
-      <WorkerBoard
-        heading={conductorWorkerBoardHeading}
-        cards={conductorWorkerCardFixtures}
-      />
+      <WorkerBoard heading={workerHeading} cards={workers} />
 
       <ScheduledJobs heading={jobsHeading} jobs={jobs} />
 
@@ -155,14 +221,15 @@ export function DesktopConductorBoard({
  * and above, the mobile board below it. Both are mounted and CSS picks one —
  * a CSS swap cannot mismatch on first paint the way a `matchMedia` read can.
  *
- * The jobs query is read ONCE here and handed to both frames, so the hidden one
- * still costs only its markup: two `useScheduledJobs` calls would share the
- * cache anyway, but one read keeps the two frames provably showing the same
- * jobs at the same moment.
+ * Both wires are read ONCE here and handed to both frames, so the hidden one
+ * still costs only its markup: a second `useScheduledJobs` / `useWorkers` call
+ * would share the cache and the store anyway, but one read keeps the two frames
+ * provably showing the same jobs and the same workers at the same moment.
  */
 export function DesktopConductorScreen() {
   useJarvisThemeAttribute()
   const scheduled = useScheduledJobs()
+  const workers = useWorkers()
 
   return (
     <div className="min-h-screen bg-jv-bg font-jv-sans tracking-normal text-jv-text">
@@ -183,9 +250,7 @@ export function DesktopConductorScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-text-caption">
-            {scheduled.isLive
-              ? conductorLiveJobsNotice
-              : conductorFixtureNotice}
+            {buildConductorNotice(workers.isLive, scheduled.isLive)}
           </p>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-blocked-dim">
             {conductorNoSourceNotice}
@@ -195,6 +260,8 @@ export function DesktopConductorScreen() {
         <DesktopConductorBoard
           jobs={scheduled.jobs}
           jobsHeading={scheduled.heading}
+          workers={workers.cards}
+          workerHeading={workers.heading}
         />
       </div>
 
@@ -212,7 +279,7 @@ export function DesktopConductorScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-text-caption">
-            {scheduled.isLive ? mobileLiveJobsNotice : mobileFixtureNotice}
+            {buildMobileConductorNotice(workers.isLive, scheduled.isLive)}
           </p>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-blocked-dim">
             {conductorNoSourceNotice}
@@ -222,6 +289,8 @@ export function DesktopConductorScreen() {
         <MobileConductorBoard
           jobs={scheduled.mobileJobs}
           scheduleHealth={scheduled.mobileScheduleHealth}
+          stats={workers.mobileStats}
+          running={workers.mobileRunning}
         />
       </div>
     </div>

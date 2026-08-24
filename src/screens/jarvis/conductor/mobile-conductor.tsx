@@ -16,19 +16,24 @@
  * panel on a glance surface would imply you can decide from here. The gate
  * itself lives on Command.
  *
- * ONE SECTION CAN BE LIVE (slice 6a). SCHEDULE HEALTH accepts real jobs as
- * props — mapped from `ClaudeJob` by the routed screen, which owns the only
- * query — and falls back to the fixtures when nothing is passed, which is what
- * a standalone render and the tests get. This file itself still opens no
+ * THREE SECTIONS CAN BE LIVE. SCHEDULE HEALTH accepts real jobs (slice 6a), and
+ * the STAT STRIP and RUNNING NOW accept real swarm workers (slice 6b) — all
+ * mapped by the routed screen, which owns the only query and the only store
+ * subscription — falling back to the fixtures when nothing is passed, which is
+ * what a standalone render and the tests get. This file itself still opens no
  * request and imports no client; it is a frame, not a fetcher.
  *
  * Live, the footer's PARTIAL half-line is DROPPED rather than carried over
  * (§3.5 item 11: PARTIAL is not a job status, only free text inside
  * `last_run_error`), and no live row is marked `no-source` because nothing
- * unsourced is drawn for a real job. Everything else on the frame — the stat
- * strip, NEEDS YOU, RUNNING NOW, LAST NIGHT — is still fixtures, and the rows
- * with NO source at all (§3.5 items 11–14) keep their `data-jv-fixture=
- * "no-source"` mark and their line in the banner above the frame.
+ * unsourced is drawn for a real job or a real worker. RUNNING NOW can be EMPTY
+ * live — when nothing is running that is the true answer, and the strip above
+ * already says RUNNING 0; padding it with idle workers to keep the section
+ * looking full would be the same lie in a different place. Its chain caption
+ * stays fixture and stays marked, because the delegation graph has no source
+ * (§3.5 item 14). NEEDS YOU and LAST NIGHT are still fixtures, and the rows
+ * with NO source at all keep their `data-jv-fixture="no-source"` mark and their
+ * line in the banner above the frame.
  *
  * Fluid, not a 390px box: `w-full` with 390 as a MAX and 844 as a MIN.
  *
@@ -358,16 +363,20 @@ function LastNight({ data }: { data: MobileLastNightFixture }) {
 /**
  * The mobile frame on its own — what artboard 04 shows, fluid to the viewport.
  *
- * Jobs come in as props defaulting to the fixtures, so the frame renders
- * standalone with no query client mounted and the slice-5 board is unchanged
- * when nothing is passed.
+ * Jobs and workers come in as props defaulting to the fixtures, so the frame
+ * renders standalone with no query client and no store poll mounted, and the
+ * slice-5 board is unchanged when nothing is passed.
  */
 export function MobileConductorBoard({
   jobs = mobileConductorJobFixtures,
   scheduleHealth = mobileConductorScheduleHealth,
+  stats = mobileConductorStatFixtures,
+  running = mobileConductorRunningFixtures,
 }: {
   jobs?: Array<MobileJobFixture>
   scheduleHealth?: MobileScheduleHealthFixture
+  stats?: Array<MobileStatFixture>
+  running?: Array<WorkerStatusLineProps>
 } = {}) {
   return (
     <div
@@ -380,14 +389,11 @@ export function MobileConductorBoard({
     >
       <MobileStatusBar data={mobileStatusBarFixture} />
       <MobileTabs tabs={conductorTopbarFixture.tabs} />
-      <StatStrip stats={mobileConductorStatFixtures} />
+      <StatStrip stats={stats} />
 
       <main className="flex min-h-0 flex-1 flex-col gap-jv-16 overflow-y-auto px-jv-14 pt-jv-14 pb-jv-16">
         <NeedsYou data={mobileConductorNeedsYouFixture} />
-        <RunningNow
-          chrome={mobileConductorRunningChain}
-          workers={mobileConductorRunningFixtures}
-        />
+        <RunningNow chrome={mobileConductorRunningChain} workers={running} />
         <ScheduleHealth chrome={scheduleHealth} jobs={jobs} />
         <LastNight data={mobileConductorLastNightFixture} />
       </main>
