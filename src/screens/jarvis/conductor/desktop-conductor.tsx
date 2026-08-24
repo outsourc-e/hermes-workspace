@@ -21,20 +21,25 @@
  * job wears a hazard-striped red frame and the silent one an amber frame, both
  * carrying the diagnostic and the chip you would actually reach for.
  *
- * FIXTURES ONLY. This directory imports no store, no gateway client and no HTTP
- * endpoint, and opens no request or event stream of any kind — every value comes
- * from `src/components/jarvis/fixtures.ts`.
+ * ONE SECTION IS LIVE (slice 6a). SCHEDULED JOBS reads real `ClaudeJob` records
+ * through `useScheduledJobs` — the same `['claude','jobs']` query the product
+ * jobs screen runs, GET only, no mutation anywhere on this board. Everything
+ * else (worker board, run log, top bar) is still fixtures, and worker status
+ * has a real source it does not yet read (§3.3) — that is slice 6b.
  *
- * That is worth stating precisely for this board, because unlike the Command
- * board much of what it shows DOES have a real source today
- * (`docs/design/jarvis-ui-mapping.md` §3.3–§3.4): worker running/idle/failed/
- * stale, and job cadence/last-run success/error/next-run. This slice still does
- * not read them — slice 6 does, and it gets one file to replace. The rows with
- * NO source at all (§3.5 items 11–14: the PARTIAL badge as a structured state,
- * the launchd diagnostic, run-log history beyond the latest run, and the chain
- * as a real edge graph) are drawn to prove the layout and are labelled as
- * fixtures both in the banner above the frame and via `data-jv-fixture=
- * "no-source"` in the DOM. Nothing on this board is live.
+ * When the gateway is unreachable — the normal case for an offline design
+ * review — the hook returns the slice-4 fixtures and `isLive: false`, and the
+ * board renders exactly as it did before. The banner above the frame says which
+ * of the two you are looking at; it is never left claiming "every value is
+ * invented" over live data, or the reverse.
+ *
+ * Live cards carry no `data-jv-fixture="no-source"` marks, because nothing
+ * unsourced is drawn for a real job: no PARTIAL badge (§3.5 item 11), no
+ * launchd diagnostic (item 12), no invented duration or payload count, and no
+ * action chips at all — TRIAGE / FULL LOG / RELOAD & RUN each imply a write
+ * this read-only slice cannot do. Those elements survive only on the fixture
+ * fallback, where they stay labelled as fixtures both in the banner and via
+ * `data-jv-fixture="no-source"` in the DOM.
  *
  * Theme handling: the `--jv-*` tokens only resolve under `[data-theme='jarvis']`,
  * so the board sets that attribute on <html> for as long as it is mounted and
@@ -60,7 +65,9 @@ import { ConductorTopbar } from './conductor-topbar'
 import { MobileConductorBoard } from './mobile-conductor'
 import { RunLog } from './run-log'
 import { ScheduledJobs } from './scheduled-jobs'
+import { useScheduledJobs } from './use-scheduled-jobs'
 import { WorkerBoard } from './worker-board'
+import type { ScheduledJobsData } from './use-scheduled-jobs'
 import {
   conductorFixtureNotice,
   conductorJobFixtures,
@@ -93,8 +100,33 @@ function useJarvisThemeAttribute() {
   }, [])
 }
 
-/** The board frame on its own — 1440×900, exactly what the artboard shows. */
-export function DesktopConductorBoard() {
+/**
+ * The honesty banner has two readings now, and the board must not show the
+ * wrong one. `conductorFixtureNotice` says every value is invented — true only
+ * while the fallback is up. These say what is actually on screen when SCHEDULED
+ * JOBS is live; the NO SOURCE notice below them is printed either way, because
+ * that list is about the design, not about the connection.
+ */
+const conductorLiveJobsNotice =
+  'SCHEDULED JOBS is LIVE — real ClaudeJob records read from the gateway (GET /api/claude-jobs, the same query the jobs screen runs). Read-only: this board issues no write of any kind, so live cards carry no action chips and nothing without a source is drawn on them. Every other section — worker board, run log, top bar — is still invented fixtures.'
+
+const mobileLiveJobsNotice =
+  'SCHEDULE HEALTH is LIVE — the same real ClaudeJob records as the desktop board, collapsed to what is unhealthy. Read-only. Every other section on this frame is still invented fixtures.'
+
+/**
+ * The board frame on its own — 1440×900, exactly what the artboard shows.
+ *
+ * Job data arrives as props with the fixtures as defaults, so the frame still
+ * renders standalone with no query client mounted; the routed screen below
+ * passes the live jobs in when the gateway has any.
+ */
+export function DesktopConductorBoard({
+  jobs = conductorJobFixtures,
+  jobsHeading = conductorJobsHeading,
+}: {
+  jobs?: ScheduledJobsData['jobs']
+  jobsHeading?: ScheduledJobsData['heading']
+} = {}) {
   return (
     <div
       data-jv-board="desktop-conductor"
@@ -111,10 +143,7 @@ export function DesktopConductorBoard() {
         cards={conductorWorkerCardFixtures}
       />
 
-      <ScheduledJobs
-        heading={conductorJobsHeading}
-        jobs={conductorJobFixtures}
-      />
+      <ScheduledJobs heading={jobsHeading} jobs={jobs} />
 
       <RunLog chrome={conductorRunLogChrome} runs={conductorRunLogFixtures} />
     </div>
@@ -124,12 +153,16 @@ export function DesktopConductorBoard() {
 /**
  * The dev route's page. One route, two compositions: the desktop board at `lg`
  * and above, the mobile board below it. Both are mounted and CSS picks one —
- * they are inert fixture boards, so nothing is paid for the hidden one beyond
- * its markup, and a CSS swap cannot mismatch on first paint the way a
- * `matchMedia` read can.
+ * a CSS swap cannot mismatch on first paint the way a `matchMedia` read can.
+ *
+ * The jobs query is read ONCE here and handed to both frames, so the hidden one
+ * still costs only its markup: two `useScheduledJobs` calls would share the
+ * cache anyway, but one read keeps the two frames provably showing the same
+ * jobs at the same moment.
  */
 export function DesktopConductorScreen() {
   useJarvisThemeAttribute()
+  const scheduled = useScheduledJobs()
 
   return (
     <div className="min-h-screen bg-jv-bg font-jv-sans tracking-normal text-jv-text">
@@ -150,14 +183,19 @@ export function DesktopConductorScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-text-caption">
-            {conductorFixtureNotice}
+            {scheduled.isLive
+              ? conductorLiveJobsNotice
+              : conductorFixtureNotice}
           </p>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-blocked-dim">
             {conductorNoSourceNotice}
           </p>
         </header>
 
-        <DesktopConductorBoard />
+        <DesktopConductorBoard
+          jobs={scheduled.jobs}
+          jobsHeading={scheduled.heading}
+        />
       </div>
 
       <div className="flex flex-col items-center gap-jv-12 p-jv-14 lg:hidden">
@@ -174,14 +212,17 @@ export function DesktopConductorScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-text-caption">
-            {mobileFixtureNotice}
+            {scheduled.isLive ? mobileLiveJobsNotice : mobileFixtureNotice}
           </p>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-blocked-dim">
             {conductorNoSourceNotice}
           </p>
         </header>
 
-        <MobileConductorBoard />
+        <MobileConductorBoard
+          jobs={scheduled.mobileJobs}
+          scheduleHealth={scheduled.mobileScheduleHealth}
+        />
       </div>
     </div>
   )

@@ -16,13 +16,19 @@
  * panel on a glance surface would imply you can decide from here. The gate
  * itself lives on Command.
  *
- * FIXTURES ONLY. This file imports no store, no gateway client and no HTTP
- * endpoint, and opens no request or event stream of any kind — every value
- * comes from `src/components/jarvis/fixtures.ts`. As on the desktop board,
- * much of what is shown DOES have a real source today
- * (`docs/design/jarvis-ui-mapping.md` §3.3–§3.4) and this slice still does not
- * read it; the rows with NO source at all (§3.5 items 11–14) carry
- * `data-jv-fixture="no-source"` and are named in the banner above the frame.
+ * ONE SECTION CAN BE LIVE (slice 6a). SCHEDULE HEALTH accepts real jobs as
+ * props — mapped from `ClaudeJob` by the routed screen, which owns the only
+ * query — and falls back to the fixtures when nothing is passed, which is what
+ * a standalone render and the tests get. This file itself still opens no
+ * request and imports no client; it is a frame, not a fetcher.
+ *
+ * Live, the footer's PARTIAL half-line is DROPPED rather than carried over
+ * (§3.5 item 11: PARTIAL is not a job status, only free text inside
+ * `last_run_error`), and no live row is marked `no-source` because nothing
+ * unsourced is drawn for a real job. Everything else on the frame — the stat
+ * strip, NEEDS YOU, RUNNING NOW, LAST NIGHT — is still fixtures, and the rows
+ * with NO source at all (§3.5 items 11–14) keep their `data-jv-fixture=
+ * "no-source"` mark and their line in the banner above the frame.
  *
  * Fluid, not a 390px box: `w-full` with 390 as a MAX and 844 as a MIN.
  *
@@ -252,6 +258,10 @@ function ScheduleHealth({
   chrome: MobileScheduleHealthFixture
   jobs: Array<MobileJobFixture>
 }) {
+  // Empty means live: there is no PARTIAL to report because no such status
+  // exists. Rendering the separator over nothing would imply one does.
+  const hasPartial = Boolean(chrome.partial)
+
   return (
     <section aria-label={chrome.heading} className="flex flex-col gap-jv-9">
       <SectionLabel label={chrome.heading} />
@@ -295,12 +305,16 @@ function ScheduleHealth({
           ●
         </span>
         <span>{chrome.healthy}</span>
-        <span aria-hidden="true" className="text-jv-label-ghost">
-          ·
-        </span>
-        <span data-jv-fixture="no-source" className="text-jv-claimed-text">
-          {chrome.partial}
-        </span>
+        {hasPartial ? (
+          <>
+            <span aria-hidden="true" className="text-jv-label-ghost">
+              ·
+            </span>
+            <span data-jv-fixture="no-source" className="text-jv-claimed-text">
+              {chrome.partial}
+            </span>
+          </>
+        ) : null}
       </div>
     </section>
   )
@@ -341,8 +355,20 @@ function LastNight({ data }: { data: MobileLastNightFixture }) {
   )
 }
 
-/** The mobile frame on its own — what artboard 04 shows, fluid to the viewport. */
-export function MobileConductorBoard() {
+/**
+ * The mobile frame on its own — what artboard 04 shows, fluid to the viewport.
+ *
+ * Jobs come in as props defaulting to the fixtures, so the frame renders
+ * standalone with no query client mounted and the slice-5 board is unchanged
+ * when nothing is passed.
+ */
+export function MobileConductorBoard({
+  jobs = mobileConductorJobFixtures,
+  scheduleHealth = mobileConductorScheduleHealth,
+}: {
+  jobs?: Array<MobileJobFixture>
+  scheduleHealth?: MobileScheduleHealthFixture
+} = {}) {
   return (
     <div
       data-jv-board="mobile-conductor"
@@ -362,10 +388,7 @@ export function MobileConductorBoard() {
           chrome={mobileConductorRunningChain}
           workers={mobileConductorRunningFixtures}
         />
-        <ScheduleHealth
-          chrome={mobileConductorScheduleHealth}
-          jobs={mobileConductorJobFixtures}
-        />
+        <ScheduleHealth chrome={scheduleHealth} jobs={jobs} />
         <LastNight data={mobileConductorLastNightFixture} />
       </main>
     </div>
