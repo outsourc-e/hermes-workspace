@@ -840,7 +840,7 @@ The Docker setup runs both automatically — no action needed if using `docker c
 
 ## ⭐ Star History
 
-## [![Star History Chart](https://api.star-history.com/svg?repos=outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)](https://www.star-history.com/#outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)
+## [![Star History Chart](https://star-history.dera.page/svg?repos=outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)](https://star-history.dera.page/#outsourc-e/hermes-workspace&type=date&logscale&legend=top-left)
 
 ## 💛 Support the Project
 
