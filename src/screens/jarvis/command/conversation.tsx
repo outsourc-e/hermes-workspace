@@ -6,10 +6,17 @@
  *   • `VerificationBadge`  — the verified / claimed pair under a turn
  *   • `ApprovalGateCard`   — the inline gate after the disagreement turn
  *
- * Everything is fixture data. The epistemic marks, the verified/claimed state
- * on a chat turn, the I DISAGREE stance and the whole gate body are NO SOURCE
- * (`docs/design/jarvis-ui-mapping.md` §3.5 items 1–7) — they are drawn here to
- * prove the layout only, and each carries `data-jv-fixture="no-source"`.
+ * ONE THING HERE CAN BE LIVE (slice 6c): the gate. It arrives as a single
+ * `GateDisplay` from the routed screen — a real pending approval when the
+ * gateway has one, the slice-3 fixture otherwise — and this file neither
+ * fetches it nor resolves it. What it does own is the caveat slot, which is
+ * where the resolve confirm step surfaces.
+ *
+ * Everything else is fixture data. The epistemic marks, the verified/claimed
+ * state on a chat turn, the I DISAGREE stance and — on EVERY gate, live or not
+ * — BLAST RADIUS, UNDO PATH and the caveat are NO SOURCE
+ * (`docs/design/jarvis-ui-mapping.md` §3.2 and §3.5 items 1–7): they are drawn
+ * to prove the layout only, and each carries `data-jv-fixture="no-source"`.
  *
  * Token discipline: no raw colour, size, spacing or radius.
  */
@@ -21,7 +28,7 @@ import type {
   GateCaveatFixture,
   RichSpan,
 } from '@/components/jarvis/fixtures'
-import type { ApprovalGateCardProps } from '@/components/jarvis/types'
+import type { GateDisplay } from '../conductor/map-approvals'
 import { ApprovalGateCard } from '@/components/jarvis/approval-gate-card'
 import { EpistemicMark } from '@/components/jarvis/epistemic-mark'
 import { VerificationBadge } from '@/components/jarvis/verification-badge'
@@ -173,39 +180,85 @@ function Turn({
   )
 }
 
+/**
+ * The caveat slot under the BLAST RADIUS / UNDO PATH panel, which holds one of
+ * three things and never two:
+ *
+ *   • the resolve line, when a confirm is pending or was blocked. It is UI
+ *     state, not entity data — it says what the button is about to do, which is
+ *     the one thing on a live gate that is knowable.
+ *   • the FIXTURE caveat, on the fixture fallback only, marked no-source as it
+ *     has been since slice 3.
+ *   • nothing. A live gate has no caveat: §3.2 makes it NO SOURCE, and
+ *     "qa has not verified…" over a real approval would be an invented reason
+ *     to hesitate.
+ */
+function GateCaveat({
+  note,
+  caveat,
+}: {
+  note?: string | null
+  caveat?: GateCaveatFixture
+}) {
+  if (note) {
+    return <span data-jv-resolve="note">{note}</span>
+  }
+  if (!caveat) return null
+  return (
+    <>
+      {caveat.lead}
+      <EpistemicMark mark={caveat.mark}>{caveat.claim}</EpistemicMark>
+      {caveat.trail}
+    </>
+  )
+}
+
 export function Conversation({
   turns,
   trailingTurn,
   gate,
-  gateCaveat,
   disagreeLabel,
 }: {
   turns: Array<ConversationTurnFixture>
   trailingTurn: ConversationTurnFixture
-  gate: Omit<ApprovalGateCardProps, 'caveat'>
-  gateCaveat: GateCaveatFixture
+  gate: GateDisplay
   disagreeLabel: string
 }) {
+  // Undefined, not an element that renders nothing: the card tests the prop for
+  // truthiness, so an "empty" caveat would still open the gap above it.
+  const caveat =
+    gate.note || gate.caveat ? (
+      <GateCaveat note={gate.note} caveat={gate.caveat} />
+    ) : undefined
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-jv-11 overflow-y-auto px-jv-32 pt-jv-14">
       {turns.map((turn) => (
         <Turn key={turn.id} turn={turn} disagreeLabel={disagreeLabel} />
       ))}
 
-      <div data-jv-fixture="no-source">
-        <ApprovalGateCard
-          {...gate}
-          caveat={
-            <>
-              {gateCaveat.lead}
-              <EpistemicMark mark={gateCaveat.mark}>
-                {gateCaveat.claim}
-              </EpistemicMark>
-              {gateCaveat.trail}
-            </>
-          }
-        />
+      {/*
+        The mark stays on a LIVE gate too, and it is not a leftover: the two
+        panel cells and the caveat have no source either way (§3.2). What
+        changes is the reason, so the tooltip does.
+      */}
+      <div
+        data-jv-fixture="no-source"
+        data-jv-gate-source={gate.isLive ? 'live' : 'fixture'}
+        title={
+          gate.isLive
+            ? 'Live approval — blast radius, undo path and the caveat have no source (§3.2)'
+            : 'Fixture — no pending approval was readable, so the slice-3 gate is drawn'
+        }
+      >
+        <ApprovalGateCard {...gate.props} caveat={caveat} onAction={gate.onAction} />
       </div>
+
+      {gate.othersWaiting ? (
+        <div className="font-jv-mono text-jv-sm leading-jv-none text-jv-blocked-dim">
+          {gate.othersWaiting}
+        </div>
+      ) : null}
 
       <Turn turn={trailingTurn} disagreeLabel={disagreeLabel} />
     </div>

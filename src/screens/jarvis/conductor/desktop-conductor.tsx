@@ -77,6 +77,7 @@ import { ConductorTopbar } from './conductor-topbar'
 import { MobileConductorBoard } from './mobile-conductor'
 import { RunLog } from './run-log'
 import { ScheduledJobs } from './scheduled-jobs'
+import { useApprovals } from './use-approvals'
 import { useScheduledJobs } from './use-scheduled-jobs'
 import { useWorkers } from './use-workers'
 import { WorkerBoard } from './worker-board'
@@ -137,6 +138,9 @@ const MOBILE_LIVE_WORKERS_CLAUSE =
 const MOBILE_LIVE_JOBS_CLAUSE =
   'SCHEDULE HEALTH is LIVE — the same real ClaudeJob records as the desktop board, collapsed to what is unhealthy.'
 
+const MOBILE_LIVE_GATE_CLAUSE =
+  'NEEDS YOU is LIVE — the oldest pending approval from GET /api/gateway/approvals, with the rest counted behind it. It offers REVIEW only: this glance surface draws no blast-radius panel, so it must not offer a decision.'
+
 function buildNotice(
   fallback: string,
   clauses: Array<string>,
@@ -165,6 +169,7 @@ function buildConductorNotice(
 function buildMobileConductorNotice(
   workersLive: boolean,
   jobsLive: boolean,
+  gateLive: boolean,
 ): string {
   const clauses: Array<string> = []
   const stillFixture: Array<string> = []
@@ -173,7 +178,9 @@ function buildMobileConductorNotice(
   else stillFixture.push('the stat strip', 'RUNNING NOW')
   if (jobsLive) clauses.push(MOBILE_LIVE_JOBS_CLAUSE)
   else stillFixture.push('SCHEDULE HEALTH')
-  stillFixture.push('NEEDS YOU', 'LAST NIGHT')
+  if (gateLive) clauses.push(MOBILE_LIVE_GATE_CLAUSE)
+  else stillFixture.push('NEEDS YOU')
+  stillFixture.push('LAST NIGHT')
 
   return buildNotice(mobileFixtureNotice, clauses, stillFixture)
 }
@@ -230,6 +237,10 @@ export function DesktopConductorScreen() {
   useJarvisThemeAttribute()
   const scheduled = useScheduledJobs()
   const workers = useWorkers()
+  // DISPLAY only, and read-only: `useApprovals` issues the same GET the worker
+  // board already shares. The resolve mutation is not imported on this screen at
+  // all — the Conductor pointer offers REVIEW, never APPROVE.
+  const approvals = useApprovals()
 
   return (
     <div className="min-h-screen bg-jv-bg font-jv-sans tracking-normal text-jv-text">
@@ -279,7 +290,11 @@ export function DesktopConductorScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-text-caption">
-            {buildMobileConductorNotice(workers.isLive, scheduled.isLive)}
+            {buildMobileConductorNotice(
+              workers.isLive,
+              scheduled.isLive,
+              approvals.isLive,
+            )}
           </p>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-blocked-dim">
             {conductorNoSourceNotice}
@@ -291,6 +306,8 @@ export function DesktopConductorScreen() {
           scheduleHealth={scheduled.mobileScheduleHealth}
           stats={workers.mobileStats}
           running={workers.mobileRunning}
+          needsYou={approvals.needsYou}
+          needsYouIsLive={approvals.isLive}
         />
       </div>
     </div>

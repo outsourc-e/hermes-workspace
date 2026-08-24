@@ -16,12 +16,16 @@
  * panel on a glance surface would imply you can decide from here. The gate
  * itself lives on Command.
  *
- * THREE SECTIONS CAN BE LIVE. SCHEDULE HEALTH accepts real jobs (slice 6a), and
- * the STAT STRIP and RUNNING NOW accept real swarm workers (slice 6b) — all
- * mapped by the routed screen, which owns the only query and the only store
- * subscription — falling back to the fixtures when nothing is passed, which is
- * what a standalone render and the tests get. This file itself still opens no
- * request and imports no client; it is a frame, not a fetcher.
+ * FOUR SECTIONS CAN BE LIVE. SCHEDULE HEALTH accepts real jobs (slice 6a), the
+ * STAT STRIP and RUNNING NOW accept real swarm workers (slice 6b), and NEEDS
+ * YOU accepts the real pending approval (slice 6c) — all mapped by the routed
+ * screen, which owns the only queries and the only store subscription — falling
+ * back to the fixtures when nothing is passed, which is what a standalone
+ * render and the tests get. This file itself still opens no request and imports
+ * no client; it is a frame, not a fetcher, and it resolves nothing: the live
+ * NEEDS YOU pointer offers REVIEW and no APPROVE, because approving from a
+ * surface that draws no blast-radius panel is exactly what that panel exists to
+ * prevent.
  *
  * Live, the footer's PARTIAL half-line is DROPPED rather than carried over
  * (§3.5 item 11: PARTIAL is not a job status, only free text inside
@@ -31,9 +35,9 @@
  * already says RUNNING 0; padding it with idle workers to keep the section
  * looking full would be the same lie in a different place. Its chain caption
  * stays fixture and stays marked, because the delegation graph has no source
- * (§3.5 item 14). NEEDS YOU and LAST NIGHT are still fixtures, and the rows
- * with NO source at all keep their `data-jv-fixture="no-source"` mark and their
- * line in the banner above the frame.
+ * (§3.5 item 14). LAST NIGHT is still a fixture, and the rows with NO source
+ * at all keep their `data-jv-fixture="no-source"` mark and their line in the
+ * banner above the frame.
  *
  * Fluid, not a 390px box: `w-full` with 390 as a MAX and 844 as a MIN.
  *
@@ -182,9 +186,19 @@ function StatStrip({ stats }: { stats: Array<MobileStatFixture> }) {
  * NEEDS YOU. A pointer to the gate, not the gate: label, what it would do, and
  * the two ways out of this screen.
  */
-function NeedsYou({ data }: { data: MobileGateSummaryFixture }) {
+function NeedsYou({
+  data,
+  isLive,
+}: {
+  data: MobileGateSummaryFixture
+  isLive: boolean
+}) {
   return (
-    <section aria-label={data.heading} className="flex flex-col gap-jv-9">
+    <section
+      aria-label={data.heading}
+      data-jv-gate-source={isLive ? 'live' : 'fixture'}
+      className="flex flex-col gap-jv-9"
+    >
       <SectionLabel label={data.heading} />
 
       <div className="border border-jv-blocked-line bg-jv-blocked-bg px-jv-12 pt-jv-10 pb-jv-11">
@@ -372,11 +386,15 @@ export function MobileConductorBoard({
   scheduleHealth = mobileConductorScheduleHealth,
   stats = mobileConductorStatFixtures,
   running = mobileConductorRunningFixtures,
+  needsYou = mobileConductorNeedsYouFixture,
+  needsYouIsLive = false,
 }: {
   jobs?: Array<MobileJobFixture>
   scheduleHealth?: MobileScheduleHealthFixture
   stats?: Array<MobileStatFixture>
   running?: Array<WorkerStatusLineProps>
+  needsYou?: MobileGateSummaryFixture
+  needsYouIsLive?: boolean
 } = {}) {
   return (
     <div
@@ -392,7 +410,7 @@ export function MobileConductorBoard({
       <StatStrip stats={stats} />
 
       <main className="flex min-h-0 flex-1 flex-col gap-jv-16 overflow-y-auto px-jv-14 pt-jv-14 pb-jv-16">
-        <NeedsYou data={mobileConductorNeedsYouFixture} />
+        <NeedsYou data={needsYou} isLive={needsYouIsLive} />
         <RunningNow chrome={mobileConductorRunningChain} workers={running} />
         <ScheduleHealth chrome={scheduleHealth} jobs={jobs} />
         <LastNight data={mobileConductorLastNightFixture} />

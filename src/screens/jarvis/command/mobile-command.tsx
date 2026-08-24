@@ -18,12 +18,21 @@
  * have meant two components owning the honest BLAST RADIUS / UNDO PATH panel,
  * which is the one thing on this board that must not be able to drift.
  *
- * FIXTURES ONLY. This file imports no store, no gateway client and no HTTP
- * endpoint, and opens no request or event stream of any kind — every value
- * comes from `src/components/jarvis/fixtures.ts`. The NO SOURCE rows from
- * `docs/design/jarvis-ui-mapping.md` §3.5 are drawn to prove the layout and are
+ * THE HERO GATE CAN BE LIVE (slice 6c). It arrives as a single `GateDisplay`
+ * from the routed screen — a real pending approval when the gateway has one,
+ * `mobileCommandGateFixture` otherwise, which is also what a standalone render
+ * and the tests get. This file itself still opens no request, imports no
+ * gateway client and holds no store subscription; it is a frame, not a fetcher,
+ * and it resolves nothing.
+ *
+ * Live or not, the gate's BLAST RADIUS, UNDO PATH and caveat have NO SOURCE
+ * (`docs/design/jarvis-ui-mapping.md` §3.2): live, the two cells read as an
+ * inert sentinel and the fixture caveat is DROPPED rather than carried over —
+ * "qa has not verified the fix" is a claim about a specific fixture, not
+ * something the approvals endpoint knows. Everything else on this board is
+ * fixtures. The NO SOURCE rows from §3.5 are drawn to prove the layout and are
  * labelled both in the banner above the frame and via `data-jv-fixture=
- * "no-source"` in the DOM. Nothing on this board is live.
+ * "no-source"` in the DOM.
  *
  * Fluid, not a 390px box: the frame is `w-full` with 390 as a MAX and 844 as a
  * MIN, so on a real phone it fills the viewport and on a wider narrow window it
@@ -37,9 +46,11 @@ import { MobileComposer } from './mobile-composer'
 import { MobileStatusBar } from './mobile-status-bar'
 import { MobileThread } from './mobile-thread'
 import type {
+  GateCaveatFixture,
   MobileAlertStripFixture,
   MobileLegendFixture,
 } from '@/components/jarvis/fixtures'
+import type { GateDisplay } from '../conductor/map-approvals'
 import {
   mobileCommandAlertStrip,
   mobileCommandComposerFixture,
@@ -96,8 +107,57 @@ function MarkLegend({ marks }: { marks: Array<MobileLegendFixture> }) {
   )
 }
 
-/** The mobile frame on its own — what artboard 03 shows, fluid to the viewport. */
-export function MobileCommandBoard() {
+/**
+ * The caveat slot. Same three-way rule as the desktop board: the resolve line
+ * when a confirm is pending, the FIXTURE caveat on the fallback only, and
+ * nothing at all on a live gate (§3.2 — the caveat has no source).
+ */
+function GateCaveat({
+  note,
+  caveat,
+}: {
+  note?: string | null
+  caveat?: GateCaveatFixture
+}) {
+  if (note) {
+    return <span data-jv-resolve="note">{note}</span>
+  }
+  if (!caveat) return null
+  return (
+    <>
+      {caveat.lead}
+      <EpistemicMark mark={caveat.mark}>{caveat.claim}</EpistemicMark>
+      {caveat.trail}
+    </>
+  )
+}
+
+/** The slice-3 gate and its caveat, as one prop. Nothing here is live. */
+const FIXTURE_GATE: GateDisplay = {
+  props: mobileCommandGateFixture,
+  caveat: mobileCommandGateCaveatFixture,
+  isLive: false,
+}
+
+/**
+ * The mobile frame on its own — what artboard 03 shows, fluid to the viewport.
+ *
+ * The gate arrives as a prop with the fixture as its default, so the frame
+ * still renders standalone with no query client mounted and the slice-5 board
+ * is unchanged when nothing is passed.
+ */
+export function MobileCommandBoard({
+  gate = FIXTURE_GATE,
+}: {
+  gate?: GateDisplay
+} = {}) {
+  // Undefined, not an element that renders nothing: the card tests the prop for
+  // truthiness, so an "empty" caveat would still open the gap above it.
+  const caveat =
+    gate.note || gate.caveat ? (
+      <GateCaveat note={gate.note} caveat={gate.caveat} />
+    ) : undefined
+
   return (
     <div
       data-jv-board="mobile-command"
@@ -111,21 +171,32 @@ export function MobileCommandBoard() {
       <AlertStrip data={mobileCommandAlertStrip} />
 
       <main className="flex min-h-0 flex-1 flex-col gap-jv-16 overflow-y-auto px-jv-14 pt-jv-14 pb-jv-16">
-        {/* The hero: the gate leads the screen, it is not buried in the thread. */}
-        <div data-jv-fixture="no-source">
+        {/*
+          The hero: the gate leads the screen, it is not buried in the thread.
+          The no-source mark stays on a LIVE gate too — the panel cells and the
+          caveat have no source either way (§3.2). Only the reason changes.
+        */}
+        <div
+          data-jv-fixture="no-source"
+          data-jv-gate-source={gate.isLive ? 'live' : 'fixture'}
+          title={
+            gate.isLive
+              ? 'Live approval — blast radius, undo path and the caveat have no source (§3.2)'
+              : 'Fixture — no pending approval was readable, so the slice-3 gate is drawn'
+          }
+        >
           <ApprovalGateCard
-            {...mobileCommandGateFixture}
-            caveat={
-              <>
-                {mobileCommandGateCaveatFixture.lead}
-                <EpistemicMark mark={mobileCommandGateCaveatFixture.mark}>
-                  {mobileCommandGateCaveatFixture.claim}
-                </EpistemicMark>
-                {mobileCommandGateCaveatFixture.trail}
-              </>
-            }
+            {...gate.props}
+            caveat={caveat}
+            onAction={gate.onAction}
           />
         </div>
+
+        {gate.othersWaiting ? (
+          <div className="font-jv-mono text-jv-sm leading-jv-none text-jv-blocked-dim">
+            {gate.othersWaiting}
+          </div>
+        ) : null}
 
         <MobileThread thread={mobileCommandThreadFixture} />
       </main>

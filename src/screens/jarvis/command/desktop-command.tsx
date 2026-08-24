@@ -17,14 +17,25 @@
  * (flex) · work trail (320). Composed entirely from the Slice 2 primitives and
  * the `--jv-*` token layer; this slice re-styles none of them.
  *
- * ONE SECTION IS LIVE (slice 6b). The WORKER RAIL — its rows and its
- * RUN/BLK/IDLE count line — reads real swarm sessions through `useWorkers`,
- * with BLOCKED joined from the gateway's pending approvals queue. Both calls
- * are GETs; this board issues no write of any kind, and no live row carries a
- * control that implies one.
+ * TWO SECTIONS CAN BE LIVE. The WORKER RAIL — its rows and its RUN/BLK/IDLE
+ * count line — reads real swarm sessions through `useWorkers` (slice 6b), with
+ * BLOCKED joined from the gateway's pending approvals queue. The GATE reads
+ * that same approvals queue through `useApprovals` (slice 6c) and shows the
+ * OLDEST pending one, with the rest as a real "+N more waiting" count.
  *
- * Everything else is still FIXTURES: the conversation, the gate, the work
- * trail, the threads list, the composer and the rail's ctx footer all come from
+ * BOTH READS ARE GETs. The one WRITE this app has for approvals —
+ * `resolveGatewayApproval` — is reached only through `useResolveApproval`, and
+ * this screen passes `enableResolve={false}`, so the gate's APPROVE / REJECT
+ * chips walk through their confirm step and then stop: nothing is POSTed. See
+ * `../conductor/use-resolve-approval.ts` for the locks. Flipping that flag is a
+ * product decision and is deliberately not made here.
+ *
+ * The gate is LIVE only in the sense of DISPLAY. Its BLAST RADIUS, UNDO PATH
+ * and caveat have NO SOURCE (§3.2) — live, the two cells carry an inert
+ * sentinel and the caveat is dropped rather than invented.
+ *
+ * Everything else is still FIXTURES: the conversation, the work trail, the
+ * threads list, the composer and the rail's ctx footer all come from
  * `src/components/jarvis/fixtures.ts`, so a later slice can still see in one
  * file exactly what needs a real source. The NO SOURCE rows from
  * `docs/design/jarvis-ui-mapping.md` §3.5 are drawn here to prove the layout
@@ -56,6 +67,8 @@
  * `--jv-space-4`).
  */
 import { useEffect } from 'react'
+import { useApprovals } from '../conductor/use-approvals'
+import { useResolveApproval } from '../conductor/use-resolve-approval'
 import { useWorkers } from '../conductor/use-workers'
 import { CommandTopbar } from './command-topbar'
 import { Composer } from './composer'
@@ -64,6 +77,7 @@ import { JV_BOARD, JV_MOBILE } from './geometry'
 import { MobileCommandBoard } from './mobile-command'
 import { WorkTrail } from './work-trail'
 import { WorkerRail } from './worker-rail'
+import type { GateDisplay } from '../conductor/map-approvals'
 import type { WorkersData } from '../conductor/use-workers'
 import {
   commandChainFixtures,
@@ -83,6 +97,7 @@ import {
   commandWorkerCounts,
   commandWorkerFixtures,
   disagreeLabel,
+  mobileCommandGateCaveatFixture,
   mobileFixtureNotice,
 } from '@/components/jarvis/fixtures'
 
@@ -95,13 +110,58 @@ const FIXTURE_RAIL = {
   counts: commandWorkerCounts,
 }
 
+/** The slice-3 gate and its caveat, as one prop. Nothing here is live. */
+const FIXTURE_GATE: GateDisplay = {
+  props: commandGateFixture,
+  caveat: commandGateCaveatFixture,
+  isLive: false,
+}
+
 /**
  * `commandFixtureNotice` says nothing on this board is live — true only while
  * the rail is on its fallback. This is what is actually on screen once the
  * gateway answers with sessions.
  */
-const commandLiveWorkersNotice =
-  'The WORKER RAIL is LIVE — real swarm sessions (GET /api/gateway/sessions), with BLOCKED joined from the pending approvals queue (GET /api/gateway/approvals) and the RUN/BLK/IDLE line tallied from the whole roster. Session status is the swarm store’s heuristic, not an authoritative gateway signal, and a live row carries only a state and an age: no task, no file, no command. Read-only — this board issues no write of any kind. Every other section — conversation, gate, work trail, threads, composer, ctx footer — is still invented fixtures.'
+const LIVE_RAIL_CLAUSE =
+  'The WORKER RAIL is LIVE — real swarm sessions (GET /api/gateway/sessions), with BLOCKED joined from the pending approvals queue (GET /api/gateway/approvals) and the RUN/BLK/IDLE line tallied from the whole roster. Session status is the swarm store’s heuristic, not an authoritative gateway signal, and a live row carries only a state and an age: no task, no file, no command.'
+
+const LIVE_GATE_CLAUSE =
+  'The GATE is LIVE as DISPLAY — the oldest pending approval from the same GET /api/gateway/approvals queue: real agent, real action, real tool and input, wait derived from requestedAt. Its BLAST RADIUS and UNDO PATH have NO SOURCE and read as an inert sentinel rather than a plausible number, and the caveat is dropped entirely.'
+
+const RESOLVE_CLAUSE =
+  'Resolve is BUILT BUT DISABLED: APPROVE / REJECT enter a two-step confirm and stop there — enableResolve is false, so nothing is POSTed to the gateway and no approval is decided from this board.'
+
+/**
+ * `commandFixtureNotice` says nothing on this board is live — true only while
+ * both wires are on their fallback, so the banner is assembled per section.
+ */
+function buildCommandNotice(railLive: boolean, gateLive: boolean): string {
+  const clauses: Array<string> = []
+  const stillFixture: Array<string> = []
+
+  if (railLive) clauses.push(LIVE_RAIL_CLAUSE)
+  else stillFixture.push('the worker rail')
+  if (gateLive) clauses.push(LIVE_GATE_CLAUSE)
+  else stillFixture.push('the gate')
+  stillFixture.push(
+    'the conversation',
+    'the work trail',
+    'threads',
+    'the composer',
+    'the ctx footer',
+  )
+
+  if (clauses.length === 0) return `${commandFixtureNotice} ${RESOLVE_CLAUSE}`
+  return `${clauses.join(' ')} ${RESOLVE_CLAUSE} Still invented fixtures: ${stillFixture.join(' · ')}.`
+}
+
+const MOBILE_LIVE_GATE_CLAUSE =
+  'The HERO GATE is LIVE as DISPLAY — the same real pending approval as the desktop board, from GET /api/gateway/approvals. Blast radius, undo path and the caveat have NO SOURCE: the two cells read as an inert sentinel and the caveat is dropped.'
+
+function buildMobileCommandNotice(gateLive: boolean): string {
+  if (!gateLive) return `${mobileFixtureNotice} ${RESOLVE_CLAUSE}`
+  return `${MOBILE_LIVE_GATE_CLAUSE} ${RESOLVE_CLAUSE} Still invented fixtures: the alert strip · the thread · the legend · the composer.`
+}
 
 /** Applies `data-theme='jarvis'` for the lifetime of the board only. */
 function useJarvisThemeAttribute() {
@@ -128,8 +188,10 @@ function useJarvisThemeAttribute() {
  */
 export function DesktopCommandBoard({
   rail = FIXTURE_RAIL,
+  gate = FIXTURE_GATE,
 }: {
   rail?: WorkersData['rail']
+  gate?: GateDisplay
 } = {}) {
   return (
     <div
@@ -154,8 +216,7 @@ export function DesktopCommandBoard({
           <Conversation
             turns={commandConversationFixtures}
             trailingTurn={commandTrailingTurnFixture}
-            gate={commandGateFixture}
-            gateCaveat={commandGateCaveatFixture}
+            gate={gate}
             disagreeLabel={disagreeLabel}
           />
           <Composer data={commandComposerFixture} />
@@ -179,13 +240,49 @@ export function DesktopCommandBoard({
  * once, here), and a CSS swap cannot mismatch on first paint the way a
  * `matchMedia` read can.
  *
- * The mobile frame is NOT wired: artboard 03 leads with the gate rather than a
- * worker roster, and wiring a gate means resolving one, which is slice 6c. Its
- * banner still says fixtures, because it still is.
+ * The mobile frame now shows the SAME gate as the desktop one — one read, one
+ * hero, two frames — because artboard 03 leads with it. Its resolve control is
+ * the same one, and it is off.
  */
 export function DesktopCommandScreen() {
   useJarvisThemeAttribute()
   const workers = useWorkers()
+  const approvals = useApprovals()
+
+  /**
+   * LOCK 1, shut, at the only call site on this screen. `useResolveApproval`
+   * already defaults `enabled` to false; it is passed explicitly anyway so that
+   * turning resolve on is a visible one-word edit in a reviewed diff rather
+   * than an omission somewhere else. While it is false the chips still walk
+   * through their confirm step — that is the interaction being reviewed — and
+   * the POST is never issued.
+   */
+  const enableResolve = false
+  const resolve = useResolveApproval({
+    enabled: enableResolve,
+    approvalId: approvals.approvalId,
+    baseActions: approvals.gate.actions,
+  })
+
+  const gateChrome = {
+    note: resolve.note,
+    othersWaiting: approvals.othersWaiting,
+    isLive: approvals.isLive,
+    onAction: resolve.onAction,
+    // NO SOURCE (§3.2) — a live gate carries no caveat at all.
+    caveat: approvals.isLive ? undefined : commandGateCaveatFixture,
+  }
+
+  const gate: GateDisplay = {
+    ...gateChrome,
+    props: { ...approvals.gate, actions: resolve.actions },
+  }
+
+  const mobileGate: GateDisplay = {
+    ...gateChrome,
+    props: { ...approvals.mobileGate, actions: resolve.actions },
+    caveat: approvals.isLive ? undefined : mobileCommandGateCaveatFixture,
+  }
 
   return (
     <div className="min-h-screen bg-jv-bg font-jv-sans tracking-normal text-jv-text">
@@ -203,14 +300,14 @@ export function DesktopCommandScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-text-caption">
-            {workers.isLive ? commandLiveWorkersNotice : commandFixtureNotice}
+            {buildCommandNotice(workers.isLive, approvals.isLive)}
           </p>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-blocked-dim">
             {commandNoSourceNotice}
           </p>
         </header>
 
-        <DesktopCommandBoard rail={workers.rail} />
+        <DesktopCommandBoard rail={workers.rail} gate={gate} />
       </div>
 
       <div className="flex flex-col items-center gap-jv-12 p-jv-14 lg:hidden">
@@ -227,14 +324,14 @@ export function DesktopCommandScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-text-caption">
-            {mobileFixtureNotice}
+            {buildMobileCommandNotice(approvals.isLive)}
           </p>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-blocked-dim">
             {commandNoSourceNotice}
           </p>
         </header>
 
-        <MobileCommandBoard />
+        <MobileCommandBoard gate={mobileGate} />
       </div>
     </div>
   )
