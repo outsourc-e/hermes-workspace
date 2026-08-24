@@ -106,7 +106,11 @@ import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
 import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
-import { useSessionModelStore } from '@/stores/session-model-store'
+import {
+  NEW_CHAT_MODEL_KEY,
+  getSessionModelKey,
+  useSessionModelStore,
+} from '@/stores/session-model-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
@@ -1057,8 +1061,20 @@ export function ChatScreen({
     return models.map((m: any) => m.id).filter((id: string) => id)
   }, [modelsQuery.data])
 
+  const modelSessionKey = getSessionModelKey(
+    isNewChat
+      ? undefined
+      : forcedSessionKey ||
+          resolvedSessionKey ||
+          activeCanonicalKey ||
+          activeSessionKey,
+  )
+  const persistedSessionModel = useSessionModelStore((state) =>
+    state.getModel(modelSessionKey),
+  )
   const gatewayModel = currentModelQuery.data || ''
-  const currentModel = _localModelOverride || gatewayModel
+  const currentModel =
+    _localModelOverride || persistedSessionModel || gatewayModel
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)
@@ -1146,6 +1162,14 @@ export function ChatScreen({
             friendlyId,
           }
         }
+        if (isNewChat) {
+          const modelStore = useSessionModelStore.getState()
+          const newChatModel = modelStore.getModel(NEW_CHAT_MODEL_KEY)
+          if (newChatModel) {
+            modelStore.setModel(sessionKey, newChatModel)
+            modelStore.clearModel(NEW_CHAT_MODEL_KEY)
+          }
+        }
         if (
           sessionKey === activeFriendlyId &&
           friendlyId === activeFriendlyId
@@ -1154,7 +1178,7 @@ export function ChatScreen({
         }
         onSessionResolved?.({ sessionKey, friendlyId })
       },
-      [activeFriendlyId, onSessionResolved],
+      [activeFriendlyId, isNewChat, onSessionResolved],
     ),
     onStarted: useCallback(
       ({ runId }: { runId: string | null }) => {

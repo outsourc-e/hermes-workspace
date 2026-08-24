@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
 /**
  * Per-session model preference.
@@ -14,6 +14,15 @@ import { persist, createJSONStorage } from 'zustand/middleware'
  *
  * Cleared automatically when the session is deleted.
  */
+export const NEW_CHAT_MODEL_KEY = '__new_chat__'
+
+export function getSessionModelKey(
+  sessionKey: string | null | undefined,
+): string {
+  const normalized = typeof sessionKey === 'string' ? sessionKey.trim() : ''
+  return normalized || NEW_CHAT_MODEL_KEY
+}
+
 type State = {
   models: Record<string, string>
 }

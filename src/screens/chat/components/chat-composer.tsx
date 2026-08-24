@@ -48,7 +48,10 @@ import {
 import { useSettings } from '@/hooks/use-settings'
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
-import { useSessionModelStore } from '@/stores/session-model-store'
+import {
+  getSessionModelKey,
+  useSessionModelStore,
+} from '@/stores/session-model-store'
 import { Button } from '@/components/ui/button'
 import { usePinnedModels } from '@/hooks/use-pinned-models'
 // import { ModeSelector } from '@/components/mode-selector'
@@ -555,32 +558,31 @@ function readText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function getResolvedModelKey(model: string, provider?: string): string {
+export function getResolvedModelKey(model: string, provider?: string): string {
   const normalizedModel = model.trim()
   const normalizedProvider = typeof provider === 'string' ? provider.trim() : ''
 
   if (!normalizedModel) return ''
-  if (!normalizedProvider) return normalizedModel
-  if (normalizedModel.startsWith(`${normalizedProvider}/`))
+  if (
+    !normalizedProvider ||
+    normalizedProvider === 'hermes' ||
+    normalizedProvider === 'hermes-agent'
+  )
     return normalizedModel
-  return `${normalizedProvider}/${normalizedModel}`
+  if (normalizedModel.startsWith(`${normalizedProvider}::`))
+    return normalizedModel
+  return `${normalizedProvider}::${normalizedModel}`
 }
 
 /**
  * Checks whether a model entry matches the current model string.
  *
  * The current model can arrive in several formats depending on the source:
- *   - "provider/model-id"  (from session-status API, persisted session model)
+ *   - "provider::model-id" (Hermes per-request provider selection)
+ *   - "provider/model-id"  (legacy Workspace persistence)
  *   - "model-id"           (bare ID from config or old data)
- *
- * The entry always has { id, provider } from the models catalog.
- *
- * We match if:
- *   1. The current model equals the entry ID exactly (bare match), or
- *   2. The current model ends with "/<entry.id>" (provider-prefixed match), or
- *   3. The resolved key from entry (provider/id) equals the current model.
  */
-function isCurrentModel(
+export function isCurrentModel(
   currentModel: string,
   entryId: string,
   entryProvider: string,
@@ -596,9 +598,12 @@ function isCurrentModel(
   // Current model is "something/<entryId>"
   if (cm.endsWith(`/${eid}`)) return true
 
-  // Resolved entry key matches current model exactly
-  const resolved = eprov ? `${eprov}/${eid}` : eid
-  if (resolved === cm) return true
+  // Hermes provider-qualified entry key matches current model exactly.
+  if (getResolvedModelKey(eid, eprov) === cm) return true
+
+  // Preserve recognition of browser-local values written by older Workspace builds.
+  const legacyResolved = eprov ? `${eprov}/${eid}` : eid
+  if (legacyResolved === cm) return true
 
   return false
 }
@@ -1107,8 +1112,9 @@ function ChatComposerComponent({
   // Drives both the composer label and the model passed to startStreaming.
   // Replaces an earlier flow that PATCHed ~/.hermes/config.yaml — that path
   // 404s and would clobber the global default for every channel anyway.
+  const modelSessionKey = getSessionModelKey(sessionKey)
   const persistedSessionModel = useSessionModelStore((s) =>
-    s.getModel(sessionKey),
+    s.getModel(modelSessionKey),
   )
   const setPersistedSessionModel = useSessionModelStore((s) => s.setModel)
 
@@ -1122,10 +1128,7 @@ function ChatComposerComponent({
     function handleModelSelect(nextModel: string, provider?: string) {
       const model = nextModel.trim()
       if (!model) return
-      const normalizedSessionKey =
-        typeof sessionKey === 'string' && sessionKey.trim().length > 0
-          ? sessionKey.trim()
-          : undefined
+      const normalizedSessionKey = getSessionModelKey(sessionKey)
       if (
         shouldBlockZeroForkModelSwitch(
           gatewayModeQuery.data,
@@ -1141,9 +1144,7 @@ function ChatComposerComponent({
       // Per-session, browser-local persistence. No global config write —
       // picking a model here only affects this chat. The actual model is
       // passed on each request via the chat-completion `model` field.
-      if (normalizedSessionKey) {
-        setPersistedSessionModel(normalizedSessionKey, resolved)
-      }
+      setPersistedSessionModel(normalizedSessionKey, resolved)
       setIsModelMenuOpen(false)
     },
     [
