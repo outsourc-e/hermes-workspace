@@ -11,6 +11,7 @@ export type ThemeId =
   | 'claude-slate-light'
   | 'scifi'
   | 'scifi-light'
+  | 'jarvis'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -90,14 +91,25 @@ export const THEMES: Array<{
     description: 'Cold steel and teal — cyberpunk interface in daylight',
     icon: '🌌',
   },
+  {
+    id: 'jarvis',
+    label: 'JARVIS',
+    description:
+      'Persistent assistant console — near-black with cyan signal, amber gates, epistemic marks',
+    icon: '◆',
+  },
 ]
 
 const STORAGE_KEY = 'claude-theme'
 const DEFAULT_THEME: ThemeId = 'claude-nous'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
+// JARVIS is dark-only (no light artboard, so no `jarvis-light` id). It
+// self-maps on both sides: asking for the light variant of JARVIS keeps
+// JARVIS. `| 'jarvis'` widens the value type just enough to allow that
+// without restructuring the maps.
 const LIGHT_THEME_MAP: Record<
   Exclude<ThemeId, `${string}-light`>,
-  Extract<ThemeId, `${string}-light`>
+  Extract<ThemeId, `${string}-light`> | 'jarvis'
 > = {
   'claude-nous': 'claude-nous-light',
   matrix: 'matrix-light',
@@ -105,9 +117,14 @@ const LIGHT_THEME_MAP: Record<
   'claude-classic': 'claude-classic-light',
   'claude-slate': 'claude-slate-light',
   'scifi': 'scifi-light',
+  jarvis: 'jarvis',
 }
+// `| 'jarvis'` on the key side for the same reason as LIGHT_THEME_MAP.
+// Never actually read for JARVIS — isDarkTheme('jarvis') is true, so
+// getThemeVariant(…, 'dark') short-circuits — but kept so the pair stays
+// symmetric and `jarvis` is present in both maps.
 const DARK_THEME_MAP: Record<
-  Extract<ThemeId, `${string}-light`>,
+  Extract<ThemeId, `${string}-light`> | 'jarvis',
   Exclude<ThemeId, `${string}-light`>
 > = {
   'claude-nous-light': 'claude-nous',
@@ -116,6 +133,7 @@ const DARK_THEME_MAP: Record<
   'claude-classic-light': 'claude-classic',
   'claude-slate-light': 'claude-slate',
   'scifi-light': 'scifi',
+  jarvis: 'jarvis',
 }
 
 const LIGHT_THEMES = new Set<ThemeId>([
