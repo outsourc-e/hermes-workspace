@@ -25,10 +25,14 @@
  *
  * BOTH READS ARE GETs. The one WRITE this app has for approvals —
  * `resolveGatewayApproval` — is reached only through `useResolveApproval`, and
- * this screen passes `enableResolve={false}`, so the gate's APPROVE / REJECT
- * chips walk through their confirm step and then stop: nothing is POSTed. See
- * `../conductor/use-resolve-approval.ts` for the locks. Flipping that flag is a
- * product decision and is deliberately not made here.
+ * whether its LOCK 1 is open is now a decision the user makes at runtime, in
+ * this session, on the LIVE RESOLVE switch above the board (slice 6d). It is
+ * OFF on every fresh session and OFF in committed code: while it is off the
+ * gate's APPROVE / REJECT chips walk through their confirm step and then stop,
+ * and nothing is POSTed. Arming it opens that one lock and NOTHING else — the
+ * two-step confirm and the need for a real approval id are untouched, and the
+ * switch itself makes no request. See `../conductor/use-resolve-approval.ts`
+ * for the locks and `../conductor/use-resolve-arm.ts` for the flag.
  *
  * The gate is LIVE only in the sense of DISPLAY. Its BLAST RADIUS, UNDO PATH
  * and caveat have NO SOURCE (§3.2) — live, the two cells carry an inert
@@ -67,8 +71,10 @@
  * `--jv-space-4`).
  */
 import { useEffect } from 'react'
+import { ResolveArmToggle } from '../conductor/resolve-arm-toggle'
 import { useApprovals } from '../conductor/use-approvals'
 import { useResolveApproval } from '../conductor/use-resolve-approval'
+import { useResolveArm } from '../conductor/use-resolve-arm'
 import { useWorkers } from '../conductor/use-workers'
 import { CommandTopbar } from './command-topbar'
 import { Composer } from './composer'
@@ -128,14 +134,25 @@ const LIVE_RAIL_CLAUSE =
 const LIVE_GATE_CLAUSE =
   'The GATE is LIVE as DISPLAY — the oldest pending approval from the same GET /api/gateway/approvals queue: real agent, real action, real tool and input, wait derived from requestedAt. Its BLAST RADIUS and UNDO PATH have NO SOURCE and read as an inert sentinel rather than a plausible number, and the caveat is dropped entirely.'
 
-const RESOLVE_CLAUSE =
-  'Resolve is BUILT BUT DISABLED: APPROVE / REJECT enter a two-step confirm and stop there — enableResolve is false, so nothing is POSTed to the gateway and no approval is decided from this board.'
+const RESOLVE_CLAUSE_OFF =
+  'Resolve is BUILT and DISARMED: LIVE RESOLVE is OFF for this session, so APPROVE / REJECT enter a two-step confirm and stop there — nothing is POSTed to the gateway and no approval is decided from this board. Arm it on the switch above the board if you mean to decide from here.'
+
+const RESOLVE_CLAUSE_ARMED =
+  'Resolve is ARMED for this session: LIVE RESOLVE is ON, so a two-step-CONFIRMED approve or reject POSTs the real decision to the gateway and there is no undo. Arming sent nothing by itself, the confirm step still stands between a click and the POST, and a fixture gate has no approval id to act on. The arm is per-session and is not in the committed default.'
+
+function resolveClause(armed: boolean): string {
+  return armed ? RESOLVE_CLAUSE_ARMED : RESOLVE_CLAUSE_OFF
+}
 
 /**
  * `commandFixtureNotice` says nothing on this board is live — true only while
  * both wires are on their fallback, so the banner is assembled per section.
  */
-function buildCommandNotice(railLive: boolean, gateLive: boolean): string {
+function buildCommandNotice(
+  railLive: boolean,
+  gateLive: boolean,
+  armed: boolean,
+): string {
   const clauses: Array<string> = []
   const stillFixture: Array<string> = []
 
@@ -151,16 +168,17 @@ function buildCommandNotice(railLive: boolean, gateLive: boolean): string {
     'the ctx footer',
   )
 
-  if (clauses.length === 0) return `${commandFixtureNotice} ${RESOLVE_CLAUSE}`
-  return `${clauses.join(' ')} ${RESOLVE_CLAUSE} Still invented fixtures: ${stillFixture.join(' · ')}.`
+  if (clauses.length === 0)
+    return `${commandFixtureNotice} ${resolveClause(armed)}`
+  return `${clauses.join(' ')} ${resolveClause(armed)} Still invented fixtures: ${stillFixture.join(' · ')}.`
 }
 
 const MOBILE_LIVE_GATE_CLAUSE =
   'The HERO GATE is LIVE as DISPLAY — the same real pending approval as the desktop board, from GET /api/gateway/approvals. Blast radius, undo path and the caveat have NO SOURCE: the two cells read as an inert sentinel and the caveat is dropped.'
 
-function buildMobileCommandNotice(gateLive: boolean): string {
-  if (!gateLive) return `${mobileFixtureNotice} ${RESOLVE_CLAUSE}`
-  return `${MOBILE_LIVE_GATE_CLAUSE} ${RESOLVE_CLAUSE} Still invented fixtures: the alert strip · the thread · the legend · the composer.`
+function buildMobileCommandNotice(gateLive: boolean, armed: boolean): string {
+  if (!gateLive) return `${mobileFixtureNotice} ${resolveClause(armed)}`
+  return `${MOBILE_LIVE_GATE_CLAUSE} ${resolveClause(armed)} Still invented fixtures: the alert strip · the thread · the legend · the composer.`
 }
 
 /** Applies `data-theme='jarvis'` for the lifetime of the board only. */
@@ -242,7 +260,9 @@ export function DesktopCommandBoard({
  *
  * The mobile frame now shows the SAME gate as the desktop one — one read, one
  * hero, two frames — because artboard 03 leads with it. Its resolve control is
- * the same one, and it is off.
+ * the same one, and so is its arm: one `useResolveArm` for the screen, so the
+ * two frames can never disagree about whether this session is armed. Both
+ * frames carry the switch, because both frames carry the gate.
  */
 export function DesktopCommandScreen() {
   useJarvisThemeAttribute()
@@ -250,16 +270,18 @@ export function DesktopCommandScreen() {
   const approvals = useApprovals()
 
   /**
-   * LOCK 1, shut, at the only call site on this screen. `useResolveApproval`
-   * already defaults `enabled` to false; it is passed explicitly anyway so that
-   * turning resolve on is a visible one-word edit in a reviewed diff rather
-   * than an omission somewhere else. While it is false the chips still walk
-   * through their confirm step — that is the interaction being reviewed — and
-   * the POST is never issued.
+   * LOCK 1, and who holds it. It is no longer a constant in this file: it is
+   * the session's arm flag, false on every fresh session and false in the
+   * committed default, flipped only by the user on the switch below. Passing it
+   * through is the whole of this slice's wiring — `useResolveApproval`'s other
+   * two locks (the two-step confirm, a real approval id) are not touched, so an
+   * armed session still cannot POST from a single click or from a fixture gate.
+   * While it is false the chips walk their confirm step and land in `blocked`,
+   * exactly as before.
    */
-  const enableResolve = false
+  const arm = useResolveArm()
   const resolve = useResolveApproval({
-    enabled: enableResolve,
+    enabled: arm.armed,
     approvalId: approvals.approvalId,
     baseActions: approvals.gate.actions,
   })
@@ -300,11 +322,12 @@ export function DesktopCommandScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-text-caption">
-            {buildCommandNotice(workers.isLive, approvals.isLive)}
+            {buildCommandNotice(workers.isLive, approvals.isLive, arm.armed)}
           </p>
           <p className="font-jv-sans text-jv-lg leading-jv-loose text-jv-blocked-dim">
             {commandNoSourceNotice}
           </p>
+          <ResolveArmToggle armed={arm.armed} onChange={arm.setArmed} />
         </header>
 
         <DesktopCommandBoard rail={workers.rail} gate={gate} />
@@ -324,11 +347,12 @@ export function DesktopCommandScreen() {
             </span>
           </div>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-text-caption">
-            {buildMobileCommandNotice(approvals.isLive)}
+            {buildMobileCommandNotice(approvals.isLive, arm.armed)}
           </p>
           <p className="font-jv-sans text-jv-md leading-jv-loose text-jv-blocked-dim">
             {commandNoSourceNotice}
           </p>
+          <ResolveArmToggle armed={arm.armed} onChange={arm.setArmed} />
         </header>
 
         <MobileCommandBoard gate={mobileGate} />
