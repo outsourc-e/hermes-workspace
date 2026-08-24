@@ -20,6 +20,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { getStateDir } from './workspace-state-dir'
+import { getActiveProfileName } from './profiles-browser'
 
 type WorkspaceOverrides = {
   claudeApiUrl?: string
@@ -343,11 +344,30 @@ function withDashboardBase(path: string): string {
   return `${CLAUDE_DASHBOARD_URL}${path.startsWith('/') ? path : `/${path}`}`
 }
 
+/**
+ * Append the active Hermes profile as a query parameter so the dashboard
+ * reads the correct profile's config (model, provider, etc.) instead of
+ * defaulting to the 'default' profile which often has no model set.
+ */
+function withProfileParam(url: string): string {
+  // Don't double-inject if the caller already passed ?profile=
+  if (/[?&]profile=/.test(url)) return url
+  try {
+    const profile = getActiveProfileName()
+    if (!profile || profile === 'default') return url
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}profile=${encodeURIComponent(profile)}`
+  } catch {
+    return url
+  }
+}
+
 export async function dashboardFetch(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const requestPath = withDashboardBase(path)
+  const rawUrl = withDashboardBase(path)
+  const requestPath = withProfileParam(rawUrl)
   const method = (init.method || 'GET').toUpperCase()
   const doFetch = async (forceToken = false) => {
     const headers = new Headers(init.headers)
