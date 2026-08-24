@@ -129,10 +129,48 @@ export async function listSessions(
   limit = 50,
   offset = 0,
 ): Promise<Array<ClaudeSession>> {
+  const { sessions } = await listSessionsPaged(limit, offset)
+  return sessions
+}
+
+/**
+ * List sessions with total count, transparently paging past the dashboard
+ * API's per-request `limit` ceiling (100). The dashboard rejects any
+ * `limit > 100` with a 422, but callers (e.g. the dashboard screen, which
+ * requests `limit=200`) may legitimately want more — so we loop in pages of
+ * 100 until we have filled the requested window or exhausted `total`.
+ */
+export async function listSessionsPaged(
+  limit = 50,
+  offset = 0,
+): Promise<{ sessions: Array<ClaudeSession>; total: number }> {
   if (getCapabilities().dashboard.available) {
-    const resp = await listDashboardSessions(limit, offset)
-    return resp.sessions as Array<ClaudeSession>
+    const PAGE = 100
+    const wanted = Math.max(1, limit)
+    const collected: Array<ClaudeSession> = []
+    let total = 0
+    let cursor = offset
+
+    // First page tells us the total and how many we still need.
+    const first = await listDashboardSessions(Math.min(wanted, PAGE), cursor)
+    total = first.total ?? first.sessions.length
+    collected.push(...(first.sessions as Array<ClaudeSession>))
+
+    // Keep fetching until we've filled `wanted` or run out of sessions.
+    while (collected.length < wanted) {
+      const next = await listDashboardSessions(
+        Math.min(PAGE, wanted - collected.length),
+        cursor + collected.length,
+      )
+      const batch = next.sessions as Array<ClaudeSession>
+      if (batch.length === 0) break
+      collected.push(...batch)
+      if (collected.length >= total) break
+    }
+
+    return { sessions: collected, total }
   }
+
   const resp = await claudeGet<{
     items?: Array<ClaudeSession>
     data?: Array<ClaudeSession>
@@ -141,7 +179,8 @@ export async function listSessions(
   // The gateway (OpenAI-compat) returns { object: 'list', data: [...] }, while the
   // dashboard / older gateway shape uses { items: [...] }. Accept either, and never
   // return undefined (callers .map over this).
-  return resp.items ?? resp.data ?? []
+  const sessions = resp.items ?? resp.data ?? []
+  return { sessions, total: resp.total ?? sessions.length }
 }
 
 export async function getSession(sessionId: string): Promise<ClaudeSession> {
@@ -328,6 +367,7 @@ export function toSessionSummary(
     friendlyId: session.id,
     kind: 'chat',
     status: session.ended_at ? 'ended' : 'idle',
+    source: session.source ?? null,
     model: session.model || '',
     label: session.title || undefined,
     title: session.title || undefined,

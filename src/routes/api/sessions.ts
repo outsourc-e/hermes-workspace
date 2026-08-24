@@ -9,7 +9,7 @@ import {
   deleteSession,
   ensureGatewayProbed,
   getGatewayCapabilities,
-  listSessions,
+  listSessionsPaged,
   toSessionSummary,
   updateSession,
 } from '../../server/claude-api'
@@ -39,8 +39,21 @@ export const Route = createFileRoute('/api/sessions')({
           })
         }
 
+        // Honour pagination query params (the dashboard screen requests
+        // `?limit=200&offset=0`; the chat sidebar requests fewer). Parse
+        // defensively — invalid/negative values fall back to sensible
+        // defaults rather than erroring the whole list.
+        const url = new URL(request.url)
+        const rawLimit = Number.parseInt(url.searchParams.get('limit') ?? '', 10)
+        const rawOffset = Number.parseInt(
+          url.searchParams.get('offset') ?? '',
+          10,
+        )
+        const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 200
+        const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0
+
         try {
-          const sessions = await listSessions(50, 0)
+          const { sessions, total } = await listSessionsPaged(limit, offset)
           const gatewaySessions = sessions.map(toSessionSummary)
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
@@ -64,7 +77,7 @@ export const Route = createFileRoute('/api/sessions')({
             }
           }
 
-          return json({ sessions: gatewaySessions })
+          return json({ sessions: gatewaySessions, total })
         } catch (err) {
           return json(
             {
