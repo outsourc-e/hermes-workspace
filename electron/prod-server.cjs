@@ -1,5 +1,6 @@
 const http = require('http')
 const fs = require('fs')
+const os = require('os')
 const path = require('path')
 
 const portArg = process.argv.find(
@@ -43,6 +44,32 @@ async function loadServerBuild() {
   return serverModule.default
 }
 
+/**
+ * GUI apps launched from Finder/Dock (macOS) don't inherit shell environment
+ * variables, so HERMES_API_TOKEN is unset even when the gateway requires it.
+ * Fall back to the API_SERVER_KEY the gateway itself reads from
+ * $HERMES_HOME/.env (~/.hermes/.env by default), so the desktop app works
+ * without any shell configuration.
+ */
+function applyApiTokenFileFallback() {
+  if (process.env.HERMES_API_TOKEN) return
+  try {
+    const hermesHome =
+      process.env.HERMES_HOME || path.join(os.homedir(), '.hermes')
+    const envFile = path.join(hermesHome, '.env')
+    if (!fs.existsSync(envFile)) return
+    const match = fs
+      .readFileSync(envFile, 'utf-8')
+      .match(/^\s*API_SERVER_KEY\s*=\s*(.+)\s*$/m)
+    if (!match) return
+    const value = match[1].trim().replace(/^["']|["']$/g, '')
+    if (value) process.env.HERMES_API_TOKEN = value
+  } catch {
+    // Best-effort: fall through silently, requests will just go unauthenticated
+    // exactly as they do today when the variable is missing.
+  }
+}
+
 async function main() {
   process.env.NODE_ENV = process.env.NODE_ENV || 'production'
   process.env.HERMES_WORKSPACE_DESKTOP =
@@ -51,6 +78,9 @@ async function main() {
     process.env.HERMES_API_URL || 'http://127.0.0.1:8642'
   process.env.HERMES_DASHBOARD_URL =
     process.env.HERMES_DASHBOARD_URL || 'http://127.0.0.1:9119'
+  // Must run before loadServerBuild(): parts of the server bundle read
+  // HERMES_API_TOKEN at module load time (e.g. the gateway bearer token).
+  applyApiTokenFileFallback()
 
   const serverBuild = await loadServerBuild()
 
