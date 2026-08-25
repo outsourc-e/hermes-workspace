@@ -105,10 +105,40 @@ export type DashboardStatus = {
   [key: string]: unknown
 }
 
+/**
+ * Thrown when the dashboard rejects a request for auth reasons (401/403,
+ * e.g. `{"error":"unauthenticated","reason":"no_cookie"}` from a
+ * cookie-gated dashboard). Lets callers distinguish "auth-gated" from
+ * "broken" and fall back to the gateway instead of surfacing the 401.
+ */
+export class DashboardAuthError extends Error {
+  readonly status: number
+  readonly reason?: string
+
+  constructor(path: string, status: number, reason?: string) {
+    super(
+      `Hermes Agent dashboard ${path}: ${status}${reason ? ` (${reason})` : ''}`,
+    )
+    this.name = 'DashboardAuthError'
+    this.status = status
+    this.reason = reason
+  }
+}
+
 async function dashboardJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await dashboardFetch(path, init)
   if (!res.ok) {
     const text = await res.text().catch(() => '')
+    if (res.status === 401 || res.status === 403) {
+      let reason: string | undefined
+      try {
+        const body = JSON.parse(text) as { reason?: string; error?: string }
+        reason = body.reason || body.error
+      } catch {
+        // non-JSON auth error body — the status code alone is enough
+      }
+      throw new DashboardAuthError(path, res.status, reason)
+    }
     throw new Error(`Hermes Agent dashboard ${path}: ${res.status} ${text}`)
   }
   if (res.status === 204) return undefined as T

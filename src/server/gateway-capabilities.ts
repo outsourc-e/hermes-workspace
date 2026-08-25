@@ -203,7 +203,21 @@ export type EnhancedCapabilities = {
 
 export type DashboardCapabilities = {
   dashboard: {
+    /**
+     * The dashboard process is reachable (`/api/status` returned 200 + a
+     * version). Display/mode semantics only — reachability does NOT imply
+     * the auth-gated APIs will accept our requests.
+     */
     available: boolean
+    /**
+     * The dashboard's auth-gated APIs actually accepted our credentials,
+     * probed against `GET /api/sessions?limit=1` through dashboardFetch (the
+     * same token path runtime calls use). Reachable-but-unauthenticated is
+     * the NORMAL state for remote/Tailscale deployments where the dashboard
+     * sits behind interactive cookie login (401 no_cookie). Server-side
+     * routing must check this flag, not `available`.
+     */
+    authenticated: boolean
     url: string
   }
 }
@@ -247,6 +261,7 @@ let capabilities: GatewayCapabilities = {
   kanban: false,
   dashboard: {
     available: false,
+    authenticated: false,
     url: CLAUDE_DASHBOARD_URL,
   },
   probed: false,
@@ -257,9 +272,33 @@ let lastProbeAt = 0
 let lastLoggedSummary = ''
 let dashboardTokenPromise: Promise<string> | null = null
 let dashboardTokenCache = ''
+let dashboardCookie = ''
+let dashboardLoginPromise: Promise<string> | null = null
+// After a failed login, skip further attempts for this window so bad/rotated
+// credentials can't hammer the rate-limited /auth/password-login endpoint into
+// an account lockout. Cleared on the next success.
+let dashboardLoginCooldownUntil = 0
+const DASHBOARD_LOGIN_COOLDOWN_MS = 30_000
 
 /** Optional bearer token for authenticated gateway endpoints. */
 export const BEARER_TOKEN = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN || ''
+
+/**
+ * Dashboard login credentials for the built-in `basic` (username+password)
+ * auth provider. When set, the workspace authenticates to the dashboard the
+ * supported way — POST /auth/password-login → session cookie — instead of the
+ * removed inline-token scrape. Leave unset to preserve the legacy
+ * token/loopback behavior.
+ *
+ * These are the DASHBOARD's credentials, which are frequently DIFFERENT from
+ * the workspace's own login password. We deliberately do NOT fall back to
+ * HERMES_PASSWORD: that is commonly the workspace's separate password, and
+ * sending it to the dashboard would fail auth (and burn rate-limit budget).
+ * Set HERMES_DASHBOARD_PASSWORD explicitly to enable dashboard cookie auth.
+ */
+const DASHBOARD_USERNAME =
+  process.env.HERMES_DASHBOARD_USERNAME || process.env.HERMES_USERNAME || ''
+const DASHBOARD_PASSWORD = process.env.HERMES_DASHBOARD_PASSWORD || ''
 
 /**
  * Dashboard API auth uses the ephemeral session token injected into the
@@ -338,6 +377,91 @@ export async function dashboardAuthHeaders(options?: {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+/** True when username+password dashboard login is configured. */
+export function dashboardPasswordAuthConfigured(): boolean {
+  return !!DASHBOARD_PASSWORD
+}
+
+/**
+ * Collect the `name=value` pairs from a login response's Set-Cookie header(s)
+ * into a single Cookie header string. Uses undici's getSetCookie() when
+ * available (multiple cookies), falling back to the combined header.
+ */
+function collectCookies(res: Response): string {
+  const h = res.headers as unknown as { getSetCookie?: () => Array<string> }
+  const raw =
+    typeof h.getSetCookie === 'function'
+      ? h.getSetCookie()
+      : res.headers.get('set-cookie')
+        ? [res.headers.get('set-cookie') as string]
+        : []
+  return raw
+    .map((c) => c.split(';')[0]?.trim())
+    .filter((c): c is string => !!c && c.includes('='))
+    .join('; ')
+}
+
+/**
+ * Authenticate to the dashboard via the built-in `basic` provider and cache
+ * the resulting session cookie. This is the supported replacement for the
+ * removed inline session-token scrape: the dashboard's own login form POSTs
+ * exactly this shape to /auth/password-login. Returns '' (degrading callers to
+ * unauthenticated → gateway fallback) when no password is configured or login
+ * fails, and never throws.
+ */
+export async function dashboardLogin(force = false): Promise<string> {
+  if (!DASHBOARD_PASSWORD) return ''
+  if (!force && dashboardCookie) return dashboardCookie
+  // Respect the failure cooldown even under `force`: a rejected login must not
+  // be retried on every request, or a wrong/rotated password would lock us out.
+  if (Date.now() < dashboardLoginCooldownUntil) return ''
+  if (dashboardLoginPromise) return dashboardLoginPromise
+
+  dashboardLoginPromise = (async () => {
+    try {
+      const res = await fetch(`${CLAUDE_DASHBOARD_URL}/auth/password-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'basic',
+          username: DASHBOARD_USERNAME,
+          password: DASHBOARD_PASSWORD,
+          next: '',
+        }),
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        dashboardLoginCooldownUntil = Date.now() + DASHBOARD_LOGIN_COOLDOWN_MS
+        console.warn(
+          `[gateway] Dashboard password-login failed (${res.status}) — dashboard APIs treated as unauthenticated (backing off ${DASHBOARD_LOGIN_COOLDOWN_MS / 1000}s)`,
+        )
+        dashboardCookie = ''
+        return ''
+      }
+      dashboardLoginCooldownUntil = 0
+      dashboardCookie = collectCookies(res)
+      if (!dashboardCookie) {
+        console.warn(
+          '[gateway] Dashboard login succeeded but returned no session cookie',
+        )
+      }
+      return dashboardCookie
+    } catch (err) {
+      dashboardLoginCooldownUntil = Date.now() + DASHBOARD_LOGIN_COOLDOWN_MS
+      console.warn(
+        `[gateway] Dashboard login error: ${err instanceof Error ? err.message : err}`,
+      )
+      return ''
+    }
+  })()
+
+  try {
+    return await dashboardLoginPromise
+  } finally {
+    dashboardLoginPromise = null
+  }
+}
+
 function withDashboardBase(path: string): string {
   if (/^https?:\/\//i.test(path)) return path
   return `${CLAUDE_DASHBOARD_URL}${path.startsWith('/') ? path : `/${path}`}`
@@ -349,7 +473,8 @@ export async function dashboardFetch(
 ): Promise<Response> {
   const requestPath = withDashboardBase(path)
   const method = (init.method || 'GET').toUpperCase()
-  const doFetch = async (forceToken = false) => {
+  const useCookieAuth = dashboardPasswordAuthConfigured()
+  const doFetch = async (forceReauth = false) => {
     const headers = new Headers(init.headers)
     const isProtected =
       requestPath.includes('/api/') &&
@@ -361,10 +486,20 @@ export async function dashboardFetch(
       !requestPath.endsWith('/api/dashboard/plugins') &&
       !requestPath.endsWith('/api/dashboard/plugins/rescan')
 
-    if (isProtected && !headers.has('Authorization')) {
-      const auth = await dashboardAuthHeaders({ force: forceToken })
-      for (const [key, value] of Object.entries(auth)) {
-        headers.set(key, value)
+    if (isProtected) {
+      if (useCookieAuth) {
+        // Preferred: authenticate with the dashboard's `basic` provider and
+        // reuse the session cookie (the supported path; inline tokens are gone).
+        if (!headers.has('Cookie')) {
+          const cookie = await dashboardLogin(forceReauth)
+          if (cookie) headers.set('Cookie', cookie)
+        }
+      } else if (!headers.has('Authorization')) {
+        // Legacy: loopback/unauthenticated dashboards or bearer-token setups.
+        const auth = await dashboardAuthHeaders({ force: forceReauth })
+        for (const [key, value] of Object.entries(auth)) {
+          headers.set(key, value)
+        }
       }
     }
 
@@ -377,7 +512,9 @@ export async function dashboardFetch(
 
   let res = await doFetch(false)
   if (res.status === 401) {
-    dashboardTokenCache = ''
+    // Cookie/token expired or auth gate newly engaged — reauthenticate once.
+    if (useCookieAuth) dashboardCookie = ''
+    else dashboardTokenCache = ''
     res = await doFetch(true)
   }
   return res
@@ -591,19 +728,61 @@ async function probeMcpConfigKey(): Promise<boolean> {
   }
 }
 
-async function probeDashboard(): Promise<{ available: boolean; url: string }> {
+async function probeDashboard(): Promise<{
+  available: boolean
+  authenticated: boolean
+  url: string
+}> {
+  const unavailable = {
+    available: false,
+    authenticated: false,
+    url: CLAUDE_DASHBOARD_URL,
+  }
   try {
     const res = await fetch(`${CLAUDE_DASHBOARD_URL}/api/status`, {
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
-    if (!res.ok) return { available: false, url: CLAUDE_DASHBOARD_URL }
+    if (!res.ok) return unavailable
     const body = (await res.json()) as { version?: string }
-    if (!body.version) return { available: false, url: CLAUDE_DASHBOARD_URL }
+    if (!body.version) return unavailable
     await fetchDashboardToken().catch(() => '')
-    return { available: true, url: CLAUDE_DASHBOARD_URL }
+    // /api/status is public: it proves reachability, not usability. Probe a
+    // real auth-gated endpoint through dashboardFetch (the same token path
+    // runtime calls use) so cookie-gated dashboards — the normal state on
+    // remote/Tailscale deployments — are classified as
+    // reachable-but-unauthenticated instead of 401ing (no_cookie) at click
+    // time in the Sessions tab.
+    let authenticated = false
+    try {
+      const authRes = await dashboardFetch('/api/sessions?limit=1&offset=0', {
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      authenticated = authRes.ok
+    } catch {
+      authenticated = false
+    }
+    return { available: true, authenticated, url: CLAUDE_DASHBOARD_URL }
   } catch {
-    return { available: false, url: CLAUDE_DASHBOARD_URL }
+    return unavailable
   }
+}
+
+/**
+ * Degrade the dashboard to reachable-but-unauthenticated at runtime, e.g.
+ * when a dashboard call 401s after a successful probe (ephemeral token
+ * expired, or the auth gate was enabled without a workspace restart).
+ * Routing helpers consult `dashboard.authenticated` on every call, so the
+ * effect is immediate; the flag is recomputed by the next full probe.
+ */
+export function markDashboardUnauthenticated(): void {
+  if (!capabilities.dashboard.authenticated) return
+  capabilities = {
+    ...capabilities,
+    dashboard: { ...capabilities.dashboard, authenticated: false },
+  }
+  console.warn(
+    '[gateway] dashboard APIs rejected credentials (401) — routing dashboard-backed calls to the gateway until the next probe',
+  )
 }
 
 /**
@@ -864,7 +1043,7 @@ export async function probeGateway(options?: {
     // Phase 1.5 fallback: when native /api/mcp is missing but the dashboard
     // exposes `config.mcp_servers` AND we are loopback-only, allow a config
     // -backed CRUD path. Test/Discover/Logs remain disabled in this mode.
-    const dashboardConfigAvailable = dashboard.available || legacyConfig
+    const dashboardConfigAvailable = dashboard.authenticated || legacyConfig
     const mcpFallback =
       !mcp &&
       dashboard.available &&
@@ -878,15 +1057,19 @@ export async function probeGateway(options?: {
       models,
       streaming: chatCompletions,
       probed: true,
-      sessions: dashboard.available || legacySessions,
+      // Dashboard-backed composites require *authenticated*, not merely
+      // reachable: every dashboard call goes through the cookie/token gate,
+      // so a reachable-but-gated dashboard cannot back these APIs. The
+      // legacy gateway probes keep them available on gateway-only setups.
+      sessions: dashboard.authenticated || legacySessions,
       enhancedChat,
-      skills: dashboard.available || legacySkills,
+      skills: dashboard.authenticated || legacySkills,
       // Memory is always available: workspace reads $HERMES_HOME/MEMORY.md +
       // memory/*.md + memories/*.md directly from the local filesystem.
       // No remote gateway endpoint is required.
       memory: true,
-      config: dashboard.available || legacyConfig,
-      jobs: dashboard.available || legacyJobs,
+      config: dashboard.authenticated || legacyConfig,
+      jobs: dashboard.authenticated || legacyJobs,
       mcp,
       mcpFallback,
       conductor,

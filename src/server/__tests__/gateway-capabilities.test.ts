@@ -83,6 +83,7 @@ describe('gateway-capabilities', () => {
             kanban: false,
             dashboard: {
               available: false,
+              authenticated: false,
               url: 'http://127.0.0.1:9119',
             },
           },
@@ -113,6 +114,7 @@ describe('gateway-capabilities', () => {
             kanban: false,
             dashboard: {
               available: false,
+              authenticated: false,
               url: 'http://127.0.0.1:9119',
             },
           },
@@ -318,6 +320,209 @@ describe('gateway-capabilities', () => {
     const caps = await mod.probeGateway({ force: true })
 
     expect(caps.conductor).toBe(true)
+  })
+
+  describe('dashboard reachable vs authenticated split', () => {
+    const routeFetch = (sessionsStatus: number) =>
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url === 'http://dashboard.test/api/status') {
+          return new Response(JSON.stringify({ version: '0.12.0' }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://dashboard.test/') {
+          // Cookie-gated dashboards serve the login shell — no inline token.
+          return new Response('<html><body>login</body></html>', {
+            headers: { 'content-type': 'text/html' },
+          })
+        }
+        if (url.startsWith('http://dashboard.test/api/sessions')) {
+          return new Response(
+            JSON.stringify(
+              sessionsStatus === 200
+                ? { sessions: [], total: 0 }
+                : {
+                    error: 'unauthenticated',
+                    detail: 'Unauthorized',
+                    reason: 'no_cookie',
+                    login_url: '/login',
+                  },
+            ),
+            {
+              status: sessionsStatus,
+              headers: { 'content-type': 'application/json' },
+            },
+          )
+        }
+        if (url === 'http://gateway.test/v1/chat/completions')
+          return new Response('', { status: 405 })
+        if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream')
+          return new Response('', { status: 404 })
+        if (url.endsWith('/api/mcp')) return new Response('', { status: 404 })
+        if (url === 'http://dashboard.test/api/conductor/missions')
+          return new Response('', { status: 404 })
+        if (url === 'http://dashboard.test/api/plugins/kanban/board')
+          return new Response('', { status: 404 })
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+
+    it('classifies a cookie-gated dashboard as reachable but NOT authenticated, keeping sessions via the gateway', async () => {
+      process.env.HERMES_API_URL = 'http://gateway.test'
+      process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+      vi.stubGlobal('fetch', routeFetch(401))
+
+      const mod = await loadMod()
+      const caps = await mod.probeGateway({ force: true })
+
+      expect(caps.dashboard.available).toBe(true)
+      expect(caps.dashboard.authenticated).toBe(false)
+      // Gateway /api/sessions probe (generic 200 fallback) keeps the composite
+      // capability alive without the dashboard.
+      expect(caps.sessions).toBe(true)
+    })
+
+    it('marks the dashboard authenticated when the sessions probe succeeds', async () => {
+      process.env.HERMES_API_URL = 'http://gateway.test'
+      process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+      vi.stubGlobal('fetch', routeFetch(200))
+
+      const mod = await loadMod()
+      const caps = await mod.probeGateway({ force: true })
+
+      expect(caps.dashboard.available).toBe(true)
+      expect(caps.dashboard.authenticated).toBe(true)
+    })
+
+    it('markDashboardUnauthenticated degrades a previously authenticated dashboard', async () => {
+      process.env.HERMES_API_URL = 'http://gateway.test'
+      process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+      vi.stubGlobal('fetch', routeFetch(200))
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const mod = await loadMod()
+      await mod.probeGateway({ force: true })
+      expect(mod.getCapabilities().dashboard.authenticated).toBe(true)
+
+      mod.markDashboardUnauthenticated()
+      expect(mod.getCapabilities().dashboard.authenticated).toBe(false)
+      expect(mod.getCapabilities().dashboard.available).toBe(true)
+      warnSpy.mockRestore()
+    })
+  })
+
+  describe('dashboard password-login (Option d)', () => {
+    afterEach(() => {
+      delete process.env.HERMES_USERNAME
+      delete process.env.HERMES_PASSWORD
+      delete process.env.HERMES_DASHBOARD_USERNAME
+      delete process.env.HERMES_DASHBOARD_PASSWORD
+    })
+
+    const routeFetch = (opts: { loginStatus: number }) => {
+      const calls = { login: 0 }
+      const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url === 'http://dashboard.test/api/status') {
+          return new Response(JSON.stringify({ version: '0.18.0' }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://dashboard.test/') {
+          return new Response('<html>login form</html>', {
+            headers: { 'content-type': 'text/html' },
+          })
+        }
+        if (url === 'http://dashboard.test/auth/password-login') {
+          calls.login++
+          if (opts.loginStatus !== 200) {
+            return new Response(JSON.stringify({ error: 'invalid' }), {
+              status: opts.loginStatus,
+              headers: { 'content-type': 'application/json' },
+            })
+          }
+          return new Response(JSON.stringify({ next: '/' }), {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+              'set-cookie': 'hermes_session_at=tok123; Path=/; HttpOnly',
+            },
+          })
+        }
+        if (url.startsWith('http://dashboard.test/api/sessions')) {
+          const cookie = new Headers(init?.headers).get('cookie') || ''
+          return cookie.includes('hermes_session_at')
+            ? new Response(JSON.stringify({ sessions: [], total: 0 }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              })
+            : new Response(
+                JSON.stringify({ error: 'unauthenticated', reason: 'no_cookie' }),
+                { status: 401, headers: { 'content-type': 'application/json' } },
+              )
+        }
+        if (url === 'http://gateway.test/v1/chat/completions')
+          return new Response('', { status: 405 })
+        if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream')
+          return new Response('', { status: 404 })
+        if (url.endsWith('/api/mcp')) return new Response('', { status: 404 })
+        if (url === 'http://dashboard.test/api/conductor/missions')
+          return new Response('', { status: 404 })
+        if (url === 'http://dashboard.test/api/plugins/kanban/board')
+          return new Response('', { status: 404 })
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+      return { fn, calls }
+    }
+
+    it('logs into the basic provider, reuses the cookie, and reports authenticated', async () => {
+      process.env.HERMES_API_URL = 'http://gateway.test'
+      process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+      process.env.HERMES_DASHBOARD_USERNAME = 'admin'
+      process.env.HERMES_DASHBOARD_PASSWORD = 'pw-123456789012345678'
+      const { fn, calls } = routeFetch({ loginStatus: 200 })
+      vi.stubGlobal('fetch', fn)
+
+      const mod = await loadMod()
+      const caps = await mod.probeGateway({ force: true })
+
+      expect(caps.dashboard.available).toBe(true)
+      expect(caps.dashboard.authenticated).toBe(true)
+      expect(calls.login).toBeGreaterThanOrEqual(1)
+      // POST body carries the documented contract
+      const loginCall = fn.mock.calls.find(
+        ([u]) => String(u) === 'http://dashboard.test/auth/password-login',
+      )
+      const body = JSON.parse(String((loginCall?.[1] as RequestInit)?.body))
+      expect(body).toMatchObject({ provider: 'basic', username: 'admin' })
+    })
+
+    it('degrades to unauthenticated when login is rejected', async () => {
+      process.env.HERMES_API_URL = 'http://gateway.test'
+      process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+      process.env.HERMES_DASHBOARD_PASSWORD = 'wrong-pw-000000000000'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { fn } = routeFetch({ loginStatus: 401 })
+      vi.stubGlobal('fetch', fn)
+
+      const mod = await loadMod()
+      const caps = await mod.probeGateway({ force: true })
+
+      expect(caps.dashboard.available).toBe(true)
+      expect(caps.dashboard.authenticated).toBe(false)
+      warn.mockRestore()
+    })
+
+    it('dashboardLogin returns empty when no password is configured', async () => {
+      process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+      vi.stubGlobal('fetch', vi.fn())
+      const mod = await loadMod()
+      await expect(mod.dashboardLogin()).resolves.toBe('')
+    })
   })
 
   describe('isLocalhostDeployment', () => {
