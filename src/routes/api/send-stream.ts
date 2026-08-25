@@ -1005,15 +1005,22 @@ export const Route = createFileRoute('/api/send-stream')({
                 }
               })()
 
+              // The Hermes session-stream endpoint consumes multimodal content
+              // from `message`, not its legacy `attachments` side channel.
+              // Send the normalized data URLs as image_url parts so browser
+              // uploads arrive at the agent as actual image bytes.
+              const gatewayMessage = buildMultimodalContent(
+                scopedMessage,
+                attachments,
+              )
               try {
                 await streamChat(
                 sessionKey,
                 {
-                  message: scopedMessage,
+                  message: gatewayMessage,
                   model:
                     typeof body.model === 'string' ? body.model : undefined,
                   system_message: thinking,
-                  attachments: attachments || undefined,
                 },
                 {
                   signal: abortController.signal,

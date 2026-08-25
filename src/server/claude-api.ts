@@ -374,7 +374,10 @@ type StreamChatOptions = {
 export async function streamChat(
   sessionId: string,
   body: {
-    message: string
+    // The session-stream endpoint accepts the same text-or-multimodal shape as
+    // /v1/chat/completions. Browser Workspace must send image bytes here,
+    // because its separate `attachments` field is not interpreted by Hermes.
+    message: string | Array<Record<string, unknown>>
     model?: string
     system_message?: string
     attachments?: Array<Record<string, unknown>>
