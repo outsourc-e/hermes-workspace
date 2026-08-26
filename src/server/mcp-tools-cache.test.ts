@@ -12,6 +12,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { getStateDir } from './workspace-state-dir'
+
 // We re-import the module fresh for each test using dynamic import + cache busting,
 // but since Vitest caches modules, we use the exported reset helper instead.
 
@@ -76,7 +78,7 @@ describe('write → read roundtrip', () => {
 describe('corrupt file → empty cache', () => {
   it('ignores corrupt JSON and starts with empty cache', async () => {
     // Write corrupt file before module load
-    const cacheDir = join(tmpDir, 'cache')
+    const cacheDir = join(getStateDir(), 'cache')
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(join(cacheDir, 'mcp-tools.json'), '{ not valid json !!!', 'utf8')
 
@@ -94,7 +96,7 @@ describe('corrupt file → empty cache', () => {
   })
 
   it('ignores wrong schema (version != 1)', async () => {
-    const cacheDir = join(tmpDir, 'cache')
+    const cacheDir = join(getStateDir(), 'cache')
     mkdirSync(cacheDir, { recursive: true })
     writeFileSync(
       join(cacheDir, 'mcp-tools.json'),
@@ -164,7 +166,9 @@ describe('HERMES_HOME override for path resolution', () => {
     vi.resetModules()
 
     const mod = await loadCache()
-    expect(mod.cacheFilePath()).toBe(join(customHome, 'cache', 'mcp-tools.json'))
+    // cacheFilePath() resolves via getStateDir() → $HERMES_HOME/workspace/cache
+    expect(mod.cacheFilePath()).toBe(join(getStateDir(), 'cache', 'mcp-tools.json'))
+    expect(mod.cacheFilePath().startsWith(customHome)).toBe(true)
 
     mod.setProbe('server-x', {
       status: 'failed',
