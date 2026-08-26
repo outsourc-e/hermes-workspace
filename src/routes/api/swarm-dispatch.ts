@@ -12,6 +12,7 @@ import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/
 import { rosterByWorkerId, type SwarmRosterWorker } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import { resolveTmuxBin as sharedResolveTmuxBin } from '../../server/swarm-tmux'
 
 const HERMES_BIN_CANDIDATES = [
   process.env.HERMES_CLI_BIN,
@@ -77,6 +78,10 @@ type RuntimeCheckpointSnapshot = {
   lastCheckIn: string | null
   lastOutputAt: number | null
   checkpointRaw: string | null
+  /** Task identity tag: the assignment this runtime checkpoint belongs to. */
+  assignmentId: string | null
+  /** The last control message the workspace wrote at dispatch time. */
+  lastControlMessage: string | null
 }
 
 const MAX_PROMPT_CHARS = 32_000
@@ -110,41 +115,12 @@ function validateWorkerId(workerId: string): boolean {
   return /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(workerId)
 }
 
-const TMUX_BIN_CANDIDATES = [
-  process.env.TMUX_BIN,
-  '/opt/homebrew/bin/tmux',
-  '/usr/local/bin/tmux',
-  '/usr/bin/tmux',
-  join(homedir(), '.local', 'bin', 'tmux'),
-  'tmux',
-].filter((value): value is string => Boolean(value))
-
 function resolveTmuxBin(): string | null {
-  // Allow operators on non-standard installs (Docker, NixOS, custom
-  // package layouts) to point Swarm at the right tmux binary without
-  // patching this list. See #244.
-  const override = process.env.HERMES_TMUX_BIN || process.env.CLAUDE_TMUX_BIN
-  if (override) {
-    if (existsSync(override)) return override
-    // If the override looks like a bare command (no slashes), trust it
-    // and let execFile resolve it via PATH.
-    if (!override.includes('/')) return override
-  }
-  for (const candidate of TMUX_BIN_CANDIDATES) {
-    if (candidate.includes('/')) {
-      if (
-        candidate === process.env.TMUX_BIN ||
-        candidate === '/opt/homebrew/bin/tmux' ||
-        candidate === '/usr/local/bin/tmux' ||
-        existsSync(candidate)
-      ) {
-        return candidate
-      }
-      continue
-    }
-    return candidate
-  }
-  return null
+  // Single shared resolver (see swarm-tmux.ts): both the runtime probe and
+  // this dispatch path must agree on the same tmux binary. Honors
+  // HERMES_TMUX_BIN / CLAUDE_TMUX_BIN / TMUX_BIN, checks absolute candidates
+  // with existsSync (never returns a non-existent path), falls back to PATH.
+  return sharedResolveTmuxBin()
 }
 
 function tmuxHasSession(tmuxBin: string, name: string): Promise<boolean> {
@@ -284,8 +260,10 @@ export function readRuntimeCheckpointSnapshot(profilePath: string): RuntimeCheck
     blockedReason: cleanRuntimeText(raw.blockedReason),
     lastCheckIn: cleanRuntimeText(raw.lastCheckIn),
     lastOutputAt: cleanRuntimeNumber(raw.lastOutputAt),
-    checkpointRaw: cleanRuntimeText(raw.checkpointRaw),
-  }
+  checkpointRaw: cleanRuntimeText(raw.checkpointRaw),
+  assignmentId: cleanRuntimeText(raw.currentAssignmentId) ?? cleanRuntimeText(raw.assignmentId),
+  lastControlMessage: cleanRuntimeText(raw.lastControlMessage),
+}
 }
 
 export function runtimeCheckpointSignature(snapshot: RuntimeCheckpointSnapshot): string {
@@ -357,6 +335,14 @@ export function checkpointFromRuntimeSnapshot(snapshot: RuntimeCheckpointSnapsho
   if (snapshot.checkpointRaw) {
     const parsed = newestCheckpointFromMessages([{ role: 'assistant', content: snapshot.checkpointRaw }])
     if (parsed) return parsed
+  }
+  // Reject a synthetic checkpoint built from the workspace's own dispatch
+  // control text. `markDispatchStarted` sets `lastSummary` to the "Dispatched
+  // task: ..." control message; without this guard a freshly-dispatched worker
+  // would make the poll return instantly with a fake IN_PROGRESS checkpoint
+  // synthesized from that control text (two-directional identity bug, fix b).
+  if (snapshot.lastControlMessage && snapshot.lastSummary === snapshot.lastControlMessage) {
+    return null
   }
   const stateLabel = stateLabelForRuntimeSnapshot(snapshot)
   if (!stateLabel || !runtimeSnapshotHasMeaningfulCheckpoint(snapshot)) return null
@@ -511,18 +497,25 @@ export function dispatchBlockReason(result: Pick<WorkerResult, 'ok' | 'error' | 
 function recordDispatchBlock(workerId: string, assignment: AssignmentRequest, result: WorkerResult, options?: { missionId?: string | null }): void {
   const reason = dispatchBlockReason(result)
   if (!reason) return
-  recordMissionAssignmentBlocked({
-    missionId: options?.missionId,
-    assignmentId: assignment.assignmentId ?? null,
-    workerId,
-    reason,
-    source: 'swarm-dispatch',
-  })
+  const isPollTimeout = result.checkpointStatus === 'timeout'
+  // A checkpoint-poll timeout does NOT mean the worker failed or blocked — it
+  // means the workspace stopped listening before a checkpoint landed. Mark the
+  // dispatch as timed out (distinct from blocked) so the worker isn't shown
+  // as permanently stuck, and so a late checkpoint can still reconcile (fix d).
+  if (!isPollTimeout) {
+    recordMissionAssignmentBlocked({
+      missionId: options?.missionId,
+      assignmentId: assignment.assignmentId ?? null,
+      workerId,
+      reason,
+      source: 'swarm-dispatch',
+    })
+  }
   writeRuntimePatch(workerId, {
-    state: 'blocked',
-    phase: 'blocked',
-    checkpointStatus: 'blocked',
-    blockedReason: reason,
+    state: isPollTimeout ? 'executing' : 'blocked',
+    phase: isPollTimeout ? 'checkpoint-timeout' : 'blocked',
+    checkpointStatus: isPollTimeout ? 'in_progress' : 'blocked',
+    blockedReason: isPollTimeout ? null : reason,
     lastDispatchResult: reason,
     lastCheckIn: new Date().toISOString(),
     lastOutputAt: Date.now(),
@@ -564,14 +557,25 @@ async function waitForFreshCheckpoint(
   baselineRuntimeSignature: string,
   dispatchedAt: number,
   timeoutMs: number,
+  assignmentId?: string | null,
 ): Promise<ParsedSwarmCheckpoint | null> {
   const started = Date.now()
   const profilePath = getProfilePath(workerId)
   while (Date.now() - started < timeoutMs) {
     const runtimeSnapshot = readRuntimeCheckpointSnapshot(profilePath)
     if (runtimeSnapshotIsFresh(runtimeSnapshot, baselineRuntimeSignature, dispatchedAt)) {
-      const runtimeCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
-      if (runtimeCheckpoint && runtimeCheckpoint.raw !== previousRaw) return runtimeCheckpoint
+      // Task identity: a fresh checkpoint must belong to THIS assignment.
+      // When the snapshot carries a tagged assignment, require it to match —
+      // this rejects a busy worker's leftover checkpoint for the previous
+      // task (its `raw` equals `previousRaw`, but the tag makes it explicit).
+      if (
+        !assignmentId ||
+        runtimeSnapshot.assignmentId === null ||
+        runtimeSnapshot.assignmentId === assignmentId
+      ) {
+        const runtimeCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
+        if (runtimeCheckpoint && runtimeCheckpoint.raw !== previousRaw) return runtimeCheckpoint
+      }
     }
 
     const chat = readWorkerMessages(profilePath, 50)
@@ -582,6 +586,87 @@ async function waitForFreshCheckpoint(
     await sleep(2_000)
   }
   return null
+}
+
+/**
+ * Post-timeout late pickup (fix d, load-bearing half).
+ *
+ * A worker checkpoint for a long-running task usually lands AFTER the bounded
+ * dispatch poll gives up — the worker writes its reply (including the
+ * checkpoint block) into its own state.db chat log, not into a POST to
+ * /api/checkpoint. This watcher keeps watching that chat log in the
+ * background after the poll timeout and, when a fresh checkpoint tied to this
+ * assignment appears, reconciles the mission (recordMissionCheckpoint) and
+ * updates runtime.json (markCheckpointResult) so the mission advances to
+ * 'checkpointed' instead of staying stuck on the dispatch-time state.
+ *
+ * It is intentionally best-effort and fire-and-forget: bounded to 10 minutes
+ * so a never-finishing worker cannot leak an unbounded watcher, and any
+ * failure just leaves the mission in its (already-recorded) timeout state.
+ */
+async function watchForLateCheckpoint(input: {
+  workerId: string
+  assignmentId: string | null
+  missionId: string | null
+  previousRaw: string | null
+  baselineRuntimeSignature: string
+  dispatchedAt: number
+  notifySessionKey: string
+}): Promise<void> {
+  const { workerId, assignmentId, missionId, previousRaw, baselineRuntimeSignature, dispatchedAt, notifySessionKey } = input
+  const started = Date.now()
+  const profilePath = getProfilePath(workerId)
+  const LATE_WATCH_MS = 10 * 60 * 1000
+  const POLL_MS = 5_000
+
+  while (Date.now() - started < LATE_WATCH_MS) {
+    await sleep(POLL_MS)
+    try {
+      // Prefer the runtime snapshot (worker push or workspace write), then the
+      // worker's own chat log — mirroring waitForFreshCheckpoint's two sources.
+      const runtimeSnapshot = readRuntimeCheckpointSnapshot(profilePath)
+      if (runtimeSnapshotIsFresh(runtimeSnapshot, baselineRuntimeSignature, dispatchedAt)) {
+        if (!assignmentId || runtimeSnapshot.assignmentId === null || runtimeSnapshot.assignmentId === assignmentId) {
+          const runtimeCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
+          if (runtimeCheckpoint && runtimeCheckpoint.raw !== previousRaw) {
+            await reconcileLateCheckpoint(runtimeCheckpoint)
+            return
+          }
+        }
+      }
+
+      const chat = readWorkerMessages(profilePath, 50)
+      if (chat.ok) {
+        const checkpoint = newestCheckpointFromMessages(chat.messages)
+        if (checkpoint && checkpoint.raw !== previousRaw) {
+          await reconcileLateCheckpoint(checkpoint)
+          return
+        }
+      }
+    } catch {
+      // best-effort: transient DB/fs errors just continue the watch
+    }
+  }
+
+  async function reconcileLateCheckpoint(checkpoint: ParsedSwarmCheckpoint): Promise<void> {
+    if (missionId) {
+      recordMissionCheckpoint({
+        missionId,
+        assignmentId,
+        workerId,
+        checkpoint,
+        source: 'swarm-late-pickup',
+      })
+    }
+    markCheckpointResult(workerId, checkpoint, notifySessionKey)
+    publishSwarmCheckpointNotification({
+      workerId,
+      missionId,
+      assignmentId,
+      checkpoint,
+      notifySessionKey,
+    })
+  }
 }
 
 function resolveWorkerCwd(workerId: string): string {
@@ -845,6 +930,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           baselineRuntimeSignature,
           startedAt,
           options.checkpointPollMs ?? 90_000,
+          assignment.assignmentId ?? null,
         )
         if (checkpoint) {
           markCheckpointResult(workerId, checkpoint, options?.notifySessionKey ?? 'main')
@@ -897,6 +983,23 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
           liveResult.checkpoint = null
           liveResult.checkpointStatus = 'timeout'
           liveResult.output = `${liveResult.output}\nNo fresh checkpoint before poll timeout.`
+          // Post-timeout late pickup (fix d, load-bearing half): the worker's
+          // checkpoint lives in its own state.db chat log, NOT in a POST to
+          // /api/checkpoint. Long tasks reliably outlast the bounded poll
+          // window, so after the poll gives up we keep watching the worker's
+          // chat DB for a fresh checkpoint tied to this assignment and, when
+          // it lands, reconcile the mission in the background. This is what
+          // turns the deterministic timeout into "the mission advanced once
+          // the worker actually finished", instead of leaving it stuck.
+          void watchForLateCheckpoint({
+            workerId,
+            assignmentId: assignment.assignmentId ?? null,
+            missionId: options?.missionId ?? null,
+            previousRaw,
+            baselineRuntimeSignature,
+            dispatchedAt: startedAt,
+            notifySessionKey: options?.notifySessionKey ?? 'main',
+          })
         }
       } else {
         liveResult.checkpointStatus = 'not-requested'
