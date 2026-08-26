@@ -16,6 +16,16 @@ This workspace uses semantic Hermes swarm workers, not numbered-only lanes. The 
 | `maintainer` | `maintainer:check` | terminal, file, web, browser, gbrain, session_search, skills | maintainer-core, github-repo-management, github-pr-workflow, github-issues, github-code-review, gbrain, gstack-for-hermes, hermes-agent | gbrain | none |
 | `strategist` | `strategist:review` | gbrain, web, session_search, file, skills, todo, clarify | strategist-core, gstack-for-hermes, gbrain, writing-plans, polymarket | gbrain | none |
 | `inbox-triage` | `inbox:triage` | gbrain, web, file, session_search, todo, skills, terminal | inbox-triage-core, gbrain, obsidian-markdown, gstack-for-hermes, defuddle, youtube-content | gbrain | none |
+| `content-growth` | `content-growth:task` | terminal, file, web, browser, gbrain, session_search, skills, todo | content-marketer, content-strategy, growth-engine, onboarding-cro, referral-program, signup-flow-cro | gbrain | none |
+| `platform-reliability` | `platform-reliability:health` | terminal, file, web, gbrain, session_search, skills, todo | cloud-architect, kubernetes-architect, service-mesh-expert, observability-engineer, incident-responder, devops-deploy | gbrain | none |
+| `data-ml` | `data-ml:task` | terminal, file, web, gbrain, session_search, skills, todo | data-engineer, ml-engineer, mlops-engineer, analytics-tracking, llm-ops, evaluation | gbrain | none |
+| `security-governance` | `security-governance:gate` | terminal, file, web, gbrain, session_search, skills | security-auditor, security-compliance-compliance-check, privacy-by-design, threat-modeling-expert, zeroize-audit, protect-mcp-governance | gbrain | none |
+| `agentic-frontier` | `agentic-frontier:plan` | todo, kanban, delegation, terminal, file, gbrain, session_search, cronjob, skills, clarify, web | multi-agent-architect, autonomous-agent-patterns, autonomous-agents, agentflow, workflow-orchestration-patterns, evaluation | gbrain | none |
+| `multimodal-spatial` | `multimodal-spatial:build` | terminal, file, browser, vision, gbrain, session_search, skills, web | voice-agents, voice-ai-development, computer-vision-expert, audio-transcriber, threejs-skills, spline-3d-integration | gbrain | none |
+| `marketplace-economy` | `marketplace-economy:review` | terminal, file, web, gbrain, session_search, skills, todo | pricing-strategy, monetization, billing-automation, market-sizing-analysis, launch-strategy, trust-calibrator | gbrain | none |
+| `quality-performance` | `quality-performance:smoke` | browser, terminal, file, vision, gbrain, session_search, skills, web | e2e-testing, playwright-skill, performance-engineer, testing-patterns, accesslint-scan, accesslint-audit | gbrain | none |
+| `accessibility-localization` | `accessibility-localization:review` | browser, terminal, file, vision, gbrain, session_search, skills, web | accessibility-compliance-accessibility-audit, wcag-audit-patterns, i18n-localization, humanize-chinese, localization, accessibility-engineering | gbrain | none |
+| `federation-trust` | `federation-trust:gate` | terminal, file, web, gbrain, session_search, skills, cronjob | trust-calibrator, identity-mirror, protect-mcp-governance, webhook-subscriptions, agent-memory-systems, workflow-orchestration-patterns | gbrain | none |
 
 ## Operating rules
 
