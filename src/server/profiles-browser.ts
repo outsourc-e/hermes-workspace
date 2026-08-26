@@ -198,15 +198,6 @@ function getDashboardUrl(): string | undefined {
   return url || undefined
 }
 
-function getDashboardToken(): string | undefined {
-  return (
-    process.env.HERMES_API_TOKEN?.trim() ||
-    process.env.CLAUDE_API_TOKEN?.trim() ||
-    process.env.CLAUDE_DASHBOARD_TOKEN?.trim() ||
-    undefined
-  )
-}
-
 async function fetchDashboardProfiles(): Promise<{
   profiles: Array<ProfileSummary>
   activeProfile: string
@@ -215,12 +206,13 @@ async function fetchDashboardProfiles(): Promise<{
   if (!dashboardUrl) return null
 
   try {
-    const token = getDashboardToken()
-    const headers: Record<string, string> = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
-    const response = await fetch(`${dashboardUrl}/api/profiles`, {
-      headers,
+    // The dashboard's /api/profiles route only accepts its ephemeral
+    // per-boot session token (scraped from its root HTML), not a static
+    // bearer token — dashboardFetch() already implements that scrape/retry
+    // dance (see gateway-capabilities.ts) and is the same helper the
+    // skills/toggle-skill dashboard proxies use.
+    const { dashboardFetch } = await import('./gateway-capabilities')
+    const response = await dashboardFetch('/api/profiles', {
       signal: AbortSignal.timeout(5000),
     })
     if (!response.ok) return null
@@ -314,12 +306,8 @@ export async function readProfileWithFallback(
   const dashboardUrl = getDashboardUrl()
   if (dashboardUrl) {
     try {
-      const token = getDashboardToken()
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
-
-      const response = await fetch(`${dashboardUrl}/api/profiles`, {
-        headers,
+      const { dashboardFetch } = await import('./gateway-capabilities')
+      const response = await dashboardFetch('/api/profiles', {
         signal: AbortSignal.timeout(5000),
       })
       if (response.ok) {
