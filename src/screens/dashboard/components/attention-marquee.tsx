@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type {
   DashboardIncident,
@@ -19,6 +20,22 @@ const SEVERITY_COLOR: Record<DashboardIncident['severity'], string> = {
 }
 
 /**
+ * Pixels-per-second at which the marquee starts (content scrolls ~60 px/s).
+ * As time-on-page grows the effective speed drops (see `speedMultiplier`).
+ */
+const BASE_PX_PER_S = 60
+
+/**
+ * After this many ms on-page the marquee is at minimum speed.
+ */
+const DECAY_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
+
+/**
+ * Minimum speed multiplier (1 = full speed, 0.25 = quarter speed).
+ */
+const MIN_SPEED = 0.25
+
+/**
  * Right-to-left marquee that surfaces the same `incidents[]` payload
  * the legacy `AttentionCard` used to render. Lives inside `OpsStrip`
  * so attention items occupy the same horizontal "10-second status
@@ -27,6 +44,10 @@ const SEVERITY_COLOR: Record<DashboardIncident['severity'], string> = {
  * Behavior:
  * - Hidden when there are no incidents (no empty marquee row).
  * - Clones the list once so the loop animation stitches seamlessly.
+ * - Speed is computed from the measured content width so items are
+ *   always readable regardless of count/length.
+ * - Gradually decelerates over the first few minutes on-page so the
+ *   operator's eye can settle on items after the initial scan.
  * - Pauses on hover so the operator can read a long item.
  * - Each item is a button that routes to the most context-appropriate
  *   page (cron → /jobs, config → /settings, log/gateway → /logs).
@@ -41,6 +62,52 @@ export function AttentionMarquee({
   if (items.length === 0) return null
 
   const tracks = [...items, ...items]
+
+  return (
+    <_AttentionMarqueeInner tracks={tracks} items={items} navigate={navigate} />
+  )
+}
+
+/* ---------- inner component with hooks ---------- */
+
+function _AttentionMarqueeInner({
+  tracks,
+  items,
+  navigate,
+}: {
+  tracks: Array<DashboardIncident>
+  items: Array<DashboardIncident>
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [duration, setDuration] = useState(32) // sensible default until measured
+  const [elapsed, setElapsed] = useState(0)
+
+  // Measure the track's full (single-set) width and compute a fitting duration.
+  useEffect(() => {
+    const el = trackRef.current
+    if (!el) return
+
+    const half = el.scrollWidth / 2 // single-set width (content is doubled)
+    if (half <= 0) return
+
+    const secs = Math.max(12, half / BASE_PX_PER_S) // floor at 12 s
+    setDuration(secs)
+  }, [tracks])
+
+  // Tick every second to track time-on-page for deceleration.
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((e) => e + 1000), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Speed multiplier: 1 → MIN_SPEED over DECAY_WINDOW_MS.
+  const speedMultiplier =
+    elapsed >= DECAY_WINDOW_MS
+      ? MIN_SPEED
+      : MIN_SPEED + (1 - MIN_SPEED) * (1 - elapsed / DECAY_WINDOW_MS)
+
+  const effectiveDuration = duration / speedMultiplier
 
   return (
     <div
@@ -79,7 +146,11 @@ export function AttentionMarquee({
         style={{ maskImage: 'linear-gradient(90deg, black 96%, transparent)' }}
       >
         <div
+          ref={trackRef}
           className="oc-marquee-track flex shrink-0 items-center gap-6 pl-3 will-change-transform"
+          style={{
+            animationDuration: `${effectiveDuration}s`,
+          }}
         >
           {tracks.map((item, idx) => {
             const handleClick = () => {
@@ -108,7 +179,7 @@ export function AttentionMarquee({
                 style={{ color: SEVERITY_COLOR[item.severity] }}
               >
                 <span aria-hidden className="text-[12px]">
-                  {SOURCE_GLYPH[item.source] ?? '•'}
+                  {SOURCE_GLYPH[item.source]}
                 </span>
                 <span style={{ color: 'var(--theme-text)' }}>
                   {item.label}
@@ -130,7 +201,8 @@ export function AttentionMarquee({
           100% { transform: translateX(-50%); }
         }
         .oc-marquee-track {
-          animation: oc-attention-marquee 32s linear infinite;
+          animation: oc-attention-marquee linear infinite;
+          /* duration set via inline style */
         }
         @media (prefers-reduced-motion: reduce) {
           .oc-marquee-track { animation: none; }
