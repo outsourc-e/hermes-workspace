@@ -1,14 +1,56 @@
 import { useEffect, useState } from 'react'
+import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
+import { Button } from '@/components/ui/button'
 import {
   DialogContent,
+  DialogDescription,
   DialogRoot,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import type { ClaudeTask, CreateTaskInput, TaskColumn, TaskPriority, TaskAssignee } from '@/lib/tasks-api'
 import { COLUMN_LABELS, COLUMN_ORDER } from '@/lib/tasks-api'
+import { cn } from '@/lib/utils'
+
+export type DecisionQuickAction = 'approve' | 'deny' | 'hold' | 'other'
+
+const DECISION_ACTION_LABELS: Record<DecisionQuickAction, string> = {
+  approve: 'Approve',
+  deny: 'Deny',
+  hold: 'Hold',
+  other: 'Other',
+}
+
+const DECISION_ACTION_STYLES: Record<DecisionQuickAction, string> = {
+  approve: 'border-emerald-400/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20',
+  deny: 'border-red-400/50 bg-red-500/10 text-red-300 hover:bg-red-500/20',
+  hold: 'border-amber-400/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20',
+  other: 'border-sky-400/50 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20',
+}
+
+export function buildDecisionStageNote(
+  action: DecisionQuickAction,
+  detail = '',
+  now: Date = new Date(),
+): string {
+  const label = DECISION_ACTION_LABELS[action]
+  const trimmedDetail = detail.trim()
+  const safeContext = trimmedDetail ? ` Context: ${trimmedDetail}` : ''
+
+  return [
+    `[Decision staged ${now.toLocaleString()}] ${label}.`,
+    'Safe follow-through only: this records Petie/Friday intent for Kanban review and does not send customer-facing messages, approve tool calls, deploy, delete, bill, or otherwise mutate production by itself.',
+    safeContext,
+  ].join(' ').trim()
+}
+
+export function appendDecisionStageNote(
+  description: string,
+  action: DecisionQuickAction,
+  detail = '',
+  now: Date = new Date(),
+): string {
+  const note = buildDecisionStageNote(action, detail, now)
+  return description.trim() ? `${description.trim()}\n\n${note}` : note
+}
 
 type Props = {
   open: boolean
@@ -30,6 +72,8 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
   const [assignee, setAssignee] = useState<string>('')
   const [tags, setTags] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [decisionMode, setDecisionMode] = useState<DecisionQuickAction | null>(null)
+  const [decisionDetail, setDecisionDetail] = useState('')
 
   useEffect(() => {
     if (task) {
@@ -49,7 +93,25 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
       setTags('')
       setDueDate('')
     }
+    setDecisionMode(null)
+    setDecisionDetail('')
   }, [task, open, defaultColumn])
+
+  function stageDecision(action: DecisionQuickAction) {
+    if (action === 'other' && decisionMode !== 'other') {
+      setDecisionMode('other')
+      return
+    }
+
+    setDescription((current) => appendDecisionStageNote(current, action, action === 'other' ? decisionDetail : ''))
+
+    const nextTags = new Set(tags.split(',').map(t => t.trim()).filter(Boolean))
+    nextTags.add('decision-staged')
+    nextTags.add(`decision-${action}`)
+    setTags(Array.from(nextTags).join(', '))
+    setDecisionMode(action)
+    setDecisionDetail('')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -111,6 +173,64 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                 placeholder="Optional details..."
               />
             </div>
+
+            {isEdit ? (
+              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
+                <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--theme-text)]">Decision quick actions</p>
+                    <p className="mt-0.5 text-[10px] leading-4 text-[var(--theme-muted)]">
+                      Stages the choice as a Kanban note only — no customer messages, tool approvals, deploys, deletes, billing, or production mutations.
+                    </p>
+                  </div>
+                  {decisionMode ? (
+                    <span className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-muted)]">
+                      staged: {DECISION_ACTION_LABELS[decisionMode]}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(Object.keys(DECISION_ACTION_LABELS) as Array<DecisionQuickAction>).map((action) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => stageDecision(action)}
+                      className={cn(
+                        'rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                        DECISION_ACTION_STYLES[action],
+                      )}
+                    >
+                      {DECISION_ACTION_LABELS[action]}
+                    </button>
+                  ))}
+                </div>
+
+                {decisionMode === 'other' ? (
+                  <div className="mt-2">
+                    <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)]">
+                      Other decision context
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        className={cn(inputClass, 'py-1.5 text-xs')}
+                        value={decisionDetail}
+                        onChange={e => setDecisionDetail(e.target.value)}
+                        placeholder="Explain what Friday/Kanban should do next..."
+                      />
+                      <button
+                        type="button"
+                        disabled={!decisionDetail.trim()}
+                        onClick={() => stageDecision('other')}
+                        className="shrink-0 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Stage
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
