@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "start:all": "concurrently \"hermes gateway run\" \"pnpm dev\"",
+    "start:all": "concurrently \"hermes gateway run\" \"hermes dashboard --port 9119 --host 127.0.0.1 --no-open\" \"pnpm dev\"",
     "start": "node server-entry.js",
     "start:dev": "vite dev",
     "preview": "vite preview",

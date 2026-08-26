@@ -111,7 +111,7 @@ services:
       HERMES_PASSWORD: ${HERMES_PASSWORD:-${CLAUDE_PASSWORD:-}}
       # Enable the Secure flag on session cookies when terminated behind
       # HTTPS (reverse proxy / Tailscale Funnel / Cloudflare Tunnel). See #123.
-      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
       # Trust proxy-forwarded headers (x-forwarded-for / x-real-ip) for IP
       # classification. Leave unset unless you deploy behind a trusted proxy
       # that sanitizes these headers — otherwise a client can spoof its IP
