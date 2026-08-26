@@ -1,7 +1,21 @@
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
+
+const require = createRequire(import.meta.url)
+
+type SqliteDatabaseSync = {
+  prepare: (sql: string) => {
+    get: () => Record<string, unknown> | undefined
+  }
+  close: () => void
+}
+
+type NodeSqliteModule = {
+  DatabaseSync: new (path: string, options?: { readOnly?: boolean }) => SqliteDatabaseSync
+}
 
 export type ProfileSummary = {
   name: string
@@ -141,6 +155,41 @@ function countFilesRecursive(
     }
   }
   return count
+}
+
+function countLegacySessionFiles(sessionsDir: string): number {
+  return countFilesRecursive(sessionsDir, (full) =>
+    /\.(jsonl|json|sqlite|db)$/i.test(full),
+  )
+}
+
+function countSessionsFromStateDb(profilePath: string): number | undefined {
+  const dbPath = path.join(profilePath, 'state.db')
+  if (!fs.existsSync(dbPath)) return undefined
+
+  let db: SqliteDatabaseSync | undefined
+  try {
+    const sqlite = require('node:sqlite') as NodeSqliteModule
+    db = new sqlite.DatabaseSync(dbPath, { readOnly: true })
+    const row = db.prepare('select count(*) as count from sessions').get()
+    const count = row?.count
+    return typeof count === 'number' ? count : undefined
+  } catch {
+    return undefined
+  } finally {
+    try {
+      db?.close()
+    } catch {
+      // Ignore close failures; session counting should not break profile listing.
+    }
+  }
+}
+
+function countProfileSessions(profilePath: string): number {
+  return (
+    countSessionsFromStateDb(profilePath) ??
+    countLegacySessionFiles(path.join(profilePath, 'sessions'))
+  )
 }
 
 function latestMtime(paths: Array<string>): string | undefined {
@@ -406,9 +455,6 @@ export function listProfiles(): Array<ProfileSummary> {
         skillsDir,
         (full) => path.basename(full) === 'SKILL.md',
       )
-      const sessionCount = countFilesRecursive(sessionsDir, (full) =>
-        /\.(jsonl|json|sqlite|db)$/i.test(full),
-      )
       // Resolve model/provider from nested or flat config structure
       let modelName: string | undefined
       let providerName: string | undefined
@@ -436,7 +482,7 @@ export function listProfiles(): Array<ProfileSummary> {
         description: extractDescription(config) || undefined,
         systemPrompt: extractSystemPrompt(config, profilePath) || undefined,
         skillCount,
-        sessionCount,
+        sessionCount: countProfileSessions(profilePath),
         hasEnv: fs.existsSync(envPath),
         updatedAt: latestMtime([
           profilePath,
@@ -481,9 +527,7 @@ export function listProfiles(): Array<ProfileSummary> {
       path.join(root, 'skills'),
       (full) => path.basename(full) === 'SKILL.md',
     ),
-    sessionCount: countFilesRecursive(path.join(root, 'sessions'), (full) =>
-      /\.(jsonl|json|sqlite|db)$/i.test(full),
-    ),
+    sessionCount: countProfileSessions(root),
     hasEnv: fs.existsSync(path.join(root, '.env')),
     updatedAt: latestMtime([root, path.join(root, 'config.yaml')]),
   })
