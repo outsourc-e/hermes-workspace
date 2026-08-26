@@ -74,6 +74,27 @@ This registry groups supported environment keys so deployments can audit what is
 - `GOOGLE_API_KEY`
 - `GOOGLE_AI_STUDIO_API_KEY`
 
+## Verifying configured keys
+
+Run the key doctor to ping each provider's live endpoint and confirm the
+configured credential is accepted. Secret values are masked in all output
+(only a short fingerprint is printed):
+
+```bash
+pnpm keys:check            # diagnostic table, always exits 0
+pnpm keys:check -- --json  # machine-readable summary
+pnpm keys:check -- --strict # exit 1 if any present key is rejected (401)
+```
+
+It reads from the process environment and the local (gitignored) `.env`.
+Status legend: `ok` live · `invalid` rejected (401) · `missing` not set ·
+`blocked` host denied by network policy / proxy (403) · `error` transport
+failure. A `blocked` result means re-run from a host allowed to reach that
+provider — it does **not** mean the key is bad. The workspace server itself
+reads `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, and `GOOGLE_API_KEY` (provider
+usage panel); `ANTHROPIC_API_KEY` and `NOUS_API_KEY` are consumed by the
+hermes-agent gateway (`~/.hermes/.env`).
+
 ## Operator handoff
 
 When handing off a phase:
