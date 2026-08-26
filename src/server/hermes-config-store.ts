@@ -4,6 +4,7 @@ import path from 'node:path'
 import YAML from 'yaml'
 
 import type { HermesConfigPaths } from './hermes-config-migration'
+import type { RoutingConfig, RouterPoolEntry, PolicyRule } from '../types/router-config'
 
 export type SetDefaultModelPatch = {
   action: 'set-default-model'
@@ -37,12 +38,19 @@ export type RemoveCustomProviderPatch = {
   name: string
 }
 
+export type SetRoutingConfigPatch = {
+  action: 'set-routing-config'
+  /** Shallow-merged over the existing routing block in config.yaml. */
+  routing: Partial<RoutingConfig>
+}
+
 export type HermesConfigPatch =
   | SetDefaultModelPatch
   | SetApiKeyPatch
   | RemoveApiKeyPatch
   | SetCustomProviderPatch
   | RemoveCustomProviderPatch
+  | SetRoutingConfigPatch
 
 export type HermesConfigPatchResult = {
   ok: boolean
@@ -244,6 +252,129 @@ function applyRemoveCustomProvider(
   return { ok: true }
 }
 
+// ─── Routing config ──────────────────────────────────────────────────────────
+
+export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
+  enabled: false,
+  default_provider: 'anthropic',
+  default_model: 'claude-sonnet-4-6',
+  escalation: {
+    opus_threshold: 0.75,
+    daily_opus_budget_usd: 5.0,
+  },
+  pool: [],
+  policy: [],
+}
+
+function readBool(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function readStr(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+}
+
+function readNum(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function parsePoolEntry(raw: unknown): RouterPoolEntry | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const r = raw as Record<string, unknown>
+  const provider = readStr(r.provider, '')
+  if (!provider) return null
+  const models = Array.isArray(r.models)
+    ? r.models.filter((m): m is string => typeof m === 'string')
+    : []
+  return {
+    provider,
+    models,
+    base_url: typeof r.base_url === 'string' ? r.base_url : undefined,
+    enabled: readBool(r.enabled, false),
+  }
+}
+
+function parsePolicyRule(raw: unknown): PolicyRule | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const r = raw as Record<string, unknown>
+  const match = r.match
+  const route = r.route
+  if (!match || typeof match !== 'object' || Array.isArray(match)) return null
+  if (!route || typeof route !== 'object' || Array.isArray(route)) return null
+  const routeR = route as Record<string, unknown>
+  const provider = readStr(routeR.provider, '')
+  const model = readStr(routeR.model, '')
+  if (!provider) return null
+  const m = match as Record<string, unknown>
+  return {
+    match: {
+      task_type: typeof m.task_type === 'string'
+        ? (m.task_type as PolicyRule['match']['task_type'])
+        : undefined,
+      complexity_gte: typeof m.complexity_gte === 'number' ? m.complexity_gte : undefined,
+      complexity_lt: typeof m.complexity_lt === 'number' ? m.complexity_lt : undefined,
+      context_len: typeof m.context_len === 'string'
+        ? (m.context_len as PolicyRule['match']['context_len'])
+        : undefined,
+      urgency: typeof m.urgency === 'string'
+        ? (m.urgency as PolicyRule['match']['urgency'])
+        : undefined,
+    },
+    route: { provider, model },
+  }
+}
+
+/**
+ * Read the `routing:` block from ~/.hermes/config.yaml.
+ * Missing or malformed fields fall back to DEFAULT_ROUTING_CONFIG values.
+ * Returns a complete RoutingConfig — callers never see partial data.
+ */
+export function readRoutingConfig(paths?: HermesConfigPaths): RoutingConfig {
+  const resolvedPaths = paths ?? resolveHermesConfigPaths()
+  const config = readYamlConfig(resolvedPaths.configPath)
+  const raw = config.routing
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ...DEFAULT_ROUTING_CONFIG, escalation: { ...DEFAULT_ROUTING_CONFIG.escalation } }
+  }
+  const r = raw as Record<string, unknown>
+  const escalationRaw = r.escalation && typeof r.escalation === 'object' && !Array.isArray(r.escalation)
+    ? (r.escalation as Record<string, unknown>)
+    : {}
+  const pool: RouterPoolEntry[] = Array.isArray(r.pool)
+    ? r.pool.map(parsePoolEntry).filter((e): e is RouterPoolEntry => e !== null)
+    : []
+  const policy: PolicyRule[] = Array.isArray(r.policy)
+    ? r.policy.map(parsePolicyRule).filter((e): e is PolicyRule => e !== null)
+    : []
+  return {
+    enabled: readBool(r.enabled, DEFAULT_ROUTING_CONFIG.enabled),
+    default_provider: readStr(r.default_provider, DEFAULT_ROUTING_CONFIG.default_provider),
+    default_model: readStr(r.default_model, DEFAULT_ROUTING_CONFIG.default_model),
+    escalation: {
+      opus_threshold: readNum(escalationRaw.opus_threshold, DEFAULT_ROUTING_CONFIG.escalation.opus_threshold),
+      daily_opus_budget_usd: readNum(escalationRaw.daily_opus_budget_usd, DEFAULT_ROUTING_CONFIG.escalation.daily_opus_budget_usd),
+    },
+    pool,
+    policy,
+  }
+}
+
+function applySetRoutingConfig(
+  paths: HermesConfigPaths,
+  patch: SetRoutingConfigPatch,
+): HermesConfigPatchResult {
+  const config = readYamlConfig(paths.configPath)
+  const existing =
+    config.routing && typeof config.routing === 'object' && !Array.isArray(config.routing)
+      ? (config.routing as Record<string, unknown>)
+      : {}
+  config.routing = { ...existing, ...(patch.routing as Record<string, unknown>) }
+  writeYamlConfig(paths.configPath, config)
+  return { ok: true }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function applyHermesConfigPatch(
   paths: HermesConfigPaths,
   patch: HermesConfigPatch,
@@ -259,6 +390,8 @@ export function applyHermesConfigPatch(
       return applySetCustomProvider(paths, patch)
     case 'remove-custom-provider':
       return applyRemoveCustomProvider(paths, patch)
+    case 'set-routing-config':
+      return applySetRoutingConfig(paths, patch)
     default: {
       const _exhaustive: never = patch
       void _exhaustive

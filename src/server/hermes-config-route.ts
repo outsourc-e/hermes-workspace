@@ -15,6 +15,7 @@ import {
   applyHermesConfigPatch,
   parseEnvFile,
   readHermesConfigFiles,
+  readRoutingConfig,
   resolveHermesConfigPaths,
   stringifyEnv,
 } from './hermes-config-store'
@@ -32,6 +33,7 @@ const ACTION_MESSAGES: Record<string, string> = {
   'remove-api-key': 'API key removed.',
   'set-custom-provider': 'Custom provider saved.',
   'remove-custom-provider': 'Custom provider removed.',
+  'set-routing-config': 'Routing configuration saved.',
 }
 
 const LEGACY_SAVE_MESSAGE = 'Saved.'
@@ -63,6 +65,10 @@ const PatchActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('remove-custom-provider'),
     name: z.string().min(1),
+  }),
+  z.object({
+    action: z.literal('set-routing-config'),
+    routing: z.record(z.string(), z.unknown()),
   }),
 ])
 
@@ -124,6 +130,7 @@ export async function handleHermesConfigGet({
     ...state,
     providers,
     claudeHome: paths.hermesHome,
+    routingConfig: readRoutingConfig(paths),
   })
 }
 

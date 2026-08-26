@@ -118,6 +118,27 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
     ),
   },
   {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    description: 'DeepSeek models — cost-efficient reasoning and chat via OpenAI-compatible API.',
+    authTypes: ['api-key'],
+    docsUrl: 'https://platform.deepseek.com/api_keys',
+    configExample: JSON.stringify(
+      {
+        auth: {
+          profiles: {
+            'deepseek:default': {
+              provider: 'deepseek',
+              apiKey: 'sk-your-key-here',
+            },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+  },
+  {
     id: 'ollama',
     name: 'Ollama',
     description: 'Local models running on your machine via Ollama.',
