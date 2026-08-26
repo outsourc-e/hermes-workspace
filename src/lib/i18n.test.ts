@@ -57,7 +57,7 @@ describe('i18n translations', () => {
   })
 
   it('exposes readable locale labels for contributor-targeted languages', () => {
-    expect(LOCALE_LABELS.zh).toBe('中文')
+    expect(LOCALE_LABELS.zh).toBe('中文（简体）')
     expect(LOCALE_LABELS.ru).toBe('Русский')
   })
 })

@@ -555,14 +555,78 @@ export function buildDisplayEntries(
     entries.push(entry)
   })
 
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
-    }
-  }
+  // Do NOT attach trailing persisted tool-only assistant messages to the last text reply
+  // They are hidden from the main display and only tracked via getTrailingToolOnlyTurnSummary
 
   return entries
+}
+
+export type TrailingToolOnlyTurnSummary = {
+  count: number
+  toolNames: Array<string>
+  hasFinalAssistantText: boolean
+}
+
+export function getTrailingToolOnlyTurnSummary(
+  messages: Array<ChatMessage>,
+): TrailingToolOnlyTurnSummary | null {
+  if (messages.length === 0) {
+    return null
+  }
+
+  // If the thread already ends with assistant text, return null
+  const lastMessage = messages[messages.length - 1]
+  if (
+    lastMessage.role === 'assistant' &&
+    !isAssistantToolCallOnlyMessage(lastMessage)
+  ) {
+    return null
+  }
+
+  // Walk backwards from the end to count trailing tool-only messages and their tool results
+  const toolNames = new Set<string>()
+  let count = 0
+  let foundLastAssistantText = false
+  let i = messages.length - 1
+
+  while (i >= 0) {
+    const message = messages[i]
+
+    if (message.role === 'assistant') {
+      if (isAssistantToolCallOnlyMessage(message)) {
+        // Count this tool-only message
+        count++
+        const toolCalls = getToolCallsFromMessage(message)
+        for (const toolCall of toolCalls) {
+          if (toolCall.name) {
+            toolNames.add(toolCall.name)
+          }
+        }
+      } else {
+        // Found the last assistant text message
+        foundLastAssistantText = true
+        break
+      }
+    } else if (message.role === 'tool' || message.role === 'toolResult') {
+      // Count tool results as part of the trailing turn
+      count++
+      if (message.toolName) {
+        toolNames.add(message.toolName)
+      }
+    }
+
+    i--
+  }
+
+  if (count === 0) {
+    return null
+  }
+
+  return {
+    count,
+    toolNames: Array.from(toolNames),
+    hasFinalAssistantText: foundLastAssistantText,
+  }
 }
 
 function escapeAttributeSelector(value: string): string {
