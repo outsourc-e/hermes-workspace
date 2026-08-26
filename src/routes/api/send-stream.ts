@@ -384,6 +384,7 @@ export const Route = createFileRoute('/api/send-stream')({
         let persistedRunReady: Promise<unknown> | null = null
         let unregisterTimer: ReturnType<typeof setTimeout> | null = null
         let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+        let keepaliveTimer: ReturnType<typeof setInterval> | null = null
         let heartbeatTimer: ReturnType<typeof setInterval> | null = null
         const abortController = new AbortController()
         // Close out the SSE stream — stop enqueueing, clear timers, and
@@ -450,7 +451,6 @@ export const Route = createFileRoute('/api/send-stream')({
 
         const stream = new ReadableStream({
           async start(controller) {
-            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
             let lastClientEventAt = Date.now()
             // Track the last human-readable activity so the heartbeat can
             // forward it to the UI. Without this the ThinkingBubble shows a
@@ -474,7 +474,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // lightweight recognized event periodically so public Workspace chats
             // do not sit at "Thinking…" until the frontend reports failure.
             enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
-            heartbeatTimer = setInterval(() => {
+            keepaliveTimer = setInterval(() => {
               if (streamClosed) return
               if (Date.now() - lastClientEventAt < 10_000) return
               // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
@@ -488,6 +488,10 @@ export const Route = createFileRoute('/api/send-stream')({
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
+              if (keepaliveTimer) {
+                clearInterval(keepaliveTimer)
+                keepaliveTimer = null
+              }
               if (heartbeatTimer) {
                 clearInterval(heartbeatTimer)
                 heartbeatTimer = null
@@ -757,80 +761,31 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  const stream = await openaiChat(portableMessages, {
+                  const responseText = await openaiChat(portableMessages, {
                     model: localBaseUrl ? bareModel : (typeof body.model === 'string' ? body.model : undefined),
                     temperature:
                       typeof body.temperature === 'number'
                         ? body.temperature
                         : undefined,
                     signal: abortController.signal,
-                    stream: true,
+                    stream: false,
                     sessionId: portableSessionKey,
                     baseUrl: localBaseUrl,
                   })
 
-                  let thinking = ''
-                  let toolEventCount = 0
-                  for await (const chunk of stream) {
-                    if (chunk.type === 'reasoning') {
-                      thinking += chunk.text
-                      persistActiveRun((runSessionKey, activeId) =>
-                        setRunThinking(runSessionKey, activeId, thinking),
-                      )
-                      sendEvent('thinking', {
-                        text: thinking,
-                        sessionKey: portableSessionKey,
-                        runId,
-                      })
-                    } else if (chunk.type === 'tool') {
-                      // Prefer the gateway's stable tool_call_id so 'running'
-                      // and 'completed' events for the same call collapse to
-                      // one card row. Fall back to a synthetic id only when
-                      // the upstream payload lacks one (older Hermes builds).
-                      toolEventCount += 1
-                      const toolCallId =
-                        chunk.toolCallId ||
-                        `${runId}:${chunk.name}:${toolEventCount}`
-                      // Map upstream status -> internal phase. 'running'
-                      // arrives at tool start; 'completed' at finish.
-                      // Missing status (back-compat path) is treated as a
-                      // one-shot 'calling' to mirror the previous behavior.
-                      const phase =
-                        chunk.status === 'completed'
-                          ? 'complete'
-                          : chunk.status === 'running'
-                            ? 'calling'
-                            : 'start'
-                      persistActiveRun((runSessionKey, activeId) =>
-                        upsertRunToolCall(runSessionKey, activeId, {
-                          id: toolCallId,
-                          name: chunk.name || 'tool',
-                          phase,
-                          preview: chunk.label,
-                        }),
-                      )
-                      sendEvent('tool', {
-                        phase,
-                        name: chunk.name,
-                        toolCallId,
-                        preview: chunk.label,
-                        sessionKey: portableSessionKey,
-                        runId,
-                      })
-                    } else {
-                      accumulated += chunk.text
-                      persistActiveRun((runSessionKey, activeId) =>
-                        appendRunText(runSessionKey, activeId, accumulated, {
-                          replace: true,
-                        }),
-                      )
-                      sendEvent('chunk', {
-                        text: accumulated,
-                        fullReplace: true,
-                        sessionKey: portableSessionKey,
-                        runId,
-                      })
-                    }
+                  accumulated = responseText
+                  if (accumulated) {
+                    persistActiveRun((runSessionKey, activeId) =>
+                      appendRunText(runSessionKey, activeId, accumulated, {
+                        replace: true,
+                      }),
+                    )
+                    sendEvent('chunk', {
+                      text: accumulated,
+                      fullReplace: true,
+                      sessionKey: portableSessionKey,
+                      runId,
+                    })
                   }
 
                   // Persist assistant response to local session store
