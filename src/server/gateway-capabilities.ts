@@ -599,7 +599,6 @@ async function probeDashboard(): Promise<{ available: boolean; url: string }> {
     if (!res.ok) return { available: false, url: CLAUDE_DASHBOARD_URL }
     const body = (await res.json()) as { version?: string }
     if (!body.version) return { available: false, url: CLAUDE_DASHBOARD_URL }
-    await fetchDashboardToken().catch(() => '')
     return { available: true, url: CLAUDE_DASHBOARD_URL }
   } catch {
     return { available: false, url: CLAUDE_DASHBOARD_URL }
