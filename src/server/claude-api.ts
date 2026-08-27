@@ -129,19 +129,30 @@ export async function listSessions(
   limit = 50,
   offset = 0,
 ): Promise<Array<ClaudeSession>> {
-  if (getCapabilities().dashboard.available) {
+  const capabilities = getCapabilities()
+
+  if (capabilities.sessions) {
+    try {
+      const resp = await claudeGet<{
+        items?: Array<ClaudeSession>
+        data?: Array<ClaudeSession>
+        total?: number
+      }>(`/api/sessions?limit=${limit}&offset=${offset}`)
+
+      return resp.items ?? resp.data ?? []
+    } catch (error) {
+      if (!capabilities.dashboard.available) {
+        throw error
+      }
+    }
+  }
+
+  if (capabilities.dashboard.available) {
     const resp = await listDashboardSessions(limit, offset)
     return resp.sessions as Array<ClaudeSession>
   }
-  const resp = await claudeGet<{
-    items?: Array<ClaudeSession>
-    data?: Array<ClaudeSession>
-    total?: number
-  }>(`/api/sessions?limit=${limit}&offset=${offset}`)
-  // The gateway (OpenAI-compat) returns { object: 'list', data: [...] }, while the
-  // dashboard / older gateway shape uses { items: [...] }. Accept either, and never
-  // return undefined (callers .map over this).
-  return resp.items ?? resp.data ?? []
+
+  throw new Error(SESSIONS_API_UNAVAILABLE_MESSAGE)
 }
 
 export async function getSession(sessionId: string): Promise<ClaudeSession> {
