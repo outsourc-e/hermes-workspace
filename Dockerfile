@@ -33,7 +33,7 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl tini python3 \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r workspace && useradd -r -g workspace -u 10010 -m workspace
+    && groupadd -r -g 10000 workspace && useradd -r -u 10000 -g workspace -m workspace
 
 COPY --from=gosu_source /gosu /usr/local/bin/gosu
 
