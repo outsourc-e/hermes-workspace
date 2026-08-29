@@ -120,6 +120,7 @@ workers:
   - terminal
   - file
   - browser
+  - agent-browser
   - web
   - gbrain
   - session_search
@@ -133,12 +134,15 @@ workers:
   - github-pr-workflow
   - requesting-code-review
   - codebase-inspection
+  - agent-browser-core
+  - builder-agent-browser
   capabilities:
   - implementation
   - code-editing
   - tests
   - integration
   - build-verification
+  - agent-browser-execution
   preferredTaskTypes:
   - implementation
   - bugfix
@@ -216,6 +220,7 @@ workers:
   - smoke
   tools:
   - browser
+  - agent-browser
   - terminal
   - file
   - vision
@@ -226,6 +231,8 @@ workers:
   skills:
   - qa-core
   - browser-harness-power-use
+  - agent-browser-core
+  - qa-dogfood-browser
   - dogfood
   - gstack-for-hermes
   capabilities:
@@ -234,6 +241,8 @@ workers:
   - regression-reproduction
   - cli-verification
   - evidence-capture
+  - agent-browser-smoke
+  - browser-evidence-capture
   preferredTaskTypes:
   - qa
   - smoke
@@ -264,6 +273,8 @@ workers:
   - gbrain
   - web
   - browser
+  - agent-browser
+  - crawl4ai
   - terminal
   - file
   - vision
@@ -275,6 +286,9 @@ workers:
   - gbrain
   - autoresearch
   - browser-harness-power-use
+  - agent-browser-core
+  - researcher-agent-browser
+  - crawl4ai-research
   - gstack-for-hermes
   - researcher-quick
   - researcher-autoresearch
@@ -287,6 +301,8 @@ workers:
   - source-verification
   - gbrain-query
   - autoresearch
+  - agent-browser-research
+  - crawl4ai-breadth
   preferredTaskTypes:
   - research
   - analysis
@@ -378,11 +394,13 @@ workers:
   - gbrain
   - gstack-for-hermes
   - hermes-agent
+  - web-access-maintenance
   capabilities:
   - upstream-tracking
   - dependency-maintenance
   - patch-hygiene
   - git-review
+  - web-access-hygiene
   - issue-tracking
   preferredTaskTypes:
   - maintenance

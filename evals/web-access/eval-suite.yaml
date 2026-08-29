@@ -1,0 +1,155 @@
+version: 1
+name: web-access-empowerment-suite
+default_lanes:
+  - phase0-smoke
+  - researcher-pilot
+  - qa-builder-smoke
+lanes:
+  - id: phase0-smoke
+    owner: Maintainer
+    command: "bash evals/web-access/run-phase0-smoke.sh"
+    allowed_targets:
+      - "https://example.com"
+      - "http://localhost:11235/health"
+    required_evidence:
+      - ".hermes/evidence/web-access/phase0-smoke/agent-browser-version.txt"
+      - ".hermes/evidence/web-access/phase0-smoke/agent-browser-skills.txt"
+      - ".hermes/evidence/web-access/phase0-smoke/agent-browser-snapshot.txt"
+      - ".hermes/evidence/web-access/phase0-smoke/agent-browser-screenshot.png"
+      - ".hermes/evidence/web-access/phase0-smoke/crawl4ai-health.json"
+      - ".hermes/evidence/web-access/phase0-smoke/crawl4ai-md.json"
+    guardrails:
+      - "safe public target only"
+      - "no cloud stealth default"
+      - "no credentials"
+      - "no CAPTCHA handling"
+      - "respect robots/site terms"
+    pass_criteria:
+      - "agent-browser version and skills are captured"
+      - "snapshot contains Example Domain"
+      - "Crawl4AI health reports status ok"
+      - "Crawl4AI Markdown contains Example Domain"
+    escalation: "Maintainer records BLOCK with command output if local runtime, agent-browser, Docker, or Crawl4AI is unavailable."
+
+  - id: researcher-pilot
+    owner: Researcher
+    command: "bash evals/web-access/run-researcher-pilot.sh"
+    allowed_targets:
+      - "https://example.com"
+      - "http://localhost:11235/health"
+    required_evidence:
+      - ".hermes/evidence/web-access/researcher-pilot/source-inventory.json"
+      - ".hermes/evidence/web-access/researcher-pilot/pilot-report.md"
+      - ".hermes/evidence/web-access/researcher-pilot/crawl4ai-health.json"
+      - ".hermes/evidence/web-access/researcher-pilot/crawl4ai-md.json"
+      - ".hermes/evidence/web-access/researcher-pilot/markdown/example.com.md"
+      - ".hermes/evidence/web-access/researcher-pilot/browser-snapshot.txt"
+      - ".hermes/evidence/web-access/researcher-pilot/browser-screenshot.png"
+    guardrails:
+      - "GBrain/internal context first when applicable"
+      - "Crawl4AI breadth before rendered browser promotion"
+      - "no cloud stealth default"
+      - "no credentials"
+      - "no bulk crawl"
+      - "respect robots/site terms"
+    pass_criteria:
+      - "source inventory exists with method, status, evidence, and robots/site terms posture"
+      - "Crawl4AI Markdown contains Example Domain"
+      - "agent-browser snapshot contains Example Domain"
+      - "screenshot exists and is non-empty"
+    escalation: "Researcher records source-level BLOCK/REVISE with failure class and evidence paths; Orchestrator decides any target broadening."
+
+  - id: qa-builder-smoke
+    owner: QA
+    command: "bash evals/web-access/run-qa-builder-smoke.sh"
+    allowed_targets:
+      - "https://example.com"
+    required_evidence:
+      - ".hermes/evidence/web-access/qa-builder-smoke/qa/snapshot-before.txt"
+      - ".hermes/evidence/web-access/qa-builder-smoke/qa/screenshot-before.png"
+      - ".hermes/evidence/web-access/qa-builder-smoke/qa/qa-report.md"
+      - ".hermes/evidence/web-access/qa-builder-smoke/builder/before.snapshot.txt"
+      - ".hermes/evidence/web-access/qa-builder-smoke/builder/before.png"
+      - ".hermes/evidence/web-access/qa-builder-smoke/builder/actions.md"
+      - ".hermes/evidence/web-access/qa-builder-smoke/summary.json"
+    guardrails:
+      - "sandbox-local profiles only"
+      - "no credential entry"
+      - "no public actions"
+      - "no form submission"
+      - "no external sends"
+      - "no cloud stealth default"
+      - "respect robots/site terms"
+    pass_criteria:
+      - "QA snapshot and Builder snapshot contain Example Domain"
+      - "QA and Builder screenshots exist and are non-empty"
+      - "Builder action contract records allowed and forbidden actions"
+      - "summary.json reports PASS"
+    escalation: "QA records evidence-backed blocker; Builder records action-contract blocker; Orchestrator decides any broader execution."
+
+  - id: gated-antibot-matrix
+    owner: QA
+    manual_gated: true
+    allowed_targets:
+      - "approved hard-site targets only"
+    required_evidence:
+      - "blocker classification report"
+      - "screenshot when allowed"
+      - "robots/site terms posture"
+      - "greenlight artifact"
+    guardrails:
+      - "not runnable by default"
+      - "classify CAPTCHA and anti-bot blockers; do not bypass"
+      - "no cloud stealth default"
+      - "no proxy escalation without separate greenlight"
+      - "no credentials"
+    pass_criteria:
+      - "each target has pass, partial, blocked, or fail classification"
+      - "no gated technique is used without a greenlight artifact"
+      - "blockers preserve exact output and evidence paths"
+    escalation: "Orchestrator reviews greenlight request; Maintainer records any service or version drift."
+
+  - id: gated-auth-persistence
+    owner: Builder
+    manual_gated: true
+    allowed_targets:
+      - "approved local/test auth target only"
+    required_evidence:
+      - "auth scope and test account approval"
+      - "session persistence report"
+      - "redacted screenshots or snapshots"
+      - "greenlight artifact"
+    guardrails:
+      - "not runnable by default"
+      - "no real credentials in prompts, logs, screenshots, or GBrain packets"
+      - "no production account mutation"
+      - "no public posting or sending"
+      - "no cloud stealth default"
+    pass_criteria:
+      - "approved test session persists across close/open"
+      - "evidence is redacted"
+      - "no credential material is written to workspace files"
+    escalation: "Builder stops on unexpected permission, credential, payment, public-send, or admin boundary and records BLOCK."
+
+  - id: gated-token-cost-baseline
+    owner: Maintainer
+    manual_gated: true
+    allowed_targets:
+      - "approved public target set"
+      - "approved local fixtures"
+    required_evidence:
+      - "target list and source budget"
+      - "evidence byte counts"
+      - "Markdown/snapshot size report"
+      - "greenlight artifact when target count exceeds default budget"
+    guardrails:
+      - "not runnable by default"
+      - "no bulk crawl beyond approved budget"
+      - "no raw HTML dumps unless explicitly justified"
+      - "respect robots/site terms"
+      - "no cloud stealth default"
+    pass_criteria:
+      - "reports source count, evidence paths, bytes, failure classes, and method"
+      - "identifies token/cost regressions against prior baseline"
+      - "does not broaden target set during the run"
+    escalation: "Maintainer records REVISE for cost drift; Orchestrator decides any larger benchmark run."

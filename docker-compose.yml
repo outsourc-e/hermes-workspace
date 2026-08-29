@@ -85,6 +85,22 @@ services:
     ports:
       - '127.0.0.1:8642:8642'
 
+  # Local Crawl4AI service for swarm Researcher breadth/Markdown extraction.
+  # This is intentionally a CLI/HTTP service, not an MCP server. It stays local
+  # and is used by the crawl4ai-research skill before browser interaction.
+  crawl4ai:
+    image: unclecode/crawl4ai:0.8.5
+    restart: unless-stopped
+    shm_size: 1g
+    ports:
+      - '127.0.0.1:11235:11235'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://localhost:11235/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # The Hermes Workspace Web UI
   # Connects to hermes-agent at http://hermes-agent:8642
   hermes-workspace:

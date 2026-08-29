@@ -1,0 +1,79 @@
+Goal: >
+  Validate that Researcher can turn a bounded public seed list into a market map
+  with source diversity, source roles, and evidence paths without scraping sprawl.
+
+Scope:
+  editable:
+    - docs/swarm/WEB-ACCESS-PHASE1-IDEA-ENGINE.md
+    - evals/web-access/contracts/market-map-breadth.yaml
+    - evals/web-access/run-researcher-pilot.sh
+    - scripts/validate-web-access-empowerment.py
+  evidence:
+    - .hermes/evidence/web-access/researcher-pilot/**
+  locked_eval:
+    - docs/swarm/WEB-ACCESS-EVAL-MATRIX.md
+    - evals/web-access/contracts/researcher-site-intelligence.yaml
+
+Metric:
+  name: market_map_breadth_quality_score
+  direction: higher
+  unit: points
+  target: 8
+  scoring:
+    - 2 points for valid source-inventory JSON
+    - 2 points for at least one primary public source
+    - 2 points for explicit source role classification
+    - 1 point for robots/terms posture on every source
+    - 1 point for a concise synthesis report linked to evidence
+
+Verify:
+  command: python3 scripts/validate-web-access-empowerment.py
+  expected:
+    - this contract includes Goal, Scope, Metric, Verify, Guard, Iterations, Results_log, Rollback, and Greenlight
+    - Phase 1 docs define market and competitive research pattern
+    - pilot runner exists and is executable
+
+Guard:
+  commands:
+    - python3 scripts/validate-web-access-empowerment.py
+    - bash evals/web-access/run-researcher-pilot.sh
+  policy:
+    - max 10 public URLs unless greenlit
+    - no Opportunity Engine repo or worktree mutation
+    - no credentialed, private, or account-mutating targets
+    - no cloud stealth or proxy escalation by default
+    - no raw corpus dump into GBrain
+    - source diversity cannot be gamed by duplicating pages from the same site
+
+Iterations:
+  count: 3
+  time_budget: 60m
+  discipline:
+    - improve one routing, extraction, or schema issue per iteration
+    - do not edit locked evals or metrics to improve score
+    - keep concise reports over broad scraped dumps
+
+Results_log:
+  path: .hermes/evidence/web-access/researcher-pilot/market-map-results.tsv
+  columns:
+    - iteration
+    - score
+    - source_roles
+    - status
+    - summary
+    - verify
+    - guard
+
+Rollback:
+  rule: >
+    Revert any candidate that increases source count without improving source
+    roles, breaks inventory validation, weakens safety gates, or makes the
+    synthesis less evidence-backed.
+
+Greenlight:
+  required_for:
+    - more than 10 URLs
+    - non-example third-party targets in runnable pilots
+    - credentials, CAPTCHA, stealth, proxy, cloud browser, or public action
+    - persistent profile export/import
+  approver: orchestrator

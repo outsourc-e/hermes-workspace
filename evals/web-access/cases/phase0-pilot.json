@@ -1,0 +1,18 @@
+[
+  {
+    "id": "web-smoke-001",
+    "target": "https://example.com",
+    "worker": "researcher",
+    "expected": ["Example Domain", "Learn more"],
+    "methods": ["crawl4ai", "agent-browser"],
+    "guard": "no external account, no cloud fallback"
+  },
+  {
+    "id": "web-smoke-006",
+    "target": "hard-site-placeholder",
+    "worker": "qa",
+    "expected": ["classified failure, no bypass"],
+    "methods": ["crawl4ai", "agent-browser"],
+    "guard": "respect robots/terms; cloud fallback requires greenlight"
+  }
+]

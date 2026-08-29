@@ -5,10 +5,13 @@ Wrapper: `researcher:quick`
 Modes: quick, autoresearch
 
 ## Tools
-gbrain, web, browser, terminal, file, vision, session_search, skills, todo
+gbrain, web, browser, agent-browser, crawl4ai, terminal, file, vision, session_search, skills, todo
 
 ## Skills
-researcher-core, gbrain, autoresearch, browser-harness-power-use, gstack-for-hermes, researcher-quick, researcher-autoresearch, arxiv, youtube-content, polymarket
+researcher-core, gbrain, autoresearch, browser-harness-power-use, agent-browser-core, researcher-agent-browser, crawl4ai-research, gstack-for-hermes, researcher-quick, researcher-autoresearch, arxiv, youtube-content, polymarket
+
+## Web access routing
+GBrain first, Crawl4AI breadth second, agent-browser interaction/evidence third. Cloud stealth remains explicit Orchestrator-gated fallback only.
 
 ## MCP servers
 gbrain

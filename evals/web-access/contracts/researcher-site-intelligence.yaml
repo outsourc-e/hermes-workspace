@@ -1,0 +1,81 @@
+Goal: >
+  Validate that Researcher can produce a source-backed site-intelligence packet
+  using the Phase 1 route: GBrain first, Crawl4AI breadth, agent-browser
+  rendered evidence, and deep browser only by explicit gate.
+
+Scope:
+  editable:
+    - docs/swarm/WEB-ACCESS-PHASE1-IDEA-ENGINE.md
+    - evals/web-access/run-researcher-pilot.sh
+    - evals/web-access/contracts/researcher-site-intelligence.yaml
+    - scripts/validate-web-access-empowerment.py
+  evidence:
+    - .hermes/evidence/web-access/researcher-pilot/**
+  locked_eval:
+    - evals/web-access/run-phase0-smoke.sh
+    - docs/swarm/WEB-ACCESS-EVAL-MATRIX.md
+
+Metric:
+  name: researcher_site_intelligence_required_artifacts
+  direction: higher
+  unit: required artifact count
+  target: 7
+  artifacts:
+    - source-inventory.json
+    - crawl4ai-health.json
+    - crawl4ai-md.json
+    - markdown/example.com.md
+    - browser-snapshot.txt
+    - browser-screenshot.png
+    - pilot-report.md
+
+Verify:
+  command: bash evals/web-access/run-researcher-pilot.sh
+  expected:
+    - source inventory is valid JSON
+    - inventory contains https://example.com
+    - Markdown contains Example Domain
+    - browser snapshot contains Example Domain
+    - screenshot file is non-empty
+
+Guard:
+  commands:
+    - python3 scripts/validate-web-access-empowerment.py
+    - bash evals/web-access/run-phase0-smoke.sh
+  policy:
+    - no edits outside allowed Phase 1 paths
+    - no Opportunity Engine repo or worktree mutation
+    - no cloud stealth, proxy escalation, CAPTCHA solving, credentials, or public actions
+    - safe pilot target is https://example.com unless Orchestrator greenlights another target
+
+Iterations:
+  count: 3
+  time_budget: 45m
+  discipline:
+    - mutate one narrow target per iteration
+    - keep only improvements that pass Verify and Guard
+    - revert worse, crashing, unparsable, or scope-expanding changes
+
+Results_log:
+  path: .hermes/evidence/web-access/researcher-pilot/results.tsv
+  columns:
+    - iteration
+    - metric
+    - status
+    - summary
+    - verify
+    - guard
+
+Rollback:
+  rule: >
+    Revert any candidate that reduces artifact count, breaks JSON/Markdown
+    validation, expands target scope without greenlight, or weakens robots/terms
+    and credential guards.
+
+Greenlight:
+  required_for:
+    - changing target from example.com to any third-party business site
+    - credentialed or account-backed browsing
+    - CAPTCHA, anti-bot, proxy, cloud stealth, or browserbase fallback
+    - public posting, checkout, account mutation, or bulk crawling
+  approver: orchestrator

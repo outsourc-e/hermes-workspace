@@ -5,10 +5,13 @@ Wrapper: `qa:smoke`
 Modes: smoke
 
 ## Tools
-browser, terminal, file, vision, gbrain, session_search, skills, web
+browser, agent-browser, terminal, file, vision, gbrain, session_search, skills, web
 
 ## Skills
-qa-core, browser-harness-power-use, dogfood, gstack-for-hermes
+qa-core, browser-harness-power-use, agent-browser-core, qa-dogfood-browser, dogfood, gstack-for-hermes
+
+## Web access routing
+Use agent-browser for low-token snapshots, deterministic refs, screenshots, traces, console/errors, and dogfood evidence before falling back to older harness-specific flows.
 
 ## MCP servers
 gbrain
