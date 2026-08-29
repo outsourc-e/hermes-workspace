@@ -344,7 +344,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   let jobs: Array<Record<string, unknown>> = []
   if (Array.isArray(raw)) {
     jobs = raw as Array<Record<string, unknown>>
-  } else if (raw && typeof raw === 'object') {
+  } else if (typeof raw === 'object') {
     const r = raw as Record<string, unknown>
     if (Array.isArray(r.jobs)) jobs = r.jobs as Array<Record<string, unknown>>
   }
@@ -355,9 +355,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   let failed = 0
   let nextRunMs: number | null = null
   const recentFailures: DashboardCronSection['recentFailures'] = []
-  for (const job of jobs) {
-    if (!job || typeof job !== 'object') continue
-    const j = job as Record<string, unknown>
+  for (const j of jobs) {
     const state = readString(j.state || j.status).toLowerCase()
     if (state === 'paused') paused += 1
     else if (state === 'running') running += 1
