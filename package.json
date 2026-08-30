@@ -101,5 +101,10 @@
     "vite": "^7.3.5",
     "vitest": "^3.2.6",
     "web-vitals": "^5.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@babel/core": "7.29.6"
+    }
   }
 }
