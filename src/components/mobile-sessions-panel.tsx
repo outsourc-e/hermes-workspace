@@ -119,6 +119,7 @@ export function MobileSessionsPanel({
                 : 'text-primary-400 hover:bg-primary-200 hover:text-primary-700',
             )}
             aria-label={`${session.pinned ? 'Unpin' : 'Pin'} session ${title}`}
+            aria-pressed={session.pinned === true}
           >
             <HugeiconsIcon
               icon={PinIcon}

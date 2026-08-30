@@ -211,7 +211,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     activeFriendlyId,
     isNewChat,
   })
-  usePinnedSessionMigration(sessions)
+  usePinnedSessionMigration(
+    sessions,
+    !sessionsLoading && !sessionsFetching,
+  )
 
   const startNewChat = useCallback(() => {
     setCreatingSession(true)

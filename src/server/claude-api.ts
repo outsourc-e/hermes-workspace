@@ -197,19 +197,19 @@ export async function setSessionPinned(
 ): Promise<boolean> {
   if (getCapabilities().dashboard.available) {
     const response = await updateDashboardSession(sessionId, { pinned })
-    const observed =
-      typeof response.pinned === 'boolean'
-        ? response.pinned
-        : response.session?.pinned
-    if (observed !== pinned) {
-      throw new Error('Hermes backend did not confirm the session pin update')
-    }
-    return observed
+    return requireConfirmedPinned(response, pinned)
   }
   const response = await claudePatch<{
     pinned?: boolean
     session?: ClaudeSession
   }>(`/api/sessions/${encodeURIComponent(sessionId)}`, { pinned })
+  return requireConfirmedPinned(response, pinned)
+}
+
+export function requireConfirmedPinned(
+  response: { pinned?: boolean; session?: { pinned?: boolean } },
+  pinned: boolean,
+): boolean {
   const observed =
     typeof response.pinned === 'boolean'
       ? response.pinned

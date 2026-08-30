@@ -156,11 +156,14 @@ export function usePinnedSessions() {
   }
 }
 
-export function usePinnedSessionMigration(sessions: Array<SessionMeta>) {
+export function usePinnedSessionMigration(
+  sessions: Array<SessionMeta>,
+  ready: boolean,
+) {
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    if (migrationStarted || sessions.length === 0) return
+    if (migrationStarted || !ready || sessions.length === 0) return
     if (getStorageItem(MIGRATION_MARKER) === '1') return
     migrationStarted = true
 
@@ -174,8 +177,12 @@ export function usePinnedSessionMigration(sessions: Array<SessionMeta>) {
       candidates.map(({ session }) => writeSessionPin(session, true)),
     ).then(async (results) => {
       let migrated = 0
+      let rejected = 0
       results.forEach((result, index) => {
-        if (result.status !== 'fulfilled') return
+        if (result.status !== 'fulfilled') {
+          rejected += 1
+          return
+        }
         const candidate = candidates[index]
         unresolved.delete(candidate.legacyKey)
         migrated += 1
@@ -183,12 +190,19 @@ export function usePinnedSessionMigration(sessions: Array<SessionMeta>) {
 
       const remaining = [...unresolved]
       writeLegacyPinnedKeys(remaining)
-      setStorageItem(MIGRATION_MARKER, '1')
+      if (rejected === 0) {
+        setStorageItem(MIGRATION_MARKER, '1')
+      } else {
+        toast(
+          `Couldn't migrate ${rejected} pinned session${rejected === 1 ? '' : 's'}; will retry next time`,
+          { type: 'error' },
+        )
+      }
       if (migrated > 0) {
         await queryClient.invalidateQueries({
           queryKey: chatQueryKeys.sessions,
         })
       }
     })
-  }, [queryClient, sessions])
+  }, [queryClient, ready, sessions])
 }
