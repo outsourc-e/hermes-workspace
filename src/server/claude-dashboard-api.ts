@@ -22,6 +22,7 @@ export type DashboardSession = {
   last_active?: number | null
   is_active?: boolean
   preview?: string | null
+  pinned?: boolean
 }
 
 export type DashboardMessage = {
@@ -161,7 +162,12 @@ export async function createSession(
 export async function updateSession(
   id: string,
   body: Record<string, unknown>,
-): Promise<{ session: DashboardSession }> {
+): Promise<{
+  session?: DashboardSession
+  ok?: boolean
+  title?: string
+  pinned?: boolean
+}> {
   return dashboardJson(`/api/sessions/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

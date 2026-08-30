@@ -83,6 +83,7 @@ export type SessionTitleSource = 'auto' | 'manual'
 
 export type SessionSummary = {
   key?: string
+  source?: string
   label?: string
   title?: string
   derivedTitle?: string
@@ -93,6 +94,7 @@ export type SessionSummary = {
   titleSource?: SessionTitleSource
   titleError?: string | null
   preview?: string | null
+  pinned?: boolean
 }
 
 export type SessionListResponse = {
@@ -108,6 +110,7 @@ export type HistoryResponse = {
 export type SessionMeta = {
   key: string
   friendlyId: string
+  source?: string
   title?: string
   derivedTitle?: string
   label?: string
@@ -117,6 +120,7 @@ export type SessionMeta = {
   titleSource?: SessionTitleSource
   titleError?: string | null
   preview?: string | null
+  pinned?: boolean
 }
 
 export type PathsPayload = {

@@ -10,16 +10,17 @@ import {
   ensureGatewayProbed,
   getGatewayCapabilities,
   listSessions,
+  setSessionPinned,
   toSessionSummary,
   updateSession,
 } from '../../server/claude-api'
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import {
   deleteLocalSession,
   getLocalSession,
   listLocalSessions,
   updateLocalSessionTitle,
 } from '../../server/local-session-store'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -192,6 +193,8 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
           const label =
             typeof body.label === 'string' ? body.label.trim() : undefined
+          const pinned =
+            typeof body.pinned === 'boolean' ? body.pinned : undefined
           const sessionKey = rawSessionKey || rawFriendlyId
 
           if (!sessionKey) {
@@ -201,8 +204,24 @@ export const Route = createFileRoute('/api/sessions')({
             )
           }
 
+          if (label === undefined && pinned === undefined) {
+            return json(
+              { ok: false, error: 'label or pinned required' },
+              { status: 400 },
+            )
+          }
+
           const localSession = getLocalSession(sessionKey)
           if (localSession) {
+            if (pinned !== undefined) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Portable local sessions do not support shared pins',
+                },
+                { status: 400 },
+              )
+            }
             if (label) updateLocalSessionTitle(sessionKey, label)
             return json({
               ok: true,
@@ -225,6 +244,25 @@ export const Route = createFileRoute('/api/sessions')({
             })
           }
 
+          let persistedPinned: boolean | undefined
+          if (pinned !== undefined) {
+            persistedPinned = await setSessionPinned(sessionKey, pinned)
+            if (label === undefined) {
+              return json({
+                ok: true,
+                sessionKey,
+                friendlyId: rawFriendlyId || sessionKey,
+                pinned: persistedPinned,
+                entry: {
+                  key: sessionKey,
+                  id: sessionKey,
+                  friendlyId: rawFriendlyId || sessionKey,
+                  pinned: persistedPinned,
+                },
+              })
+            }
+          }
+
           if (capabilities.dashboard.available && !capabilities.enhancedChat) {
             return json({
               ok: true,
@@ -236,7 +274,13 @@ export const Route = createFileRoute('/api/sessions')({
                 label: label || sessionKey,
                 derivedTitle: label || sessionKey,
                 updatedAt: Date.now(),
+                ...(persistedPinned === undefined
+                  ? {}
+                  : { pinned: persistedPinned }),
               },
+              ...(persistedPinned === undefined
+                ? {}
+                : { pinned: persistedPinned }),
               updated: false,
             })
           }
@@ -244,11 +288,16 @@ export const Route = createFileRoute('/api/sessions')({
           const session = await updateSession(sessionKey, {
             title: label,
           })
+          const entry = toSessionSummary(session)
+          if (persistedPinned !== undefined) entry.pinned = persistedPinned
 
           return json({
             ok: true,
             sessionKey,
-            entry: toSessionSummary(session),
+            ...(persistedPinned === undefined
+              ? {}
+              : { pinned: persistedPinned }),
+            entry,
           })
         } catch (err) {
           return json(

@@ -253,6 +253,7 @@ export function normalizeSessions(
     return {
       key,
       friendlyId: friendlyIdCandidate,
+      source: typeof session.source === 'string' ? session.source : undefined,
       title: explicitTitle,
       derivedTitle,
       label,
@@ -262,6 +263,8 @@ export function normalizeSessions(
       titleStatus,
       titleSource,
       titleError: session.titleError ?? null,
+      pinned:
+        typeof session.pinned === 'boolean' ? session.pinned : undefined,
       preview:
         typeof session.preview === 'string'
           ? cleanUserText(session.preview) || session.preview.trim() || null

@@ -39,3 +39,35 @@ describe('chat utils workspace directive cleanup', () => {
     expect(sessions[1]?.derivedTitle).toBe('Fix Docker publish')
   })
 })
+
+describe('chat session pin normalization', () => {
+  it('preserves the durable backend pinned flag', () => {
+    const sessions = normalizeSessions([
+      {
+        key: 'pinned-session',
+        friendlyId: 'pinned-session',
+        pinned: true,
+      },
+      {
+        key: 'regular-session',
+        friendlyId: 'regular-session',
+        pinned: false,
+      },
+    ] satisfies Array<SessionSummary>)
+
+    expect(sessions.map((session) => session.pinned)).toEqual([true, false])
+  })
+
+  it('preserves source and leaves missing pin state undefined', () => {
+    const [session] = normalizeSessions([
+      {
+        key: 'legacy-session',
+        friendlyId: 'legacy-session',
+        source: 'desktop',
+      },
+    ])
+
+    expect(session?.source).toBe('desktop')
+    expect(session?.pinned).toBeUndefined()
+  })
+})
