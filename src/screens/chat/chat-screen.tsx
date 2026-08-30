@@ -81,6 +81,7 @@ import type {
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type {AgentActivity} from '@/stores/chat-activity-store';
+import { usePinnedSessions } from '@/hooks/use-pinned-sessions'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
 import {
@@ -567,6 +568,7 @@ export function ChatScreen({
     sessionsFetching: _sessionsFetching,
     refetchSessions: _refetchSessions,
   } = useChatSessions({ activeFriendlyId, isNewChat, forcedSessionKey })
+  const { togglePinnedSession } = usePinnedSessions()
   const {
     historyQuery,
     historyMessages,
@@ -2956,6 +2958,7 @@ export function ChatScreen({
               params: { sessionKey: 'new' },
             })
           }}
+          onTogglePin={togglePinnedSession}
         />
       )}
 

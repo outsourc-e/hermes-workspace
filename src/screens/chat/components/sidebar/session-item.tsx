@@ -107,6 +107,7 @@ function SessionItemComponent({
 }: SessionItemProps) {
   const isGenerating = session.titleStatus === 'generating'
   const isError = session.titleStatus === 'error'
+  const canPin = session.source !== 'local'
   const baseTitle = getSessionDisplayTitle(session, isGenerating)
 
   const updatedAt = useMemo(() => {
@@ -186,17 +187,19 @@ function SessionItemComponent({
           />
         </MenuTrigger>
         <MenuContent side="bottom" align="end">
-          <MenuItem
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onTogglePin(session)
-            }}
-            className="gap-2"
-          >
-            <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
-            {isPinned ? 'Unpin session' : 'Pin session'}
-          </MenuItem>
+          {canPin ? (
+            <MenuItem
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onTogglePin(session)
+              }}
+              className="gap-2"
+            >
+              <HugeiconsIcon icon={PinIcon} size={20} strokeWidth={1.5} />{' '}
+              {isPinned ? 'Unpin session' : 'Pin session'}
+            </MenuItem>
+          ) : null}
           <MenuItem
             onClick={(event) => {
               event.preventDefault()

@@ -48,6 +48,7 @@ export type ClaudeSession = {
   parent_session_id?: string | null
   last_active?: number | null
   preview?: string | null
+  pinned?: boolean
 }
 
 export type ClaudeMessage = {
@@ -172,17 +173,35 @@ export async function createSession(opts?: {
 
 export async function updateSession(
   sessionId: string,
-  updates: { title?: string },
+  updates: { title?: string; pinned?: boolean },
 ): Promise<ClaudeSession> {
   if (getCapabilities().dashboard.available) {
     const resp = await updateDashboardSession(sessionId, updates)
-    return resp.session as ClaudeSession
+    if (resp.session) return resp.session as ClaudeSession
+    return {
+      id: sessionId,
+      title: resp.title,
+      pinned: resp.pinned,
+    }
   }
   const resp = await claudePatch<{ session: ClaudeSession }>(
     `/api/sessions/${sessionId}`,
     updates,
   )
   return resp.session
+}
+
+export async function setSessionPinned(
+  sessionId: string,
+  pinned: boolean,
+): Promise<void> {
+  if (getCapabilities().dashboard.available) {
+    await updateDashboardSession(sessionId, { pinned })
+    return
+  }
+  await claudePatch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+    pinned,
+  })
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
@@ -329,10 +348,14 @@ export function toSessionSummary(
     kind: 'chat',
     status: session.ended_at ? 'ended' : 'idle',
     model: session.model || '',
+    source: session.source,
     label: session.title || undefined,
     title: session.title || undefined,
     derivedTitle: session.title || session.preview || undefined,
     preview: session.preview || undefined,
+    ...(typeof session.pinned === 'boolean'
+      ? { pinned: session.pinned }
+      : {}),
     tokenCount: (session.input_tokens ?? 0) + (session.output_tokens ?? 0),
     totalTokens: (session.input_tokens ?? 0) + (session.output_tokens ?? 0),
     message_count: session.message_count ?? 0,

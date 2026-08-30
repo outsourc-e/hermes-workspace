@@ -17,7 +17,10 @@ import {
   ScrollAreaViewport,
 } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
-import { usePinnedSessions } from '@/hooks/use-pinned-sessions'
+import {
+  splitPinnedSessions,
+  usePinnedSessions,
+} from '@/hooks/use-pinned-sessions'
 
 type SidebarSessionsProps = {
   sessions: Array<SessionMeta>
@@ -44,24 +47,14 @@ export const SidebarSessions = memo(function SidebarSessions({
   error,
   onRetry,
 }: SidebarSessionsProps) {
-  const { pinnedSessionKeys, togglePinnedSession } = usePinnedSessions()
+  const { togglePinnedSession } = usePinnedSessions()
 
   const [pinnedSessions, unpinnedSessions] = useMemo(() => {
-    const pinnedKeys = new Set(pinnedSessionKeys)
-    const pinned: Array<SessionMeta> = []
-    const unpinned: Array<SessionMeta> = []
-    for (const session of sessions) {
-      if (pinnedKeys.has(session.key)) {
-        pinned.push(session)
-      } else {
-        unpinned.push(session)
-      }
-    }
-    return [pinned, unpinned] as const
-  }, [pinnedSessionKeys, sessions])
+    return splitPinnedSessions(sessions)
+  }, [sessions])
 
   function handleTogglePin(session: SessionMeta) {
-    togglePinnedSession(session.key)
+    togglePinnedSession(session)
   }
 
   return (

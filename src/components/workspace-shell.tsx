@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
+import { usePinnedSessionMigration } from '@/hooks/use-pinned-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
@@ -210,6 +211,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     activeFriendlyId,
     isNewChat,
   })
+  usePinnedSessionMigration(sessions)
 
   const startNewChat = useCallback(() => {
     setCreatingSession(true)

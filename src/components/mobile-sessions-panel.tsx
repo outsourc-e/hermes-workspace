@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, Chat01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Chat01Icon, PinIcon } from '@hugeicons/core-free-icons'
 import type { SessionMeta } from '@/screens/chat/types'
 import { cn } from '@/lib/utils'
+import { splitPinnedSessions } from '@/hooks/use-pinned-sessions'
 
 type Props = {
   open: boolean
@@ -11,6 +12,7 @@ type Props = {
   activeFriendlyId: string
   onSelectSession: (key: string) => void
   onNewChat: () => void
+  onTogglePin: (session: SessionMeta) => void
 }
 
 function normalizeLabel(value: string | undefined): string {
@@ -56,6 +58,7 @@ export function MobileSessionsPanel({
   activeFriendlyId,
   onSelectSession,
   onNewChat,
+  onTogglePin,
 }: Props) {
   useEffect(() => {
     if (!open) return
@@ -77,6 +80,57 @@ export function MobileSessionsPanel({
   }, [open])
 
   if (!open) return null
+
+  const [pinnedSessions, unpinnedSessions] = splitPinnedSessions(sessions)
+
+  const renderSession = (session: SessionMeta) => {
+    const active = session.friendlyId === activeFriendlyId
+    const timestamp = formatUpdatedAt(session.updatedAt)
+    const title = getSessionTitle(session)
+    return (
+      <div
+        key={session.key}
+        className={cn(
+          'flex w-full items-center rounded-lg border transition-colors',
+          active
+            ? 'border-accent-300 bg-accent-50'
+            : 'border-transparent bg-primary-50 hover:border-primary-200',
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => onSelectSession(session.friendlyId)}
+          className="min-w-0 flex-1 px-3 py-2 text-left"
+        >
+          <div className="truncate text-sm font-medium text-ink">{title}</div>
+          <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-primary-500">
+            <span className="truncate">{session.friendlyId}</span>
+            {timestamp ? <span>{timestamp}</span> : null}
+          </div>
+        </button>
+        {session.source !== 'local' ? (
+          <button
+            type="button"
+            onClick={() => onTogglePin(session)}
+            className={cn(
+              'mr-1 inline-flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors',
+              session.pinned
+                ? 'text-accent-600 hover:bg-accent-100'
+                : 'text-primary-400 hover:bg-primary-200 hover:text-primary-700',
+            )}
+            aria-label={`${session.pinned ? 'Unpin' : 'Pin'} session ${title}`}
+          >
+            <HugeiconsIcon
+              icon={PinIcon}
+              size={18}
+              strokeWidth={1.7}
+              className={session.pinned ? 'fill-current' : undefined}
+            />
+          </button>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-[97] no-swipe md:hidden">
@@ -117,32 +171,27 @@ export function MobileSessionsPanel({
                 </p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {sessions.map((session) => {
-                  const active = session.friendlyId === activeFriendlyId
-                  const timestamp = formatUpdatedAt(session.updatedAt)
-                  return (
-                    <button
-                      key={session.key}
-                      type="button"
-                      onClick={() => onSelectSession(session.friendlyId)}
-                      className={cn(
-                        'w-full rounded-lg border px-3 py-2 text-left transition-colors',
-                        active
-                          ? 'border-accent-300 bg-accent-50'
-                          : 'border-transparent bg-primary-50 hover:border-primary-200',
-                      )}
-                    >
-                      <div className="truncate text-sm font-medium text-ink">
-                        {getSessionTitle(session)}
-                      </div>
-                      <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-primary-500">
-                        <span className="truncate">{session.friendlyId}</span>
-                        {timestamp ? <span>{timestamp}</span> : null}
-                      </div>
-                    </button>
-                  )
-                })}
+              <div className="space-y-4">
+                {pinnedSessions.length > 0 ? (
+                  <section>
+                    <h3 className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-primary-500">
+                      Pinned
+                    </h3>
+                    <div className="space-y-1">
+                      {pinnedSessions.map(renderSession)}
+                    </div>
+                  </section>
+                ) : null}
+                {unpinnedSessions.length > 0 ? (
+                  <section>
+                    <h3 className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-primary-500">
+                      Recent
+                    </h3>
+                    <div className="space-y-1">
+                      {unpinnedSessions.map(renderSession)}
+                    </div>
+                  </section>
+                ) : null}
               </div>
             )}
           </div>
