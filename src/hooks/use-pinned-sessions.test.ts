@@ -96,5 +96,6 @@ describe('planLegacyPinMigration', () => {
       'local-session',
       'not-loaded',
     ])
+    expect([...plan.unattempted]).toEqual(['not-loaded'])
   })
 })

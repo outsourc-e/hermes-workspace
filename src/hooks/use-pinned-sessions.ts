@@ -95,19 +95,24 @@ export function planLegacyPinMigration(
   sessions: Array<SessionMeta>,
 ) {
   const unresolved = new Set(legacyKeys)
+  const unattempted = new Set<string>()
   const candidates: Array<{ legacyKey: string; session: SessionMeta }> = []
   for (const legacyKey of legacyKeys) {
     const session = sessions.find(
       (row) => row.key === legacyKey || row.friendlyId === legacyKey,
     )
-    if (!session || session.source === 'local') continue
+    if (!session) {
+      unattempted.add(legacyKey)
+      continue
+    }
+    if (session.source === 'local') continue
     if (session.pinned) {
       unresolved.delete(legacyKey)
       continue
     }
     candidates.push({ legacyKey, session })
   }
-  return { candidates, unresolved }
+  return { candidates, unresolved, unattempted }
 }
 
 export function usePinnedSessions() {
@@ -169,7 +174,7 @@ export function usePinnedSessionMigration(
 
     const legacyKeys = readLegacyPinnedKeys()
     if (legacyKeys === null) return
-    const { candidates, unresolved } = planLegacyPinMigration(
+    const { candidates, unresolved, unattempted } = planLegacyPinMigration(
       legacyKeys,
       sessions,
     )
@@ -190,11 +195,12 @@ export function usePinnedSessionMigration(
 
       const remaining = [...unresolved]
       writeLegacyPinnedKeys(remaining)
-      if (rejected === 0) {
+      if (rejected === 0 && unattempted.size === 0) {
         setStorageItem(MIGRATION_MARKER, '1')
       } else {
+        const deferred = rejected + unattempted.size
         toast(
-          `Couldn't migrate ${rejected} pinned session${rejected === 1 ? '' : 's'}; will retry next time`,
+          `Couldn't migrate ${deferred} pinned session${deferred === 1 ? '' : 's'}; will retry next time`,
           { type: 'error' },
         )
       }
