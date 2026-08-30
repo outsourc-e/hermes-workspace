@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { SessionMeta } from '@/screens/chat/types'
 import { chatQueryKeys } from '@/screens/chat/chat-queries'
+import { toast } from '@/components/ui/toast'
 
 const LEGACY_STORAGE_KEY = 'pinned-sessions'
 const MIGRATION_MARKER = 'pinned-sessions-backend-migrated-v1'
@@ -40,11 +41,15 @@ export async function writeSessionPin(
       pinned,
     }),
   })
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string
+    pinned?: boolean
+  }
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as {
-      error?: string
-    }
     throw new Error(payload.error || `Pin update failed (${response.status})`)
+  }
+  if (payload.pinned !== pinned) {
+    throw new Error('Hermes backend did not confirm the session pin update')
   }
 }
 
@@ -126,10 +131,14 @@ export function usePinnedSessions() {
       )
       return { previous }
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, _variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(chatQueryKeys.sessions, context.previous)
       }
+      toast(
+        error instanceof Error ? error.message : 'Failed to update session pin',
+        { type: 'error' },
+      )
     },
     onSettled: async () => {
       await Promise.all([
@@ -174,9 +183,7 @@ export function usePinnedSessionMigration(sessions: Array<SessionMeta>) {
 
       const remaining = [...unresolved]
       writeLegacyPinnedKeys(remaining)
-      if (remaining.length === 0) {
-        setStorageItem(MIGRATION_MARKER, '1')
-      }
+      setStorageItem(MIGRATION_MARKER, '1')
       if (migrated > 0) {
         await queryClient.invalidateQueries({
           queryKey: chatQueryKeys.sessions,

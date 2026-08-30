@@ -194,14 +194,30 @@ export async function updateSession(
 export async function setSessionPinned(
   sessionId: string,
   pinned: boolean,
-): Promise<void> {
+): Promise<boolean> {
   if (getCapabilities().dashboard.available) {
-    await updateDashboardSession(sessionId, { pinned })
-    return
+    const response = await updateDashboardSession(sessionId, { pinned })
+    const observed =
+      typeof response.pinned === 'boolean'
+        ? response.pinned
+        : response.session?.pinned
+    if (observed !== pinned) {
+      throw new Error('Hermes backend did not confirm the session pin update')
+    }
+    return observed
   }
-  await claudePatch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
-    pinned,
-  })
+  const response = await claudePatch<{
+    pinned?: boolean
+    session?: ClaudeSession
+  }>(`/api/sessions/${encodeURIComponent(sessionId)}`, { pinned })
+  const observed =
+    typeof response.pinned === 'boolean'
+      ? response.pinned
+      : response.session?.pinned
+  if (observed !== pinned) {
+    throw new Error('Hermes backend did not confirm the session pin update')
+  }
+  return observed
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

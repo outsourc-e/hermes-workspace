@@ -38,6 +38,28 @@ describe('writeSessionPin', () => {
       }),
     })
   })
+
+  it('rejects a successful response that does not confirm persistence', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+
+    await expect(
+      writeSessionPin(
+        {
+          key: 'session-key',
+          friendlyId: 'friendly-id',
+        },
+        true,
+      ),
+    ).rejects.toThrow('did not confirm')
+  })
 })
 
 describe('planLegacyPinMigration', () => {

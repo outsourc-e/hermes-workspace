@@ -244,19 +244,20 @@ export const Route = createFileRoute('/api/sessions')({
             })
           }
 
+          let persistedPinned: boolean | undefined
           if (pinned !== undefined) {
-            await setSessionPinned(sessionKey, pinned)
+            persistedPinned = await setSessionPinned(sessionKey, pinned)
             if (label === undefined) {
               return json({
                 ok: true,
                 sessionKey,
                 friendlyId: rawFriendlyId || sessionKey,
-                pinned,
+                pinned: persistedPinned,
                 entry: {
                   key: sessionKey,
                   id: sessionKey,
                   friendlyId: rawFriendlyId || sessionKey,
-                  pinned,
+                  pinned: persistedPinned,
                 },
               })
             }
@@ -273,9 +274,13 @@ export const Route = createFileRoute('/api/sessions')({
                 label: label || sessionKey,
                 derivedTitle: label || sessionKey,
                 updatedAt: Date.now(),
-                ...(pinned === undefined ? {} : { pinned }),
+                ...(persistedPinned === undefined
+                  ? {}
+                  : { pinned: persistedPinned }),
               },
-              ...(pinned === undefined ? {} : { pinned }),
+              ...(persistedPinned === undefined
+                ? {}
+                : { pinned: persistedPinned }),
               updated: false,
             })
           }
@@ -284,12 +289,14 @@ export const Route = createFileRoute('/api/sessions')({
             title: label,
           })
           const entry = toSessionSummary(session)
-          if (pinned !== undefined) entry.pinned = pinned
+          if (persistedPinned !== undefined) entry.pinned = persistedPinned
 
           return json({
             ok: true,
             sessionKey,
-            ...(pinned === undefined ? {} : { pinned }),
+            ...(persistedPinned === undefined
+              ? {}
+              : { pinned: persistedPinned }),
             entry,
           })
         } catch (err) {
