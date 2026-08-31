@@ -184,7 +184,12 @@ export async function listExternalConversations(): Promise<
       : []
   const remote =
     remoteResult.status === 'fulfilled' ? remoteResult.value : []
-  if (!local.length && !remote.length && localResult.status === 'rejected') {
+  if (
+    !local.length &&
+    !remote.length &&
+    localResult.status === 'rejected' &&
+    !(localResult.reason instanceof Error && /fetch failed/i.test(localResult.reason.message))
+  ) {
     throw localResult.reason
   }
   return [...remote, ...local].sort(
