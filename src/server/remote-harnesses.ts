@@ -91,6 +91,8 @@ async function fetchJson(
   const headers = new Headers(init?.headers)
   headers.set('accept', 'application/json')
   if (init?.body) headers.set('content-type', 'application/json')
+  const apiToken = process.env.HERMES_API_TOKEN
+  if (apiToken) headers.set('authorization', `Bearer ${apiToken}`)
   const response = await fetch(url, {
     ...init,
     headers,
