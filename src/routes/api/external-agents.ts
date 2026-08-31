@@ -27,6 +27,12 @@ export const Route = createFileRoute('/api/external-agents')({
               snapshot.online ||
               remoteRuntimes.some((runtime) => runtime.status === 'online'),
             runtimes: [...remoteRuntimes, ...snapshot.runtimes],
+            // A missing AionCore companion should not surface an error when
+            // remote harnesses are active (Hermes-only deployments).
+            error:
+              remoteRuntimes.length === 0
+                ? (snapshot.error ?? undefined)
+                : undefined,
           },
         })
       },
