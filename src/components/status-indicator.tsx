@@ -17,7 +17,11 @@ type ConnectionStatus = {
 
 async function fetchConnectionStatus(): Promise<ConnectionStatus> {
   const response = await fetch('/api/connection-status', {
-    signal: AbortSignal.timeout(5000),
+    // Generous budget: the server may legitimately spend ~6s re-probing the
+    // dashboard (3s probe + 3s retry) after a transient backend stall.
+    // A 5s abort here would report 'Disconnected' while the server is doing
+    // exactly the right recovery work.
+    signal: AbortSignal.timeout(10_000),
   })
   if (!response.ok) {
     return {
