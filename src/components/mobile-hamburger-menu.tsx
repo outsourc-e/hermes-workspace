@@ -259,7 +259,7 @@ export function MobileHamburgerMenu() {
         </div>
 
         {/* Nav items */}
-        <nav className="flex flex-col gap-1 px-3 pt-4 flex-1">
+        <nav className="flex flex-col gap-1 px-3 pt-4 flex-1 overflow-y-auto">
           {visibleNavItems.map((item) => {
             const isActive = item.match(pathname)
             return (
