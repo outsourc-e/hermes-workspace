@@ -61,6 +61,55 @@ export const Route = createFileRoute('/api/profiles/skills')({
           )
           const body = await response.text()
           if (!response.ok) {
+            // hermes-agent < #25116 has no /api/profiles/<name>/skills.
+            // The dashboard's /api/skills?profile=<name> variant exists on
+            // all versions and returns the same inventory — fall back to it
+            // so the per-profile view works against older dashboards.
+            if (response.status === 404 || response.status === 405) {
+              const fallback = await dashboardFetch(
+                `/api/skills?profile=${encodeURIComponent(profile)}`,
+                { signal: AbortSignal.timeout(30_000) },
+              )
+              const fallbackBody = (await fallback
+                .json()
+                .catch(() => null)) as unknown
+              const arr = Array.isArray(fallbackBody)
+                ? fallbackBody
+                : fallbackBody &&
+                    typeof fallbackBody === 'object' &&
+                    Array.isArray(
+                      (fallbackBody as { items?: Array<unknown> }).items,
+                    )
+                  ? (fallbackBody as { items: Array<unknown> }).items
+                  : null
+              if (fallback.ok && arr) {
+                const items = arr
+                  .map((entry) => {
+                    const record = entry as Record<string, unknown>
+                    const name =
+                      typeof record.name === 'string' ? record.name.trim() : ''
+                    if (!name) return null
+                    return {
+                      name,
+                      description:
+                        typeof record.description === 'string'
+                          ? record.description
+                          : '',
+                      category:
+                        typeof record.category === 'string'
+                          ? record.category
+                          : null,
+                      path: '',
+                      enabled: record.enabled !== false,
+                    }
+                  })
+                  .filter(
+                    (entry): entry is NonNullable<typeof entry> =>
+                      entry !== null,
+                  )
+                return json({ profile, items })
+              }
+            }
             // 404 from dashboard means the profile doesn't exist or doesn't
             // expose the endpoint (older dashboard without PR #25116).
             return json(

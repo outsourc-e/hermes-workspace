@@ -142,16 +142,33 @@ export const DASHBOARD_REQUIRED_INSTRUCTIONS =
 export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes backend does not support the sessions API. ${CLAUDE_UPGRADE_INSTRUCTIONS}`
 
 const PROBE_TIMEOUT_MS = 3_000
-// Probe TTL: 120s when the gateway is healthy, 15s when it isn't. The
+// Probe TTL: 120s when the full backend is healthy, 15s when it isn't. The
 // shorter window during 'disconnected' state means a Docker stack where
 // the workspace boots before the agent recovers within ~15s of the agent
 // becoming reachable, instead of being stuck on the first failed probe
 // for two minutes. See #275.
+//
+// The degraded case (gateway healthy but dashboard probe failing) also uses
+// the short window: a single transient dashboard stall (loaded host, agent
+// session churn, restart) must not pin the UI to degraded mode for 2
+// minutes — the next probe recovers it within ~15s of the stall ending.
 const PROBE_TTL_MS = 120_000
 const PROBE_TTL_DISCONNECTED_MS = 15_000
+// A first probe attempt that fails this fast (connection refused / instant
+// error) means the dashboard is genuinely unreachable — a retry would only
+// burn another 3s window. Slower failures (timeout while the host is under
+// load) get one retry before the dashboard is declared gone.
+const PROBE_RETRY_SLOW_THRESHOLD_MS = 1_000
 
-function effectiveProbeTtl(caps: { health: boolean; chatCompletions: boolean }): number {
-  if (caps.health || caps.chatCompletions) return PROBE_TTL_MS
+export function effectiveProbeTtl(caps: {
+  health: boolean
+  chatCompletions: boolean
+  dashboard: { available: boolean }
+}): number {
+  if (caps.health || caps.chatCompletions) {
+    if (caps.dashboard.available) return PROBE_TTL_MS
+    return PROBE_TTL_DISCONNECTED_MS
+  }
   return PROBE_TTL_DISCONNECTED_MS
 }
 const DASHBOARD_TOKEN_REGEX =
@@ -591,19 +608,48 @@ async function probeMcpConfigKey(): Promise<boolean> {
   }
 }
 
-async function probeDashboard(): Promise<{ available: boolean; url: string }> {
-  try {
-    const res = await fetch(`${CLAUDE_DASHBOARD_URL}/api/status`, {
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    })
-    if (!res.ok) return { available: false, url: CLAUDE_DASHBOARD_URL }
-    const body = (await res.json()) as { version?: string }
-    if (!body.version) return { available: false, url: CLAUDE_DASHBOARD_URL }
-    await fetchDashboardToken().catch(() => '')
-    return { available: true, url: CLAUDE_DASHBOARD_URL }
-  } catch {
-    return { available: false, url: CLAUDE_DASHBOARD_URL }
+export async function probeDashboard(): Promise<{ available: boolean; url: string }> {
+  // Retry once when the first attempt failed slowly (timeout / slow response
+  // while the host is under load): a transient >3s stall must not flip the
+  // whole workspace to degraded mode for the probe TTL. Fast failures
+  // (ECONNREFUSED, dead port) skip the retry — the dashboard is genuinely
+  // down and a second 3s wait buys nothing; the short degraded TTL re-probes
+  // again shortly anyway.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const startedAt = Date.now()
+    try {
+      const res = await fetch(`${CLAUDE_DASHBOARD_URL}/api/status`, {
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        if (attempt === 0 && Date.now() - startedAt > PROBE_RETRY_SLOW_THRESHOLD_MS) {
+          continue
+        }
+        console.warn(
+          `[gateway] dashboard probe failed: /api/status returned ${res.status}`,
+        )
+        return { available: false, url: CLAUDE_DASHBOARD_URL }
+      }
+      const body = (await res.json()) as { version?: string }
+      if (!body.version) {
+        console.warn(
+          '[gateway] dashboard probe failed: /api/status missing version field',
+        )
+        return { available: false, url: CLAUDE_DASHBOARD_URL }
+      }
+      await fetchDashboardToken().catch(() => '')
+      return { available: true, url: CLAUDE_DASHBOARD_URL }
+    } catch (err) {
+      if (attempt === 0 && Date.now() - startedAt > PROBE_RETRY_SLOW_THRESHOLD_MS) {
+        continue
+      }
+      console.warn(
+        `[gateway] dashboard probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      )
+      return { available: false, url: CLAUDE_DASHBOARD_URL }
+    }
   }
+  return { available: false, url: CLAUDE_DASHBOARD_URL }
 }
 
 /**
@@ -828,6 +874,7 @@ export async function probeGateway(options?: {
   }
 
   probePromise = (async () => {
+    const prevDashboardAvailable = capabilities.dashboard.available
     await Promise.all([autoDetectGatewayUrl(), autoDetectDashboardUrl()])
 
     const [
@@ -895,6 +942,11 @@ export async function probeGateway(options?: {
     }
     lastProbeAt = Date.now()
     logCapabilities(capabilities)
+    if (prevDashboardAvailable && !dashboard.available) {
+      console.warn(
+        '[gateway] dashboard was available and just failed the probe — capabilities degraded; re-probing on the short (15s) window for fast recovery',
+      )
+    }
     return capabilities
   })()
 

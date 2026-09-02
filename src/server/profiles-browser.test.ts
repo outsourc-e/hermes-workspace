@@ -3,13 +3,20 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { listProfiles, readProfile, updateProfileConfig } from './profiles-browser'
+import {
+  listProfiles,
+  listProfilesWithFallback,
+  readProfile,
+  updateProfileConfig,
+} from './profiles-browser'
 
 describe('listProfiles', () => {
   let tempHome: string
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-profiles-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-profiles-'),
+    )
     vi.spyOn(os, 'homedir').mockReturnValue(tempHome)
     delete process.env.HERMES_HOME
     delete process.env.CLAUDE_HOME
@@ -26,7 +33,11 @@ describe('listProfiles', () => {
     const namedProfileRoot = path.join(profilesRoot, 'jarvis')
 
     fs.mkdirSync(namedProfileRoot, { recursive: true })
-    fs.writeFileSync(path.join(hermesRoot, 'active_profile'), 'jarvis\n', 'utf-8')
+    fs.writeFileSync(
+      path.join(hermesRoot, 'active_profile'),
+      'jarvis\n',
+      'utf-8',
+    )
     fs.writeFileSync(
       path.join(hermesRoot, 'config.yaml'),
       'model: default-model\ndescription: Default operator\n',
@@ -43,10 +54,18 @@ describe('listProfiles', () => {
 
     expect(names).toContain('default')
     expect(names).toContain('jarvis')
-    expect(profiles.find((profile) => profile.name === 'default')?.active).toBe(false)
-    expect(profiles.find((profile) => profile.name === 'jarvis')?.active).toBe(true)
-    expect(profiles.find((profile) => profile.name === 'default')?.description).toBe('Default operator')
-    expect(profiles.find((profile) => profile.name === 'jarvis')?.description).toBe('Named operator')
+    expect(profiles.find((profile) => profile.name === 'default')?.active).toBe(
+      false,
+    )
+    expect(profiles.find((profile) => profile.name === 'jarvis')?.active).toBe(
+      true,
+    )
+    expect(
+      profiles.find((profile) => profile.name === 'default')?.description,
+    ).toBe('Default operator')
+    expect(
+      profiles.find((profile) => profile.name === 'jarvis')?.description,
+    ).toBe('Named operator')
   })
 
   it('skips profiles/default so only the root-backed default card renders', () => {
@@ -68,14 +87,56 @@ describe('listProfiles', () => {
     )
 
     const profiles = listProfiles()
-    const defaultProfiles = profiles.filter((profile) => profile.name === 'default')
+    const defaultProfiles = profiles.filter(
+      (profile) => profile.name === 'default',
+    )
 
     expect(defaultProfiles).toHaveLength(1)
     expect(defaultProfiles[0]?.path).toBe(hermesRoot)
     expect(defaultProfiles[0]?.model).toBe('root-model')
     expect(defaultProfiles[0]?.provider).toBe('openai')
     expect(defaultProfiles[0]?.description).toBe('Root default')
-    expect(profiles.find((profile) => profile.name === 'builder')?.provider).toBe('anthropic')
+    expect(
+      profiles.find((profile) => profile.name === 'builder')?.provider,
+    ).toBe('anthropic')
+  })
+
+  it('counts sessions from state.db rows, not session dir files', () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const profileRoot = path.join(hermesRoot, 'profiles', 'builder')
+
+    fs.mkdirSync(profileRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(profileRoot, 'config.yaml'),
+      'model: named-model\n',
+      'utf-8',
+    )
+    // Legacy dump file that must NOT be counted as a session.
+    fs.mkdirSync(path.join(profileRoot, 'sessions'), { recursive: true })
+    fs.writeFileSync(
+      path.join(profileRoot, 'sessions', 'request_dump_main.json'),
+      '{}',
+      'utf-8',
+    )
+    // Real sessions live as rows in state.db.
+    const { DatabaseSync } = require('node:sqlite') as {
+      DatabaseSync: new (p: string) => {
+        exec: (s: string) => void
+        close: () => void
+      }
+    }
+    const db = new DatabaseSync(path.join(profileRoot, 'state.db'))
+    db.exec(
+      "CREATE TABLE sessions (id TEXT PRIMARY KEY); INSERT INTO sessions (id) VALUES ('a'), ('b'), ('c');",
+    )
+    db.close()
+
+    const profiles = listProfiles()
+    const builder = profiles.find((p) => p.name === 'builder')
+    expect(builder?.sessionCount).toBe(3)
+    // The default profile (no state.db) falls back to legacy file counting.
+    const def = profiles.find((p) => p.name === 'default')
+    expect(def?.sessionCount).toBe(0)
   })
 
   it('reads and updates profile descriptions from config.yaml', () => {
@@ -107,8 +168,16 @@ describe('listProfiles', () => {
     fs.mkdirSync(soulProfileRoot, { recursive: true })
     fs.mkdirSync(configProfileRoot, { recursive: true })
 
-    fs.writeFileSync(path.join(hermesRoot, 'config.yaml'), 'model: root-model\n', 'utf-8')
-    fs.writeFileSync(path.join(soulProfileRoot, 'config.yaml'), 'model: named-model\n', 'utf-8')
+    fs.writeFileSync(
+      path.join(hermesRoot, 'config.yaml'),
+      'model: root-model\n',
+      'utf-8',
+    )
+    fs.writeFileSync(
+      path.join(soulProfileRoot, 'config.yaml'),
+      'model: named-model\n',
+      'utf-8',
+    )
     fs.writeFileSync(
       path.join(soulProfileRoot, 'SOUL.md'),
       'You are Leelo, executive assistant.',
@@ -127,15 +196,86 @@ describe('listProfiles', () => {
 
     const profiles = listProfiles()
 
-    expect(profiles.find((profile) => profile.name === 'leelo')?.systemPrompt).toBe(
-      'You are Leelo, executive assistant.',
-    )
-    expect(profiles.find((profile) => profile.name === 'ops')?.systemPrompt).toBe(
-      'Config prompt wins',
-    )
+    expect(
+      profiles.find((profile) => profile.name === 'leelo')?.systemPrompt,
+    ).toBe('You are Leelo, executive assistant.')
+    expect(
+      profiles.find((profile) => profile.name === 'ops')?.systemPrompt,
+    ).toBe('Config prompt wins')
     expect(readProfile('leelo').systemPrompt).toBe(
       'You are Leelo, executive assistant.',
     )
     expect(readProfile('ops').systemPrompt).toBe('Config prompt wins')
+  })
+})
+
+describe('listProfilesWithFallback (dashboard path)', () => {
+  let tempHome: string
+
+  beforeEach(() => {
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-profiles-fb-'),
+    )
+    vi.spyOn(os, 'homedir').mockReturnValue(tempHome)
+    delete process.env.HERMES_HOME
+    delete process.env.CLAUDE_HOME
+    delete process.env.HERMES_API_TOKEN
+    delete process.env.CLAUDE_API_TOKEN
+    process.env.HERMES_DASHBOARD_URL = 'http://dashboard.test'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    delete process.env.HERMES_DASHBOARD_URL
+    fs.rmSync(tempHome, { recursive: true, force: true })
+  })
+
+  it('marks the LOCAL active_profile as active, not the dashboard is_default', async () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const profilesRoot = path.join(hermesRoot, 'profiles')
+    const investRoot = path.join(profilesRoot, 'invest')
+    fs.mkdirSync(investRoot, { recursive: true })
+    fs.writeFileSync(path.join(hermesRoot, 'active_profile'), 'invest\n', 'utf-8')
+
+    // Dashboard payload: `is_default` only names the default-named profile —
+    // it must NOT be treated as the active profile.
+    const dashboardPayload = {
+      profiles: [
+        {
+          name: 'default',
+          path: hermesRoot,
+          is_default: true,
+          model: 'm',
+          provider: 'p',
+          has_env: true,
+          skill_count: 10,
+          updated_at: '2026-08-21T00:00:00.000Z',
+        },
+        {
+          name: 'invest',
+          path: investRoot,
+          is_default: false,
+          model: 'm',
+          provider: 'p',
+          has_env: true,
+          skill_count: 20,
+          updated_at: '2026-08-21T01:00:00.000Z',
+        },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => dashboardPayload,
+      }),
+    )
+
+    const { profiles, activeProfile } = await listProfilesWithFallback()
+
+    expect(activeProfile).toBe('invest')
+    expect(profiles.find((p) => p.name === 'invest')?.active).toBe(true)
+    expect(profiles.find((p) => p.name === 'default')?.active).toBe(false)
   })
 })

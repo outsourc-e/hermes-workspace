@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process'
+import { accessSync, constants as fsConstants } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
@@ -133,6 +135,36 @@ async function searchBundledSkills(
   }
 }
 
+/**
+ * Resolve the Python interpreter for the skills-hub search bridge.
+ *
+ * The bridge imports hermes-agent's `tools.skills_hub` (httpx-based), so it
+ * must run under the hermes venv python — the system `python3` typically has
+ * no httpx (PEP 668) and the import fails, silently degrading the marketplace
+ * to the bundled fallback. Resolution order: venv of HERMES_AGENT_HOME (if
+ * set) → venv of ~/.hermes/hermes-agent → venv of ~/hermes-agent (legacy
+ * layout) → plain `python3` (last resort; the bridge falls back gracefully).
+ */
+export function resolveSkillsSearchPython(): string {
+  const envDir = process.env.HERMES_AGENT_HOME?.trim()
+  const candidates = envDir
+    ? [path.join(envDir, 'venv/bin/python'), 'python3']
+    : [
+        path.join(os.homedir(), '.hermes/hermes-agent/venv/bin/python'),
+        path.join(os.homedir(), 'hermes-agent/venv/bin/python'),
+        'python3',
+      ]
+  for (const candidate of candidates) {
+    try {
+      accessSync(candidate, fsConstants.X_OK)
+      return candidate
+    } catch {
+      // try next candidate
+    }
+  }
+  return 'python3'
+}
+
 async function searchPythonSkillsHub(
   query: string,
   limit: number,
@@ -140,10 +172,13 @@ async function searchPythonSkillsHub(
 ): Promise<SkillSearchPayload> {
   const scriptPath = path.join(process.cwd(), 'scripts/skills-search.py')
   const { stdout } = await execFileAsync(
-    'python3',
+    resolveSkillsSearchPython(),
     [scriptPath, query, String(limit), source],
     {
-      timeout: 30_000,
+      // The bridge probes multiple registries (GitHub rate-limit retries can
+      // add ~30s on top of a normal run); keep the timeout generous so the
+      // marketplace doesn't silently degrade to the bundled fallback.
+      timeout: 90_000,
       maxBuffer: 1024 * 1024 * 2,
     },
   )

@@ -23,12 +23,39 @@ function isBrowserMemoryPath(relativePath: string): boolean {
   )
 }
 
-function normalizeWorkspaceRoot(): string {
-  // Honor HERMES_HOME when set (e.g. ~/.hermes-vanilla for running alongside prod).
-  // Fall back to ~/.hermes for the default install location.
+/**
+ * Resolve the Hermes home whose memory this browser serves.
+ *
+ * Precedence:
+ *   1. Explicit HERMES_HOME / CLAUDE_HOME env (operator override, e.g.
+ *      ~/.hermes-vanilla for running alongside prod) — wins unconditionally.
+ *   2. The ACTIVE profile named by <hermes root>/active_profile (same on-disk
+ *      source the dashboard wrapper and gateway re-home on). Memory follows
+ *      the profile the workspace chat is bound to, matching the Files screen
+ *      and the rest of the stack.
+ *   3. <hermes root> (default profile) when no marker or an unknown profile.
+ */
+function resolveMemoryHome(): string {
   const envHome = (process.env.HERMES_HOME || process.env.CLAUDE_HOME)?.trim()
-  const resolved = envHome ? path.resolve(envHome) : path.resolve(path.join(os.homedir(), '.hermes'))
-  return resolved
+  if (envHome) return path.resolve(envHome)
+
+  const hermesRoot = path.resolve(path.join(os.homedir(), '.hermes'))
+  try {
+    const active = fs
+      .readFileSync(path.join(hermesRoot, 'active_profile'), 'utf-8')
+      .trim()
+    if (active && active !== 'default') {
+      const profileHome = path.join(hermesRoot, 'profiles', active)
+      if (fs.existsSync(profileHome)) return path.resolve(profileHome)
+    }
+  } catch {
+    // no active_profile marker — default home
+  }
+  return hermesRoot
+}
+
+function normalizeWorkspaceRoot(): string {
+  return resolveMemoryHome()
 }
 
 export function getMemoryWorkspaceRoot(): string {

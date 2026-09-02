@@ -79,6 +79,29 @@ export const Route = createFileRoute('/api/profiles/toggle-skill')({
           } catch {
             payload = { ok: false, error: text }
           }
+          if (!response.ok) {
+            // hermes-agent < #25116 has no per-profile toggle endpoint, but
+            // /api/skills/toggle accepts a `profile` body field on all
+            // versions — fall back so per-profile toggling works.
+            if (response.status === 404 || response.status === 405) {
+              const fallback = await dashboardFetch('/api/skills/toggle', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, enabled, profile }),
+                signal: AbortSignal.timeout(30_000),
+              })
+              const fallbackText = await fallback.text()
+              let fallbackPayload: unknown = null
+              try {
+                fallbackPayload = fallbackText
+                  ? JSON.parse(fallbackText)
+                  : null
+              } catch {
+                fallbackPayload = { ok: false, error: fallbackText }
+              }
+              return json(fallbackPayload, { status: fallback.status })
+            }
+          }
           return json(payload, { status: response.status })
         } catch (err) {
           return json(

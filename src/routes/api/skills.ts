@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
@@ -15,14 +16,35 @@ import {
 import { requireJsonContentType } from '../../server/rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
-function getSkillsDir(): string {
-  return (
-    process.env.HERMES_SKILLS_DIR ||
-    path.join(
-      process.env.HERMES_HOME || path.join(os.homedir(), '.hermes'),
-      'skills',
-    )
-  )
+/**
+ * Resolve the skills directory whose local inventory enriches the list.
+ *
+ * Precedence:
+ *   1. HERMES_SKILLS_DIR (explicit operator override) — wins unconditionally.
+ *   2. HERMES_HOME / CLAUDE_HOME env (e.g. ~/.hermes-vanilla deployments).
+ *   3. The ACTIVE profile named by <hermes root>/active_profile — the local
+ *      path map must match the profile the dashboard serves (invest-scoped),
+ *      otherwise invest-only skills get no local path and default-profile
+ *      paths leak into the UI.
+ *   4. <hermes root>/skills (default profile).
+ */
+export function getSkillsDir(): string {
+  const envDir = process.env.HERMES_SKILLS_DIR?.trim()
+  if (envDir) return envDir
+  const envHome = (process.env.HERMES_HOME || process.env.CLAUDE_HOME)?.trim()
+  if (envHome) return path.join(envHome, 'skills')
+
+  const hermesRoot = path.join(os.homedir(), '.hermes')
+  try {
+    const active = readFileSync(path.join(hermesRoot, 'active_profile'), 'utf-8').trim()
+    if (active && active !== 'default') {
+      const profileHome = path.join(hermesRoot, 'profiles', active)
+      if (existsSync(profileHome)) return path.join(profileHome, 'skills')
+    }
+  } catch {
+    // no active_profile marker — default home
+  }
+  return path.join(hermesRoot, 'skills')
 }
 
 type LocalSkillMeta = { path: string; author: string }
@@ -58,6 +80,21 @@ async function buildLocalSkillPathMap(): Promise<Map<string, LocalSkillMeta>> {
   for (const cat of categoryEntries) {
     if (!cat.isDirectory() || cat.name.startsWith('.')) continue
     const catPath = path.join(root, cat.name)
+    // Flat-layout skills: SKILL.md lives DIRECTLY in the category dir
+    // (e.g. profile role skills like invest-orchestrator), not in a
+    // skill subdir. Treat those as skills named after the category.
+    try {
+      const flatStat = await fs.stat(path.join(catPath, 'SKILL.md'))
+      if (flatStat.isFile() && !map.has(cat.name)) {
+        collect.push(
+          readSkillAuthor(catPath).then((author) => {
+            map.set(cat.name, { path: catPath, author })
+          }),
+        )
+      }
+    } catch {
+      // no flat SKILL.md — normal category layout, walk subdirs below
+    }
     let skillEntries: Array<{
       name: string
       isDirectory: () => boolean
