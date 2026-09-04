@@ -138,10 +138,10 @@ function SessionItemComponent({
       }}
       className={cn(
         'group inline-flex items-center justify-between',
-        'w-full text-left pl-1.5 pr-0.5 h-14 rounded-lg transition-colors duration-0',
+        'w-full text-left pl-1.5 pr-0.5 h-11 rounded-xl transition-colors duration-0',
         'select-none',
         active
-          ? 'bg-primary-200 text-primary-950'
+          ? 'relative bg-[var(--theme-accent-soft)] text-primary-950 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-[var(--theme-accent)]'
           : 'bg-transparent text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200',
       )}
     >

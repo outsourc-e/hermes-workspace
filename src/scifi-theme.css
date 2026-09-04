@@ -51,6 +51,11 @@
   --code-border: #142d4a;
   --code-foreground: #64ffda;
   --theme-input: #0a1628;
+  --theme-accent-soft: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+  --theme-accent-soft-strong: color-mix(in srgb, var(--theme-accent) 18%, transparent);
+  --theme-accent-strong: color-mix(in srgb, var(--theme-accent) 78%, var(--theme-text));
+  --theme-radius-bubble: 12px;
+  --theme-radius-composer: 12px;
 }
 
 /* ── SciFi Light ────────────────────────────────────────────────────── */
@@ -100,6 +105,11 @@
   --code-border: #c4cdd8;
   --code-foreground: #0a1628;
   --theme-input: #f6f8fa;
+  --theme-accent-soft: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+  --theme-accent-soft-strong: color-mix(in srgb, var(--theme-accent) 18%, transparent);
+  --theme-accent-strong: color-mix(in srgb, var(--theme-accent) 78%, var(--theme-text));
+  --theme-radius-bubble: 12px;
+  --theme-radius-composer: 12px;
 }
 
 /* ── SciFi dark theme body bg/color overrides ───────────────────────── */

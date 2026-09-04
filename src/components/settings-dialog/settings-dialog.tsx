@@ -89,6 +89,8 @@ const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
   'claude-official',
   'claude-classic',
   'claude-slate',
+  'matrix',
+  'scifi',
 ])
 
 function _isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
@@ -131,7 +133,7 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 py-1.5">
+    <div className="flex flex-wrap items-center justify-between gap-4 py-3">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
           {label}
@@ -1520,19 +1522,19 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
   preview:
     theme.id === 'claude-nous'
       ? {
-          bg: '#041C1C',
-          panel: '#06282A',
-          border: 'rgba(255,230,203,0.2)',
-          accent: '#FFAC02',
-          text: '#FFE6CB',
+          bg: '#072424',
+          panel: '#0B3032',
+          border: 'rgba(243,230,212,0.16)',
+          accent: '#d4a054',
+          text: '#F3E6D4',
         }
       : theme.id === 'claude-nous-light'
         ? {
-            bg: '#F8FAF8',
-            panel: '#FBFDFB',
-            border: 'rgba(30,74,92,0.18)',
-            accent: '#2557B7',
-            text: '#16315F',
+            bg: '#F4EEE4',
+            panel: '#FAF6EE',
+            border: 'rgba(28,58,60,0.16)',
+            accent: '#9A6B28',
+            text: '#1C3A3C',
           }
         : theme.id === 'matrix'
           ? {
@@ -1874,7 +1876,7 @@ function ChatContent() {
             className="h-8 rounded-md border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400"
             aria-label="Chat content width"
           >
-            <option value="comfortable">Comfortable (900px)</option>
+            <option value="comfortable">Comfortable (760px)</option>
             <option value="wide">Wide (1200px)</option>
             <option value="full">Full width</option>
           </select>

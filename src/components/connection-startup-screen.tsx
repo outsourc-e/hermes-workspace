@@ -222,7 +222,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         <img
           src="/claude-avatar.webp"
           alt="Hermes Agent"
-          className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+          className="app-mark mb-5 h-20 w-20 shadow-[0_12px_40px_rgba(124,58,237,0.35)]"
         />
 
         <h1 className="text-[2rem] font-semibold tracking-tight text-white">

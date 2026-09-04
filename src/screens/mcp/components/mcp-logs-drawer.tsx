@@ -109,7 +109,7 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
         className="absolute inset-0 bg-black/30"
         onClick={onClose}
       />
-      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-primary-200 bg-white shadow-xl">
+      <aside className="relative flex h-full w-full max-w-md flex-col border-l border-primary-200 bg-[var(--theme-card)] shadow-xl">
         <header className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
           <div className="min-w-0">
             <h3 className="truncate text-sm font-semibold text-primary-900">

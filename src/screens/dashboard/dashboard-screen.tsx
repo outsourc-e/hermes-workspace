@@ -48,7 +48,14 @@ import type { ClaudeSession } from '@/server/claude-api'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
+import { Panel } from '@/components/ui/surface'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import {
+  getTheme,
+  getThemeVariant,
+  isDarkTheme,
+  setTheme,
+} from '@/lib/theme'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
@@ -135,28 +142,25 @@ function GlassCard({
   children: ReactNode
 }) {
   return (
-    <div
+    <Panel
       className={cn(
-        'relative flex flex-col overflow-hidden rounded-xl border transition-colors',
+        'relative flex flex-col overflow-hidden',
         className,
       )}
-      style={{
-        background: 'var(--theme-card)',
-        borderColor: 'var(--theme-border)',
-      }}
     >
       {accentColor && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-px"
           style={{
-            background: `linear-gradient(90deg, ${accentColor}, ${accentColor}50, transparent)`,
+            background: accentColor,
+            opacity: 0.2,
           }}
         />
       )}
       {title && (
         <div className="flex items-center justify-between px-5 pt-4 pb-0">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">
+          <h3 className="micro-label">
             {title}
           </h3>
           {titleRight}
@@ -165,7 +169,7 @@ function GlassCard({
       <div className={cn('flex-1', noPadding ? '' : 'px-5 pb-4 pt-3')}>
         {children}
       </div>
-    </div>
+    </Panel>
   )
 }
 
@@ -840,7 +844,7 @@ export function DashboardScreen() {
           onClick={openHamburgerMenu}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
         >
-          <svg width="20" height="16" viewBox="0 0 20 16" fill="none" className="opacity-70" style={{ color: 'var(--color-ink, #111)' }}>
+          <svg width="20" height="16" viewBox="0 0 20 16" fill="none" className="opacity-70" style={{ color: 'var(--theme-text)' }}>
             <path d="M1 1.5H19M1 8H19M1 14.5H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
@@ -848,20 +852,10 @@ export function DashboardScreen() {
           type="button"
           aria-label="Toggle theme"
           onClick={() => {
-            const LIGHT_DARK_PAIRS: Record<string, string> = {
-              'claude-nous': 'claude-nous-light',
-              'claude-nous-light': 'claude-nous',
-              'claude-official': 'claude-official-light',
-              'claude-official-light': 'claude-official',
-              'claude-classic': 'claude-classic-light',
-              'claude-classic-light': 'claude-classic',
-              'claude-slate': 'claude-slate-light',
-              'claude-slate-light': 'claude-slate',
-            }
-            const cur = document.documentElement.getAttribute('data-theme') || 'claude-official'
-            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'claude-official-light' : 'claude-official')
-            import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
-            const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
+            const current = getTheme()
+            const next = getThemeVariant(current, isDarkTheme(current) ? 'light' : 'dark')
+            setTheme(next)
+            const nextMode = isDarkTheme(next) ? 'dark' : 'light'
             applyTheme(nextMode)
             updateSettings({ theme: nextMode })
             setIsDark(nextMode === 'dark')
@@ -901,8 +895,7 @@ export function DashboardScreen() {
             <img
               src="/claude-avatar.webp"
               alt="Hermes Workspace logo"
-              className="size-8 rounded-md"
-              style={{ background: 'transparent' }}
+              className="app-mark size-8"
             />
           </span>
           {/* Iter 011: dropped the 'Operator console · vX.Y.Z'

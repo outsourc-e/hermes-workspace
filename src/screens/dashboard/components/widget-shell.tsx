@@ -51,8 +51,7 @@ export function WidgetShell({
         style={{
           outline: '1px dashed var(--theme-accent)',
           outlineOffset: '2px',
-          boxShadow:
-            '0 0 0 6px color-mix(in srgb, var(--theme-accent) 8%, transparent)',
+          boxShadow: 'none',
           borderRadius: 12,
         }}
       />

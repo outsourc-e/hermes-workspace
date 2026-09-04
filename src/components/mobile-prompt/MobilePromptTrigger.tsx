@@ -103,7 +103,7 @@ export function MobilePromptTrigger() {
                   <img
                     src="/claude-avatar.webp"
                     alt="Hermes Agent"
-                    className="size-8 rounded-lg"
+                    className="app-mark size-8"
                   />
                   <span className="text-xs text-primary-600">+</span>
                   <div className="flex size-8 items-center justify-center rounded-lg bg-[#232b3b]">

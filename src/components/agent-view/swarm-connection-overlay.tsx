@@ -19,7 +19,7 @@ function getLineColor(status: AgentNodeStatus): string {
   if (status === 'thinking') return '#f97316' // accent-500
   if (status === 'complete') return '#10b981' // emerald-500
   if (status === 'failed') return '#ef4444' // red-500
-  if (status === 'queued') return '#6366f1' // primary-500
+  if (status === 'queued') return 'var(--theme-accent)'
   return '#10b981' // emerald-500
 }
 

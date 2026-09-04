@@ -146,8 +146,14 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
       className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] overflow-hidden"
       style={{
         borderLeftWidth: '3px',
-        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
-        boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.12)' : 'none',
+        borderLeftColor: isRunning
+          ? 'var(--theme-accent)'
+          : isDone
+            ? 'var(--theme-success)'
+            : 'var(--theme-danger)',
+        boxShadow: isRunning
+          ? '0 0 8px color-mix(in srgb, var(--theme-accent) 18%, transparent)'
+          : 'none',
       }}
     >
       <div className="flex items-center gap-1.5 px-2.5 py-1.5">
@@ -162,7 +168,7 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
         {isDone && <span className="text-xs text-green-500">✅</span>}
         {isError && <span className="text-xs text-red-500">❌</span>}
         {isRunning && (
-          <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />
+          <span className="size-1.5 rounded-full animate-pulse bg-[var(--theme-accent)]" />
         )}
       </div>
       {isRunning && (
@@ -1817,7 +1823,7 @@ function ChatMessageListComponent({
                 {/* // Keep the last exchange pinned without extra tail gap. // Account
               for space-y-6 (24px) when pinning. */}
                 <div
-                  className="my-2 flex flex-col gap-2 md:my-3 md:gap-3"
+                  className="my-2 flex flex-col gap-4 md:my-3 md:gap-4"
                   style={{
                     minHeight: `${Math.max(0, pinGroupMinHeight - 12)}px`,
                   }}
@@ -1920,7 +1926,7 @@ function ChatMessageListComponent({
               streamingText.trim().length > 0
             ) ? (
               <div
-                className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
+                className="flex flex-col gap-4 py-2 px-1 animate-in fade-in duration-150 md:gap-4 md:py-3"
                 role="status"
                 aria-live="polite"
               >

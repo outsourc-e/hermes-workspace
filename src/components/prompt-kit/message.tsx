@@ -60,7 +60,7 @@ function MessageContent({
   ...props
 }: MessageContentProps) {
   const classNames = cn(
-    'rounded-[12px] break-words whitespace-normal min-w-0',
+    'rounded-[var(--theme-radius-bubble,12px)] break-words whitespace-normal min-w-0',
     className,
   )
 

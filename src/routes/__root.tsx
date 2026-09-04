@@ -51,6 +51,10 @@ const VALID_THEMES = [
   'claude-classic-light',
   'claude-slate',
   'claude-slate-light',
+  'matrix',
+  'matrix-light',
+  'scifi',
+  'scifi-light',
 ]
 
 const themeScript = `
@@ -61,7 +65,7 @@ const themeScript = `
     const root = document.documentElement
     const storedTheme = localStorage.getItem('${THEME_STORAGE_KEY}')
     const theme = ${JSON.stringify(VALID_THEMES)}.includes(storedTheme) ? storedTheme : '${DEFAULT_THEME}'
-    const lightThemes = ['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light']
+    const lightThemes = ['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light', 'matrix-light', 'scifi-light']
     const isDark = !lightThemes.includes(theme)
     root.classList.remove('light', 'dark', 'system')
     root.classList.add(isDark ? 'dark' : 'light')
@@ -84,17 +88,21 @@ const themeColorScript = `
     const root = document.documentElement
     const theme = root.getAttribute('data-theme') || '${DEFAULT_THEME}'
     const colors = {
-      'claude-nous': '#031A1A',
-      'claude-nous-light': '#F8FAF8',
+      'claude-nous': '#072424',
+      'claude-nous-light': '#F4EEE4',
       'claude-official': '#0A0E1A',
       'claude-official-light': '#F7F7F1',
       'claude-classic': '#0d0f12',
       'claude-classic-light': '#F5F2ED',
       'claude-slate': '#0d1117',
       'claude-slate-light': '#F6F8FA',
+      'matrix': '#020804',
+      'matrix-light': '#F4FFF6',
+      'scifi': '#060B18',
+      'scifi-light': '#EEF1F5',
     }
     const nextColor = colors[theme] || colors['${DEFAULT_THEME}']
-    const isDark = !['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light'].includes(String(theme))
+    const isDark = !['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light', 'matrix-light', 'scifi-light'].includes(String(theme))
 
     let meta = document.querySelector('meta[name="theme-color"]')
     if (!meta) {
@@ -109,10 +117,10 @@ const themeColorScript = `
 `
 
 const DEFAULT_SPLASH_HTML = `
-<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,#FFAC02 45%, transparent))" />
+<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:8px;border:2px solid #7c3aed;background:#fff;box-sizing:border-box;filter:drop-shadow(0 8px 32px color-mix(in srgb,#7c3aed 45%, transparent))" />
 <img src="/claude-banner.png" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5))" />
-<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:#9CB2AE">Workspace</div>
-<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#FFAC02;border-radius:3px;transition:width 0.4s ease"></div></div>
+<div style="font:400 14px/1 Inter,system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:#9CB2AE">Workspace</div>
+<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#d4a054;border-radius:3px;transition:width 0.4s ease"></div></div>
 `
 
 export const Route = createRootRoute({
@@ -441,19 +449,39 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             if (location.pathname === '/hermes-world' || location.pathname.indexOf('/hermes-world/') === 0 || location.pathname === '/world' || location.pathname.indexOf('/world/') === 0) return;
             var d = document.getElementById('splash-screen');
             if (!d) return;
-            var bg = '#031A1A', txt = '#F8F1E3', muted = '#9CB2AE', accent = '#FFAC02';
+            var bg = '#072424', txt = '#F3E6D4', muted = '#9CB2AE', accent = '#d4a054';
             try {
               var theme = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_THEME}';
               if (theme === 'claude-nous') {
-                bg = '#031A1A';
-                txt = '#F8F1E3';
+                bg = '#072424';
+                txt = '#F3E6D4';
                 muted = '#9CB2AE';
-                accent = '#FFAC02';
+                accent = '#d4a054';
               } else if (theme === 'claude-nous-light') {
-                bg = '#F8FAF8';
-                txt = '#16315F';
-                muted = '#6F7D96';
-                accent = '#2557B7';
+                bg = '#F4EEE4';
+                txt = '#1C3A3C';
+                muted = '#6F7D6E';
+                accent = '#9A6B28';
+              } else if (theme === 'matrix') {
+                bg = '#020804';
+                txt = '#D8FFE3';
+                muted = '#7AAF88';
+                accent = '#00FF41';
+              } else if (theme === 'matrix-light') {
+                bg = '#F4FFF6';
+                txt = '#062A12';
+                muted = '#3D6B48';
+                accent = '#008F2D';
+              } else if (theme === 'scifi') {
+                bg = '#060B18';
+                txt = '#E0F7FA';
+                muted = '#5D9BB8';
+                accent = '#00F0FF';
+              } else if (theme === 'scifi-light') {
+                bg = '#EEF1F5';
+                txt = '#0A1628';
+                muted = '#5A6A7E';
+                accent = '#0097A7';
               } else if (theme === 'claude-classic') {
                 bg = '#0d0f12';
                 txt = '#eceff4';
@@ -482,12 +510,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               }
             } catch(e){}
 
-            var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light'].includes(theme);
+            var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light','matrix-light','scifi-light'].includes(theme);
             var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning your agent...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
             var quip = quips[Math.floor(Math.random() * quips.length)];
 
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
-            d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
+            d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:8px;border:2px solid #7c3aed;background:#fff;box-sizing:border-box;filter:drop-shadow(0 8px 32px color-mix(in srgb,#7c3aed 45%, transparent))" />'
               + '<img src="'+(isDark ? '/claude-banner.png' : '/claude-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
               + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
               + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';

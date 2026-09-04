@@ -1113,9 +1113,11 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] max-w-full overflow-hidden"
       style={{
         borderLeftWidth: '3px',
-        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
+        borderLeftColor: leftAccent,
         transition: 'border-color 0.3s',
-        boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.15)' : 'none',
+        boxShadow: isRunning
+          ? '0 0 8px color-mix(in srgb, var(--theme-accent) 18%, transparent)'
+          : 'none',
       }}
     >
       {/* Header row — always clickable */}
@@ -1145,7 +1147,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         {isDone && <span className="shrink-0 text-xs text-green-500">✅</span>}
         {isError && <span className="shrink-0 text-xs text-red-500">❌</span>}
         {isRunning && (
-          <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-indigo-500" />
+          <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-[var(--theme-accent)]" />
         )}
       </button>
       {isRunning && !expanded && (
@@ -2689,11 +2691,11 @@ function MessageItemComponent({
           <div
             data-chat-message-bubble={isUser ? 'user' : 'assistant'}
             className={cn(
-              'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
+              'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-4 py-3 max-w-[80%]',
               '',
               !isUser
                 ? 'border rounded-2xl rounded-tl-sm'
-                : 'text-white rounded-2xl rounded-tr-sm',
+                : 'rounded-2xl rounded-tr-sm',
               isQueued && isUser && !isFailed && 'opacity-70',
               isFailed && isUser && 'bg-red-50/50 border border-red-300',
               bubbleClassName,
