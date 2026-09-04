@@ -27,7 +27,9 @@ function DialogContent({ className, children, style }: DialogContentProps) {
     <Dialog.Portal>
       <Dialog.Backdrop
         className="fixed inset-0 transition-all duration-150 data-[state=open]:opacity-100 data-[state=closed]:opacity-0"
-        style={{ background: 'rgba(0,0,0,0.5)' }}
+        style={{
+          background: 'color-mix(in srgb, var(--theme-bg) 55%, black)',
+        }}
       />
       <Dialog.Popup
         className={cn(

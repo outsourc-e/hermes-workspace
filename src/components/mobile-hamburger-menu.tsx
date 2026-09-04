@@ -221,7 +221,7 @@ export function MobileHamburgerMenu() {
             <img
               src="/claude-avatar.webp"
               alt="Hermes Agent"
-              className="size-8 rounded-xl shrink-0"
+              className="app-mark size-8 shrink-0"
             />
             <div className="flex flex-col leading-tight">
               <span

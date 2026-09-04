@@ -2134,8 +2134,8 @@ function ChatComposerComponent({
                       // scroll-hide / integrated: floating pill above tab bar
                       'left-4 right-4',
                       'bg-surface/95 backdrop-blur-2xl',
-                      'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
-                      'rounded-[22px]',
+                      'shadow-[var(--theme-shadow-2)]',
+                      'rounded-xl',
                     ].join(' '),
               ].join(' ')
           : [
@@ -2174,7 +2174,7 @@ function ChatComposerComponent({
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&
-            'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(48,80,255,0.35)] animate-pulse-glow',
+            'ring-2 ring-[color-mix(in_srgb,var(--theme-accent)_40%,transparent)]',
         )}
         onPaste={handlePaste}
         onDragEnter={handleDragEnter}
@@ -2409,7 +2409,7 @@ function ChatComposerComponent({
                       }}
                     />
                     <div
-                      className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
+                      className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl bg-[var(--theme-card)] text-[var(--theme-text)] shadow-2xl pb-safe animate-in slide-in-from-bottom-10 duration-200"
                       role="dialog"
                       aria-label="Actions"
                       onClick={(event) => event.stopPropagation()}
@@ -2427,7 +2427,7 @@ function ChatComposerComponent({
                             handleOpenAttachmentPicker(event)
                             // sheet stays open; closes naturally after file selected or on backdrop tap
                           }}
-                          className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="rounded-lg bg-orange-100 dark:bg-orange-900/30 p-1.5 text-orange-600 dark:text-orange-400">
                             <HugeiconsIcon
@@ -2452,7 +2452,7 @@ function ChatComposerComponent({
                               setIsModelMenuOpen(true)
                             }
                           }}
-                          className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="rounded-lg bg-indigo-100 dark:bg-indigo-900/30 p-1.5 text-indigo-600 dark:text-indigo-400">
                             <HugeiconsIcon
@@ -2473,7 +2473,7 @@ function ChatComposerComponent({
                               handleClearDraft()
                               setIsMobileActionsMenuOpen(false)
                             }}
-                            className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
+                            className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3 flex flex-col items-start gap-2 text-left"
                           >
                             <span className="rounded-lg bg-red-100 dark:bg-red-900/30 p-1.5 text-red-600 dark:text-red-400">
                               <HugeiconsIcon
@@ -2495,7 +2495,7 @@ function ChatComposerComponent({
                               onNewSession()
                               setIsMobileActionsMenuOpen(false)
                             }}
-                            className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left"
+                            className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3 flex flex-col items-start gap-2 text-left"
                           >
                             <span className="rounded-lg bg-green-100 dark:bg-green-900/30 p-1.5 text-green-600 dark:text-green-400">
                               <HugeiconsIcon
@@ -2527,7 +2527,7 @@ function ChatComposerComponent({
                       onClick={() => setIsModelMenuOpen(false)}
                     />
                     <div
-                      className="fixed bottom-0 left-0 right-0 z-[210] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
+                      className="fixed bottom-0 left-0 right-0 z-[210] rounded-t-2xl bg-[var(--theme-card)] text-[var(--theme-text)] shadow-2xl pb-safe animate-in slide-in-from-bottom-10 duration-200"
                       role="dialog"
                       aria-label="Select model"
                       onClick={(event) => event.stopPropagation()}
@@ -2823,8 +2823,8 @@ function ChatComposerComponent({
                       <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
                     </button>
                     {isControlsMenuOpen ? (
-                      <div className="absolute bottom-full left-0 z-[190] mb-2 w-[min(32rem,calc(100vw-2rem))] min-w-[18rem] overflow-visible rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
-                        <div className="mb-2 px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                      <div className="absolute bottom-full left-0 z-[190] mb-2 w-[min(32rem,calc(100vw-2rem))] min-w-[18rem] overflow-visible rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <div className="micro-label mb-2 px-2 pt-1">
                           Chat controls
                         </div>
                         <div className="flex flex-wrap items-start gap-2">
@@ -2855,8 +2855,8 @@ function ChatComposerComponent({
                               <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
                             </button>
                             {isProfileMenuOpen && (
-                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
-                                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                <div className="micro-label px-3 py-2">
                                   Agent profile
                                 </div>
                                 {(profilesQuery.data?.profiles ?? []).map((profile) => {
@@ -2917,7 +2917,7 @@ function ChatComposerComponent({
                               <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
                             </button>
                             {isThinkingMenuOpen && (
-                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[10rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[10rem] overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
                                 {([
                                   ['off', 'None'],
                                   ['low', 'Low'],
@@ -2963,7 +2963,7 @@ function ChatComposerComponent({
                             {isModelMenuOpen && (
                               <>
                                 <div className="fixed inset-0 z-[199]" onClick={() => setIsModelMenuOpen(false)} />
-                                <div className="absolute bottom-full left-0 mb-2 z-[200] w-[min(28rem,calc(100vw-2rem))] min-w-[18rem] origin-bottom-left overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                <div className="absolute bottom-full left-0 mb-2 z-[200] w-[min(28rem,calc(100vw-2rem))] min-w-[18rem] origin-bottom-left overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
                                   <div className="max-h-[20rem] overflow-y-auto overflow-x-hidden p-1">
                                     {(() => {
                                       const allModels = modelsQuery.data?.models ?? []

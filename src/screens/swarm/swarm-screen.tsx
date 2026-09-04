@@ -7,6 +7,7 @@ import {
   Activity01Icon,
   ChartLineData02Icon,
   ComputerTerminal01Icon,
+  CpuIcon,
   FlashIcon,
   RefreshIcon,
   ViewIcon,
@@ -209,23 +210,20 @@ export function SwarmScreen() {
   }
 
   return (
-    <div
-      className="relative flex h-full min-h-screen flex-col gap-4 overflow-auto bg-[#0a0d0b] p-4 pb-[420px] text-emerald-50 md:p-6"
-      style={{ background: 'radial-gradient(circle at top, rgba(34,197,94,0.10), transparent 28%), linear-gradient(180deg, #0a0d0b 0%, #0c110d 100%)' }}
-    >
-      <header className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-400/20 bg-black/45 px-4 py-2.5 backdrop-blur">
+    <div className="relative flex h-full min-h-screen flex-col gap-4 overflow-auto p-4 pb-[420px] md:p-6 theme-bg theme-text">
+      <header className="flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2.5 theme-shadow-1">
         <div className="inline-flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-300">
+          <div className="flex size-7 items-center justify-center rounded-lg border border-[var(--theme-accent-border)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent)]">
             <HugeiconsIcon icon={CpuIcon} size={14} />
           </div>
-          <div className="text-sm font-bold tracking-tight text-white">Swarm OS</div>
+          <div className="font-serif text-sm font-medium tracking-tight">Swarm</div>
         </div>
         <Chip icon={ChartLineData02Icon} label="Model" value={workspaceModel} />
         <Chip icon={Activity01Icon} label="Provider" value={provider} />
         <Chip icon={FlashIcon} label="Auth errors 24h" value={String(authErrors)} tone={authErrors === 0 ? 'good' : 'warn'} />
         <Chip icon={ViewIcon} label="Online" value={`${onlineCount}/${swarmMembers.length} agents`} tone="good" />
         {pingResult ? (
-          <div className={cn('truncate rounded-full border px-3 py-1 text-[11px]', pingResult.startsWith('✓') ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-red-500/40 bg-red-500/10 text-red-200')}>
+          <div className={cn('truncate rounded-full border px-3 py-1 text-[11px]', pingResult.startsWith('✓') ? 'border-[var(--theme-success)] bg-[color-mix(in_srgb,var(--theme-success)_12%,transparent)] text-[var(--theme-success)]' : 'border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] text-[var(--theme-danger)]')}>
             {pingResult}
           </div>
         ) : null}
@@ -259,12 +257,12 @@ export function SwarmScreen() {
             ]}
           />
           <ViewModeToggle mode={viewMode} setMode={setViewMode} />
-          {updatedAgo ? <div className="text-[11px] text-emerald-200/55">Updated {updatedAgo}</div> : null}
+          {updatedAgo ? <div className="text-[11px] text-[var(--theme-muted)]">Updated {updatedAgo}</div> : null}
           <button
             type="button"
             onClick={() => void refetch()}
             disabled={isFetching}
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
           >
             <HugeiconsIcon icon={RefreshIcon} size={11} className={isFetching ? 'animate-spin' : ''} />
             Refresh
@@ -273,7 +271,7 @@ export function SwarmScreen() {
             type="button"
             onClick={() => setMissionOpen(true)}
             disabled={!selectedId}
-            className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/20 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-accent-border)] bg-[var(--theme-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-accent-strong)] hover:bg-[var(--theme-accent-soft-strong)] disabled:opacity-50"
           >
             <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} />
             Route to {selectedId ?? 'agent'}
@@ -282,7 +280,7 @@ export function SwarmScreen() {
             type="button"
             onClick={pingSelected}
             disabled={!selectedId || pinging}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-black hover:bg-emerald-300 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-bg)] hover:opacity-90 disabled:opacity-50"
           >
             <HugeiconsIcon icon={FlashIcon} size={12} />
             {pinging ? 'Pinging…' : `Ping ${selectedId ?? 'selected'}`}
@@ -302,17 +300,17 @@ export function SwarmScreen() {
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/65">Agent Workspace</div>
-              <h2 className="text-xl font-semibold text-white">
+              <div className="micro-label">Agent Workspace</div>
+              <h2 className="editorial-display text-xl">
                 {viewMode === 'cards' ? 'Active Swarm' : 'Live Agent Terminals'}
               </h2>
-              <p className="mt-0.5 text-sm text-emerald-50/55">
+              <p className="mt-0.5 text-sm text-[var(--theme-muted)]">
                 {viewMode === 'cards'
                   ? 'Operations-style cards, visible room wiring, and inline worker chat.'
                   : 'Flip into terminal mode to inspect each worker session directly without leaving Swarm.'}
               </p>
             </div>
-            <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/55">
+            <div className="micro-label">
               {viewMode === 'cards'
                 ? `${swarmMembers.length} workers`
                 : `${terminalTargets.length || 0} terminal${terminalTargets.length === 1 ? '' : 's'} visible`}
@@ -353,7 +351,7 @@ export function SwarmScreen() {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="rounded-[1.5rem] border border-emerald-400/15 bg-black/35 px-4 py-3 text-sm text-emerald-50/70 backdrop-blur">
+              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-sm text-[var(--theme-muted)]">
                 {roomIds.length > 0
                   ? `Showing live terminals for the active room: ${roomIds.join(', ')}.`
                   : selectedId
@@ -362,7 +360,7 @@ export function SwarmScreen() {
               </div>
 
               {terminalTargets.length === 0 ? (
-                <div className="rounded-[1.5rem] border border-emerald-400/12 bg-emerald-500/5 px-4 py-10 text-center text-sm text-emerald-100/55">
+                <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-accent-soft)] px-4 py-10 text-center text-sm text-[var(--theme-muted)]">
                   No terminal targets yet.
                 </div>
               ) : (
@@ -370,19 +368,19 @@ export function SwarmScreen() {
                   {terminalTargets.map((member) => {
                     const runtime = runtimeByWorker.get(member.id)
                     return (
-                      <div key={member.id} className="overflow-hidden rounded-[1.6rem] border border-emerald-400/18 bg-[#0b0f0c]/80 p-3 backdrop-blur-xl">
+                      <div key={member.id} className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
                         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                           <div>
-                            <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/60">{member.id}</div>
-                            <div className="text-base font-semibold text-white">{runtime?.currentTask ?? member.lastSessionTitle ?? 'Idle session'}</div>
-                            <div className="mt-1 text-xs text-emerald-100/50">
+                            <div className="micro-label">{member.id}</div>
+                            <div className="text-base font-semibold">{runtime?.currentTask ?? member.lastSessionTitle ?? 'Idle session'}</div>
+                            <div className="mt-1 text-xs text-[var(--theme-muted)]">
                               {runtime?.tmuxAttachable ? `tmux ${runtime.tmuxSession}` : 'shell fallback'} · last output {relative(runtime?.lastOutputAt)}
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => setSelectedId(member.id)}
-                            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
+                            className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
                           >
                             <HugeiconsIcon icon={ComputerTerminal01Icon} size={11} />
                             Focus
@@ -425,7 +423,7 @@ export function SwarmScreen() {
         <button
           type="button"
           onClick={() => setMissionOpen(true)}
-          className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-black shadow-[0_18px_40px_rgba(34,197,94,0.35)] hover:bg-emerald-300"
+          className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-[var(--theme-accent)] px-5 py-2 text-sm font-semibold text-[var(--theme-bg)] theme-shadow-2 hover:opacity-90"
         >
           Open Agent Router Chat ↑
         </button>
@@ -436,18 +434,18 @@ export function SwarmScreen() {
 
 function ViewModeToggle({ mode, setMode }: { mode: SwarmViewMode; setMode: (mode: SwarmViewMode) => void }) {
   return (
-    <div className="flex rounded-full border border-emerald-400/20 bg-black/40 p-1 text-[10px] uppercase tracking-[0.18em] text-emerald-200/65">
+    <div className="flex rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] p-1 text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
       <button
         type="button"
         onClick={() => setMode('cards')}
-        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'cards' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
+        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'cards' ? 'bg-[var(--theme-accent)] text-[var(--theme-bg)]' : 'hover:text-[var(--theme-text)]')}
       >
         Cards
       </button>
       <button
         type="button"
         onClick={() => setMode('terminals')}
-        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'terminals' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
+        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'terminals' ? 'bg-[var(--theme-accent)] text-[var(--theme-bg)]' : 'hover:text-[var(--theme-text)]')}
       >
         Terminals
       </button>
@@ -461,19 +459,19 @@ function Chip({ icon, label, value, tone = 'neutral' }: { icon: typeof CpuIcon; 
       className={cn(
         'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px]',
         tone === 'good'
-          ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200'
+          ? 'border-[color-mix(in_srgb,var(--theme-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
           : tone === 'warn'
-            ? 'border-amber-400/35 bg-amber-500/10 text-amber-200'
-            : 'border-emerald-400/15 bg-black/35 text-emerald-100/75',
+            ? 'border-[color-mix(in_srgb,var(--theme-warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
+            : 'border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)]',
       )}
     >
       <HugeiconsIcon icon={icon} size={11} />
-      <span className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/55">{label}</span>
-      <span className="truncate text-emerald-50">{value}</span>
+      <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">{label}</span>
+      <span className="truncate text-[var(--theme-text)]">{value}</span>
     </div>
   )
 }
 
 function SkeletonCard() {
-  return <div className="h-[420px] animate-pulse rounded-2xl border border-emerald-400/10 bg-emerald-500/5" />
+  return <div className="h-[420px] animate-pulse rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]" />
 }

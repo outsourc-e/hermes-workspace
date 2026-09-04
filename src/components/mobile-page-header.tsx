@@ -25,7 +25,7 @@ export function MobilePageHeader({
         className,
       )}
       style={{
-        borderColor: 'var(--color-border, #e5e7eb)',
+        borderColor: 'var(--theme-border)',
         paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
     >
@@ -41,7 +41,7 @@ export function MobilePageHeader({
           viewBox="0 0 20 16"
           fill="none"
           className="opacity-70"
-          style={{ color: 'var(--color-ink, #111)' }}
+          style={{ color: 'var(--theme-text)' }}
         >
           <path
             d="M1 1.5H19M1 8H19M1 14.5H13"
@@ -53,7 +53,7 @@ export function MobilePageHeader({
       </button>
       <span
         className="flex-1 text-center text-[15px] font-semibold truncate -ml-11"
-        style={{ color: 'var(--color-ink, #111)' }}
+        style={{ color: 'var(--theme-text)' }}
       >
         {title}
       </span>

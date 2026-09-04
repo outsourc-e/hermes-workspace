@@ -57,7 +57,7 @@ const TerminalWorkspace = lazy(() =>
 )
 
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
-  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-[color-mix(in_srgb,var(--theme-bg)_72%,transparent)] backdrop-blur-[1px]'
 
 type WorkspaceShellProps = {
   children?: React.ReactNode
@@ -317,7 +317,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div
-            className="absolute inset-x-0 top-0 flex h-10 items-center border-b border-primary-200 z-40"
+            className="absolute inset-x-0 top-0 flex h-10 items-center border-b-2 border-[#7C3AED] z-40"
             style={
               {
                 WebkitAppRegion: 'drag',
@@ -331,7 +331,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             <div className="flex-1 text-center">
               <span
                 className="text-[13px] font-medium select-none"
-                style={{ color: 'var(--theme-accent, #B98A44)' }}
+                style={{ color: 'var(--theme-accent)' }}
               >
                 Hermes
               </span>

@@ -194,7 +194,7 @@ export function MobileTabBar() {
           'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
           // Keep the pill visually isolated from page and error-state backgrounds
           'bg-surface/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-surface/90',
-          'rounded-full',
+          'rounded-[10px]',
           'border border-primary-200/40',
           // Inner padding
           'px-3 py-2',

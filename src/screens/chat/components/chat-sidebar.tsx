@@ -62,6 +62,12 @@ import {
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { fetchExternalRuntimes } from '@/lib/external-harness-api'
+import {
+  getTheme,
+  getThemeVariant,
+  isDarkTheme,
+  setTheme,
+} from '@/lib/theme'
 import { useHarnessVisibility } from '@/screens/chat/harness-visibility'
 
 type WorkspaceStats = Record<string, unknown>
@@ -70,41 +76,16 @@ function ThemeToggleMini() {
   const _theme = useSettingsStore((state) => state.settings.theme)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   void _theme
-  // Detect dark/light from actual data-theme attribute
-  const currentDataTheme =
-    typeof document !== 'undefined'
-      ? document.documentElement.getAttribute('data-theme') || 'claude-nous'
-      : 'claude-nous'
-  const isDark = !currentDataTheme.endsWith('-light')
-
-  // Map between dark and light counterparts — must include all theme families
-  const LIGHT_DARK_PAIRS: Record<string, string> = {
-    'claude-nous': 'claude-nous-light',
-    'claude-nous-light': 'claude-nous',
-    'claude-official': 'claude-official-light',
-    'claude-official-light': 'claude-official',
-    'claude-classic': 'claude-classic-light',
-    'claude-classic-light': 'claude-classic',
-    'claude-slate': 'claude-slate-light',
-    'claude-slate-light': 'claude-slate',
-  }
+  const current = getTheme()
+  const isDark = isDarkTheme(current)
 
   return (
     <button
       type="button"
       onClick={() => {
-        // Fall back to current family rather than dropping the user into claude-official
-        const nextDataTheme =
-          LIGHT_DARK_PAIRS[currentDataTheme] ||
-          (isDark
-            ? `${currentDataTheme}-light`
-            : currentDataTheme.replace(/-light$/, ''))
-        // Import and call setTheme to persist and apply
-        import('@/lib/theme').then(({ setTheme }) => {
-          setTheme(nextDataTheme as any)
-        })
-        // Also update settings hook
-        const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
+        const next = getThemeVariant(current, isDark ? 'light' : 'dark')
+        setTheme(next)
+        const nextMode = isDarkTheme(next) ? 'dark' : 'light'
         applyTheme(nextMode)
         updateSettings({ theme: nextMode })
       }}
@@ -179,10 +160,10 @@ function NavItem({
 }) {
   const cls = cn(
     buttonVariants({ variant: 'ghost', size: 'sm' }),
-    'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0',
+    'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-10',
     isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
-      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15'
+      ? 'relative bg-[var(--theme-accent-soft)] text-[var(--theme-accent)] hover:bg-[var(--theme-accent-soft-strong)] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[var(--theme-accent)]'
       : 'text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
   )
 
@@ -225,10 +206,8 @@ function NavItem({
               style={
                 item.badge === 'NEW'
                   ? {
-                      background:
-                        'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
-                      color: '#0b1320',
-                      boxShadow: '0 0 8px rgba(250,204,21,0.4)',
+                      background: 'var(--theme-accent-soft)',
+                      color: 'var(--theme-accent-strong)',
                       letterSpacing: '0.08em',
                     }
                   : undefined
@@ -378,7 +357,7 @@ function SectionLabel({
   if (isCollapsed) return null
 
   const labelContent = (
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 select-none">
+    <span className="micro-label select-none">
       {label}
     </span>
   )
@@ -393,7 +372,7 @@ function SectionLabel({
         {navigateTo ? (
           <Link
             to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
+            className="micro-label hover:text-primary-700 select-none transition-colors"
           >
             {label}
           </Link>
@@ -429,7 +408,7 @@ function SectionLabel({
       {navigateTo ? (
         <Link
           to={navigateTo}
-          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
+          className="micro-label hover:text-primary-700 select-none transition-colors"
         >
           {label}
         </Link>
@@ -1102,17 +1081,39 @@ function ChatSidebarComponent({
                 <img
                   src="/claude-avatar.webp"
                   alt="Hermes Agent"
-                  className="size-6 rounded-lg"
+                  className="app-mark size-6"
                 />
                 <span
-                  className="text-sm font-semibold tracking-tight"
+                  className="font-serif text-sm font-medium tracking-tight"
                   style={{ color: 'var(--theme-text)' }}
                 >
                   Hermes Workspace
                 </span>
               </Link>
             </motion.div>
-          ) : null}
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={transition}
+            >
+              <Link
+                to="/chat"
+                className={cn(
+                  buttonVariants({ variant: 'ghost', size: 'sm' }),
+                  'justify-start p-1',
+                )}
+                aria-label="Hermes Workspace"
+              >
+                <img
+                  src="/claude-avatar.webp"
+                  alt="Hermes Agent"
+                  className="app-mark size-7"
+                />
+              </Link>
+            </motion.div>
+          )}
         </AnimatePresence>
         <TooltipProvider>
           <TooltipRoot>

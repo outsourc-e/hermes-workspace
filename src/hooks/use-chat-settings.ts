@@ -32,7 +32,7 @@ export type ChatSettings = {
   enterBehavior: EnterBehavior
   /**
    * Max-width of the chat content column (#89).
-   *  - 'comfortable' — 900px (default, keeps prior layout)
+   *  - 'comfortable' — 760px (editorial column)
    *  - 'wide'        — 1200px
    *  - 'full'        — 100% of the pane (edge-to-edge)
    * Implemented via the --chat-content-max-width CSS variable switched by
