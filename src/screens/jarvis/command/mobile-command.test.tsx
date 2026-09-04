@@ -33,8 +33,12 @@ describe('MobileCommandBoard', () => {
     // Composing a second gate card for mobile would let the honest panel
     // drift; this asserts the primitive itself is what the phone shows.
     expect(screen.getByText('APPROVAL REQUIRED')).toBeTruthy()
-    expect(screen.getByText('BLAST RADIUS')).toBeTruthy()
-    expect(screen.getByText('UNDO PATH')).toBeTruthy()
+    // Artboard 03 shortens the two headings for the 390pt column — the same
+    // primitive, the same cells, fewer words.
+    expect(screen.getByText('RADIUS')).toBeTruthy()
+    expect(screen.getByText('UNDO')).toBeTruthy()
+    expect(screen.queryByText('BLAST RADIUS')).toBeNull()
+    expect(screen.queryByText('UNDO PATH')).toBeNull()
     expect(screen.getByText(mobileCommandGateFixture.blastRadius)).toBeTruthy()
     expect(screen.getAllByRole('button')).toHaveLength(3)
   })

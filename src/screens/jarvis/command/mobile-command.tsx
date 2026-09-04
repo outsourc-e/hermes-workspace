@@ -63,6 +63,13 @@ import {
 import { ApprovalGateCard } from '@/components/jarvis/approval-gate-card'
 import { EpistemicMark } from '@/components/jarvis/epistemic-mark'
 
+/**
+ * Artboard 03 shortens the gate's two headings to fit a 390pt column. Only the
+ * words change — the same primitive draws the same panel, so the honest cells
+ * still cannot drift from the desktop's.
+ */
+const MOBILE_GATE_CELL_LABELS = { blastRadius: 'RADIUS', undoPath: 'UNDO' }
+
 /** `1 GATE WAITING · 2 running · 1 blocked` — the strip under the status bar. */
 function AlertStrip({ data }: { data: MobileAlertStripFixture }) {
   return (
@@ -187,6 +194,7 @@ export function MobileCommandBoard({
         >
           <ApprovalGateCard
             {...gate.props}
+            cellLabels={MOBILE_GATE_CELL_LABELS}
             caveat={caveat}
             onAction={gate.onAction}
           />
