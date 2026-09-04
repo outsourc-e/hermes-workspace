@@ -8,7 +8,12 @@
  * component never invents them.
  *
  * The buttons are presentational: they call `onAction` if one is supplied and
- * do nothing otherwise. No approval is resolved here.
+ * do nothing otherwise. No approval is resolved here. `hint` prints a keyboard
+ * affordance after them while pending — text only, this card binds no keys.
+ *
+ * `cellLabels` shortens the two headings for narrow boards (RADIUS / UNDO).
+ * Both it and `hint` are optional and default to the desktop rendering, so a
+ * caller that passes neither draws exactly what it drew before they existed.
  *
  * Token discipline: no raw colour, size, or px value in this file.
  */
@@ -77,6 +82,10 @@ const GATES: Record<ApprovalGateState, GateTokens> = {
 const CELL_LABEL_CLASS =
   'font-jv-mono text-jv-3xs leading-jv-none font-semibold tracking-jv-wider-2'
 
+/** Full headings. Narrow boards override them; nothing else does. */
+const DEFAULT_BLAST_RADIUS_LABEL = 'BLAST RADIUS'
+const DEFAULT_UNDO_PATH_LABEL = 'UNDO PATH'
+
 export function ApprovalGateCard({
   title,
   command,
@@ -84,8 +93,10 @@ export function ApprovalGateCard({
   waiting,
   blastRadius,
   undoPath,
+  cellLabels,
   caveat,
   actions,
+  hint,
   state = 'pending',
   onAction,
 }: ApprovalGateCardProps) {
@@ -139,11 +150,19 @@ export function ApprovalGateCard({
 
         <div className={clsx('mt-jv-13 flex gap-jv-1 border', tokens.gutter)}>
           {[
-            { label: 'BLAST RADIUS', value: blastRadius },
-            { label: 'UNDO PATH', value: undoPath },
+            {
+              key: 'blast-radius',
+              label: cellLabels?.blastRadius ?? DEFAULT_BLAST_RADIUS_LABEL,
+              value: blastRadius,
+            },
+            {
+              key: 'undo-path',
+              label: cellLabels?.undoPath ?? DEFAULT_UNDO_PATH_LABEL,
+              value: undoPath,
+            },
           ].map((cell) => (
             <div
-              key={cell.label}
+              key={cell.key}
               className={clsx('flex-1 px-jv-11 py-jv-9', tokens.cell)}
             >
               <div className={clsx(CELL_LABEL_CLASS, tokens.cellLabel)}>
@@ -181,6 +200,11 @@ export function ApprovalGateCard({
                 {action}
               </button>
             ))}
+            {hint ? (
+              <span className="font-jv-mono text-jv-sm leading-jv-none text-jv-text-faint">
+                {hint}
+              </span>
+            ) : null}
           </div>
         ) : (
           <div

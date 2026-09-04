@@ -60,9 +60,23 @@ export interface ApprovalGateCardProps {
   waiting?: string
   blastRadius: string
   undoPath: string
+  /**
+   * Overrides for the two panel headings. Narrow boards pass RADIUS / UNDO;
+   * unset means the full BLAST RADIUS / UNDO PATH, which is what every desktop
+   * caller gets.
+   */
+  cellLabels?: {
+    blastRadius?: string
+    undoPath?: string
+  }
   /** May contain an <EpistemicMark>, so it is a node rather than a string. */
   caveat?: ReactNode
   actions: Array<string>
+  /**
+   * Keyboard affordance printed after the buttons, e.g. `⌘⏎ approve · ⌘⌫
+   * reject`. Shown only while pending; the card binds no keys itself.
+   */
+  hint?: string
   state?: ApprovalGateState
   /** Presentational — buttons are inert unless a handler is supplied. */
   onAction?: (action: string) => void

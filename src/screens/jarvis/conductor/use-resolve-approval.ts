@@ -72,7 +72,7 @@ export const CONFIRM_NOTE: Record<ResolveIntent, string> = {
 }
 
 export const DISABLED_NOTE =
-  'Resolve is DISABLED in this build — nothing was sent to the gateway. The gate is display-only until approving from here is explicitly turned on.'
+  'LIVE RESOLVE is off for this session — nothing was sent to the gateway. Arm it to decide from here.'
 
 export const RESOLVING_NOTE = 'Sending…'
 export const RESOLVED_NOTE = 'Sent — the gateway has the decision.'

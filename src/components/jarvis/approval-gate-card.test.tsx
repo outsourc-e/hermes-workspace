@@ -37,6 +37,50 @@ describe('ApprovalGateCard', () => {
     expect(onAction).toHaveBeenCalledWith('REJECT')
   })
 
+  it('shortens the panel headings only when asked to', () => {
+    const { unmount } = render(
+      <ApprovalGateCard
+        {...BASE}
+        cellLabels={{ blastRadius: 'RADIUS', undoPath: 'UNDO' }}
+      />,
+    )
+    expect(screen.getByText('RADIUS')).toBeTruthy()
+    expect(screen.getByText('UNDO')).toBeTruthy()
+    expect(screen.queryByText('BLAST RADIUS')).toBeNull()
+    expect(screen.queryByText('UNDO PATH')).toBeNull()
+    // The values are untouched — only the headings change.
+    expect(screen.getByText(BASE.blastRadius)).toBeTruthy()
+    expect(screen.getByText(BASE.undoPath)).toBeTruthy()
+    unmount()
+
+    // One override leaves the other heading full.
+    render(<ApprovalGateCard {...BASE} cellLabels={{ undoPath: 'UNDO' }} />)
+    expect(screen.getByText('BLAST RADIUS')).toBeTruthy()
+    expect(screen.getByText('UNDO')).toBeTruthy()
+  })
+
+  it('prints the keyboard hint only when given one, and only while pending', () => {
+    const hint = '⌘⏎ approve · ⌘⌫ reject'
+
+    const { unmount } = render(<ApprovalGateCard {...BASE} />)
+    expect(screen.queryByText(hint)).toBeNull()
+    unmount()
+
+    const withHint = render(<ApprovalGateCard {...BASE} hint={hint} />)
+    expect(screen.getByText(hint)).toBeTruthy()
+    // It sits in the button row, after the buttons.
+    expect(screen.getAllByRole('button')).toHaveLength(3)
+    withHint.unmount()
+
+    for (const state of ['approved', 'rejected'] as const) {
+      const resolved = render(
+        <ApprovalGateCard {...BASE} hint={hint} state={state} />,
+      )
+      expect(screen.queryByText(hint)).toBeNull()
+      resolved.unmount()
+    }
+  })
+
   it('drops the buttons and the waiting timer once resolved', () => {
     for (const state of ['approved', 'rejected'] as const) {
       const { unmount } = render(
