@@ -59,22 +59,39 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
     return null
   }
 
+  const desktopTailscaleReady = networkUrl?.source === 'tailscale'
+
   const steps = [
-    {
-      title: 'Install Tailscale on your desktop',
-      body: 'Install Tailscale on the machine running Hermes Workspace, then sign in.',
-      showTailscaleIcon: true,
-      action: (
-        <a
-          href="https://tailscale.com/download"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-400"
-        >
-          Open Tailscale Downloads
-        </a>
-      ),
-    },
+    ...(!desktopTailscaleReady
+      ? [
+          {
+            title: 'Install Tailscale on your desktop',
+            body: 'Install Tailscale on the machine running Hermes Workspace, then sign in.',
+            showTailscaleIcon: true,
+            action: (
+              <a
+                href="https://tailscale.com/download"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-400"
+              >
+                Open Tailscale Downloads
+              </a>
+            ),
+          },
+        ]
+      : [
+          {
+            title: 'Tailscale is already connected',
+            body: 'This Mac is on your tailnet. Keep Tailscale running so your phone can reach Hermes Workspace.',
+            showTailscaleIcon: true,
+            action: (
+              <div className="rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED]/10 px-4 py-3 text-sm text-primary-100">
+                Desktop Tailscale is signed in and online.
+              </div>
+            ),
+          },
+        ]),
     {
       title: 'Keep your backend reachable',
       body: 'Hermes Workspace can talk to any OpenAI-compatible backend on mobile too. Make sure both the workspace and backend stay reachable over Tailscale or your local network.',
@@ -223,7 +240,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
           <img
             src="/claude-avatar.webp"
             alt="Hermes Agent"
-            className="size-9 rounded-xl"
+            className="app-mark size-9"
           />
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-white">Mobile Setup</h2>
