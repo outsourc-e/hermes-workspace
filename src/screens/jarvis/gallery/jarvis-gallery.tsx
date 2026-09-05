@@ -2,8 +2,18 @@
  * JARVIS primitive gallery — DEV ONLY (`/jarvis-gallery`).
  *
  * Every state of the four primitives, side by side, against fixtures. No store,
- * no gateway, no real data; interactions are no-ops. This is the surface the
- * slice is reviewed on.
+ * no gateway, interactions are no-ops. This is the surface the slice is
+ * reviewed on.
+ *
+ * ONE SECTION IS LIVE. `CODE CHECKPOINTS` reads the real `tsc | tests | lint |
+ * e2e` results recorded on a workspace checkpoint — per
+ * `docs/design/jarvis-ui-mapping.md` §3.6 the only genuine verified-vs-claimed
+ * source in the codebase. It lives HERE, on a dev surface of its own, and
+ * nowhere near the conversation: verification on a chat message is NO SOURCE
+ * (§3.5 items 2–3), so wiring code checks into a turn would claim a typechecker
+ * had confirmed something a person said. The Command board's conversation is
+ * untouched by this and stays inert. When the workspace daemon is not running
+ * the section falls back to the same fixtures as the section above and says so.
  *
  * Theme handling: the `--jv-*` tokens only resolve under `[data-theme='jarvis']`,
  * so this screen sets that attribute directly on <html> for as long as it is
@@ -25,6 +35,7 @@ import {
   verificationBadgeFixtures,
   workerStatusFixtures,
 } from '@/components/jarvis/fixtures'
+import { useCheckpointVerification } from '@/screens/jarvis/conductor/use-checkpoint-verification'
 
 const THEME_ATTRIBUTE = 'data-theme'
 const JARVIS_THEME = 'jarvis'
@@ -77,6 +88,68 @@ function Caption({ children }: { children: ReactNode }) {
   )
 }
 
+const LIVE_CHECKPOINT_NOTICE =
+  'CODE CHECKPOINT verification is LIVE (tsc/tests/lint/e2e) from the workspace API — this is code-check state, NOT conversation verification. A passed check is VERIFIED with its real output as evidence; a failed one is drawn as CLAIMED · UNVERIFIED, because the affirmative state would read as “this passed”, and its title says FAILED outright. Checks that never ran draw no badge at all. Read-only: no re-run, no review, no action chips.'
+
+const FIXTURE_CHECKPOINT_NOTICE =
+  'No checkpoint came back from the workspace API — without the workspace daemon, GET /api/workspace/checkpoints either 404s or falls through to the SPA shell, and both read as an empty list. That is the normal case for a design review, so the badges below are the SAME invented fixtures as the section above. Nothing here is a real code check.'
+
+/**
+ * The live section: real checkpoint verification, or the fixtures with the
+ * fallback said out loud. Both readings render badges, so the notice above them
+ * is the only thing that tells a reviewer which one they are looking at — it is
+ * printed first, and unconditionally.
+ */
+function CodeCheckpointSection() {
+  const { badges, inertChecks, source, isLive } = useCheckpointVerification()
+
+  return (
+    <Section
+      title="CODE CHECKPOINTS"
+      note="The one real verified-vs-claimed source in the codebase (§3.6) — the tsc/tests/lint/e2e checks recorded on a workspace code checkpoint. Out-of-band from chat: a conversation claim still has no verification field and stays inert."
+    >
+      <div className="flex flex-col gap-jv-16">
+        <p
+          data-jv-fixture={isLive ? undefined : 'no-source'}
+          className="font-jv-sans text-jv-lg leading-jv-loose text-jv-text-caption"
+        >
+          {isLive ? LIVE_CHECKPOINT_NOTICE : FIXTURE_CHECKPOINT_NOTICE}
+        </p>
+
+        {source ? <Caption>{source}</Caption> : null}
+
+        {badges.length > 0 ? (
+          <div className="flex flex-col gap-jv-10">
+            {badges.map((props) => (
+              <VerificationBadge key={props.title} {...props} />
+            ))}
+          </div>
+        ) : (
+          // LIVE with nothing to show. A real checkpoint on which no check ran
+          // is not an empty state to paper over — it is the answer.
+          <div className="border border-dashed border-jv-line px-jv-10 py-jv-7 font-jv-mono text-jv-base leading-jv-loose text-jv-label-faint">
+            No check on this checkpoint produced a verdict — nothing here is
+            verified, and nothing is claimed.
+          </div>
+        )}
+
+        {inertChecks.length > 0 ? (
+          <div className="flex flex-col gap-jv-6">
+            <Caption>ran nothing · no verdict, not a verdict</Caption>
+            <div className="border-y border-jv-line-soft bg-jv-surface-0 px-jv-14 py-jv-12 font-jv-mono text-jv-xs leading-jv-loose text-jv-label-faint">
+              {inertChecks.map((check) => (
+                <div key={check.key}>
+                  {check.scope} — {check.note}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </Section>
+  )
+}
+
 function GateCaveat({ caveat }: { caveat: GateCaveatFixture }) {
   return (
     <>
@@ -98,9 +171,11 @@ export function JarvisGalleryScreen() {
             JARVIS PRIMITIVES
           </h1>
           <p className="font-jv-sans text-jv-xl leading-jv-loose text-jv-text-caption">
-            Dev-only gallery. Every state below is fixture data — nothing here
-            is wired to a store, the gateway, or a real session, and no
-            component decides anything for itself.
+            Dev-only gallery. Every state below is fixture data — nothing is
+            wired to a store, the gateway, or a real session, and no component
+            decides anything for itself. The one exception is CODE CHECKPOINTS,
+            which reads real tsc/tests/lint/e2e results from the workspace API
+            and labels itself live or fallback on every render.
           </p>
         </header>
 
@@ -159,6 +234,8 @@ export function JarvisGalleryScreen() {
             </div>
           </div>
         </Section>
+
+        <CodeCheckpointSection />
 
         <Section
           title="WORKER STATUS LINE"
