@@ -35,7 +35,7 @@ export function usePullToRefresh(
 
     function onTouchStart(e: TouchEvent) {
       const touch = e.touches[0]
-      if (!touch) return
+
       // Only start pull if at the top of the scroll
       if (container!.scrollTop === 0) {
         startYRef.current = touch.clientY
@@ -46,7 +46,7 @@ export function usePullToRefresh(
     function onTouchMove(e: TouchEvent) {
       if (!isPullingRef.current) return
       const touch = e.touches[0]
-      if (!touch) return
+
       const delta = touch.clientY - startYRef.current
       if (delta > 0) {
         const clamped = Math.min(delta, THRESHOLD * 1.5)

@@ -17,7 +17,8 @@ function readStringArg(
   if (!args) return null
   for (const key of keys) {
     const value = args[key]
-    if (typeof value === 'string' && value.trim().length > 0) return value.trim()
+    if (typeof value === 'string' && value.trim().length > 0)
+      return value.trim()
   }
   return null
 }

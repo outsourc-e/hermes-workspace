@@ -1,9 +1,10 @@
+import { join } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getProfilesDir } from '../../server/claude-paths'
-import { readWorkerMessages, type SwarmChatMessage } from '../../server/swarm-chat-reader'
+import { readWorkerMessages } from '../../server/swarm-chat-reader'
+import type { SwarmChatMessage } from '../../server/swarm-chat-reader'
 
 type ChatResponse = {
   workerId: string
@@ -35,7 +36,13 @@ export const Route = createFileRoute('/api/swarm-chat')({
           return json({ error: 'workerId required' }, { status: 400 })
         }
         const limitRaw = Number(url.searchParams.get('limit') ?? DEFAULT_LIMIT)
-        const limit = Math.max(1, Math.min(MAX_LIMIT, Number.isFinite(limitRaw) ? limitRaw : DEFAULT_LIMIT))
+        const limit = Math.max(
+          1,
+          Math.min(
+            MAX_LIMIT,
+            Number.isFinite(limitRaw) ? limitRaw : DEFAULT_LIMIT,
+          ),
+        )
         const profilePath = join(getProfilesDir(), workerIdRaw)
         const result = readWorkerMessages(profilePath, limit)
         const response: ChatResponse = {

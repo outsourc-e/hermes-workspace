@@ -9,6 +9,7 @@ Characters should live at:
 - `/public/assets/hermesworld/characters/<id>.glb`
 
 Examples:
+
 - `player-adventurer.glb`
 - `oracle-scholar.glb`
 - `forge-blacksmith.glb`
@@ -19,12 +20,14 @@ Examples:
 ## Source pipeline
 
 Recommended source order:
+
 1. Ready Player Me or similar believable humanoid base
 2. Mixamo animation clips
 3. GLB export
 4. browser optimization
 
 ## First animations to support
+
 - idle
 - walk
 - run
@@ -33,6 +36,7 @@ Recommended source order:
 - use
 
 ## Naming rules
+
 - lowercase kebab-case ids
 - keep one archetype per file
 - prefer shared rigs

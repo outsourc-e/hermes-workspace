@@ -53,7 +53,11 @@ const DISK_TTL_MS = 24 * 60 * 60 * 1_000 // 24 h
 // ------------------------------------------------------------------
 
 function hermesHome(): string {
-  return process.env.HERMES_HOME?.trim() || process.env.CLAUDE_HOME?.trim() || join(homedir(), '.hermes')
+  return (
+    process.env.HERMES_HOME?.trim() ||
+    process.env.CLAUDE_HOME?.trim() ||
+    join(homedir(), '.hermes')
+  )
 }
 
 function cacheDir(): string {
@@ -78,7 +82,11 @@ function atomicWrite(path: string, content: string): void {
   try {
     renameSync(tmp, path)
   } catch (err) {
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
     throw err
   }
 }
@@ -136,7 +144,11 @@ export function getCache(source: string): CachePayload | null {
 /**
  * Persist a cache entry to both memory and disk.
  */
-export function setCache(source: string, data: Omit<CachePayload, 'fetchedAt' | 'expiresAt'> & Partial<Pick<CachePayload, 'fetchedAt' | 'expiresAt'>>): void {
+export function setCache(
+  source: string,
+  data: Omit<CachePayload, 'fetchedAt' | 'expiresAt'> &
+    Partial<Pick<CachePayload, 'fetchedAt' | 'expiresAt'>>,
+): void {
   const now = Date.now()
   const entry: CachePayload = {
     fetchedAt: now,

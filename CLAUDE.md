@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Hermes Workspace is a **control plane / web UI for an external `hermes-agent` gateway** — not a standalone app. It is a TanStack Start (React 19 + Vite 7, SSR + server routes) application that connects over WebSocket RPC to a separately-running `hermes-agent` process (default `HERMES_API_URL=http://127.0.0.1:8642`). Most server routes proxy to that gateway. Nothing works end-to-end without a reachable gateway.
 
-**Zero-fork principle:** the workspace runs against *vanilla* `hermes-agent`. When an upstream endpoint is missing, features must degrade via capability gates rather than fail (e.g. Conductor falls back to native Swarm dispatch). See `src/server/gateway-capabilities.ts` and `src/lib/feature-gates.ts`.
+**Zero-fork principle:** the workspace runs against _vanilla_ `hermes-agent`. When an upstream endpoint is missing, features must degrade via capability gates rather than fail (e.g. Conductor falls back to native Swarm dispatch). See `src/server/gateway-capabilities.ts` and `src/lib/feature-gates.ts`.
 
 ## Commands
 
@@ -30,12 +30,14 @@ Electron desktop builds: `pnpm electron:dev`, `pnpm electron:build[:mac|:win]` (
 ## Architecture
 
 **Client layer**
+
 - `src/routes/` — TanStack file-based routes; `routeTree.gen.ts` is **generated**, do not edit by hand.
 - `src/screens/` — per-feature page UIs (chat, dashboard, swarm, mcp, memory, …).
 - `src/stores/` — Zustand stores (chat, mission, task, workspace, agent-swarm, …).
 - `src/lib/` — client-side API wrappers and shared logic; `src/components/`, `src/hooks/`, `src/utils/` support these.
 
 **Server layer**
+
 - `src/routes/api/*.ts` — TanStack Start server route handlers (the HTTP/SSE surface). These are thin; real logic lives in `src/server/`.
 - `src/server/gateway.ts` — the core integration point. Owns the WebSocket connection to `hermes-agent`; `gatewayRpc()` is the primary request path and `onGatewayEvent()` the event stream. Most API routes call through here.
 - `src/server/auth-middleware.ts` — auth enforced on every route; plus CSP and path-traversal guards. Treat auth as fail-closed.
@@ -47,7 +49,7 @@ A large multi-agent control plane: persistent tmux-backed workers with role-base
 ## Conventions
 
 - **Path alias:** import from `@/*` → `src/*`.
-- **Naming contract** (`docs/hermes-workspace-naming-contract.md`): canonical product names are *Hermes Workspace*, *Hermes Agent*, *Swarm*, *Hermes Kanban*, `HERMES_HOME`, `~/.hermes`. Treat Claude-era wording in older code/docs as legacy residue and normalize it to Hermes naming — **except** where it preserves real backward compatibility (e.g. `CLAUDE_PASSWORD` is accepted as a fallback for `HERMES_PASSWORD`; `CLAUDE_AGENT_PATH` is still read). Don't break those compat fallbacks.
+- **Naming contract** (`docs/hermes-workspace-naming-contract.md`): canonical product names are _Hermes Workspace_, _Hermes Agent_, _Swarm_, _Hermes Kanban_, `HERMES_HOME`, `~/.hermes`. Treat Claude-era wording in older code/docs as legacy residue and normalize it to Hermes naming — **except** where it preserves real backward compatibility (e.g. `CLAUDE_PASSWORD` is accepted as a fallback for `HERMES_PASSWORD`; `CLAUDE_AGENT_PATH` is still read). Don't break those compat fallbacks.
 - TypeScript is `strict`; `noUnusedLocals`/`noUnusedParameters` are off but `noFallthroughCasesInSwitch` is on.
 - One PR per feature/fix against `main`; run `pnpm check` and `npx tsc --noEmit` before opening.
 

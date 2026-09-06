@@ -1,8 +1,5 @@
 // Module-level local model override — set by composer when user picks a local model
 // Avoids prop threading. Reset when switching back to cloud models.
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) { _localModelOverride = model }
-
 import {
   useCallback,
   useEffect,
@@ -22,11 +19,10 @@ import {
 } from './utils'
 import {
   advanceStickyStreamingText,
-  createResponseWaitSnapshot,
   createOptimisticMessage,
+  createResponseWaitSnapshot,
   isTerminalActiveRunStatus,
   shouldClearWaitingForAssistantMessage,
-  type ResponseWaitSnapshot,
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
@@ -43,21 +39,19 @@ import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
 import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
+  clearPendingSendForSession,
   consumePendingSend,
   hasPendingGeneration,
   hasPendingSend,
   isRecentSession,
   resetPendingSend,
   setPendingGeneration,
-  clearPendingSendForSession,
 } from './pending-send'
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
 import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useStreamingMessage } from './hooks/use-streaming-message'
-import { playChatComplete } from '@/lib/sounds'
-import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { useActiveRunCheck } from './hooks/use-active-run-check'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
@@ -70,6 +64,7 @@ import {
   CHAT_PENDING_COMMAND_STORAGE_KEY,
   CHAT_RUN_COMMAND_EVENT,
 } from './chat-events'
+import type { ResponseWaitSnapshot } from './chat-screen-utils'
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
@@ -79,6 +74,9 @@ import type {
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type { ChatRunCommandDetail } from './chat-events'
+import type { AgentActivity } from '@/stores/chat-activity-store'
+import { useChatSettingsStore } from '@/hooks/use-chat-settings'
+import { playChatComplete } from '@/lib/sounds'
 import {
   addApproval,
   loadApprovals,
@@ -101,12 +99,17 @@ import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
 import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
-import { useChatStore, persistRecoveryMessage } from '@/stores/chat-store'
+import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
 import { useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
-import { useChatActivityStore, type AgentActivity } from '@/stores/chat-activity-store'
+import { useChatActivityStore } from '@/stores/chat-activity-store'
+
+export let _localModelOverride = ''
+export function setLocalModelOverride(model: string) {
+  _localModelOverride = model
+}
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -227,7 +230,7 @@ function exportConversationTranscript(payload: {
       const text = textFromMessage(message).trim()
       const attachments = Array.isArray(message.attachments)
         ? message.attachments
-            .map((attachment) => attachment?.name?.trim())
+            .map((attachment) => attachment.name?.trim())
             .filter((value): value is string => Boolean(value))
         : []
 
@@ -285,11 +288,11 @@ function messageFallbackSignature(message: ChatMessage): string {
     ? message.attachments
         .map((attachment) => {
           const name =
-            typeof attachment?.name === 'string' ? attachment.name : ''
+            typeof attachment.name === 'string' ? attachment.name : ''
           const size =
-            typeof attachment?.size === 'number' ? String(attachment.size) : ''
+            typeof attachment.size === 'number' ? String(attachment.size) : ''
           const type =
-            typeof attachment?.contentType === 'string'
+            typeof attachment.contentType === 'string'
               ? attachment.contentType
               : ''
           return `${name}:${size}:${type}`
@@ -388,13 +391,11 @@ function getMessageAttachmentSignature(message: ChatMessage): string {
 
   return message.attachments
     .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const name = typeof attachment.name === 'string' ? attachment.name : ''
       const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
+        typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment?.contentType === 'string'
-          ? attachment.contentType
-          : ''
+        typeof attachment.contentType === 'string' ? attachment.contentType : ''
       return `${name}:${size}:${type}`
     })
     .sort()
@@ -633,8 +634,9 @@ export function ChatScreen({
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
-    sessionKey: resolvedSessionKey ?? '',
-    enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
+    sessionKey: resolvedSessionKey,
+    enabled:
+      !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
     onCheckComplete: useCallback(() => {
       setActiveRunCheckDone(true)
     }, []),
@@ -660,9 +662,9 @@ export function ChatScreen({
       : isNewChat
         ? 'new'
         : resolvedSessionKey ||
-        sessionKeyForHistory ||
-        activeCanonicalKey ||
-        'main',
+          sessionKeyForHistory ||
+          activeCanonicalKey ||
+          'main',
     friendlyId: portableChatFriendlyId,
     historyMessages,
     portableMode: isPortableMode,
@@ -694,7 +696,9 @@ export function ChatScreen({
       if (
         approvalId &&
         currentApprovals.some((entry) => {
-          return entry.status === 'pending' && entry.gatewayApprovalId === approvalId
+          return (
+            entry.status === 'pending' && entry.gatewayApprovalId === approvalId
+          )
         })
       ) {
         setPendingApprovals(
@@ -994,7 +998,8 @@ export function ChatScreen({
     ],
     queryFn: async () => {
       try {
-        const statusSessionKey = resolvedSessionKey || activeFriendlyId || 'main'
+        const statusSessionKey =
+          resolvedSessionKey || activeFriendlyId || 'main'
         const query = statusSessionKey
           ? `?sessionKey=${encodeURIComponent(statusSessionKey)}`
           : ''
@@ -1084,8 +1089,7 @@ export function ChatScreen({
     cancelStreaming,
   } = useStreamingMessage({
     pinMainSession:
-      activeFriendlyId === 'main' &&
-      (resolvedSessionKey || activeFriendlyId || 'main') === 'main',
+      activeFriendlyId === 'main' && resolvedSessionKey === 'main',
     onSessionResolved: useCallback(
       ({
         sessionKey,
@@ -1133,36 +1137,39 @@ export function ChatScreen({
       },
       [queryClient],
     ),
-    onComplete: useCallback((message: ChatMessage) => {
-      const activeSend = activeSendRef.current
-      if (activeSend?.clientId) {
-        updateHistoryMessageByClientIdEverywhere(
-          queryClient,
-          activeSend.clientId,
-          (message) => ({
-            ...message,
-            status: 'done',
-          }),
-        )
-      }
-      if (activeSend?.sessionKey) {
-        persistRecoveryMessage(activeSend.sessionKey, message)
-        clearPendingSendForSession(
-          activeSend.sessionKey,
-          activeSend.friendlyId,
-        )
-      }
-      activeSendRef.current = null
-      refreshHistoryRef.current()
-      setSending(false)
-      // Clear waitingForResponse so ThinkingBubble hides and message renders
-      streamFinish()
-      // Play notification sound if the user opted in (Settings → Chat).
-      // Read directly from the store to avoid re-creating this callback on every settings change.
-      if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
-        playChatComplete()
-      }
-    }, [queryClient, streamFinish]),
+    onComplete: useCallback(
+      (message: ChatMessage) => {
+        const activeSend = activeSendRef.current
+        if (activeSend?.clientId) {
+          updateHistoryMessageByClientIdEverywhere(
+            queryClient,
+            activeSend.clientId,
+            (message) => ({
+              ...message,
+              status: 'done',
+            }),
+          )
+        }
+        if (activeSend?.sessionKey) {
+          persistRecoveryMessage(activeSend.sessionKey, message)
+          clearPendingSendForSession(
+            activeSend.sessionKey,
+            activeSend.friendlyId,
+          )
+        }
+        activeSendRef.current = null
+        refreshHistoryRef.current()
+        setSending(false)
+        // Clear waitingForResponse so ThinkingBubble hides and message renders
+        streamFinish()
+        // Play notification sound if the user opted in (Settings → Chat).
+        // Read directly from the store to avoid re-creating this callback on every settings change.
+        if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
+          playChatComplete()
+        }
+      },
+      [queryClient, streamFinish],
+    ),
     onError: useCallback(
       (messageText: string) => {
         const activeSend = activeSendRef.current
@@ -1245,7 +1252,7 @@ export function ChatScreen({
   // wanted in either session).
   const navCancelKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    const navKey = `${activeCanonicalKey ?? ''}::${isNewChat ? 'new' : activeFriendlyId}`
+    const navKey = `${activeCanonicalKey}::${isNewChat ? 'new' : activeFriendlyId}`
     if (navCancelKeyRef.current === null) {
       navCancelKeyRef.current = navKey
       return
@@ -1266,10 +1273,12 @@ export function ChatScreen({
     activeRealtimeStreamingText,
     activeIsRealtimeStreaming,
   )
-  const stickyStreamingTextRef = useRef<{ runId: string | null; text: string }>({
-    runId: null,
-    text: '',
-  })
+  const stickyStreamingTextRef = useRef<{ runId: string | null; text: string }>(
+    {
+      runId: null,
+      text: '',
+    },
+  )
   stickyStreamingTextRef.current = advanceStickyStreamingText({
     isStreaming: activeIsRealtimeStreaming,
     runId: streamingRunId ?? null,
@@ -1431,14 +1440,14 @@ export function ChatScreen({
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
       const id = isPortableMode
         ? localStreamingMessageId
-        : last?.role === 'assistant'
+        : last.role === 'assistant'
           ? (last as any).__optimisticId || (last as any).id || null
           : null
       return { isStreaming: true, streamingMessageId: id }
     }
     if (waitingForResponse && finalDisplayMessages.length > 0) {
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (last && last.role === 'assistant') {
+      if (last.role === 'assistant') {
         const isStreamingPlaceholder =
           (last as any).__streamingStatus === 'streaming'
         if (!isStreamingPlaceholder) {
@@ -1534,9 +1543,9 @@ export function ChatScreen({
   }, [suggestion, resolvedSessionKey, dismiss])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setLocalActivity = useChatActivityStore(
-    (s) => s.setLocalActivity,
-  ) as (next: AgentActivity) => void
+  const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity) as (
+    next: AgentActivity,
+  ) => void
   useEffect(() => {
     if (liveToolActivity.length > 0) {
       setLocalActivity('tool-use')
@@ -1565,21 +1574,20 @@ export function ChatScreen({
     staleTime: 30_000,
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
-  // Don't show errors for new chats or when SSE is connected
-  const statusError =
-    !isNewChat && connectionState !== 'connected'
-      ? statusQuery.error instanceof Error
+  // Don't show errors for new chats; SSE connection is always stub-connected.
+  const statusError = !isNewChat
+    ? statusQuery.error instanceof Error
+      ? {
+          message: statusQuery.error.message,
+          status: (statusQuery.error as Error & { status?: number }).status,
+        }
+      : statusQuery.data && !statusQuery.data.ok
         ? {
-            message: statusQuery.error.message,
-            status: (statusQuery.error as Error & { status?: number }).status,
+            message: statusQuery.data.error || 'Hermes Agent unavailable',
+            status: statusQuery.data.status,
           }
-        : statusQuery.data && !statusQuery.data.ok
-          ? {
-              message: statusQuery.data.error || 'Hermes Agent unavailable',
-              status: statusQuery.data.status,
-            }
-          : null
-      : null
+        : null
+    : null
   const serverError = statusError?.message ?? sessionsError ?? historyError
   const serverErrorStatus = statusError?.status
   const showErrorNotice = Boolean(serverError) && !isNewChat
@@ -1624,7 +1632,8 @@ export function ChatScreen({
       void historyQuery.refetch()
     }, 2000)
     return () => window.clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+    // mount-only effect — no deps
+  }, [])
 
   useEffect(() => {
     function handleSSEDrop() {
@@ -2127,14 +2136,9 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (false) {
-      // Server connection checks removed — Hermes Agent uses direct API
-      hasSeenDisconnectRef.current = true
-      retriedQueuedMessageKeysRef.current.clear()
-      return
-    }
-
-    if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
+    // Server connection checks removed — Hermes Agent uses direct API.
+    // connectionState is always 'connected' from the stub stream hook.
+    if (hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()
     }
@@ -2474,7 +2478,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleRunCommand(event: Event) {
       const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
-      if (!detail?.command) return
+      if (!detail.command) return
       runPaletteSlashCommand(detail.command)
     }
 
@@ -2553,12 +2557,9 @@ export function ChatScreen({
     )
   }, [serverError, serverErrorStatus, handleRefetch, showErrorNotice])
 
+  // SSE connectionState is always 'connected' (stub hook), so header always reports connected.
   const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
-    connectionState === 'connected'
-      ? 'connected'
-      : statusQuery.data?.ok === false || statusQuery.isError
-        ? 'disconnected'
-        : 'connecting'
+    'connected'
 
   const activeHeaderToolName =
     liveToolActivity[0]?.name || activeToolCalls[0]?.name || undefined
@@ -2657,7 +2658,7 @@ export function ChatScreen({
               renamingTitle={renamingSessionTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
-              sessions={sessions ?? []}
+              sessions={sessions}
               activeFriendlyId={activeFriendlyId}
               onSelectSession={(key) =>
                 void navigate({
@@ -2671,7 +2672,7 @@ export function ChatScreen({
               dataUpdatedAt={historyQuery.dataUpdatedAt}
               onRefresh={handleRefreshHistory}
               agentModel={currentModel}
-              agentConnected={mobileHeaderStatus === 'connected'}
+              agentConnected={true}
               onOpenAgentDetails={handleOpenAgentDetails}
               pullOffset={0}
               statusMode={headerStatusMode}

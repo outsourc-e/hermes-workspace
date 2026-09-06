@@ -10,21 +10,34 @@ type WorkerState = {
 }
 
 const WORKERS = [
-  'orchestrator', 'km-agent', 'builder', 'reviewer', 'qa',
-  'researcher', 'ops-watch', 'maintainer', 'strategist', 'inbox-triage', 'swarm5',
+  'orchestrator',
+  'km-agent',
+  'builder',
+  'reviewer',
+  'qa',
+  'researcher',
+  'ops-watch',
+  'maintainer',
+  'strategist',
+  'inbox-triage',
+  'swarm5',
 ]
 
 function statusColor(s: string) {
   switch (s) {
-    case 'running': return 'bg-emerald-500'
-    case 'idle':    return 'bg-blue-400'
-    case 'error':   return 'bg-red-500'
-    default:        return 'bg-[var(--theme-muted)]'
+    case 'running':
+      return 'bg-emerald-500'
+    case 'idle':
+      return 'bg-blue-400'
+    case 'error':
+      return 'bg-red-500'
+    default:
+      return 'bg-[var(--theme-muted)]'
   }
 }
 
 export function SwarmStatusWidget() {
-  const [workers, setWorkers] = useState<WorkerState[]>([])
+  const [workers, setWorkers] = useState<Array<WorkerState>>([])
 
   useEffect(() => {
     const load = async () => {
@@ -33,16 +46,22 @@ export function SwarmStatusWidget() {
           try {
             const r = await fetch(`/api/swarm-project?workerId=${id}`)
             const d = await r.json()
-            return { id, status: d.error ? 'error' : 'idle', lastSeen: Date.now() }
+            return {
+              id,
+              status: d.error ? ('error' as const) : ('idle' as const),
+              lastSeen: Date.now(),
+            }
           } catch {
             return { id, status: 'unknown' as const, lastSeen: null }
           }
-        })
+        }),
       )
       setWorkers(
         results.map((r, i) =>
-          r.status === 'fulfilled' ? r.value : { id: WORKERS[i], status: 'unknown' as const, lastSeen: null }
-        )
+          r.status === 'fulfilled'
+            ? r.value
+            : { id: WORKERS[i], status: 'unknown' as const, lastSeen: null },
+        ),
       )
     }
     load()
@@ -57,11 +76,15 @@ export function SwarmStatusWidget() {
           Swarm
         </span>
         <span className="text-[10px] text-[var(--theme-muted)]">
-          {workers.filter(w => w.status === 'idle' || w.status === 'running').length}/{WORKERS.length}
+          {
+            workers.filter((w) => w.status === 'idle' || w.status === 'running')
+              .length
+          }
+          /{WORKERS.length}
         </span>
       </div>
       <div className="grid grid-cols-4 gap-1">
-        {workers.map(w => (
+        {workers.map((w) => (
           <div key={w.id} className="flex flex-col items-center gap-0.5">
             <div className={`w-2 h-2 rounded-full ${statusColor(w.status)}`} />
             <span className="text-[9px] text-[var(--theme-muted)] truncate w-full text-center">

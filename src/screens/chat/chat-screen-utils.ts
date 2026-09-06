@@ -34,7 +34,7 @@ export function createResponseWaitSnapshot(
   return {
     messageCount: messages.length,
     lastAssistantId:
-      last?.role === 'assistant' ? assistantMessageIdentity(last) : null,
+      last.role === 'assistant' ? assistantMessageIdentity(last) : null,
   }
 }
 
@@ -43,7 +43,7 @@ export function shouldClearWaitingForAssistantMessage(
   snapshot: ResponseWaitSnapshot,
 ): boolean {
   const last = messages[messages.length - 1]
-  if (!last || last.role !== 'assistant') return false
+  if (last.role !== 'assistant') return false
   if (last.__streamingStatus === 'streaming') return false
 
   if (messages.length > snapshot.messageCount) return true
@@ -72,11 +72,12 @@ export function advanceStickyStreamingText(params: {
   const nextRunId = runId ?? previousState.runId ?? 'streaming'
   const isNewRun = nextRunId !== previousState.runId
   const candidateText = smoothedText || rawText
-  const nextText = candidateText.length > 0
-    ? candidateText
-    : isNewRun
-      ? ''
-      : previousState.text
+  const nextText =
+    candidateText.length > 0
+      ? candidateText
+      : isNewRun
+        ? ''
+        : previousState.text
 
   return {
     runId: nextRunId,

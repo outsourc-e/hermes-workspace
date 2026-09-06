@@ -1,7 +1,16 @@
 /**
  * Tests for GET /api/mcp/hub-search route handler.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { isAuthenticated } from '../../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../../server/rate-limit'
+import { unifiedSearch } from '../../../server/mcp-hub/index'
+import { Route } from './hub-search'
 
 vi.mock('../../../server/auth-middleware', () => ({
   isAuthenticated: vi.fn(),
@@ -10,16 +19,13 @@ vi.mock('../../../server/rate-limit', () => ({
   rateLimit: vi.fn(),
   getClientIp: vi.fn(),
   rateLimitResponse: vi.fn(),
-  safeErrorMessage: vi.fn((e: unknown) => (e instanceof Error ? e.message : String(e))),
+  safeErrorMessage: vi.fn((e: unknown) =>
+    e instanceof Error ? e.message : String(e),
+  ),
 }))
 vi.mock('../../../server/mcp-hub/index', () => ({
   unifiedSearch: vi.fn(),
 }))
-
-import { isAuthenticated } from '../../../server/auth-middleware'
-import { rateLimit, getClientIp, rateLimitResponse } from '../../../server/rate-limit'
-import { unifiedSearch } from '../../../server/mcp-hub/index'
-import { Route } from './hub-search'
 
 const mockIsAuthenticated = vi.mocked(isAuthenticated)
 const mockRateLimit = vi.mocked(rateLimit)
@@ -33,9 +39,15 @@ function makeRequest(url: string): Request {
 
 async function callGet(url: string): Promise<Response> {
   const request = makeRequest(url)
-  const handler = Route.options.server?.handlers?.GET
+  const handlers = Route.options.server?.handlers as
+    | Record<
+        string,
+        ((ctx: { request: Request }) => Promise<Response>) | undefined
+      >
+    | undefined
+  const handler = handlers?.GET
   if (!handler) throw new Error('No GET handler')
-  return handler({ request } as Parameters<typeof handler>[0])
+  return handler({ request })
 }
 
 beforeEach(() => {
@@ -66,25 +78,43 @@ describe('GET /api/mcp/hub-search — auth', () => {
 
 describe('GET /api/mcp/hub-search — query parsing', () => {
   it('passes q, source, limit, offset to unifiedSearch', async () => {
-    mockUnifiedSearch.mockResolvedValue({ results: [], source: 'mcp-get', total: 0 })
-    await callGet('http://localhost/api/mcp/hub-search?q=github&source=mcp-get&limit=5')
+    mockUnifiedSearch.mockResolvedValue({
+      results: [],
+      source: 'mcp-get',
+      total: 0,
+    })
+    await callGet(
+      'http://localhost/api/mcp/hub-search?q=github&source=mcp-get&limit=5',
+    )
     expect(mockUnifiedSearch).toHaveBeenCalledWith('github', 'mcp-get', 5, 0)
   })
 
   it('uses defaults when params absent', async () => {
-    mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
+    mockUnifiedSearch.mockResolvedValue({
+      results: [],
+      source: 'all',
+      total: 0,
+    })
     await callGet('http://localhost/api/mcp/hub-search')
     expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 20, 0)
   })
 
   it('clamps limit to 500', async () => {
-    mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
+    mockUnifiedSearch.mockResolvedValue({
+      results: [],
+      source: 'all',
+      total: 0,
+    })
     await callGet('http://localhost/api/mcp/hub-search?limit=9999')
     expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 500, 0)
   })
 
   it('defaults invalid source to all', async () => {
-    mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
+    mockUnifiedSearch.mockResolvedValue({
+      results: [],
+      source: 'all',
+      total: 0,
+    })
     await callGet('http://localhost/api/mcp/hub-search?source=invalid')
     expect(mockUnifiedSearch).toHaveBeenCalledWith('', 'all', 20, 0)
   })
@@ -119,7 +149,11 @@ describe('GET /api/mcp/hub-search — response shape', () => {
   })
 
   it('does not include warnings key when empty', async () => {
-    mockUnifiedSearch.mockResolvedValue({ results: [], source: 'all', total: 0 })
+    mockUnifiedSearch.mockResolvedValue({
+      results: [],
+      source: 'all',
+      total: 0,
+    })
     const res = await callGet('http://localhost/api/mcp/hub-search')
     const body = await res.json()
     expect(body.warnings).toBeUndefined()

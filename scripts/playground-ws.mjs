@@ -35,7 +35,9 @@ const CHAT_RING_MAX = 50
 const server = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, players: presence.size, ts: Date.now() }))
+    res.end(
+      JSON.stringify({ ok: true, players: presence.size, ts: Date.now() }),
+    )
     return
   }
   res.writeHead(404)
@@ -48,7 +50,9 @@ function broadcast(originSocket, data) {
   const payload = typeof data === 'string' ? data : JSON.stringify(data)
   for (const client of wss.clients) {
     if (client !== originSocket && client.readyState === 1) {
-      try { client.send(payload) } catch {}
+      try {
+        client.send(payload)
+      } catch {}
     }
   }
 }
@@ -66,18 +70,32 @@ setInterval(pruneStale, 1000)
 
 wss.on('connection', (socket, req) => {
   socket.id = `c_${Math.random().toString(36).slice(2, 10)}`
-  socket.send(JSON.stringify({ kind: 'hello', server: 'hermes.playground.v0', ts: Date.now() }))
+  socket.send(
+    JSON.stringify({
+      kind: 'hello',
+      server: 'hermes.playground.v0',
+      ts: Date.now(),
+    }),
+  )
   // Snapshot existing presence for the newcomer
   for (const p of presence.values()) {
-    try { socket.send(JSON.stringify(p)) } catch {}
+    try {
+      socket.send(JSON.stringify(p))
+    } catch {}
   }
   for (const c of chatRing) {
-    try { socket.send(JSON.stringify(c)) } catch {}
+    try {
+      socket.send(JSON.stringify(c))
+    } catch {}
   }
 
   socket.on('message', (raw) => {
     let msg
-    try { msg = JSON.parse(raw.toString()) } catch { return }
+    try {
+      msg = JSON.parse(raw.toString())
+    } catch {
+      return
+    }
     if (!msg || typeof msg.kind !== 'string') return
     if (msg.kind === 'presence' && msg.id) {
       presence.set(msg.id, msg)

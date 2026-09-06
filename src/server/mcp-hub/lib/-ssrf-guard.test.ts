@@ -1,8 +1,9 @@
 /**
  * Tests for ssrf-guard helpers.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { isPrivateAddress, assertNotPrivate } from './ssrf-guard'
+import { lookup } from 'node:dns/promises'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { assertNotPrivate, isPrivateAddress } from './ssrf-guard'
 
 // ---------------------------------------------------------------------------
 // isPrivateAddress
@@ -87,11 +88,11 @@ describe('isPrivateAddress', () => {
 vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(),
 }))
-
-import { lookup } from 'node:dns/promises'
 const mockLookup = vi.mocked(lookup)
 
-function makeLookupResult(addresses: string[]): { address: string; family: number }[] {
+function makeLookupResult(
+  addresses: Array<string>,
+): Array<{ address: string; family: number }> {
   return addresses.map((a) => ({ address: a, family: a.includes(':') ? 6 : 4 }))
 }
 
@@ -101,7 +102,9 @@ beforeEach(() => {
 
 describe('assertNotPrivate', () => {
   it('rejects non-HTTPS schemes', async () => {
-    await expect(assertNotPrivate('http://example.com/feed')).rejects.toThrow(/only HTTPS/)
+    await expect(assertNotPrivate('http://example.com/feed')).rejects.toThrow(
+      /only HTTPS/,
+    )
   })
 
   it('rejects invalid URLs', async () => {
@@ -109,40 +112,56 @@ describe('assertNotPrivate', () => {
   })
 
   it('allows a public IP literal', async () => {
-    await expect(assertNotPrivate('https://8.8.8.8/feed')).resolves.toBeUndefined()
+    await expect(
+      assertNotPrivate('https://8.8.8.8/feed'),
+    ).resolves.toBeUndefined()
   })
 
   it('rejects a private IP literal directly', async () => {
-    await expect(assertNotPrivate('https://192.168.1.1/feed')).rejects.toThrow(/private\/reserved/)
+    await expect(assertNotPrivate('https://192.168.1.1/feed')).rejects.toThrow(
+      /private\/reserved/,
+    )
   })
 
   it('rejects loopback IP literal', async () => {
-    await expect(assertNotPrivate('https://127.0.0.1/feed')).rejects.toThrow(/private\/reserved/)
+    await expect(assertNotPrivate('https://127.0.0.1/feed')).rejects.toThrow(
+      /private\/reserved/,
+    )
   })
 
   it('allows a hostname that resolves to public IPs', async () => {
     mockLookup.mockResolvedValue(makeLookupResult(['93.184.216.34']) as never)
-    await expect(assertNotPrivate('https://example.com/feed')).resolves.toBeUndefined()
+    await expect(
+      assertNotPrivate('https://example.com/feed'),
+    ).resolves.toBeUndefined()
   })
 
   it('rejects a hostname resolving to private IPv4', async () => {
     mockLookup.mockResolvedValue(makeLookupResult(['10.0.0.1']) as never)
-    await expect(assertNotPrivate('https://internal.corp/feed')).rejects.toThrow(/private address/)
+    await expect(
+      assertNotPrivate('https://internal.corp/feed'),
+    ).rejects.toThrow(/private address/)
   })
 
   it('rejects a hostname resolving to loopback', async () => {
     mockLookup.mockResolvedValue(makeLookupResult(['127.0.0.1']) as never)
-    await expect(assertNotPrivate('https://localhost-alias.example.com/feed')).rejects.toThrow(/private address/)
+    await expect(
+      assertNotPrivate('https://localhost-alias.example.com/feed'),
+    ).rejects.toThrow(/private address/)
   })
 
   it('rejects a hostname resolving to link-local', async () => {
     mockLookup.mockResolvedValue(makeLookupResult(['169.254.169.254']) as never)
-    await expect(assertNotPrivate('https://metadata.example.com/feed')).rejects.toThrow(/private address/)
+    await expect(
+      assertNotPrivate('https://metadata.example.com/feed'),
+    ).rejects.toThrow(/private address/)
   })
 
   it('rejects a hostname resolving to IPv6 ULA', async () => {
     mockLookup.mockResolvedValue(makeLookupResult(['fd00::1']) as never)
-    await expect(assertNotPrivate('https://ipv6-ula.example.com/feed')).rejects.toThrow(/private address/)
+    await expect(
+      assertNotPrivate('https://ipv6-ula.example.com/feed'),
+    ).rejects.toThrow(/private address/)
   })
 
   it('rejects when ANY record is private (mixed public+private)', async () => {
@@ -150,11 +169,15 @@ describe('assertNotPrivate', () => {
     mockLookup
       .mockResolvedValueOnce(makeLookupResult(['93.184.216.34']) as never)
       .mockResolvedValueOnce(makeLookupResult(['fd00::1']) as never)
-    await expect(assertNotPrivate('https://mixed.example.com/feed')).rejects.toThrow(/private address/)
+    await expect(
+      assertNotPrivate('https://mixed.example.com/feed'),
+    ).rejects.toThrow(/private address/)
   })
 
   it('rejects when hostname cannot be resolved', async () => {
     mockLookup.mockRejectedValue(new Error('ENOTFOUND'))
-    await expect(assertNotPrivate('https://nxdomain.example.com/feed')).rejects.toThrow(/could not resolve/)
+    await expect(
+      assertNotPrivate('https://nxdomain.example.com/feed'),
+    ).rejects.toThrow(/could not resolve/)
   })
 })

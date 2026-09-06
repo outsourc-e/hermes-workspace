@@ -20,19 +20,19 @@ Use those specs as the source of truth for standing missions. The role preset is
 
 ## Preset summary
 
-| Preset | Default model | Use when |
-| --- | --- | --- |
-| Orchestrator | GPT-5.4 | You need dispatch, routing, drift detection, and escalation. |
-| Builder | GPT-5.5 | You need product code shipped with tests/build proof. |
-| Reviewer | GPT-5.4 | You need byte-verified review and merge readiness. |
-| Triage | GPT-5.5 | You need issues/PRs scored, reproduced, patched, or prepared. |
-| Lab | GPT-5.4 | You need isolated experiments or local-model benchmarking. |
-| Sage | GPT-5.5 | You need research, synthesis, scripts, or launch copy. |
-| Scribe | GPT-5.5 | You need docs, specs, handoffs, skills hygiene, memory curation. |
-| Foundation | GPT-5.4 | You need runtime, repair, infra, health, or lifecycle work. |
-| QA | GPT-5.4 | You need regression, smoke, expected-vs-actual verification. |
-| Mirror Integrations | GPT-5.4 | You need upstream sync, integrations, or asset packs. |
-| Custom | user-selected | You are creating a lane that does not fit an existing preset. |
+| Preset              | Default model | Use when                                                         |
+| ------------------- | ------------- | ---------------------------------------------------------------- |
+| Orchestrator        | GPT-5.4       | You need dispatch, routing, drift detection, and escalation.     |
+| Builder             | GPT-5.5       | You need product code shipped with tests/build proof.            |
+| Reviewer            | GPT-5.4       | You need byte-verified review and merge readiness.               |
+| Triage              | GPT-5.5       | You need issues/PRs scored, reproduced, patched, or prepared.    |
+| Lab                 | GPT-5.4       | You need isolated experiments or local-model benchmarking.       |
+| Sage                | GPT-5.5       | You need research, synthesis, scripts, or launch copy.           |
+| Scribe              | GPT-5.5       | You need docs, specs, handoffs, skills hygiene, memory curation. |
+| Foundation          | GPT-5.4       | You need runtime, repair, infra, health, or lifecycle work.      |
+| QA                  | GPT-5.4       | You need regression, smoke, expected-vs-actual verification.     |
+| Mirror Integrations | GPT-5.4       | You need upstream sync, integrations, or asset packs.            |
+| Custom              | user-selected | You are creating a lane that does not fit an existing preset.    |
 
 ## Orchestrator
 
@@ -372,19 +372,19 @@ Blank custom workers become expensive autocomplete. Add structure first.
 
 Use this routing rule:
 
-| If the work is mostly... | Send it to... |
-| --- | --- |
-| deciding who should do what | Orchestrator |
-| changing product code | Builder |
-| proving a branch is safe | Reviewer |
-| chewing through issues/PRs | Triage |
-| experimenting away from release | Lab |
-| researching or drafting narrative | Sage |
-| explaining, documenting, preserving context | Scribe |
-| runtime/health/repair infrastructure | Foundation |
-| checking behavior and regressions | QA |
-| upstream/integration/assets | Mirror Integrations |
-| none of the above | Custom |
+| If the work is mostly...                    | Send it to...       |
+| ------------------------------------------- | ------------------- |
+| deciding who should do what                 | Orchestrator        |
+| changing product code                       | Builder             |
+| proving a branch is safe                    | Reviewer            |
+| chewing through issues/PRs                  | Triage              |
+| experimenting away from release             | Lab                 |
+| researching or drafting narrative           | Sage                |
+| explaining, documenting, preserving context | Scribe              |
+| runtime/health/repair infrastructure        | Foundation          |
+| checking behavior and regressions           | QA                  |
+| upstream/integration/assets                 | Mirror Integrations |
+| none of the above                           | Custom              |
 
 ## Adding a new role preset
 

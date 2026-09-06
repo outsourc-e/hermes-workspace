@@ -1,38 +1,47 @@
-import * as YAML from 'yaml';
-import { promises as fs } from 'fs';
-import type { HUDConfig, WidgetId } from '../../server/hud/types';
+import { promises as fs } from 'node:fs'
+import * as YAML from 'yaml'
+import type { HUDConfig, WidgetId } from '../../server/hud/types'
 
-export const HUD_CONFIG_PATH = `${process.env.CLAUDE_WORKSPACE_DIR || '/root/.hermes'}/hud-config.yaml`;
+export const HUD_CONFIG_PATH = `${process.env.CLAUDE_WORKSPACE_DIR || '/root/.hermes'}/hud-config.yaml`
 
 export const defaultHUDConfig: HUDConfig = {
   widgets: {
-    'brief': true,
+    brief: true,
     'up-next': true,
-    'recovery': true,
+    recovery: true,
     'next-deadline': true,
-    'timeline': true,
-    'agents': true,
-    'jobs': true,
-    'sessions': true,
+    timeline: true,
+    agents: true,
+    jobs: true,
+    sessions: true,
     'vm-health': true,
-    'prs': true,
-    'ci': true,
-    'sms': true,
-    'telegram': true,
-    'plaud': true,
-    'cliniko': true,
-    'errors': true,
-    'inbox': true,
+    prs: true,
+    ci: true,
+    sms: true,
+    telegram: true,
+    plaud: true,
+    cliniko: true,
+    errors: true,
+    inbox: true,
   },
   mc_tile_order: [
-    'agents', 'jobs', 'sessions', 'vm-health',
-    'prs', 'ci', 'sms', 'telegram',
-    'plaud', 'cliniko', 'errors',
+    'agents',
+    'jobs',
+    'sessions',
+    'vm-health',
+    'prs',
+    'ci',
+    'sms',
+    'telegram',
+    'plaud',
+    'cliniko',
+    'errors',
   ],
   inbox_severity_overrides: { starred_sms_contacts: [] },
   dismissed_inbox_items: {},
+  deadline_attendance: {},
   mobile_tiles: ['agents', 'jobs', 'prs', 'sms', 'telegram', 'plaud'],
-};
+}
 
 /**
  * Parse a YAML string into a HUDConfig, merging with defaults.
@@ -49,26 +58,26 @@ export const defaultHUDConfig: HUDConfig = {
  * defaultHUDConfig or any other previously returned config object.
  */
 export function parseHUDConfig(yamlStr: string): HUDConfig {
-  if (!yamlStr.trim()) return structuredClone(defaultHUDConfig);
-  const parsed = YAML.parse(yamlStr) as Partial<HUDConfig> | null;
-  if (!parsed) return structuredClone(defaultHUDConfig);
+  if (!yamlStr.trim()) return structuredClone(defaultHUDConfig)
+  const parsed = YAML.parse(yamlStr) as Partial<HUDConfig> | null
+  if (!parsed) return structuredClone(defaultHUDConfig)
   return structuredClone({
     ...defaultHUDConfig,
     ...parsed,
     widgets: { ...defaultHUDConfig.widgets, ...(parsed.widgets ?? {}) },
-  });
+  })
 }
 
 export async function loadHUDConfig(): Promise<HUDConfig> {
   try {
-    const raw = await fs.readFile(HUD_CONFIG_PATH, 'utf8');
-    return parseHUDConfig(raw);
+    const raw = await fs.readFile(HUD_CONFIG_PATH, 'utf8')
+    return parseHUDConfig(raw)
   } catch (e: any) {
-    if (e.code === 'ENOENT') return structuredClone(defaultHUDConfig);
-    throw e;
+    if (e.code === 'ENOENT') return structuredClone(defaultHUDConfig)
+    throw e
   }
 }
 
 export async function saveHUDConfig(cfg: HUDConfig): Promise<void> {
-  await fs.writeFile(HUD_CONFIG_PATH, YAML.stringify(cfg), 'utf8');
+  await fs.writeFile(HUD_CONFIG_PATH, YAML.stringify(cfg), 'utf8')
 }

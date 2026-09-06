@@ -32,7 +32,7 @@ async function* streamClaudeChat(
   }
 
   const queue: Array<string> = []
-  let done = false
+  let done = false as boolean
   let failure: Error | null = null
   let notify: (() => void) | null = null
 
@@ -92,8 +92,6 @@ async function* streamClaudeChat(
       notify = resolve
     })
   }
-
-  if (failure) throw failure
 }
 
 export async function sendChatUnified(

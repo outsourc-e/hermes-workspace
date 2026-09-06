@@ -312,7 +312,8 @@ export async function readProfileWithFallback(
           }>
         }
         const match = data.profiles?.find(
-          (p) => p.name === normalized || (normalized === 'default' && p.is_default),
+          (p) =>
+            p.name === normalized || (normalized === 'default' && p.is_default),
         )
         if (match) {
           const active = getActiveProfileName()

@@ -5,15 +5,23 @@
  * the WebSocket server on `join`.
  */
 import { useCallback, useEffect, useState } from 'react'
-import {
-  AGORA_PROFILE_STORAGE_KEY,
-  type AgoraAvatarId,
-  type AgoraProfile,
-  type AgoraStatus,
+import { AGORA_PROFILE_STORAGE_KEY } from '../lib/agora-types'
+import type {
+  AgoraAvatarId,
+  AgoraProfile,
+  AgoraStatus,
 } from '../lib/agora-types'
 
 const FUNNY_ANIMALS = [
-  'Owl', 'Fox', 'Wolf', 'Otter', 'Hawk', 'Lynx', 'Crow', 'Stag', 'Heron',
+  'Owl',
+  'Fox',
+  'Wolf',
+  'Otter',
+  'Hawk',
+  'Lynx',
+  'Crow',
+  'Stag',
+  'Heron',
 ]
 
 function generateInitialProfile(): AgoraProfile {
@@ -40,14 +48,22 @@ function loadProfile(): AgoraProfile {
     const raw = window.localStorage.getItem(AGORA_PROFILE_STORAGE_KEY)
     if (!raw) {
       const initial = generateInitialProfile()
-      window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(initial))
+      window.localStorage.setItem(
+        AGORA_PROFILE_STORAGE_KEY,
+        JSON.stringify(initial),
+      )
       return initial
     }
-    const parsed = JSON.parse(raw) as AgoraProfile
-    if (!parsed.id || !parsed.handle || !parsed.displayName || !parsed.avatarId) {
+    const parsed = JSON.parse(raw) as Partial<AgoraProfile>
+    if (
+      typeof parsed.id !== 'string' ||
+      typeof parsed.handle !== 'string' ||
+      typeof parsed.displayName !== 'string' ||
+      typeof parsed.avatarId !== 'string'
+    ) {
       return generateInitialProfile()
     }
-    return parsed
+    return parsed as AgoraProfile
   } catch {
     return generateInitialProfile()
   }
@@ -58,7 +74,10 @@ export function useAgoraProfile() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(profile))
+      window.localStorage.setItem(
+        AGORA_PROFILE_STORAGE_KEY,
+        JSON.stringify(profile),
+      )
     } catch {
       // ignore quota / private mode
     }

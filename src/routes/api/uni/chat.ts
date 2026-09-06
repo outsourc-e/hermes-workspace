@@ -8,11 +8,11 @@
  * Body: { messages: [{role: 'user'|'assistant'|'system', content: string}] }
  * Response: SSE stream of OpenAI-compatible chat completions chunks
  */
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { openaiChat } from '../../../server/openai-compat-api'
 
@@ -79,9 +79,10 @@ export const Route = createFileRoute('/api/uni/chat')({
 
         const allMessages = [systemMsg, ...body.messages]
 
-        const stream = openaiChat(allMessages, {
+        const stream = await openaiChat(allMessages, {
           model: 'kimi-latest',
           signal: request.signal,
+          stream: true,
         })
 
         const readable = new ReadableStream({

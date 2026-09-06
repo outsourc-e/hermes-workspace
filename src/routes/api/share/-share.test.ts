@@ -1,10 +1,21 @@
 /**
  * Tests for share API endpoints
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdirSync, rmSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  existsSync,
+  existsSync as fsExists,
+  mkdirSync as fsMkdir,
+  rmSync as fsRm,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { join, join as pathJoin } from 'node:path'
 import os from 'node:os'
+import { randomBytes } from 'node:crypto'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 // Use a temp dir for share storage during tests
 const tmpShareDir = join(os.tmpdir(), `hermes-share-test-${Date.now()}`)
@@ -16,31 +27,24 @@ process.env.HERMES_SHARE_DIR = tmpShareDir
 // server/auth-middleware, we patch the environment to avoid real auth checks.
 // isLocalRequest will auto-pass for 127.0.0.1 requests.
 
-function makeReq(method: string, url: string, options: {
-  body?: string
-  contentType?: string
-  remoteAddress?: string
-} = {}): Request {
+function makeReq(
+  method: string,
+  url: string,
+  options: {
+    body?: string
+    contentType?: string
+    remoteAddress?: string
+  } = {},
+): Request {
   const req = new Request(url, {
     method,
     body: options.body,
     headers: options.contentType ? { 'Content-Type': options.contentType } : {},
   })
-  ;(req as unknown as { remoteAddress: string }).remoteAddress = options.remoteAddress ?? '127.0.0.1'
+  ;(req as unknown as { remoteAddress: string }).remoteAddress =
+    options.remoteAddress ?? '127.0.0.1'
   return req
 }
-
-// Inline minimal share handler for testing (avoids complex module resolution)
-import {
-  mkdirSync as fsMkdir,
-  writeFileSync,
-  readFileSync,
-  readdirSync,
-  existsSync as fsExists,
-  rmSync as fsRm,
-} from 'node:fs'
-import { join as pathJoin } from 'node:path'
-import { randomBytes } from 'node:crypto'
 
 // Copy of the core share logic to test directly
 const SHARE_DIR_TEST = tmpShareDir
@@ -78,7 +82,9 @@ describe('Share API — text round-trip', () => {
     const binBack = readFileSync(pathJoin(SHARE_DIR_TEST, `${id}.bin`))
     expect(binBack.toString('utf8')).toBe(content)
 
-    const metaBack = JSON.parse(readFileSync(pathJoin(SHARE_DIR_TEST, `${id}.json`), 'utf8'))
+    const metaBack = JSON.parse(
+      readFileSync(pathJoin(SHARE_DIR_TEST, `${id}.json`), 'utf8'),
+    )
     expect(metaBack.kind).toBe('text')
     expect(metaBack.id).toBe(id)
   })
@@ -87,7 +93,10 @@ describe('Share API — text round-trip', () => {
     ensureDir(SHARE_DIR_TEST)
     const id = randomBytes(8).toString('hex')
     const buf = Buffer.from('data')
-    writeFileSync(pathJoin(SHARE_DIR_TEST, `${id}.json`), JSON.stringify({ id, kind: 'text', expiresAt: Date.now() + 99999 }))
+    writeFileSync(
+      pathJoin(SHARE_DIR_TEST, `${id}.json`),
+      JSON.stringify({ id, kind: 'text', expiresAt: Date.now() + 99999 }),
+    )
     writeFileSync(pathJoin(SHARE_DIR_TEST, `${id}.bin`), buf)
 
     expect(fsExists(pathJoin(SHARE_DIR_TEST, `${id}.json`))).toBe(true)
@@ -103,7 +112,7 @@ describe('Share API — text round-trip', () => {
   it('list pagination: only newest 50 returned when >50 shares exist', () => {
     ensureDir(SHARE_DIR_TEST)
     // Create 55 shares with incrementing timestamps
-    const ids: string[] = []
+    const ids: Array<string> = []
     for (let i = 0; i < 55; i++) {
       const id = randomBytes(8).toString('hex')
       ids.push(id)
@@ -114,7 +123,10 @@ describe('Share API — text round-trip', () => {
         created: i * 1000,
         expiresAt: Date.now() + 99999999,
       }
-      writeFileSync(pathJoin(SHARE_DIR_TEST, `${id}.json`), JSON.stringify(meta))
+      writeFileSync(
+        pathJoin(SHARE_DIR_TEST, `${id}.json`),
+        JSON.stringify(meta),
+      )
       writeFileSync(pathJoin(SHARE_DIR_TEST, `${id}.bin`), Buffer.from('hello'))
     }
 

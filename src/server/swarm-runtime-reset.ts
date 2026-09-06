@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
 import { listSwarmWorkerIds } from './swarm-foundation'
@@ -10,7 +16,9 @@ export type SwarmRuntimeResetResult = {
 }
 
 export function listResettableSwarmWorkerIds(): Array<string> {
-  return listSwarmWorkerIds({ swarmOnly: true }).filter((workerId) => workerId !== 'workspace')
+  return listSwarmWorkerIds({ swarmOnly: true }).filter(
+    (workerId) => workerId !== 'workspace',
+  )
 }
 
 export function resolveResetTargetWorkerIds(workerIds?: Array<string> | null): {
@@ -32,7 +40,10 @@ export function resolveResetTargetWorkerIds(workerIds?: Array<string> | null): {
   )
 
   if (normalized.length === 0) {
-    return { ok: false, error: 'workerIds must include at least one non-empty worker id' }
+    return {
+      ok: false,
+      error: 'workerIds must include at least one non-empty worker id',
+    }
   }
 
   const unknown = normalized.filter((workerId) => !available.has(workerId))
@@ -43,7 +54,10 @@ export function resolveResetTargetWorkerIds(workerIds?: Array<string> | null): {
   return { ok: true, workerIds: normalized }
 }
 
-export function resetSwarmWorkerRuntime(workerId: string, input: { actor: string; reason: string }): SwarmRuntimeResetResult {
+export function resetSwarmWorkerRuntime(
+  workerId: string,
+  input: { actor: string; reason: string },
+): SwarmRuntimeResetResult {
   const available = new Set(listResettableSwarmWorkerIds())
   if (!available.has(workerId)) {
     return { workerId, ok: false, error: 'unknown worker id' }
@@ -54,7 +68,10 @@ export function resetSwarmWorkerRuntime(workerId: string, input: { actor: string
   let current: Record<string, unknown> = {}
   if (existsSync(runtimePath)) {
     try {
-      current = JSON.parse(readFileSync(runtimePath, 'utf-8')) as Record<string, unknown>
+      current = JSON.parse(readFileSync(runtimePath, 'utf-8')) as Record<
+        string,
+        unknown
+      >
     } catch {
       current = {}
     }
@@ -98,6 +115,9 @@ export function resetSwarmWorkerRuntime(workerId: string, input: { actor: string
   }
 }
 
-export function resetSwarmWorkerRuntimes(workerIds: Array<string>, input: { actor: string; reason: string }): Array<SwarmRuntimeResetResult> {
+export function resetSwarmWorkerRuntimes(
+  workerIds: Array<string>,
+  input: { actor: string; reason: string },
+): Array<SwarmRuntimeResetResult> {
   return workerIds.map((workerId) => resetSwarmWorkerRuntime(workerId, input))
 }

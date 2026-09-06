@@ -56,14 +56,23 @@ async function sendDirectChat(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ workerId, prompt, limit, timeoutMs: 120_000 }),
   })
-  const data = (await res.json().catch(() => null)) as DirectChatResponse | { error?: string } | null
+  const data = (await res.json().catch(() => null)) as
+    | DirectChatResponse
+    | { error?: string }
+    | null
   if (!res.ok) {
-    throw new Error((data && 'error' in data && data.error) || `swarm-direct-chat HTTP ${res.status}`)
+    throw new Error(
+      (data && 'error' in data && data.error) ||
+        `swarm-direct-chat HTTP ${res.status}`,
+    )
   }
   if (!data || !('delivered' in data) || !data.delivered) {
-    throw new Error((data as { error?: string } | null)?.error || 'Direct chat did not reach worker')
+    throw new Error(
+      (data as { error?: string } | null)?.error ||
+        'Direct chat did not reach worker',
+    )
   }
-  return data as DirectChatResponse
+  return data
 }
 
 export type UseSwarmChatOptions = {
@@ -124,7 +133,6 @@ export function useSwarmChat({
     refetch: query.refetch,
     sendMessage: dispatch.mutateAsync,
     isSending: dispatch.isPending,
-    sendError:
-      dispatch.error instanceof Error ? dispatch.error.message : null,
+    sendError: dispatch.error instanceof Error ? dispatch.error.message : null,
   }
 }

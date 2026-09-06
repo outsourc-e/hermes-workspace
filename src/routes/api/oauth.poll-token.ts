@@ -22,7 +22,11 @@ function readString(value: unknown): string {
 // `authorization_pending` are RFC 8628 device-flow intermediate states; the
 // dashboard relays them through, and treating them as errors halts polling
 // prematurely.
-const PENDING_STATUSES = new Set(['pending', 'authorization_pending', 'slow_down'])
+const PENDING_STATUSES = new Set([
+  'pending',
+  'authorization_pending',
+  'slow_down',
+])
 
 export function mapDashboardOAuthPoll(data: DashboardOAuthPollResponse) {
   const status = readString(data.status)

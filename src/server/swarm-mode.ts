@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
 
@@ -9,7 +15,11 @@ export type SwarmModeState = {
   updatedAt: string
 }
 
-export const SWARM_MODE_PATH = join(SWARM_CANONICAL_REPO, '.runtime', 'swarm-mode.json')
+export const SWARM_MODE_PATH = join(
+  SWARM_CANONICAL_REPO,
+  '.runtime',
+  'swarm-mode.json',
+)
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -20,10 +30,15 @@ export function readSwarmMode(): SwarmModeState {
     return { mode: 'auto', updatedAt: nowIso() }
   }
   try {
-    const parsed = JSON.parse(readFileSync(SWARM_MODE_PATH, 'utf8')) as Partial<SwarmModeState>
+    const parsed = JSON.parse(
+      readFileSync(SWARM_MODE_PATH, 'utf8'),
+    ) as Partial<SwarmModeState>
     return {
       mode: parsed.mode === 'manual' ? 'manual' : 'auto',
-      updatedAt: typeof parsed.updatedAt === 'string' && parsed.updatedAt.trim() ? parsed.updatedAt : nowIso(),
+      updatedAt:
+        typeof parsed.updatedAt === 'string' && parsed.updatedAt.trim()
+          ? parsed.updatedAt
+          : nowIso(),
     }
   } catch {
     return { mode: 'auto', updatedAt: nowIso() }

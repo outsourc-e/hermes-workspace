@@ -7,7 +7,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 
-const CLINITRACK_HOST = 'http://100.64.45.20:8080'
+const CLINITRACK_HOST = 'http://100.92.120.31:8080'
 
 export const Route = createFileRoute('/api/clinitrack/health')({
   server: {

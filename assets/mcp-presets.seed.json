@@ -29,7 +29,11 @@
         "name": "filesystem",
         "transportType": "stdio",
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/root"],
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "/path/to/root"
+        ],
         "authType": "none",
         "toolMode": "all"
       }

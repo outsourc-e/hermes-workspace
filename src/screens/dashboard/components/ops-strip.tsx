@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
-import { cn } from '@/lib/utils'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { cn } from '@/lib/utils'
 
 function formatPulse(iso: string | null): string {
   if (!iso) return '—'
@@ -56,7 +56,8 @@ function formatNextRun(iso: string | null): {
 } {
   if (!iso) return { text: 'no schedule', tone: 'var(--theme-muted)' }
   const ms = Date.parse(iso)
-  if (!Number.isFinite(ms)) return { text: 'no schedule', tone: 'var(--theme-muted)' }
+  if (!Number.isFinite(ms))
+    return { text: 'no schedule', tone: 'var(--theme-muted)' }
   const diff = ms - Date.now()
   if (diff < -7 * 86_400_000) {
     return { text: 'stale', tone: 'var(--theme-muted)' }
@@ -66,8 +67,14 @@ function formatNextRun(iso: string | null): {
   if (diff < 3_600_000)
     return { text: `${Math.round(diff / 60_000)}m`, tone: 'var(--theme-text)' }
   if (diff < 86_400_000)
-    return { text: `${Math.round(diff / 3_600_000)}h`, tone: 'var(--theme-text)' }
-  return { text: `${Math.round(diff / 86_400_000)}d`, tone: 'var(--theme-text)' }
+    return {
+      text: `${Math.round(diff / 3_600_000)}h`,
+      tone: 'var(--theme-text)',
+    }
+  return {
+    text: `${Math.round(diff / 86_400_000)}d`,
+    tone: 'var(--theme-text)',
+  }
 }
 
 /**
@@ -121,9 +128,7 @@ export function OpsStrip({
               ok ? 'animate-pulse' : '',
             )}
             style={{
-              background: ok
-                ? 'var(--theme-success)'
-                : 'var(--theme-warning)',
+              background: ok ? 'var(--theme-success)' : 'var(--theme-warning)',
             }}
           />
           <span
@@ -208,56 +213,58 @@ export function OpsStrip({
                     : `${platform.name} · ${platform.state}`
                 }
               >
-                <span aria-hidden>
-                  {PLATFORM_GLYPH[platform.name] ?? '🔌'}
-                </span>
+                <span aria-hidden>{PLATFORM_GLYPH[platform.name] ?? '🔌'}</span>
                 {platform.name.replace('_', ' ')}
               </span>
             ))}
           </div>
         ) : null}
 
-        {cron ? (() => {
-          const isStale = next?.text === 'stale'
-          const isWarn = next?.text === 'overdue' || isStale
-          return (
-            <button
-              type="button"
-              onClick={() => navigate({ to: '/jobs' })}
-              className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80"
-              style={{
-                borderColor: isWarn
-                  ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
-                  : 'var(--theme-border)',
-                background: isWarn
-                  ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
-                  : 'transparent',
-                color: 'var(--theme-muted)',
-              }}
-              title={
-                isStale
-                  ? 'Cron next-run is more than 7 days overdue'
-                  : 'Open cron jobs'
-              }
-            >
-              <span>cron</span>
-              <span style={{ color: 'var(--theme-text)' }}>{cron.total}</span>
-              {cron.paused > 0 ? (
-                <span style={{ color: 'var(--theme-warning)' }}>
-                  · {cron.paused} paused
-                </span>
-              ) : null}
-              {cron.running > 0 ? (
-                <span style={{ color: 'var(--theme-success)' }}>
-                  · {cron.running} running
-                </span>
-              ) : null}
-              {next ? (
-                <span style={{ color: next.tone }}>· {next.text}</span>
-              ) : null}
-            </button>
-          )
-        })() : null}
+        {cron
+          ? (() => {
+              const isStale = next?.text === 'stale'
+              const isWarn = next?.text === 'overdue' || isStale
+              return (
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: '/jobs' })}
+                  className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80"
+                  style={{
+                    borderColor: isWarn
+                      ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
+                      : 'var(--theme-border)',
+                    background: isWarn
+                      ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
+                      : 'transparent',
+                    color: 'var(--theme-muted)',
+                  }}
+                  title={
+                    isStale
+                      ? 'Cron next-run is more than 7 days overdue'
+                      : 'Open cron jobs'
+                  }
+                >
+                  <span>cron</span>
+                  <span style={{ color: 'var(--theme-text)' }}>
+                    {cron.total}
+                  </span>
+                  {cron.paused > 0 ? (
+                    <span style={{ color: 'var(--theme-warning)' }}>
+                      · {cron.paused} paused
+                    </span>
+                  ) : null}
+                  {cron.running > 0 ? (
+                    <span style={{ color: 'var(--theme-success)' }}>
+                      · {cron.running} running
+                    </span>
+                  ) : null}
+                  {next ? (
+                    <span style={{ color: next.tone }}>· {next.text}</span>
+                  ) : null}
+                </button>
+              )
+            })()
+          : null}
       </div>
     </div>
   )

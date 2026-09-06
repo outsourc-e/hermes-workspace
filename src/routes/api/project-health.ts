@@ -26,7 +26,8 @@ export const Route = createFileRoute('/api/project-health')({
             headers: {
               // SSH round-trip is slow; cache aggressively to keep the
               // dashboard snappy when the user reloads.
-              'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+              'Cache-Control':
+                'private, max-age=60, stale-while-revalidate=120',
             },
           },
         )

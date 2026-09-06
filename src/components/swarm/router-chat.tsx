@@ -16,7 +16,14 @@ import { cn } from '@/lib/utils'
 
 type Mode = 'auto' | 'manual' | 'broadcast'
 
-type Assignment = { workerId: string; task: string; rationale: string; expectedOutput?: string; dependsOn?: Array<string>; reviewRequired?: boolean }
+type Assignment = {
+  workerId: string
+  task: string
+  rationale: string
+  expectedOutput?: string
+  dependsOn?: Array<string>
+  reviewRequired?: boolean
+}
 type ParsedCheckpoint = {
   stateLabel: string
   result: string | null
@@ -45,7 +52,12 @@ export type DispatchResponse = {
 
 type FollowUpResponse = {
   ok: boolean
-  summary?: { checkpointed: number; stale: number; waiting: number; unavailable: number }
+  summary?: {
+    checkpointed: number
+    stale: number
+    waiting: number
+    unavailable: number
+  }
   continuation?: { results?: Array<DispatchResult> } | null
   error?: string
 }
@@ -68,7 +80,6 @@ type Props = {
 function roleForMember(members: Array<CrewMember>, id: string): string {
   return members.find((member) => member.id === id)?.role || 'Worker'
 }
-
 
 const QUICK_ROUTES = [
   'Research',
@@ -145,7 +156,11 @@ export function RouterChat({
 
     return (
       <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-xl px-4 pb-3">
-        <RouterClosedDock targetLabel={targetLabel} mode={mode} onOpen={onOpen} />
+        <RouterClosedDock
+          targetLabel={targetLabel}
+          mode={mode}
+          onOpen={onOpen}
+        />
       </div>
     )
   }
@@ -163,7 +178,9 @@ export function RouterChat({
       m.mission || m.lastSessionTitle,
       m.skills?.length ? `skills=${m.skills.join(',')}` : '',
       `${m.sessionCount} sess · ${m.totalTokens} tok`,
-    ].filter(Boolean).join(' · '),
+    ]
+      .filter(Boolean)
+      .join(' · '),
   }))
 
   async function autoDecompose(): Promise<Array<Assignment> | null> {
@@ -252,20 +269,38 @@ export function RouterChat({
       const data = (await res.json()) as DispatchResponse
       setResults(data)
       onResults(data)
-      if (plan.length > 1 && data.results.some((result) => result.checkpointStatus === 'checkpointed')) {
-        const reviewer = members.find((member) => member.id === 'swarm6') ?? members.find((member) => /review|qa|critic/i.test(`${member.role} ${member.specialty ?? ''}`))
+      if (
+        plan.length > 1 &&
+        data.results.some(
+          (result) => result.checkpointStatus === 'checkpointed',
+        )
+      ) {
+        const reviewer =
+          members.find((member) => member.id === 'swarm6') ??
+          members.find((member) =>
+            /review|qa|critic/i.test(
+              `${member.role} ${member.specialty ?? ''}`,
+            ),
+          )
         const follow = await fetch('/api/swarm-orchestrator-loop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            workerIds: [...new Set([...plan.map((item) => item.workerId), ...(reviewer ? [reviewer.id] : [])])],
+            workerIds: [
+              ...new Set([
+                ...plan.map((item) => item.workerId),
+                ...(reviewer ? [reviewer.id] : []),
+              ]),
+            ],
             staleMinutes: 3,
             autoContinue: true,
             allowExecution: false,
             reviewWorkerId: reviewer?.id,
           }),
         })
-        const followData = (await follow.json().catch(() => null)) as FollowUpResponse | null
+        const followData = (await follow
+          .json()
+          .catch(() => null)) as FollowUpResponse | null
         if (followData) setFollowUp(followData)
       }
     } catch (err) {
@@ -286,14 +321,27 @@ export function RouterChat({
   }
 
   return (
-    <div className={cn(embedded ? 'w-full' : 'fixed inset-x-0 bottom-0 z-40 mx-auto max-w-6xl px-4 pb-3')}>
-      <div className={cn(
-        'overflow-hidden rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)]',
+    <div
+      className={cn(
         embedded
-          ? 'max-h-none shadow-none'
-          : 'max-h-[min(58vh,460px)] shadow-[0_-18px_50px_var(--theme-shadow)]',
-      )}>
-        <div className={cn('flex flex-wrap items-start justify-between gap-3', embedded ? 'px-3 pt-3' : 'px-5 pt-4')}>
+          ? 'w-full'
+          : 'fixed inset-x-0 bottom-0 z-40 mx-auto max-w-6xl px-4 pb-3',
+      )}
+    >
+      <div
+        className={cn(
+          'overflow-hidden rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)]',
+          embedded
+            ? 'max-h-none shadow-none'
+            : 'max-h-[min(58vh,460px)] shadow-[0_-18px_50px_var(--theme-shadow)]',
+        )}
+      >
+        <div
+          className={cn(
+            'flex flex-wrap items-start justify-between gap-3',
+            embedded ? 'px-3 pt-3' : 'px-5 pt-4',
+          )}
+        >
           <div>
             {!embedded ? (
               <>
@@ -302,7 +350,8 @@ export function RouterChat({
                   Agent Router Chat
                 </div>
                 <div className="mt-1 text-sm text-[var(--theme-muted-2)]">
-                  Type a mission, choose routing, dispatch. Keep workers selected in cards.
+                  Type a mission, choose routing, dispatch. Keep workers
+                  selected in cards.
                 </div>
               </>
             ) : null}
@@ -321,12 +370,14 @@ export function RouterChat({
           </div>
         </div>
 
-        <div className={cn(
-          'grid gap-3 overflow-y-auto py-3',
-          embedded
-            ? 'max-h-none px-3'
-            : 'max-h-[330px] px-5 lg:grid-cols-[1.35fr_minmax(280px,1fr)]',
-        )}>
+        <div
+          className={cn(
+            'grid gap-3 overflow-y-auto py-3',
+            embedded
+              ? 'max-h-none px-3'
+              : 'max-h-[330px] px-5 lg:grid-cols-[1.35fr_minmax(280px,1fr)]',
+          )}
+        >
           <div className="flex flex-col gap-2">
             <textarea
               rows={embedded ? 5 : 7}
@@ -370,11 +421,13 @@ export function RouterChat({
                 </div>
               ) : (
                 <div className="text-[11px] text-[var(--theme-muted)]">
-                  {`${prompt.trim().length} chars · ${mode === 'auto'
-                    ? 'auto-route by role'
-                    : mode === 'manual'
-                      ? `→ ${selectedId ?? 'no target'}`
-                      : `broadcast to ${roomIds.length || members.length}`}`}
+                  {`${prompt.trim().length} chars · ${
+                    mode === 'auto'
+                      ? 'auto-route by role'
+                      : mode === 'manual'
+                        ? `→ ${selectedId ?? 'no target'}`
+                        : `broadcast to ${roomIds.length || members.length}`
+                  }`}
                 </div>
               )}
               <div className="flex items-center gap-2">
@@ -404,7 +457,13 @@ export function RouterChat({
                   )}
                 >
                   <HugeiconsIcon
-                    icon={mode === 'manual' ? SentIcon : mode === 'auto' ? Settings01Icon : Rocket01Icon}
+                    icon={
+                      mode === 'manual'
+                        ? SentIcon
+                        : mode === 'auto'
+                          ? Settings01Icon
+                          : Rocket01Icon
+                    }
                     size={12}
                   />
                   {dispatching || decomposing
@@ -432,75 +491,75 @@ export function RouterChat({
           </div>
 
           {!embedded ? (
-          <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-              Routing plan
-            </div>
-            {assignments.length === 0 ? (
-              <div className="text-[12px] text-[var(--theme-muted-2)]">
-                {mode === 'auto'
-                  ? 'Hit Auto decompose to see proposed routing here.'
-                  : mode === 'manual'
-                    ? 'Single target dispatch.'
-                    : 'Broadcast — no per-target plan needed.'}
+            <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                Routing plan
               </div>
-            ) : (
-              <ol className="max-h-72 space-y-1.5 overflow-y-auto pr-1 text-[12px]">
-                {assignments.map((a, idx) => (
-                  <li
-                    key={`${a.workerId}-${idx}`}
-                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5"
-                  >
-                    <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                      <span>
-                        → {a.workerId} · {roleForMember(members, a.workerId)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setAssignments((c) => c.filter((_, i) => i !== idx))
-                        }
-                        className="text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"
-                      >
-                        remove
-                      </button>
-                    </div>
-                    <textarea
-                      rows={4}
-                      value={a.task}
-                      onChange={(e) =>
-                        setAssignments((c) =>
-                          c.map((entry, i) =>
-                            i === idx
-                              ? { ...entry, task: e.target.value }
-                              : entry,
-                          ),
-                        )
-                      }
-                      className="mt-1 w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[11px] text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none"
-                    />
-                    {a.rationale ? (
-                      <div className="mt-1 text-[10px] italic text-[var(--theme-muted-2)]">
-                        {a.rationale}
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-            )}
-            {unassigned.length > 0 ? (
-              <div className="rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[11px] text-[var(--theme-text)]">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                  Unrouted notes
+              {assignments.length === 0 ? (
+                <div className="text-[12px] text-[var(--theme-muted-2)]">
+                  {mode === 'auto'
+                    ? 'Hit Auto decompose to see proposed routing here.'
+                    : mode === 'manual'
+                      ? 'Single target dispatch.'
+                      : 'Broadcast — no per-target plan needed.'}
                 </div>
-                <ul className="list-disc pl-4">
-                  {unassigned.map((u, i) => (
-                    <li key={i}>{u}</li>
+              ) : (
+                <ol className="max-h-72 space-y-1.5 overflow-y-auto pr-1 text-[12px]">
+                  {assignments.map((a, idx) => (
+                    <li
+                      key={`${a.workerId}-${idx}`}
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5"
+                    >
+                      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                        <span>
+                          → {a.workerId} · {roleForMember(members, a.workerId)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAssignments((c) => c.filter((_, i) => i !== idx))
+                          }
+                          className="text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"
+                        >
+                          remove
+                        </button>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={a.task}
+                        onChange={(e) =>
+                          setAssignments((c) =>
+                            c.map((entry, i) =>
+                              i === idx
+                                ? { ...entry, task: e.target.value }
+                                : entry,
+                            ),
+                          )
+                        }
+                        className="mt-1 w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[11px] text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none"
+                      />
+                      {a.rationale ? (
+                        <div className="mt-1 text-[10px] italic text-[var(--theme-muted-2)]">
+                          {a.rationale}
+                        </div>
+                      ) : null}
+                    </li>
                   ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
+                </ol>
+              )}
+              {unassigned.length > 0 ? (
+                <div className="rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[11px] text-[var(--theme-text)]">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                    Unrouted notes
+                  </div>
+                  <ul className="list-disc pl-4">
+                    {unassigned.map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
@@ -532,7 +591,11 @@ export function RouterChat({
                       <HugeiconsIcon
                         icon={r.ok ? CheckmarkCircle02Icon : AlertCircleIcon}
                         size={11}
-                        className={r.ok ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-danger)]'}
+                        className={
+                          r.ok
+                            ? 'text-[var(--theme-accent)]'
+                            : 'text-[var(--theme-danger)]'
+                        }
                       />
                       {r.workerId}
                     </span>
@@ -563,7 +626,8 @@ export function RouterChat({
                     </div>
                   ) : r.checkpointStatus === 'timeout' ? (
                     <div className="mt-2 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] p-2 text-[11px] text-[var(--theme-text)]">
-                      Delivered, waiting for checkpoint. Orchestrator loop can follow up.
+                      Delivered, waiting for checkpoint. Orchestrator loop can
+                      follow up.
                     </div>
                   ) : null}
                   {r.output ? (
@@ -585,11 +649,12 @@ export function RouterChat({
               Orchestrator follow-up
             </div>
             <div className="mt-1 text-[var(--theme-muted-2)]">
-              Parsed {followUp.summary?.checkpointed ?? 0} checkpoints · stale {followUp.summary?.stale ?? 0} · continuation {followUp.continuation ? 'sent' : 'not needed'}
+              Parsed {followUp.summary?.checkpointed ?? 0} checkpoints · stale{' '}
+              {followUp.summary?.stale ?? 0} · continuation{' '}
+              {followUp.continuation ? 'sent' : 'not needed'}
             </div>
           </div>
         ) : null}
-
       </div>
     </div>
   )
@@ -611,7 +676,11 @@ function RouterClosedDock({
       className="flex w-full items-center justify-between gap-3 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left text-[var(--theme-text)] shadow-[0_-12px_34px_var(--theme-shadow)] transition-colors hover:border-[var(--theme-accent)]"
     >
       <span className="inline-flex min-w-0 items-center gap-2">
-        <HugeiconsIcon icon={FlashIcon} size={14} className="text-[var(--theme-accent)]" />
+        <HugeiconsIcon
+          icon={FlashIcon}
+          size={14}
+          className="text-[var(--theme-accent)]"
+        />
         <span className="min-w-0">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--theme-muted)]">
             Router
@@ -644,7 +713,9 @@ function ModeToggle({
           onClick={() => setMode(m)}
           className={cn(
             'rounded-lg px-3 py-1 transition-colors',
-            mode === m ? 'bg-[var(--theme-accent)] text-primary-950' : 'hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
+            mode === m
+              ? 'bg-[var(--theme-accent)] text-primary-950'
+              : 'hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
           )}
         >
           {m === 'manual' ? 'one agent' : m}

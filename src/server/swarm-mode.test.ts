@@ -36,20 +36,24 @@ describe('swarm-mode', () => {
   it('forces manual loop requests to report-only mode', async () => {
     const mod = await loadModule()
 
-    expect(mod.applySwarmModeToLoopFlags({
-      mode: 'manual',
-      autoContinueRequested: true,
-      allowExecutionRequested: true,
-    })).toEqual({
+    expect(
+      mod.applySwarmModeToLoopFlags({
+        mode: 'manual',
+        autoContinueRequested: true,
+        allowExecutionRequested: true,
+      }),
+    ).toEqual({
       autoContinue: false,
       allowExecution: false,
     })
 
-    expect(mod.applySwarmModeToLoopFlags({
-      mode: 'auto',
-      autoContinueRequested: true,
-      allowExecutionRequested: false,
-    })).toEqual({
+    expect(
+      mod.applySwarmModeToLoopFlags({
+        mode: 'auto',
+        autoContinueRequested: true,
+        allowExecutionRequested: false,
+      }),
+    ).toEqual({
       autoContinue: true,
       allowExecution: false,
     })

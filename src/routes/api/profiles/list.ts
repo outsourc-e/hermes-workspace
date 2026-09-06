@@ -11,8 +11,7 @@ export const Route = createFileRoute('/api/profiles/list')({
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          const { profiles, activeProfile } =
-            await listProfilesWithFallback()
+          const { profiles, activeProfile } = await listProfilesWithFallback()
           return json({ profiles, activeProfile })
         } catch (error) {
           return json(

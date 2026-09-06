@@ -2,7 +2,8 @@
  * SSE Error Boundary — catches SSE stream failures and shows user-friendly error.
  * Wrap streaming components with <SSEErrorBoundary onError={...}>.
  */
-import { Component, type ReactNode, type ReactElement } from 'react'
+import { Component } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 
 type Props = {
   children: ReactNode
@@ -31,7 +32,9 @@ export class SSEErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback
       return (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-red-500/30 bg-red-950/20 p-4 text-center">
-          <div className="text-sm font-medium text-red-400">Stream interrupted</div>
+          <div className="text-sm font-medium text-red-400">
+            Stream interrupted
+          </div>
           <div className="text-xs text-[var(--theme-muted)]">
             The connection dropped. Check your network and try again.
           </div>

@@ -49,7 +49,7 @@ afterEach(() => {
 
 async function loadHandlers(modulePath: string) {
   const mod = await import(modulePath)
-  return (mod as any).Route.server.handlers
+  return mod.Route.server.handlers
 }
 
 describe('canonical /api/hermes-config route', () => {
@@ -95,9 +95,9 @@ describe('canonical /api/hermes-config route', () => {
     const body = await res.json()
 
     expect(body).toMatchObject({ ok: true, message: 'Default model updated.' })
-    expect(
-      fs.readFileSync(path.join(tmpHome, 'config.yaml'), 'utf-8'),
-    ).toMatch(/provider: openrouter/)
+    expect(fs.readFileSync(path.join(tmpHome, 'config.yaml'), 'utf-8')).toMatch(
+      /provider: openrouter/,
+    )
   })
 
   it('PATCH legacy { config } body deep-merges and preserves siblings', async () => {
@@ -140,7 +140,11 @@ describe('canonical /api/hermes-config route', () => {
     const res = await handlers.PATCH({
       request: new Request('http://localhost/api/hermes-config', {
         method: 'PATCH',
-        body: JSON.stringify({ action: 'set-api-key', envKey: 'X', value: 'y' }),
+        body: JSON.stringify({
+          action: 'set-api-key',
+          envKey: 'X',
+          value: 'y',
+        }),
       }),
     })
     expect(res.status).toBe(503)

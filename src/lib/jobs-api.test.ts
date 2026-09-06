@@ -52,9 +52,24 @@ describe('job helpers', () => {
 
   it('returns the latest non-empty job output text', () => {
     const outputs: Array<JobOutput> = [
-      { filename: 'a.log', timestamp: '2026-04-30T12:00:00Z', content: 'older run', size: 9 },
-      { filename: 'b.log', timestamp: '2026-04-30T12:05:00Z', content: '   ', size: 3 },
-      { filename: 'c.log', timestamp: '2026-04-30T12:10:00Z', content: 'newest run', size: 10 },
+      {
+        filename: 'a.log',
+        timestamp: '2026-04-30T12:00:00Z',
+        content: 'older run',
+        size: 9,
+      },
+      {
+        filename: 'b.log',
+        timestamp: '2026-04-30T12:05:00Z',
+        content: '   ',
+        size: 3,
+      },
+      {
+        filename: 'c.log',
+        timestamp: '2026-04-30T12:10:00Z',
+        content: 'newest run',
+        size: 10,
+      },
     ]
 
     expect(getLatestJobOutputText(outputs)).toBe('newest run')
@@ -62,11 +77,12 @@ describe('job helpers', () => {
 
   it('prefers explicit job error text', () => {
     expect(getJobErrorText({ ...job, last_run_error: '  boom  ' })).toBe('boom')
-    expect(getJobErrorText({ ...job, last_run_error: null, error: 'oops' })).toBe('oops')
+    expect(
+      getJobErrorText({ ...job, last_run_error: null, error: 'oops' }),
+    ).toBe('oops')
     expect(getJobErrorText(null)).toBeNull()
   })
 })
-
 
 describe('job mutation payloads', () => {
   it('sends prompt as input for Hermes cron APIs that require an input string', () => {

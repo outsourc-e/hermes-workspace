@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useHUDSnapshot } from '../components/hud/hooks/useHUDSnapshot'
 import {
   useHUDConfig,
   useHUDConfigPatch,
 } from '../components/hud/hooks/useHUDConfig'
+import { WhoopWidget } from '../screens/dashboard/widgets/whoop-widget'
+import { ClinitrackWidget } from '../screens/dashboard/widgets/clinitrack-widget'
+import { SpotifyWidget } from '../screens/dashboard/widgets/spotify-widget'
+import { SwarmStatusWidget } from '../screens/dashboard/widgets/swarm-status-widget'
+import { UptimeWidget } from '../screens/dashboard/widgets/uptime-widget'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -29,10 +34,10 @@ interface CalendarEventLite {
 }
 
 interface TodayResponse {
-  events: CalendarEventLite[]
+  events: Array<CalendarEventLite>
 }
 interface WeekResponse {
-  events: CalendarEventLite[]
+  events: Array<CalendarEventLite>
 }
 
 interface Deadline {
@@ -48,7 +53,7 @@ interface Deadline {
 }
 
 interface DeadlinesResponse {
-  deadlines: Deadline[]
+  deadlines: Array<Deadline>
   semester_name: string
 }
 
@@ -205,12 +210,7 @@ function categoryGlyph(category: string): { letter: string; full: string } {
   if (c === 'clinic' || c === 'tadc' || c === 'hcc')
     return { letter: 'C', full: 'Clinic' }
   if (c === 'family') return { letter: 'F', full: 'Family' }
-  if (
-    c === 'work' ||
-    c === 'project' ||
-    c === 'projects' ||
-    c === 'praxentis'
-  )
+  if (c === 'work' || c === 'project' || c === 'projects' || c === 'praxentis')
     return { letter: 'W', full: 'Work' }
   return { letter: 'L', full: 'Life' }
 }
@@ -257,7 +257,7 @@ function DayTimeline({
   now,
   nextEventId,
 }: {
-  events: CalendarEventLite[]
+  events: Array<CalendarEventLite>
   now: Date
   nextEventId: string | null
 }) {
@@ -736,6 +736,27 @@ function Telemetry({
   )
 }
 
+// Card chrome for richer widgets (Whoop/Clinitrack/Spotify/Swarm/Uptime)
+// that ship their own label inside. The widgets render their own header,
+// so VitalsTile only supplies the panel frame + hover state — no extra label.
+function VitalsTile({
+  children,
+  label,
+}: {
+  children: React.ReactNode
+  label?: string
+}) {
+  return (
+    <div
+      className="rounded-lg border border-slate-900/80 bg-slate-950/40 p-3 transition-colors hover:border-slate-800"
+      style={{ minHeight: '88px' }}
+      aria-label={label}
+    >
+      {children}
+    </div>
+  )
+}
+
 function BodyStatus({ recovery }: { recovery: RecoveryData }) {
   const d = recovery.details
   if (!d) return null
@@ -906,7 +927,10 @@ function MissionObjectiveRow({
       <span
         aria-hidden="true"
         className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-        style={{ backgroundColor: dotColor, boxShadow: `0 0 6px ${dotColor}88` }}
+        style={{
+          backgroundColor: dotColor,
+          boxShadow: `0 0 6px ${dotColor}88`,
+        }}
       />
       <div className="min-w-0 flex-1">
         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mb-0.5 font-semibold">
@@ -999,13 +1023,13 @@ function DashboardPage() {
   })
 
   const widgets = (snapshot?.widgets ?? {}) as WidgetMap
-  const recovery = widgets['recovery']?.data as RecoveryData | undefined
-  const inboxItems = (widgets['inbox']?.data ?? []) as InboxItemData[]
-  const briefText = (widgets['brief']?.data as { text?: string } | undefined)
+  const recovery = widgets['recovery'].data as RecoveryData | undefined
+  const inboxItems = (widgets['inbox'].data ?? []) as Array<InboxItemData>
+  const briefText = (widgets['brief'].data as { text?: string } | undefined)
     ?.text
-  const vm = widgets['vm-health']?.data as SimpleWidget | undefined
-  const cliniko = widgets['cliniko']?.data as SimpleWidget | undefined
-  const feeds = widgets['calendar-feeds']?.data as SimpleWidget | undefined
+  const vm = widgets['vm-health'].data as SimpleWidget | undefined
+  const cliniko = widgets['cliniko'].data as SimpleWidget | undefined
+  const feeds = widgets['calendar-feeds'].data as SimpleWidget | undefined
 
   // Tick once every 30s so the now-line and countdown stay current.
   const [now, setNow] = useState<Date>(() => new Date())
@@ -1126,11 +1150,7 @@ function DashboardPage() {
         </header>
 
         {/* Day timeline strip — spatial view of today */}
-        <DayTimeline
-          events={todayEvents}
-          now={now}
-          nextEventId={nextEventId}
-        />
+        <DayTimeline events={todayEvents} now={now} nextEventId={nextEventId} />
 
         {/* First action hero — drenched panel, composes Body says */}
         <Hero firstAction={firstAction} rec={rec} />
@@ -1138,8 +1158,33 @@ function DashboardPage() {
         {/* Next up — the imminent thing */}
         <NextUp next={nextUp} now={now} />
 
-        {/* Body — labelled, separated tiles */}
-        {recovery && <BodyStatus recovery={recovery} />}
+        {/* Body — WHOOP readiness (richer than HUD-served BodyStatus tiles) */}
+        <Section title="Body">
+          <WhoopWidget />
+        </Section>
+
+        {/* System Vitals — CliniTrack, Spotify, Swarm, Workspace uptime */}
+        <Section
+          title="System vitals"
+          action={
+            <span className="text-[10px] text-slate-500">live · 30s</span>
+          }
+        >
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <VitalsTile label="Workspace">
+              <UptimeWidget />
+            </VitalsTile>
+            <VitalsTile label="CliniTrack">
+              <ClinitrackWidget />
+            </VitalsTile>
+            <VitalsTile label="Swarm">
+              <SwarmStatusWidget />
+            </VitalsTile>
+            <VitalsTile label="Spotify">
+              <SpotifyWidget />
+            </VitalsTile>
+          </div>
+        </Section>
 
         {/* Telemetry — VM, Cliniko, Calendar feed health */}
         <Telemetry vm={vm} cliniko={cliniko} feeds={feeds} />

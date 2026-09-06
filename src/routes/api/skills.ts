@@ -107,7 +107,8 @@ function deriveOrigin(
   bundled: Set<string>,
 ): SkillSummary['origin'] {
   if (bundled.has(skill.id) || bundled.has(skill.slug)) return 'builtin'
-  if (skill.author === 'Hermes Agent' && skill.sourcePath) return 'agent-created'
+  if (skill.author === 'Hermes Agent' && skill.sourcePath)
+    return 'agent-created'
   return 'marketplace'
 }
 
@@ -284,7 +285,7 @@ function normalizeCategoryLabel(raw: string): string {
   const caseMatch = KNOWN_CATEGORY_LOWER.get(lower)
   if (caseMatch) return caseMatch
   const key = lower.replace(/[\s&]+/g, '-').replace(/-+/g, '-')
-  return CATEGORY_ALIASES[key] ?? CATEGORY_ALIASES[lower] ?? raw
+  return CATEGORY_ALIASES[key]
 }
 
 function guessCategory(record: Record<string, unknown>): string {
@@ -456,11 +457,12 @@ export const Route = createFileRoute('/api/skills')({
             Math.max(1, Number(url.searchParams.get('limit') || '30')),
           )
 
-          const [sourceItems, localPathMap, bundledManifest] = await Promise.all([
-            fetchClaudeSkills(),
-            buildLocalSkillPathMap(),
-            loadBundledManifest(),
-          ])
+          const [sourceItems, localPathMap, bundledManifest] =
+            await Promise.all([
+              fetchClaudeSkills(),
+              buildLocalSkillPathMap(),
+              loadBundledManifest(),
+            ])
           for (const skill of sourceItems) {
             if (skill.installed) {
               const meta =

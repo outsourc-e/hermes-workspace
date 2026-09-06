@@ -10,15 +10,15 @@ Make the game loop feel real without creating a giant shared branch. Workers sho
 
 ## Ownership map
 
-| System | Owner files | May import from | Must not own |
-| --- | --- | --- | --- |
-| Contracts | `src/screens/playground/lib/gameplay-contracts.ts` | none / type-only | Runtime state mutation |
-| Quest engine | `src/screens/playground/lib/quest-engine.ts`, quest tests | `gameplay-contracts`, static quest data | React hooks, NPC copy, inventory UI |
-| Event bus/log | `src/screens/playground/lib/gameplay-events.ts`, event tests | `gameplay-contracts` | Quest definitions, reward calculations |
-| NPC state/dialog | `src/screens/playground/lib/npc-state.ts`, `npc-dialog.ts` | `gameplay-contracts`, event emitters | Inventory mutation, reward granting |
-| Inventory/rewards | `src/screens/playground/lib/inventory-rewards.ts`, reward tests | `gameplay-contracts`, item data | Quest completion decisions, NPC dialog text |
-| Agent actions | `src/screens/playground/lib/agent-actions.ts`, API route stubs later | `gameplay-contracts`, event bus | Prize oracle, direct secrets, UI orchestration |
-| React integration | `src/screens/playground/hooks/use-playground-rpg.ts` | all service modules | New business rules once extracted |
+| System            | Owner files                                                          | May import from                         | Must not own                                   |
+| ----------------- | -------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------- |
+| Contracts         | `src/screens/playground/lib/gameplay-contracts.ts`                   | none / type-only                        | Runtime state mutation                         |
+| Quest engine      | `src/screens/playground/lib/quest-engine.ts`, quest tests            | `gameplay-contracts`, static quest data | React hooks, NPC copy, inventory UI            |
+| Event bus/log     | `src/screens/playground/lib/gameplay-events.ts`, event tests         | `gameplay-contracts`                    | Quest definitions, reward calculations         |
+| NPC state/dialog  | `src/screens/playground/lib/npc-state.ts`, `npc-dialog.ts`           | `gameplay-contracts`, event emitters    | Inventory mutation, reward granting            |
+| Inventory/rewards | `src/screens/playground/lib/inventory-rewards.ts`, reward tests      | `gameplay-contracts`, item data         | Quest completion decisions, NPC dialog text    |
+| Agent actions     | `src/screens/playground/lib/agent-actions.ts`, API route stubs later | `gameplay-contracts`, event bus         | Prize oracle, direct secrets, UI orchestration |
+| React integration | `src/screens/playground/hooks/use-playground-rpg.ts`                 | all service modules                     | New business rules once extracted              |
 
 Rule: static content can live in `playground-rpg.ts`/`npc-dialog.ts`; game rules should move into small pure modules with tests.
 
@@ -39,6 +39,7 @@ Do not let components directly grant items, complete quests, or unlock worlds ex
 Events are facts that already happened. They should be append-only and serializable.
 
 Required MVP events:
+
 - `npc.talked` — player opened dialog with NPC.
 - `npc.choice_selected` — player chose a dialog option.
 - `quest.objective_completed` — objective completion accepted by quest engine.
@@ -55,12 +56,14 @@ Every event must include `id`, `type`, `createdAt`, `actorId`, and `source`. Eve
 ## Quest boundary
 
 Quest engine owns:
+
 - objective matching from events
 - required vs optional objective completion
 - quest completion idempotency
 - emitting reward intents, not directly mutating inventory
 
 Quest engine does not own:
+
 - toast copy
 - NPC dialog text
 - item definitions
@@ -78,6 +81,7 @@ advanceQuests(snapshot, event): QuestAdvanceResult
 ## NPC state boundary
 
 NPC state owns:
+
 - per-NPC relationship flags
 - seen dialog node ids
 - choice availability predicates
@@ -85,6 +89,7 @@ NPC state owns:
 - emitting events for selected choices
 
 NPC state does not own:
+
 - adding items to inventory
 - completing quests directly
 - unlocking worlds directly
@@ -94,6 +99,7 @@ NPC dialog choices should move from imperative fields like `grantItems`/`complet
 ## Inventory and reward boundary
 
 Inventory/rewards owns:
+
 - idempotent item grants
 - stack/currency semantics when added
 - equipment slot validation
@@ -101,6 +107,7 @@ Inventory/rewards owns:
 - reward toast descriptors
 
 Inventory/rewards does not own:
+
 - deciding whether a quest is complete
 - deciding whether an NPC choice is allowed
 - calling external prize services
@@ -112,6 +119,7 @@ MVP rule: keep item ids public and harmless. Anything valuable uses a hosted pri
 Agent actions are gameplay verbs that may call Hermes later. They must be request/response objects, not ad hoc component callbacks.
 
 MVP actions:
+
 - `agent.ask_npc` — get dynamic NPC line/lore.
 - `agent.build_prompt` — turn player text into a Forge artifact summary.
 - `agent.summon_companion` — spawn temporary familiar metadata.
@@ -119,12 +127,14 @@ MVP actions:
 - `agent.generate_lore` — create non-prize lore/zone flavor.
 
 Agent action handler owns:
+
 - schema validation
 - rate-limit metadata
 - safe public context assembly
 - status events
 
 Agent action handler must not own:
+
 - secrets/prize decisions
 - direct state mutation without returning `GameplayPatch`
 - raw model/provider selection inside UI components

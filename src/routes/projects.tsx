@@ -1,9 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Building01Icon, CheckmarkCircle01Icon, AlertCircleIcon, Cancel01Icon, SourceCodeCircleIcon } from '@hugeicons/core-free-icons'
-import { usePageTitle } from '@/hooks/use-page-title'
+import {
+  AlertCircleIcon,
+  Building01Icon,
+  Cancel01Icon,
+  CheckmarkCircle01Icon,
+  SourceCodeCircleIcon,
+} from '@hugeicons/core-free-icons'
 import type { RepoData } from './api/projects/list'
+import { usePageTitle } from '@/hooks/use-page-title'
 
 export const Route = createFileRoute('/projects')({
   ssr: false,
@@ -11,7 +17,7 @@ export const Route = createFileRoute('/projects')({
 })
 
 interface ProjectsResponse {
-  repos: (RepoData & { error?: string })[]
+  repos: Array<RepoData & { error?: string }>
   cachedAt: number
 }
 
@@ -47,7 +53,9 @@ function CIPill({ status }: { status: RepoData['latestCI'] }) {
     unknown: '? unknown',
   }
   return (
-    <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-mono ${styles[status]}`}>
+    <span
+      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-mono ${styles[status]}`}
+    >
       {labels[status]}
     </span>
   )
@@ -78,7 +86,11 @@ function RepoCard({ repo }: { repo: RepoData & { error?: string } }) {
           rel="noreferrer"
           className="flex items-center gap-1.5 text-sm font-semibold text-[#58a6ff] hover:underline"
         >
-          <HugeiconsIcon icon={SourceCodeCircleIcon} size={14} strokeWidth={1.5} />
+          <HugeiconsIcon
+            icon={SourceCodeCircleIcon}
+            size={14}
+            strokeWidth={1.5}
+          />
           {repo.owner}/{repo.name}
         </a>
         <CIPill status={repo.latestCI} />
@@ -87,14 +99,21 @@ function RepoCard({ repo }: { repo: RepoData & { error?: string } }) {
       {/* Error state */}
       {repo.error && (
         <p className="mb-2 text-xs text-[#f85149]">
-          <HugeiconsIcon icon={AlertCircleIcon} size={12} strokeWidth={1.5} className="inline mr-1" />
+          <HugeiconsIcon
+            icon={AlertCircleIcon}
+            size={12}
+            strokeWidth={1.5}
+            className="inline mr-1"
+          />
           {repo.error}
         </p>
       )}
 
       {/* PRs */}
       <div className="mb-2 text-xs text-[#8b949e]">
-        <span className={`mr-2 font-semibold ${repo.openPRs > 0 ? 'text-[#d29922]' : 'text-[#6e7681]'}`}>
+        <span
+          className={`mr-2 font-semibold ${repo.openPRs > 0 ? 'text-[#d29922]' : 'text-[#6e7681]'}`}
+        >
           {repo.openPRs} open PR{repo.openPRs !== 1 ? 's' : ''}
         </span>
         {repo.prTitles.length > 0 && (
@@ -116,7 +135,9 @@ function RepoCard({ repo }: { repo: RepoData & { error?: string } }) {
             {repo.lastCommit.sha}
           </code>
           <span className="flex-1 truncate">{shortMsg}</span>
-          <span className="shrink-0 text-[#4d5566]">{timeAgo(repo.lastCommit.date)}</span>
+          <span className="shrink-0 text-[#4d5566]">
+            {timeAgo(repo.lastCommit.date)}
+          </span>
         </div>
       )}
     </div>
@@ -141,9 +162,16 @@ function ProjectsRoute() {
       {/* Header */}
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <HugeiconsIcon icon={Building01Icon} size={22} strokeWidth={1.5} className="text-[#c4b5fd]" />
+          <HugeiconsIcon
+            icon={Building01Icon}
+            size={22}
+            strokeWidth={1.5}
+            className="text-[#c4b5fd]"
+          />
           <div>
-            <h1 className="font-mono text-lg font-bold tracking-wide text-[#e6edf3]">Projects</h1>
+            <h1 className="font-mono text-lg font-bold tracking-wide text-[#e6edf3]">
+              Projects
+            </h1>
             <p className="font-mono text-xs text-[#6e7681]">
               GitHub repos · {trackedCount} tracked
             </p>
@@ -168,7 +196,12 @@ function ProjectsRoute() {
       {/* Error */}
       {isError && (
         <div className="rounded-lg border border-[#da3633] bg-[#1a0a0a] p-4 font-mono text-sm text-[#f85149]">
-          <HugeiconsIcon icon={AlertCircleIcon} size={16} strokeWidth={1.5} className="inline mr-2" />
+          <HugeiconsIcon
+            icon={AlertCircleIcon}
+            size={16}
+            strokeWidth={1.5}
+            className="inline mr-2"
+          />
           Failed to load projects. Check that the VM has GitHub CLI access.
         </div>
       )}
@@ -176,7 +209,8 @@ function ProjectsRoute() {
       {/* Repos */}
       {!isLoading && !isError && repos.length === 0 && (
         <p className="font-mono text-sm text-[#6e7681]">
-          No repos configured. Set <code className="text-[#c4b5fd]">HUD_TRACKED_REPOS</code> env var.
+          No repos configured. Set{' '}
+          <code className="text-[#c4b5fd]">HUD_TRACKED_REPOS</code> env var.
         </p>
       )}
 
@@ -191,7 +225,8 @@ function ProjectsRoute() {
       {/* Cache age */}
       {data?.cachedAt && (
         <p className="mt-4 font-mono text-[10px] text-[#4d5566]">
-          data as of {timeAgo(new Date(data.cachedAt).toISOString())} · refreshes every 5 min
+          data as of {timeAgo(new Date(data.cachedAt).toISOString())} ·
+          refreshes every 5 min
         </p>
       )}
     </div>

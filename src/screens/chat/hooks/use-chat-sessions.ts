@@ -85,7 +85,10 @@ export function useChatSessions({
       (session) => session.friendlyId === activeFriendlyId,
     )
 
-    if (!activeAlreadyPresent && (forcedSessionKey || isRecentSession(activeFriendlyId))) {
+    if (
+      !activeAlreadyPresent &&
+      (forcedSessionKey || isRecentSession(activeFriendlyId))
+    ) {
       const synthetic = buildSyntheticActiveSession(
         activeFriendlyId,
         forcedSessionKey,
@@ -101,12 +104,7 @@ export function useChatSessions({
       const bTs = b.updatedAt ?? 0
       return bTs - aTs
     })
-  }, [
-    activeFriendlyId,
-    forcedSessionKey,
-    sessionsQuery.data,
-    storedTitles,
-  ])
+  }, [activeFriendlyId, forcedSessionKey, sessionsQuery.data, storedTitles])
 
   const activeSession = useMemo(() => {
     return sessions.find((session) => session.friendlyId === activeFriendlyId)

@@ -24,16 +24,29 @@ export const Route = createFileRoute('/api/swarm-lifecycle')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        if (!isAuthenticated(request))
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         const url = new URL(request.url)
         const requested = validWorkerId(url.searchParams.get('workerId'))
         const ids = requested ? [requested] : listSwarmWorkerIds()
-        return json({ ok: true, checkedAt: Date.now(), workers: ids.map((id) => getSwarmLifecycleStatus(id)) })
+        return json({
+          ok: true,
+          checkedAt: Date.now(),
+          workers: ids.map((id) => getSwarmLifecycleStatus(id)),
+        })
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        if (!isAuthenticated(request))
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         let body: LifecyclePost
-        try { body = await request.json() as LifecyclePost } catch { return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 }) }
+        try {
+          body = (await request.json()) as LifecyclePost
+        } catch {
+          return json(
+            { ok: false, error: 'Invalid JSON body' },
+            { status: 400 },
+          )
+        }
         const action = typeof body.action === 'string' ? body.action : ''
         const workerIdMaybe = validWorkerId(body.workerId)
         if (action === 'auto-sweep') {
@@ -41,15 +54,19 @@ export const Route = createFileRoute('/api/swarm-lifecycle')({
           const sweep = await autoSweepLifecycle(targets)
           return json({ ok: true, action, sweep })
         }
-        if (!workerIdMaybe) return json({ ok: false, error: 'workerId required' }, { status: 400 })
+        if (!workerIdMaybe)
+          return json(
+            { ok: false, error: 'workerId required' },
+            { status: 400 },
+          )
         const workerId = workerIdMaybe
         if (action === 'request-handoff') {
           const result = await requestWorkerHandoff(workerId)
-          return json({ ok: result.ok, workerId, action, ...result })
+          return json({ ...result, workerId, action })
         }
         if (action === 'renew') {
           const result = await renewWorker(workerId)
-          return json({ ok: result.ok, workerId, action, ...result })
+          return json({ ...result, workerId, action })
         }
         if (action === 'notify-handoff-written') {
           notifyHandoffWritten(workerId)

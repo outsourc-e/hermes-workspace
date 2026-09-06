@@ -40,7 +40,9 @@ export function deriveFallbackModelInfoFromGateway(
   capabilities: GatewayModelInfoFallbackCapabilities | null | undefined,
 ): NormalizedModelInfo {
   const hasEnhancedRuntime = Boolean(
-    capabilities?.enhancedChat || capabilities?.config || capabilities?.sessions,
+    capabilities?.enhancedChat ||
+    capabilities?.config ||
+    capabilities?.sessions,
   )
 
   if (hasEnhancedRuntime || gatewayMode === 'enhanced-fork') {
@@ -60,7 +62,9 @@ export function deriveFallbackModelInfoFromGateway(
   }
 }
 
-export function normalizeModelInfoResponse(value: unknown): NormalizedModelInfo {
+export function normalizeModelInfoResponse(
+  value: unknown,
+): NormalizedModelInfo {
   const record = asRecord(value)
   if (!record) {
     return {

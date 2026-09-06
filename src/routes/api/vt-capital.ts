@@ -154,7 +154,9 @@ function readJsonFile(filePath: string): JsonRecord | null {
 function payloadOf(record: JsonRecord | null): JsonRecord | null {
   if (!record) return null
   const payload = record.payload
-  return payload && typeof payload === 'object' ? (payload as JsonRecord) : record
+  return payload && typeof payload === 'object'
+    ? (payload as JsonRecord)
+    : record
 }
 
 function sourceProposal(record: JsonRecord | null): JsonRecord | null {
@@ -167,7 +169,10 @@ function sourceProposal(record: JsonRecord | null): JsonRecord | null {
 function flattenExecutedOrder(record: JsonRecord | null): JsonRecord | null {
   const payload = payloadOf(record)
   if (!payload) return null
-  const order = payload.order && typeof payload.order === 'object' ? (payload.order as JsonRecord) : {}
+  const order =
+    payload.order && typeof payload.order === 'object'
+      ? (payload.order as JsonRecord)
+      : {}
   const proposal = sourceProposal(record) ?? {}
   return {
     ...proposal,
@@ -176,13 +181,16 @@ function flattenExecutedOrder(record: JsonRecord | null): JsonRecord | null {
     book: order.book ?? proposal.book ?? null,
     strategy_id: order.strategy_id ?? proposal.strategy_id ?? null,
     intent: order.intent ?? proposal.intent ?? null,
-    position_horizon: order.position_horizon ?? proposal.position_horizon ?? null,
+    position_horizon:
+      order.position_horizon ?? proposal.position_horizon ?? null,
   }
 }
 
 function summariseDemoState(): JsonRecord {
   const state = readJsonFile(VT_DEMO_STATE_PATH)
-  const orders = Array.isArray(state?.orders) ? (state.orders as Array<JsonRecord>) : []
+  const orders = Array.isArray(state?.orders)
+    ? (state.orders as Array<JsonRecord>)
+    : []
   const lastOrder = orders.length > 0 ? orders[orders.length - 1] : null
   return {
     trackedOrders: orders.length,
@@ -196,7 +204,12 @@ function recentGuardianBlocks(records: Array<JsonRecord>): Array<JsonRecord> {
     .map(payloadOf)
     .filter((payload): payload is JsonRecord => Boolean(payload))
     .filter((payload) =>
-      Boolean(payload.reason_code || payload.reason || payload.error || payload.rejected),
+      Boolean(
+        payload.reason_code ||
+        payload.reason ||
+        payload.error ||
+        payload.rejected,
+      ),
     )
     .slice(-5)
 }
@@ -213,15 +226,12 @@ export const Route = createFileRoute('/api/vt-capital')({
         const executedRecords = readLastLines(VT_ORDER_EXECUTED_PATH, 10)
         const biasStat = safeStat(HOURLY_BIAS_PATH)
         const precheckStat = safeStat(PRECHECK_PATH)
-        const lastOrderProposed = sourceProposal(
-          proposedRecords.at(-1) ?? null,
-        )
+        const lastOrderProposed = sourceProposal(proposedRecords.at(-1) ?? null)
         const lastOrderExecuted = flattenExecutedOrder(
           executedRecords.at(-1) ?? null,
         )
-        const lastRiskCheck = lastOrderProposed ?? sourceProposal(
-          executedRecords.at(-1) ?? null,
-        )
+        const lastRiskCheck =
+          lastOrderProposed ?? sourceProposal(executedRecords.at(-1) ?? null)
         return json({
           ok: true,
           checkedAt: Date.now(),

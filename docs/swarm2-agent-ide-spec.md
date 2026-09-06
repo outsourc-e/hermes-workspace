@@ -489,6 +489,7 @@ Acceptance: one Swarm route, no duplicates, all swarm tests green, docs/README/n
 ## 9. Immediate Next Build Pass
 
 Execution contract for this mission:
+
 - Context, memory, and handoffs come from `/Users/aurora/.openclaw/workspace`
 - Swarm2 code, git, build, and tests run in `/Users/aurora/hermes-workspace`
 - Do not use legacy workspace aliases

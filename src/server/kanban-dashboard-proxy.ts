@@ -73,7 +73,10 @@ async function buildHeaders(): Promise<Record<string, string>> {
   return headers
 }
 
-function dashboardUrl(path: string, params: Record<string, string | undefined> = {}): string {
+function dashboardUrl(
+  path: string,
+  params: Record<string, string | undefined> = {},
+): string {
   const base = CLAUDE_DASHBOARD_URL.replace(/\/+$/, '')
   const url = new URL(`${base}${path}`)
   for (const [key, value] of Object.entries(params)) {

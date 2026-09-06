@@ -51,8 +51,10 @@ export function WhoopWidget() {
 
   useEffect(() => {
     fetch('/api/whoop')
-      .then(r => r.json())
-      .then(d => { if (d.date) setData(d) })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.date) setData(d)
+      })
       .catch(() => {})
   }, [])
 
@@ -74,7 +76,10 @@ export function WhoopWidget() {
           Today's Readiness
         </span>
         <span className="text-[10px] text-[var(--theme-muted)]">
-          {new Date(data.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+          {new Date(data.date).toLocaleDateString('en-AU', {
+            day: 'numeric',
+            month: 'short',
+          })}
         </span>
       </div>
 
@@ -89,7 +94,9 @@ export function WhoopWidget() {
         <div className="h-1.5 w-full rounded-full bg-[var(--theme-border)]">
           <div
             className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-red-500"
-            style={{ width: `${data.dayStrain !== null ? Math.min(100, (data.dayStrain / 10) * 100) : 0}%` }}
+            style={{
+              width: `${data.dayStrain !== null ? Math.min(100, (data.dayStrain / 10) * 100) : 0}%`,
+            }}
           />
         </div>
       </div>
@@ -97,8 +104,12 @@ export function WhoopWidget() {
       {/* Recovery bar */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-[var(--theme-muted)]">RECOVERY</span>
-          <span className={`text-sm font-bold ${recoveryColor(data.recoveryPct)}`}>
+          <span className="text-[10px] text-[var(--theme-muted)]">
+            RECOVERY
+          </span>
+          <span
+            className={`text-sm font-bold ${recoveryColor(data.recoveryPct)}`}
+          >
             {data.recoveryPct !== null ? `${data.recoveryPct}%` : '—'}
           </span>
         </div>
@@ -119,7 +130,9 @@ export function WhoopWidget() {
           </span>
         </div>
         <div className="flex-1 flex flex-col gap-0.5">
-          <span className="text-[10px] text-[var(--theme-muted)]">RESTING HR</span>
+          <span className="text-[10px] text-[var(--theme-muted)]">
+            RESTING HR
+          </span>
           <span className="text-sm font-bold text-[var(--theme-text)]">
             {data.restingHrBpm !== null ? `${data.restingHrBpm}bpm` : '—'}
           </span>
@@ -130,12 +143,16 @@ export function WhoopWidget() {
       <div className="flex gap-2">
         <div className="flex-1 flex flex-col gap-0.5">
           <span className="text-[10px] text-[var(--theme-muted)]">SLEEP</span>
-          <span className="text-sm font-bold text-[var(--theme-text)]">{fmtHours(data.sleepHours)}</span>
+          <span className="text-sm font-bold text-[var(--theme-text)]">
+            {fmtHours(data.sleepHours)}
+          </span>
         </div>
         <div className="flex-1 flex flex-col gap-0.5">
           <span className="text-[10px] text-[var(--theme-muted)]">PERF</span>
           <span className="text-sm font-bold text-[var(--theme-text)]">
-            {data.sleepPerformancePct !== null ? `${data.sleepPerformancePct}%` : '—'}
+            {data.sleepPerformancePct !== null
+              ? `${data.sleepPerformancePct}%`
+              : '—'}
           </span>
         </div>
       </div>

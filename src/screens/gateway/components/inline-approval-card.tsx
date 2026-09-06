@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
 import type { ApprovalRequest } from '../lib/approvals-store'
+import { cn } from '@/lib/utils'
 
 type InlineApprovalCardProps = {
   approval: ApprovalRequest
@@ -8,18 +8,23 @@ type InlineApprovalCardProps = {
   onDeny: (id: string) => void
 }
 
-export function InlineApprovalCard({ approval, onApprove, onDeny }: InlineApprovalCardProps) {
+export function InlineApprovalCard({
+  approval,
+  onApprove,
+  onDeny,
+}: InlineApprovalCardProps) {
   const [resolved, setResolved] = useState<'approved' | 'denied' | null>(
     approval.status !== 'pending' ? approval.status : null,
   )
 
   const isPending = !resolved && approval.status === 'pending'
   const age = Date.now() - approval.requestedAt
-  const ageLabel = age < 60_000
-    ? `${Math.floor(age / 1000)}s ago`
-    : age < 3_600_000
-      ? `${Math.floor(age / 60_000)}m ago`
-      : `${Math.floor(age / 3_600_000)}h ago`
+  const ageLabel =
+    age < 60_000
+      ? `${Math.floor(age / 1000)}s ago`
+      : age < 3_600_000
+        ? `${Math.floor(age / 60_000)}m ago`
+        : `${Math.floor(age / 3_600_000)}h ago`
 
   return (
     <div
@@ -55,14 +60,20 @@ export function InlineApprovalCard({ approval, onApprove, onDeny }: InlineApprov
             <div className="mt-2 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => { setResolved('approved'); onApprove(approval.id) }}
+                onClick={() => {
+                  setResolved('approved')
+                  onApprove(approval.id)
+                }}
                 className="rounded-md bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-700"
               >
                 ✓ Approve
               </button>
               <button
                 type="button"
-                onClick={() => { setResolved('denied'); onDeny(approval.id) }}
+                onClick={() => {
+                  setResolved('denied')
+                  onDeny(approval.id)
+                }}
                 className="rounded-md border border-red-300 bg-white px-3 py-1 text-[11px] font-semibold text-red-600 transition-colors hover:bg-red-50 dark:border-red-700 dark:bg-neutral-800 dark:text-red-400 dark:hover:bg-red-950"
               >
                 ✕ Deny
@@ -71,7 +82,9 @@ export function InlineApprovalCard({ approval, onApprove, onDeny }: InlineApprov
           ) : (
             <p className="mt-1.5 text-[11px] font-medium text-neutral-500">
               {resolved === 'approved' ? 'Approved' : 'Denied'}
-              {approval.resolvedAt ? ` at ${new Date(approval.resolvedAt).toLocaleTimeString()}` : ''}
+              {approval.resolvedAt
+                ? ` at ${new Date(approval.resolvedAt).toLocaleTimeString()}`
+                : ''}
             </p>
           )}
         </div>

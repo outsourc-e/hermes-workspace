@@ -140,7 +140,7 @@ export type SessionHistoryMessage = {
 
 export type SessionHistoryResponse = {
   ok?: boolean
-  messages?: SessionHistoryMessage[]
+  messages?: Array<SessionHistoryMessage>
   error?: string
 }
 
@@ -154,13 +154,18 @@ export async function fetchSessionHistory(
     const params = new URLSearchParams({ key: sessionKey })
     if (opts?.limit) params.set('limit', String(opts.limit))
     if (opts?.includeTools) params.set('includeTools', 'true')
-    const response = await fetch(makeEndpoint(`/api/session-history?${params}`), {
-      signal: controller.signal,
-    })
-    if (!response.ok) return { ok: false, messages: [], error: await readError(response) }
+    const response = await fetch(
+      makeEndpoint(`/api/session-history?${params}`),
+      {
+        signal: controller.signal,
+      },
+    )
+    if (!response.ok)
+      return { ok: false, messages: [], error: await readError(response) }
     return (await response.json()) as SessionHistoryResponse
   } catch (error) {
-    if (isAbortError(error)) return { ok: false, messages: [], error: 'Request timed out' }
+    if (isAbortError(error))
+      return { ok: false, messages: [], error: 'Request timed out' }
     return { ok: false, messages: [], error: String(error) }
   } finally {
     globalThis.clearTimeout(timeout)
@@ -185,7 +190,9 @@ export async function sendToSession(
       body: JSON.stringify({ sessionKey, message }),
       signal: controller.signal,
     })
-    const payload = (await response.json().catch(() => ({}))) as SendToSessionResponse
+    const payload = (await response
+      .json()
+      .catch(() => ({}))) as SendToSessionResponse
     if (!response.ok || payload.ok === false) {
       throw new Error(
         typeof payload.error === 'string' && payload.error.trim()
@@ -213,19 +220,16 @@ export async function fetchSessions(): Promise<GatewaySessionsResponse> {
 export async function fetchSessionStatus(
   key: string,
 ): Promise<GatewaySessionStatusResponse> {
-  const response = await fetch(makeEndpoint(`/api/session-status?key=${encodeURIComponent(key)}`))
+  const response = await fetch(
+    makeEndpoint(`/api/session-status?key=${encodeURIComponent(key)}`),
+  )
   if (!response.ok) {
     throw new Error(await readError(response))
   }
 
   const payload = (await response.json()) as Record<string, unknown>
-  const normalized =
-    payload &&
-    typeof payload === 'object' &&
-    payload.payload &&
-    typeof payload.payload === 'object'
-      ? payload.payload
-      : payload
+  const inner = payload.payload
+  const normalized = inner && typeof inner === 'object' ? inner : payload
 
   return normalized as GatewaySessionStatusResponse
 }
@@ -433,8 +437,8 @@ export type GatewayApprovalEntry = {
 
 export type GatewayApprovalsResponse = {
   ok?: boolean
-  approvals?: GatewayApprovalEntry[]
-  pending?: GatewayApprovalEntry[]
+  approvals?: Array<GatewayApprovalEntry>
+  pending?: Array<GatewayApprovalEntry>
 }
 
 export async function fetchGatewayApprovals(): Promise<GatewayApprovalsResponse> {
@@ -460,11 +464,14 @@ export async function resolveGatewayApproval(
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), 8000)
   try {
-    const response = await fetch(makeEndpoint(`/api/gateway/approvals/${approvalId}/${action}`), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      signal: controller.signal,
-    })
+    const response = await fetch(
+      makeEndpoint(`/api/gateway/approvals/${approvalId}/${action}`),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal: controller.signal,
+      },
+    )
     return { ok: response.ok }
   } catch {
     return { ok: false }

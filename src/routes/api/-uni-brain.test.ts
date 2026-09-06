@@ -1,11 +1,19 @@
 /**
  * Tests for /api/uni-brain handler
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
-import { resolve, relative, isAbsolute, extname } from 'node:path'
+import { extname, isAbsolute, join, relative, resolve } from 'node:path'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+// ─── list entries ─────────────────────────────────────────────────────────────
 
 // ─── safeResolve logic under test ─────────────────────────────────────────────
 // We re-implement the function here to test it in isolation without importing
@@ -14,7 +22,7 @@ import { resolve, relative, isAbsolute, extname } from 'node:path'
 const VAULT_ROOT = join(os.tmpdir(), `uni-brain-test-${Date.now()}`)
 
 function safeResolve(relPath: string): string | null {
-  const clean = (relPath ?? '').replace(/\0/g, '').trim()
+  const clean = relPath.replace(/\0/g, '').trim()
   const resolved =
     clean === '' || clean === '.'
       ? VAULT_ROOT
@@ -36,7 +44,10 @@ beforeAll(() => {
   mkdirSync(VAULT_ROOT, { recursive: true })
   mkdirSync(join(VAULT_ROOT, 'Anatomy'), { recursive: true })
   writeFileSync(join(VAULT_ROOT, 'index.md'), '# Uni Brain\nHello world')
-  writeFileSync(join(VAULT_ROOT, 'Anatomy', 'spine.md'), '# Spine\nVertebrae notes here')
+  writeFileSync(
+    join(VAULT_ROOT, 'Anatomy', 'spine.md'),
+    '# Spine\nVertebrae notes here',
+  )
   writeFileSync(join(VAULT_ROOT, 'Anatomy', 'not-md.txt'), 'ignored')
 })
 
@@ -69,10 +80,6 @@ describe('safeResolve — path traversal prevention', () => {
     expect(safeResolve('')).toBe(VAULT_ROOT)
   })
 })
-
-// ─── list entries ─────────────────────────────────────────────────────────────
-
-import { readdirSync, statSync } from 'node:fs'
 
 describe('list entries — sorted dirs first', () => {
   function listDir(dir: string) {

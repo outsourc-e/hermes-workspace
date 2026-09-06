@@ -14,6 +14,7 @@ It should enter a world, move, learn, compete, trade, join groups, and act with 
 ## North star
 
 Build the best AI-native MMO on the internet:
+
 - playable instantly in browser
 - embedded inside Hermes Workspace
 - visually premium enough to feel acquisition-grade
@@ -42,6 +43,7 @@ Guilds have halls, banners, rankings, tasks, and shared objectives.
 ### 5. Compete
 
 Minigames and arenas:
+
 - boxing / duels
 - sports-style games
 - agent-vs-agent tournaments
@@ -63,6 +65,7 @@ This becomes the Roblox layer.
 ## Agent-native mechanics
 
 Agents can:
+
 - navigate the world
 - inspect objects
 - talk to NPCs
@@ -89,6 +92,7 @@ Agents can:
 ## Economy/rewards
 
 Safe progression:
+
 - XP
 - titles
 - cosmetic items
@@ -98,6 +102,7 @@ Safe progression:
 - companion upgrades
 
 Valuable rewards:
+
 - ETH/SOL prize claims
 - token bonus/multipliers only if optional
 - rare cosmetics validated server-side
@@ -108,6 +113,7 @@ Valuable rewards:
 Target: premium dark fantasy/sci-fi MMO, not toy demo.
 
 Reference goals:
+
 - cinematic Agora plaza
 - compact premium HUD
 - rich lighting and prop density
@@ -135,6 +141,7 @@ HermesWorld turns agents into characters, tools into quests, model evals into ar
 ## Build strategy
 
 Use the swarm as an AI game studio:
+
 - art realism lane
 - mobile UX lane
 - gameplay systems lane
@@ -148,6 +155,7 @@ Every lane runs goal loops. Main orchestrator integrates.
 ## Immediate milestones
 
 ### v0.3 — Premium playable hub
+
 - hosted runtime embedded in Workspace
 - Agora plaza approaches Inso reference
 - mobile no-scroll playable layout
@@ -157,6 +165,7 @@ Every lane runs goal loops. Main orchestrator integrates.
 - art bible + first generated asset pack
 
 ### v0.4 — Agents in the world
+
 - agent action API
 - agent companions
 - party-like interactions
@@ -164,6 +173,7 @@ Every lane runs goal loops. Main orchestrator integrates.
 - NPC memory/state
 
 ### v0.5 — Guilds and events
+
 - guild creation
 - guild hall prototype
 - public event board
@@ -171,6 +181,7 @@ Every lane runs goal loops. Main orchestrator integrates.
 - leaderboard
 
 ### v0.6 — Prize hunts
+
 - private oracle
 - wallet signed claims
 - public lore/easter egg hunt
@@ -178,6 +189,7 @@ Every lane runs goal loops. Main orchestrator integrates.
 - anti-cheat event trail
 
 ### v1 — Agent MMO platform
+
 - user-generated zones/minigames
 - guild battles
 - creator economy hooks

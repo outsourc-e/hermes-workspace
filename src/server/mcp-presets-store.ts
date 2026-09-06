@@ -25,9 +25,9 @@ import {
 import { dirname, join, resolve as pathResolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomBytes } from 'node:crypto'
-import type { McpClientInput } from '../types/mcp'
 import { parseMcpServerInput } from './mcp-input-validate'
 import { getStateDir } from './workspace-state-dir'
+import type { McpClientInput } from '../types/mcp'
 
 export interface McpPreset {
   id: string
@@ -129,7 +129,13 @@ function statKey(path: string): StatKeyResult {
     const fd = openSync(path, 'r')
     try {
       const st = fstatSync(fd)
-      return { ok: true, mtimeMs: st.mtimeMs, size: st.size, ino: st.ino, ctimeMs: st.ctimeMs }
+      return {
+        ok: true,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+        ino: st.ino,
+        ctimeMs: st.ctimeMs,
+      }
     } finally {
       closeSync(fd)
     }
@@ -186,11 +192,19 @@ function bootstrapSeed(seedBytes: string, final: string): boolean {
     // linkSync is atomic on POSIX: succeeds only if final does not exist yet.
     linkSync(tmp, final)
     // We own final now — remove the temp hard-link.
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
     return true
   } catch (linkErr) {
     // Always remove temp regardless of outcome.
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
     if ((linkErr as NodeJS.ErrnoException).code === 'EEXIST') {
       // Another worker beat us — return false so caller re-reads final.
       return false
@@ -244,7 +258,10 @@ function validatePayload(parsed: unknown): PresetValidation {
     // Unknown per-preset fields → warnings
     for (const key of Object.keys(p)) {
       if (!PRESET_KNOWN_FIELDS.has(key)) {
-        warnings.push({ path: `${base}.${key}`, message: 'unknown field (ignored)' })
+        warnings.push({
+          path: `${base}.${key}`,
+          message: 'unknown field (ignored)',
+        })
       }
     }
 
@@ -272,7 +289,10 @@ function validatePayload(parsed: unknown): PresetValidation {
     if (p.description === undefined) {
       description = ''
     } else if (typeof p.description !== 'string') {
-      errors.push({ path: `${base}.description`, message: 'description must be a string' })
+      errors.push({
+        path: `${base}.description`,
+        message: 'description must be a string',
+      })
     } else if (p.description.length > DESC_MAX) {
       errors.push({
         path: `${base}.description`,
@@ -285,7 +305,10 @@ function validatePayload(parsed: unknown): PresetValidation {
     let category = 'Custom'
     if (p.category !== undefined) {
       if (typeof p.category !== 'string') {
-        errors.push({ path: `${base}.category`, message: 'category must be a string' })
+        errors.push({
+          path: `${base}.category`,
+          message: 'category must be a string',
+        })
       } else if (!VALID_CATEGORIES.has(p.category)) {
         errors.push({
           path: `${base}.category`,
@@ -299,17 +322,26 @@ function validatePayload(parsed: unknown): PresetValidation {
     let homepage: string | undefined
     if (p.homepage !== undefined) {
       if (typeof p.homepage !== 'string') {
-        errors.push({ path: `${base}.homepage`, message: 'homepage must be a string' })
+        errors.push({
+          path: `${base}.homepage`,
+          message: 'homepage must be a string',
+        })
       } else {
         try {
           const u = new URL(p.homepage)
           if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-            errors.push({ path: `${base}.homepage`, message: 'homepage must be http(s)' })
+            errors.push({
+              path: `${base}.homepage`,
+              message: 'homepage must be http(s)',
+            })
           } else {
             homepage = p.homepage
           }
         } catch {
-          errors.push({ path: `${base}.homepage`, message: 'homepage is not a valid URL' })
+          errors.push({
+            path: `${base}.homepage`,
+            message: 'homepage is not a valid URL',
+          })
         }
       }
     }
@@ -319,12 +351,20 @@ function validatePayload(parsed: unknown): PresetValidation {
       if (!Array.isArray(p.tags)) {
         errors.push({ path: `${base}.tags`, message: 'tags must be an array' })
       } else if (p.tags.length > TAGS_MAX) {
-        errors.push({ path: `${base}.tags`, message: `tags max ${TAGS_MAX} entries` })
+        errors.push({
+          path: `${base}.tags`,
+          message: `tags max ${TAGS_MAX} entries`,
+        })
       } else {
         const collected: Array<string> = []
         for (let ti = 0; ti < p.tags.length; ti++) {
           const t = p.tags[ti]
-          if (typeof t !== 'string' || t.length < TAG_LEN_MIN || t.length > TAG_LEN_MAX || !TAG_RE.test(t)) {
+          if (
+            typeof t !== 'string' ||
+            t.length < TAG_LEN_MIN ||
+            t.length > TAG_LEN_MAX ||
+            !TAG_RE.test(t)
+          ) {
             errors.push({
               path: `${base}.tags[${ti}]`,
               message: 'tag must match /^[a-z][a-z0-9-]*$/ (1..30 chars)',
@@ -337,7 +377,11 @@ function validatePayload(parsed: unknown): PresetValidation {
       }
     }
 
-    if (!p.template || typeof p.template !== 'object' || Array.isArray(p.template)) {
+    if (
+      !p.template ||
+      typeof p.template !== 'object' ||
+      Array.isArray(p.template)
+    ) {
       errors.push({ path: `${base}.template`, message: 'template is required' })
       continue
     }
@@ -374,14 +418,20 @@ function parseFromText(text: string): unknown | { __jsonError: string } {
   }
 }
 
-function readSeed(): { ok: true; bytes: string; data: unknown } | { ok: false; error: string; path: string } {
+function readSeed():
+  | { ok: true; bytes: string; data: unknown }
+  | { ok: false; error: string; path: string } {
   const seedPath = seedAssetPath()
   const bytes = readFileText(seedPath)
   if (bytes === null) {
     return { ok: false, error: 'seed asset missing', path: seedPath }
   }
   const parsed = parseFromText(bytes)
-  if (parsed && typeof parsed === 'object' && '__jsonError' in (parsed as Record<string, unknown>)) {
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    '__jsonError' in (parsed as Record<string, unknown>)
+  ) {
     return {
       ok: false,
       error: `seed asset is not valid JSON: ${(parsed as { __jsonError: string }).__jsonError}`,
@@ -392,7 +442,10 @@ function readSeed(): { ok: true; bytes: string; data: unknown } | { ok: false; e
 }
 
 /** Build a cache key that detects same-size edits via inode + ctime. */
-function makeCacheKey(path: string, st: { mtimeMs: number; size: number; ino: number; ctimeMs: number }): string {
+function makeCacheKey(
+  path: string,
+  st: { mtimeMs: number; size: number; ino: number; ctimeMs: number },
+): string {
   return `${path}:${st.mtimeMs}:${st.size}:${st.ino}:${st.ctimeMs}`
 }
 
@@ -432,14 +485,21 @@ export async function readPresets(): Promise<ReadPresetsResult> {
       // File vanished between stat and read — fall through to bootstrap
     } else {
       const parsed = parseFromText(text)
-      if (parsed && typeof parsed === 'object' && '__jsonError' in (parsed as Record<string, unknown>)) {
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        '__jsonError' in (parsed as Record<string, unknown>)
+      ) {
         const result: ReadPresetsResult = {
           presets: [],
           source: 'invalid',
           error: `User catalog file is not valid JSON: ${(parsed as { __jsonError: string }).__jsonError}`,
           errorPath: path,
           validationErrors: [
-            { path: '', message: (parsed as { __jsonError: string }).__jsonError },
+            {
+              path: '',
+              message: (parsed as { __jsonError: string }).__jsonError,
+            },
           ],
         }
         _cache = { key, result }
@@ -453,7 +513,9 @@ export async function readPresets(): Promise<ReadPresetsResult> {
           error: `User catalog file failed validation (${validation.errors.length} error${validation.errors.length === 1 ? '' : 's'}).`,
           errorPath: path,
           validationErrors: validation.errors,
-          ...(validation.warnings.length > 0 ? { warnings: validation.warnings } : {}),
+          ...(validation.warnings.length > 0
+            ? { warnings: validation.warnings }
+            : {}),
         }
         _cache = { key, result }
         return result
@@ -461,7 +523,9 @@ export async function readPresets(): Promise<ReadPresetsResult> {
       const result: ReadPresetsResult = {
         presets: validation.presets,
         source: 'user-file',
-        ...(validation.warnings.length > 0 ? { warnings: validation.warnings } : {}),
+        ...(validation.warnings.length > 0
+          ? { warnings: validation.warnings }
+          : {}),
       }
       _cache = { key, result }
       return result
@@ -490,7 +554,9 @@ export async function readPresets(): Promise<ReadPresetsResult> {
       error: `Bundled seed asset failed validation (${seedValidation.errors.length} error${seedValidation.errors.length === 1 ? '' : 's'}).`,
       errorPath: seedAssetPath(),
       validationErrors: seedValidation.errors,
-      ...(seedValidation.warnings.length > 0 ? { warnings: seedValidation.warnings } : {}),
+      ...(seedValidation.warnings.length > 0
+        ? { warnings: seedValidation.warnings }
+        : {}),
     }
     // Do NOT clobber user file (we never had one) — just return invalid
     return result
@@ -517,14 +583,20 @@ export async function readPresets(): Promise<ReadPresetsResult> {
     if (stat2.ok && text2 !== null) {
       const parsed2 = parseFromText(text2)
       if (
-        !(parsed2 && typeof parsed2 === 'object' && '__jsonError' in (parsed2 as Record<string, unknown>))
+        !(
+          parsed2 &&
+          typeof parsed2 === 'object' &&
+          '__jsonError' in (parsed2 as Record<string, unknown>)
+        )
       ) {
         const validation = validatePayload(parsed2)
         if (validation.errors.length === 0) {
           const result: ReadPresetsResult = {
             presets: validation.presets,
             source: 'seed',
-            ...(validation.warnings.length > 0 ? { warnings: validation.warnings } : {}),
+            ...(validation.warnings.length > 0
+              ? { warnings: validation.warnings }
+              : {}),
           }
           _cache = { key: makeCacheKey(path, stat2), result }
           return result
@@ -539,7 +611,9 @@ export async function readPresets(): Promise<ReadPresetsResult> {
   const result: ReadPresetsResult = {
     presets: seedValidation.presets,
     source: 'seed',
-    ...(seedValidation.warnings.length > 0 ? { warnings: seedValidation.warnings } : {}),
+    ...(seedValidation.warnings.length > 0
+      ? { warnings: seedValidation.warnings }
+      : {}),
   }
   if (stat3.ok) {
     _cache = { key: makeCacheKey(path, stat3), result }

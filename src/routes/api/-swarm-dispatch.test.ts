@@ -6,6 +6,7 @@ import {
   runtimeCheckpointSignature,
   runtimeSnapshotIsFresh,
 } from './swarm-dispatch'
+import type { SwarmRosterWorker } from '../../server/swarm-roster'
 
 describe('checkpointFromRuntimeSnapshot', () => {
   it('maps runtime lifecycle fields into a structured checkpoint', () => {
@@ -24,7 +25,9 @@ describe('checkpointFromRuntimeSnapshot', () => {
     expect(checkpoint).not.toBeNull()
     expect(checkpoint?.stateLabel).toBe('DONE')
     expect(checkpoint?.checkpointStatus).toBe('done')
-    expect(checkpoint?.result).toBe('Structured checkpoint returned to RouterChat')
+    expect(checkpoint?.result).toBe(
+      'Structured checkpoint returned to RouterChat',
+    )
     expect(checkpoint?.nextAction).toBe('Verify in UI flow')
     expect(checkpoint?.raw).toContain('STATE: DONE')
   })
@@ -61,7 +64,13 @@ describe('runtimeSnapshotIsFresh', () => {
     }
     const dispatchedAt = 1_746_000_000_000
 
-    expect(runtimeSnapshotIsFresh(baseline, runtimeCheckpointSignature(baseline), dispatchedAt)).toBe(false)
+    expect(
+      runtimeSnapshotIsFresh(
+        baseline,
+        runtimeCheckpointSignature(baseline),
+        dispatchedAt,
+      ),
+    ).toBe(false)
 
     const updated = {
       ...baseline,
@@ -72,7 +81,13 @@ describe('runtimeSnapshotIsFresh', () => {
       lastOutputAt: 1_746_000_001_000,
     }
 
-    expect(runtimeSnapshotIsFresh(updated, runtimeCheckpointSignature(baseline), dispatchedAt)).toBe(true)
+    expect(
+      runtimeSnapshotIsFresh(
+        updated,
+        runtimeCheckpointSignature(baseline),
+        dispatchedAt,
+      ),
+    ).toBe(true)
   })
 })
 
@@ -110,7 +125,7 @@ describe('buildHermesTmuxLaunchCommand', () => {
 })
 
 describe('buildWorkerPrompt', () => {
-  const roster = {
+  const roster: SwarmRosterWorker = {
     id: 'swarm5',
     name: 'Builder',
     role: 'Primary Builder',
@@ -123,6 +138,12 @@ describe('buildWorkerPrompt', () => {
     maxConcurrentTasks: 1,
     acceptsBroadcast: true,
     reviewRequired: false,
+    plugins: [],
+    modes: [],
+    tools: [],
+    pluginToolsets: [],
+    mcpServers: [],
+    greenlightRequiredFor: [],
   }
 
   it('uses Name — Role as the human-facing label while preserving swarmN as machine ID', () => {
@@ -135,8 +156,12 @@ describe('buildWorkerPrompt', () => {
 
     expect(prompt).toContain('Worker: Builder — Primary Builder')
     expect(prompt).toContain('Machine ID: swarm5')
-    expect(prompt).toContain('Mission: Ship focused product slices with tests and clean diffs.')
-    expect(prompt).toContain('Capabilities: code-editing, ui-implementation, build-verification')
+    expect(prompt).toContain(
+      'Mission: Ship focused product slices with tests and clean diffs.',
+    )
+    expect(prompt).toContain(
+      'Capabilities: code-editing, ui-implementation, build-verification',
+    )
     expect(prompt).toContain('Skills: swarm-ui-worker, swarm-worker-core')
   })
 

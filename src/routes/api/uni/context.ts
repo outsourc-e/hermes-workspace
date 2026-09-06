@@ -4,11 +4,11 @@
  * Returns the raw content of ~/.hermes/uni/context.md
  * Used by the UniDashboard page to render subjects, deadlines, tasks.
  */
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 
 const CONTEXT_PATH = join(homedir(), '.hermes', 'uni', 'context.md')
 

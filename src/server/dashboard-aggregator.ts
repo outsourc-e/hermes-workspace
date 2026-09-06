@@ -78,7 +78,7 @@ export type DashboardStatusSection = {
   activeSessions: number
   /**
    * Canonical "currently running" number from gateway runtime status
-   * (​`/health/detailed` -> `active_agents`). Falls back to legacy
+   * ( `/health/detailed` -> `active_agents`). Falls back to legacy
    * `active_sessions` when `/health/detailed` is unreachable.
    */
   activeAgents: number
@@ -157,7 +157,13 @@ export type DashboardAnalyticsSection = {
   totalSessions: number
   /** API call count over the window. */
   totalApiCalls: number
-  topModels: Array<{ id: string; tokens: number; calls: number; cost: number; sessions: number }>
+  topModels: Array<{
+    id: string
+    tokens: number
+    calls: number
+    cost: number
+    sessions: number
+  }>
   /**
    * Per-day rollup for sparklines. ISO date string + tokens + sessions
    * + cost per day. Always returned, even when empty.
@@ -327,6 +333,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   let jobs: Array<Record<string, unknown>> = []
   if (Array.isArray(raw)) {
     jobs = raw as Array<Record<string, unknown>>
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS infers non-null but field may still be null/undefined at runtime
   } else if (raw && typeof raw === 'object') {
     const r = raw as Record<string, unknown>
     if (Array.isArray(r.jobs)) jobs = r.jobs as Array<Record<string, unknown>>
@@ -339,8 +346,9 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   let nextRunMs: number | null = null
   const recentFailures: DashboardCronSection['recentFailures'] = []
   for (const job of jobs) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: defensive check; lint can't see store mutation
     if (!job || typeof job !== 'object') continue
-    const j = job as Record<string, unknown>
+    const j = job
     const state = readString(j.state || j.status).toLowerCase()
     if (state === 'paused') paused += 1
     else if (state === 'running') running += 1
@@ -349,7 +357,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.last_error === 'string'
         ? j.last_error
         : typeof j.last_delivery_error === 'string'
-          ? (j.last_delivery_error as string)
+          ? j.last_delivery_error
           : null
     const isFailure =
       lastStatus === 'failed' ||
@@ -359,17 +367,14 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       failed += 1
       const id = readString(j.id) || readString(j.name) || 'unknown'
       const name = readString(j.name) || id
-      const lastRunAt =
-        typeof j.last_run_at === 'string' ? j.last_run_at : null
+      const lastRunAt = typeof j.last_run_at === 'string' ? j.last_run_at : null
       recentFailures.push({ id, name, lastError, lastRunAt })
     }
     const candidates = [
       typeof j.next_run_at === 'string' ? Date.parse(j.next_run_at) : NaN,
       typeof j.next_run === 'string' ? Date.parse(j.next_run) : NaN,
-      typeof j.next_run_at === 'number'
-        ? (j.next_run_at as number) * 1000
-        : NaN,
-    ].filter((v) => Number.isFinite(v)) as Array<number>
+      typeof j.next_run_at === 'number' ? j.next_run_at * 1000 : NaN,
+    ].filter((v) => Number.isFinite(v))
     for (const ts of candidates) {
       if (nextRunMs === null || ts < nextRunMs) nextRunMs = ts
     }
@@ -399,8 +404,7 @@ function normalizeAchievementUnlock(
     category: readString(r.category) || 'General',
     icon: readString(r.icon) || 'Star',
     tier: typeof r.tier === 'string' ? r.tier : null,
-    unlockedAt:
-      typeof r.unlocked_at === 'number' ? (r.unlocked_at as number) : null,
+    unlockedAt: typeof r.unlocked_at === 'number' ? r.unlocked_at : null,
   }
 }
 
@@ -413,9 +417,7 @@ function normalizeAchievements(
   if (recentArr.length === 0 && (!all || typeof all !== 'object')) return null
   const recentUnlocks = recentArr
     .map(normalizeAchievementUnlock)
-    .filter(
-      (entry): entry is DashboardAchievementUnlock => entry !== null,
-    )
+    .filter((entry): entry is DashboardAchievementUnlock => entry !== null)
     .slice(0, limit)
 
   let totalUnlocked = 0
@@ -473,14 +475,13 @@ function normalizeSkillsUsage(
         skill,
         totalCount: readNumber(e.total_count),
         percentage: readNumber(e.percentage),
-        lastUsedAt:
-          typeof e.last_used_at === 'number'
-            ? (e.last_used_at as number)
-            : null,
+        lastUsedAt: typeof e.last_used_at === 'number' ? e.last_used_at : null,
       }
     })
     .filter(
-      (e): e is {
+      (
+        e,
+      ): e is {
         skill: string
         totalCount: number
         percentage: number
@@ -489,10 +490,7 @@ function normalizeSkillsUsage(
     )
     .sort((a, b) => b.totalCount - a.totalCount)
     .slice(0, 5)
-  if (
-    !summary &&
-    topSkills.length === 0
-  ) {
+  if (!summary && topSkills.length === 0) {
     return null
   }
   return {
@@ -525,9 +523,7 @@ function normalizeAnalytics(
     totalsRaw?.total_output ?? r.total_output ?? r.output_tokens,
   )
   const cacheReadTokens = readNumber(
-    totalsRaw?.total_cache_read ??
-      r.total_cache_read ??
-      r.cache_read_tokens,
+    totalsRaw?.total_cache_read ?? r.total_cache_read ?? r.cache_read_tokens,
   )
   const reasoningTokens = readNumber(
     totalsRaw?.total_reasoning ?? r.total_reasoning ?? r.reasoning_tokens,
@@ -555,9 +551,7 @@ function normalizeAnalytics(
   // reasoning are exposed separately for the rich UI.
   const fallbackTotal = readNumber(r.total_tokens)
   const totalTokens =
-    inputTokens + outputTokens > 0
-      ? inputTokens + outputTokens
-      : fallbackTotal
+    inputTokens + outputTokens > 0 ? inputTokens + outputTokens : fallbackTotal
 
   const modelsRaw = Array.isArray(r.by_model)
     ? r.by_model
@@ -576,14 +570,19 @@ function normalizeAnalytics(
       const tokensOut = readNumber(e.output_tokens)
       return {
         id,
-        tokens: tokensIn + tokensOut > 0 ? tokensIn + tokensOut : readNumber(e.tokens),
+        tokens:
+          tokensIn + tokensOut > 0
+            ? tokensIn + tokensOut
+            : readNumber(e.tokens),
         calls: readNumber(e.api_calls ?? e.calls ?? e.requests),
         cost: readNumber(e.estimated_cost ?? e.cost),
         sessions: readNumber(e.sessions),
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         id: string
         tokens: number
         calls: number
@@ -613,7 +612,9 @@ function normalizeAnalytics(
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         day: string
         inputTokens: number
         outputTokens: number
@@ -718,7 +719,7 @@ function formatTokensCompact(n: number): string {
  */
 function shortSkillName(raw: string): string {
   if (!raw) return raw
-  const segments = raw.split(/[:\/]/)
+  const segments = raw.split(/[:/]/)
   return segments[segments.length - 1] || raw
 }
 
@@ -762,6 +763,7 @@ function computeInsights(
     }
     if (peakVal > 0) {
       const top = analytics.topModels[0]
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS infers non-null but field may still be null/undefined at runtime
       const driver = top ? `, driven by ${shortModelName(top.id)}` : ''
       const peakDay = analytics.daily[peakIdx].day
       const todayIso = new Date().toISOString().slice(0, 10)
@@ -797,16 +799,12 @@ function computeInsights(
   // glance.
   const ops: Array<string> = []
   if (cron && cron.failed > 0) {
-    ops.push(
-      `${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`,
-    )
+    ops.push(`${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`)
   }
   if (cron && cron.nextRunAt) {
     const nextMs = Date.parse(cron.nextRunAt)
     if (Number.isFinite(nextMs) && nextMs - Date.now() < -7 * 86_400_000) {
-      ops.push(
-        `${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`,
-      )
+      ops.push(`${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`)
     }
   }
   if (

@@ -8,6 +8,7 @@ Latest commit: `13bc6e234`.
 ## 1. How to test multiplayer (5 min)
 
 ### Same-machine (fast smoke test)
+
 1. Hard refresh the playground in your current browser tab: **Cmd+Shift+R**.
 2. Open a second tab → http://localhost:3005/playground
 3. Both tabs should:
@@ -17,6 +18,7 @@ Latest commit: `13bc6e234`.
 4. Same-browser presence runs over BroadcastChannel + WS, so this works even with no network.
 
 ### Cross-device (real multiplayer)
+
 1. Phone or second machine on **any network** (LAN or cellular).
 2. From your dev Mac, expose 3005 — **easiest options**:
    - `tailscale serve --bg http://localhost:3005` → use the printed `https://aurora.tail***.ts.net` URL.
@@ -26,6 +28,7 @@ Latest commit: `13bc6e234`.
 4. Verify in the browser console: you should see one WebSocket connection to that URL and **no fallback to BroadcastChannel-only** (transport indicator shows "ws" or "both").
 
 ### Verify hub health from CLI
+
 ```bash
 curl https://hermes-playground-ws.myaurora-agi.workers.dev/health
 # → {"ok":true,"online":N,"ts":...}
@@ -38,23 +41,23 @@ curl https://hermes-playground-ws.myaurora-agi.workers.dev/stats
 
 ## 2. What's wired up
 
-| Surface | Status |
-| --- | --- |
-| Mouse camera (left/right/middle drag, wheel zoom) | ✅ |
-| Hermes statue + braziers + banners | ✅ Training, Agora, Forge, Arena |
-| Practice dummies + weapon racks | ✅ Trainer's Ring |
-| Knight-styled NPCs (helmet/plume/sword sheath) | ✅ Trainer, Recruiter, Hermes |
-| 5-step Hermes tutorial chain | ✅ |
-| Quest education panels (Hermes lesson + Why it matters) | ✅ |
-| Action bar (Strike/Dash/Bolt) + cooldowns | ✅ |
-| Glitch Wisp training enemy | ✅ |
-| HUD: minimap, quest tracker, equip/inventory, HP/MP/SP/XP | ✅ |
-| Audio: Web Audio synth ambient + SFX, mute toggle | ✅ |
-| Multiplayer presence (BroadcastChannel + WS) | ✅ |
-| Public WS hub (Cloudflare Worker + Durable Object) | ✅ live |
-| `.env.example` wired to public hub | ✅ |
-| Local `.env` written for this dev session | ✅ |
-| `pnpm build` clean | ✅ |
+| Surface                                                   | Status                           |
+| --------------------------------------------------------- | -------------------------------- |
+| Mouse camera (left/right/middle drag, wheel zoom)         | ✅                               |
+| Hermes statue + braziers + banners                        | ✅ Training, Agora, Forge, Arena |
+| Practice dummies + weapon racks                           | ✅ Trainer's Ring                |
+| Knight-styled NPCs (helmet/plume/sword sheath)            | ✅ Trainer, Recruiter, Hermes    |
+| 5-step Hermes tutorial chain                              | ✅                               |
+| Quest education panels (Hermes lesson + Why it matters)   | ✅                               |
+| Action bar (Strike/Dash/Bolt) + cooldowns                 | ✅                               |
+| Glitch Wisp training enemy                                | ✅                               |
+| HUD: minimap, quest tracker, equip/inventory, HP/MP/SP/XP | ✅                               |
+| Audio: Web Audio synth ambient + SFX, mute toggle         | ✅                               |
+| Multiplayer presence (BroadcastChannel + WS)              | ✅                               |
+| Public WS hub (Cloudflare Worker + Durable Object)        | ✅ live                          |
+| `.env.example` wired to public hub                        | ✅                               |
+| Local `.env` written for this dev session                 | ✅                               |
+| `pnpm build` clean                                        | ✅                               |
 
 ---
 
@@ -73,21 +76,21 @@ curl https://hermes-playground-ws.myaurora-agi.workers.dev/stats
 
 ## 4. Showcase flow (mirrors `iterations/006-showcase.md`)
 
-| # | Beat | Time |
-| --- | --- | --- |
-| 1 | Title screen → display name → avatar → enter Training Grounds | 5s |
-| 2 | Slow orbit on **Hermes statue** at the center of Training Grounds | 5s |
-| 3 | Talk to Athena → accept first quest | 8s |
-| 4 | Trainer's Ring: practice dummies + weapon racks + Glitch Wisp duel using `1` `2` `3` | 12s |
-| 5 | Quartermaster Tent → equip Training Blade + Novice Cloak | 6s |
-| 6 | Archive Podium (Iris, docs/memory beat) | 6s |
-| 7 | Walk to **Forge Gate** → portal payoff | 5s |
-| 8 | Forge: cyan-flame braziers, Pan + Chronos build dialog | 8s |
-| 9 | Map screen showing world graph | 4s |
-| 10 | Open second tab → multiplayer nameplate visible | 6s |
-| 11 | Quick cuts: Grove, Oracle, Arena (with Hermes referee + caduceus + 6-brazier ring) | 12s |
-| 12 | End on slow zoom-out from the Hermes statue with banners + braziers | 5s |
-| **Total** | | **~80s** |
+| #         | Beat                                                                                 | Time     |
+| --------- | ------------------------------------------------------------------------------------ | -------- |
+| 1         | Title screen → display name → avatar → enter Training Grounds                        | 5s       |
+| 2         | Slow orbit on **Hermes statue** at the center of Training Grounds                    | 5s       |
+| 3         | Talk to Athena → accept first quest                                                  | 8s       |
+| 4         | Trainer's Ring: practice dummies + weapon racks + Glitch Wisp duel using `1` `2` `3` | 12s      |
+| 5         | Quartermaster Tent → equip Training Blade + Novice Cloak                             | 6s       |
+| 6         | Archive Podium (Iris, docs/memory beat)                                              | 6s       |
+| 7         | Walk to **Forge Gate** → portal payoff                                               | 5s       |
+| 8         | Forge: cyan-flame braziers, Pan + Chronos build dialog                               | 8s       |
+| 9         | Map screen showing world graph                                                       | 4s       |
+| 10        | Open second tab → multiplayer nameplate visible                                      | 6s       |
+| 11        | Quick cuts: Grove, Oracle, Arena (with Hermes referee + caduceus + 6-brazier ring)   | 12s      |
+| 12        | End on slow zoom-out from the Hermes statue with banners + braziers                  | 5s       |
+| **Total** |                                                                                      | **~80s** |
 
 ---
 
@@ -103,20 +106,21 @@ curl https://hermes-playground-ws.myaurora-agi.workers.dev/stats
 
 ## 6. If something breaks during recording
 
-| Symptom | Fix |
-| --- | --- |
-| Camera frozen / left-drag dead | Cmd+Shift+R; check console for WS errors; mouse-look effect is in `playground-world-3d.tsx` ~L939 |
-| Multiplayer nameplate missing | Check Network tab for `wss://hermes-playground-ws.*/playground`; `.env` must be loaded by Vite (restart dev if needed) |
-| Audio dead | Click anywhere first (browsers gate audio behind user gesture); check mute toggle in utility dock |
-| Quest stuck | Try `localStorage.removeItem('playerProfile'); location.reload()` |
-| WS hub down | Falls back to BroadcastChannel — same-browser MP still works |
-| Forge Gate locked | Finish all 5 tutorial steps; `playerProfile.questProgress` flags it |
+| Symptom                        | Fix                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Camera frozen / left-drag dead | Cmd+Shift+R; check console for WS errors; mouse-look effect is in `playground-world-3d.tsx` ~L939                      |
+| Multiplayer nameplate missing  | Check Network tab for `wss://hermes-playground-ws.*/playground`; `.env` must be loaded by Vite (restart dev if needed) |
+| Audio dead                     | Click anywhere first (browsers gate audio behind user gesture); check mute toggle in utility dock                      |
+| Quest stuck                    | Try `localStorage.removeItem('playerProfile'); location.reload()`                                                      |
+| WS hub down                    | Falls back to BroadcastChannel — same-browser MP still works                                                           |
+| Forge Gate locked              | Finish all 5 tutorial steps; `playerProfile.questProgress` flags it                                                    |
 
 ---
 
 ## 7. Push readiness
 
 When Eric explicitly OKs a push:
+
 ```bash
 cd /Users/aurora/.worktrees/hermes-playground-local
 git log --oneline feat/agent-view-port-from-controlsuite ^origin/main

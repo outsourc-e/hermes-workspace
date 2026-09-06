@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 type CounterState = {
@@ -40,7 +41,8 @@ function ReserveRoute() {
     fetch('/api/hermesworld/reservations', { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json()
-        if (!response.ok) throw new Error(payload.error || 'Failed to load counter')
+        if (!response.ok)
+          throw new Error(payload.error || 'Failed to load counter')
         if (!cancelled) {
           setCounter({ loading: false, count: payload.count || 0, error: null })
         }
@@ -105,7 +107,10 @@ function ReserveRoute() {
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:grid lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
         <section className="rounded-[2rem] border border-[#d9b35f]/24 bg-[#05080e]/82 p-7 shadow-[0_40px_140px_rgba(0,0,0,.52)] backdrop-blur-2xl sm:p-9">
-          <a href="/hermes-world" className="text-[11px] font-black uppercase tracking-[0.22em] text-[#d9b35f]/72 hover:text-[#f8e4ac]">
+          <a
+            href="/hermes-world"
+            className="text-[11px] font-black uppercase tracking-[0.22em] text-[#d9b35f]/72 hover:text-[#f8e4ac]"
+          >
             ← Back to HermesWorld
           </a>
           <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#d9b35f]/30 bg-[#d9b35f]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#f8e4ac]">
@@ -115,7 +120,9 @@ function ReserveRoute() {
             Reserve your HermesWorld name before accounts launch.
           </h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-[#d7d0bd]/68 sm:text-lg">
-            Lock your desired handle now. We validate duplicates, profanity, and admin/system names server-side, then email you a confirmation link so the reservation can auto-bind when the account system goes live.
+            Lock your desired handle now. We validate duplicates, profanity, and
+            admin/system names server-side, then email you a confirmation link
+            so the reservation can auto-bind when the account system goes live.
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -123,10 +130,24 @@ function ReserveRoute() {
               label="Reservations"
               value={counter.loading ? '...' : String(counter.count)}
               tone="gold"
-              subcopy={counter.error ? 'Counter temporarily unavailable' : 'Public live counter'}
+              subcopy={
+                counter.error
+                  ? 'Counter temporarily unavailable'
+                  : 'Public live counter'
+              }
             />
-            <StatCard label="Name rules" value="3–20" tone="cyan" subcopy="Letters, numbers, underscores" />
-            <StatCard label="Confirmation" value="Email" tone="violet" subcopy="One-click verification" />
+            <StatCard
+              label="Name rules"
+              value="3–20"
+              tone="cyan"
+              subcopy="Letters, numbers, underscores"
+            />
+            <StatCard
+              label="Confirmation"
+              value="Email"
+              tone="violet"
+              subcopy="One-click verification"
+            />
           </div>
 
           <div className="mt-8 rounded-2xl border border-white/10 bg-black/24 p-5">
@@ -134,10 +155,18 @@ function ReserveRoute() {
               Reservation notes
             </div>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-[#d7d0bd]/64">
-              <li>• Desired names must use letters, numbers, or underscores only.</li>
+              <li>
+                • Desired names must use letters, numbers, or underscores only.
+              </li>
               <li>• Duplicate names are rejected immediately.</li>
-              <li>• Wallet is optional today, but helps with future account linking.</li>
-              <li>• Confirmation email required before the reservation is considered locked.</li>
+              <li>
+                • Wallet is optional today, but helps with future account
+                linking.
+              </li>
+              <li>
+                • Confirmation email required before the reservation is
+                considered locked.
+              </li>
             </ul>
           </div>
         </section>
@@ -149,7 +178,9 @@ function ReserveRoute() {
                 Reserve handle
               </div>
               <div className="mt-2 text-2xl font-bold text-[#fff6df]">
-                {trimmedName ? `Claim ${trimmedName}` : 'Enter your launch-day name'}
+                {trimmedName
+                  ? `Claim ${trimmedName}`
+                  : 'Enter your launch-day name'}
               </div>
             </div>
             <div className="rounded-full border border-cyan-200/22 bg-cyan-200/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100/82">
@@ -273,8 +304,12 @@ function StatCard({
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/24 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]">
-      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#d9b35f]/72">{label}</div>
-      <div className={`mt-3 inline-flex rounded-full border px-3 py-1 text-lg font-black ${accent}`}>
+      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#d9b35f]/72">
+        {label}
+      </div>
+      <div
+        className={`mt-3 inline-flex rounded-full border px-3 py-1 text-lg font-black ${accent}`}
+      >
         {value}
       </div>
       <div className="mt-3 text-xs leading-5 text-[#d7d0bd]/55">{subcopy}</div>

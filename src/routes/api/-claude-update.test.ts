@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { createRemoteStatus, remoteUrlMatchesExpectedRepo } from './claude-update'
+import {
+  createRemoteStatus,
+  remoteUrlMatchesExpectedRepo,
+} from './claude-update'
 
 describe('claude update repo gating', () => {
   it('matches Claude workspace repo aliases', () => {
-    expect(remoteUrlMatchesExpectedRepo('https://github.com/example/hermes-workspace.git', ['hermes-workspace'])).toBe(true)
-    expect(remoteUrlMatchesExpectedRepo('git@github.com:outsourc-e/hermes-workspace.git', ['outsourc-e/hermes-workspace'])).toBe(true)
+    expect(
+      remoteUrlMatchesExpectedRepo(
+        'https://github.com/example/hermes-workspace.git',
+        ['hermes-workspace'],
+      ),
+    ).toBe(true)
+    expect(
+      remoteUrlMatchesExpectedRepo(
+        'git@github.com:outsourc-e/hermes-workspace.git',
+        ['outsourc-e/hermes-workspace'],
+      ),
+    ).toBe(true)
   })
 
   it('blocks update availability for wrong remote repos even when heads differ', () => {

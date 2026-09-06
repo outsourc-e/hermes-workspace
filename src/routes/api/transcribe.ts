@@ -40,10 +40,16 @@ export const Route = createFileRoute('/api/transcribe')({
           const form = await request.formData()
           const file = form.get('file')
           if (!(file instanceof File)) {
-            return json({ ok: false, error: 'Missing audio file.' }, { status: 400 })
+            return json(
+              { ok: false, error: 'Missing audio file.' },
+              { status: 400 },
+            )
           }
           if (file.size <= 0) {
-            return json({ ok: false, error: 'Audio file is empty.' }, { status: 400 })
+            return json(
+              { ok: false, error: 'Audio file is empty.' },
+              { status: 400 },
+            )
           }
           if (file.size > MAX_AUDIO_UPLOAD_BYTES) {
             return json(
@@ -65,20 +71,24 @@ export const Route = createFileRoute('/api/transcribe')({
             upstreamForm.set('language', target.language)
           }
 
-          const upstream = await fetch(`${target.baseUrl}/audio/transcriptions`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${target.apiKey}`,
+          const upstream = await fetch(
+            `${target.baseUrl}/audio/transcriptions`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${target.apiKey}`,
+              },
+              body: upstreamForm,
             },
-            body: upstreamForm,
-          })
+          )
 
           const raw = await upstream.text()
           if (!upstream.ok) {
             return json(
               {
                 ok: false,
-                error: raw || `Transcription request failed (${upstream.status}).`,
+                error:
+                  raw || `Transcription request failed (${upstream.status}).`,
               },
               { status: upstream.status },
             )

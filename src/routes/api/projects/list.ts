@@ -23,7 +23,7 @@ export interface RepoData {
   owner: string
   name: string
   openPRs: number
-  prTitles: string[]
+  prTitles: Array<string>
   latestCI: RepoCIStatus
   latestCIWorkflow?: string
   lastCommit?: {
@@ -34,7 +34,7 @@ export interface RepoData {
   }
 }
 
-function getTrackedRepos(): string[] {
+function getTrackedRepos(): Array<string> {
   const env = process.env.HUD_TRACKED_REPOS ?? 'SPACEMAN1898/CliniTrack-Suite'
   return env
     .split(',')
@@ -43,9 +43,11 @@ function getTrackedRepos(): string[] {
 }
 
 function isLocalRequest(request: Request): boolean {
-  const maybeAddress = (request as unknown as { remoteAddress?: string }).remoteAddress
+  const maybeAddress = (request as unknown as { remoteAddress?: string })
+    .remoteAddress
   const ip = (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
-  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip)) return true
+  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip))
+    return true
   if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return true
   if (/^192\.168\./.test(ip)) return true
   if (/^10\./.test(ip)) return true
@@ -57,17 +59,43 @@ async function fetchRepoData(fullName: string): Promise<RepoData> {
   const repo = `${owner}/${name}`
 
   const [prsResult, ciResult, commitResult] = await Promise.allSettled([
-    execFileAsync('gh', ['pr', 'list', '-R', repo, '--state', 'open', '--json', 'number,title,reviewDecision']),
-    execFileAsync('gh', ['run', 'list', '-R', repo, '--limit', '1', '--json', 'conclusion,name']),
-    execFileAsync('gh', ['api', `repos/${repo}/commits/HEAD`, '--jq', '{sha: .sha[0:7], message: .commit.message, date: .commit.author.date, author: .commit.author.name}']),
+    execFileAsync('gh', [
+      'pr',
+      'list',
+      '-R',
+      repo,
+      '--state',
+      'open',
+      '--json',
+      'number,title,reviewDecision',
+    ]),
+    execFileAsync('gh', [
+      'run',
+      'list',
+      '-R',
+      repo,
+      '--limit',
+      '1',
+      '--json',
+      'conclusion,name',
+    ]),
+    execFileAsync('gh', [
+      'api',
+      `repos/${repo}/commits/HEAD`,
+      '--jq',
+      '{sha: .sha[0:7], message: .commit.message, date: .commit.author.date, author: .commit.author.name}',
+    ]),
   ])
 
   // Parse PRs
   let openPRs = 0
-  let prTitles: string[] = []
+  let prTitles: Array<string> = []
   if (prsResult.status === 'fulfilled') {
     try {
-      const prs = JSON.parse(prsResult.value.stdout) as Array<{ number: number; title: string }>
+      const prs = JSON.parse(prsResult.value.stdout) as Array<{
+        number: number
+        title: string
+      }>
       openPRs = prs.length
       prTitles = prs.slice(0, 3).map((p) => p.title)
     } catch {
@@ -80,11 +108,14 @@ async function fetchRepoData(fullName: string): Promise<RepoData> {
   let latestCIWorkflow: string | undefined
   if (ciResult.status === 'fulfilled') {
     try {
-      const runs = JSON.parse(ciResult.value.stdout) as Array<{ conclusion: string; name: string }>
+      const runs = JSON.parse(ciResult.value.stdout) as Array<{
+        conclusion: string
+        name: string
+      }>
       if (runs.length > 0) {
         const run = runs[0]
         latestCIWorkflow = run.name
-        const c = (run.conclusion ?? '').toLowerCase()
+        const c = run.conclusion.toLowerCase()
         if (c === 'success') latestCI = 'success'
         else if (c === 'failure') latestCI = 'failure'
         else if (c === 'cancelled') latestCI = 'cancelled'
@@ -105,10 +136,22 @@ async function fetchRepoData(fullName: string): Promise<RepoData> {
     }
   }
 
-  return { owner, name, openPRs, prTitles, latestCI, latestCIWorkflow, lastCommit }
+  return {
+    owner,
+    name,
+    openPRs,
+    prTitles,
+    latestCI,
+    latestCIWorkflow,
+    lastCommit,
+  }
 }
 
-async function projectsListHandler({ request }: { request: Request }): Promise<Response> {
+async function projectsListHandler({
+  request,
+}: {
+  request: Request
+}): Promise<Response> {
   if (!isAuthenticated(request) && !isLocalRequest(request)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
@@ -118,12 +161,18 @@ async function projectsListHandler({ request }: { request: Request }): Promise<R
 
   // Serve from cache if fresh
   try {
-    const cached = await cache.get<RepoData[]>(CACHE_KEY)
+    const cached = await cache.get<Array<RepoData>>(CACHE_KEY)
     if (cached && !cached.isStale) {
-      return new Response(JSON.stringify({ repos: cached.data, cachedAt: cached.fetchedAt }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-      })
+      return new Response(
+        JSON.stringify({ repos: cached.data, cachedAt: cached.fetchedAt }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        },
+      )
     }
   } catch {
     // ignore cache errors
@@ -132,19 +181,18 @@ async function projectsListHandler({ request }: { request: Request }): Promise<R
   const repos = getTrackedRepos()
   const results = await Promise.allSettled(repos.map(fetchRepoData))
 
-  const data: RepoData[] = results
-    .map((r, i) => {
-      if (r.status === 'fulfilled') return r.value
-      const [owner, name] = (repos[i] ?? '/').split('/')
-      return {
-        owner: owner ?? '',
-        name: name ?? '',
-        openPRs: 0,
-        prTitles: [],
-        latestCI: 'unknown' as RepoCIStatus,
-        error: r.reason instanceof Error ? r.reason.message : String(r.reason),
-      }
-    })
+  const data: Array<RepoData> = results.map((r, i) => {
+    if (r.status === 'fulfilled') return r.value
+    const [owner, name] = (repos[i] ?? '/').split('/')
+    return {
+      owner,
+      name,
+      openPRs: 0,
+      prTitles: [],
+      latestCI: 'unknown' as RepoCIStatus,
+      error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+    }
+  })
 
   // Cache results
   try {
@@ -155,7 +203,10 @@ async function projectsListHandler({ request }: { request: Request }): Promise<R
 
   return new Response(JSON.stringify({ repos: data, cachedAt: Date.now() }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    },
   })
 }
 

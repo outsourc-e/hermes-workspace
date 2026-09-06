@@ -6,7 +6,8 @@ import path from 'node:path'
 
 const baseUrl = process.argv[2] || 'https://127.0.0.1:4445/chat/new'
 const errorLogPath =
-  process.argv[3] || path.join(os.homedir(), '.pm2', 'logs', 'hermes-workspace-error.log')
+  process.argv[3] ||
+  path.join(os.homedir(), '.pm2', 'logs', 'hermes-workspace-error.log')
 const suspiciousPatterns = [
   'ERR_MODULE_NOT_FOUND',
   'Cannot find module',
@@ -37,14 +38,25 @@ function fetchText(url) {
 
 const html = await fetchText(baseUrl)
 if (!html.includes('Hermes Workspace')) {
-  throw new Error(`Managed companion did not render the expected shell at ${baseUrl}`)
+  throw new Error(
+    `Managed companion did not render the expected shell at ${baseUrl}`,
+  )
 }
 
 if (fs.existsSync(errorLogPath)) {
-  const tail = fs.readFileSync(errorLogPath, 'utf8').trim().split('\n').slice(-200).join('\n')
-  const badPattern = suspiciousPatterns.find((pattern) => tail.includes(pattern))
+  const tail = fs
+    .readFileSync(errorLogPath, 'utf8')
+    .trim()
+    .split('\n')
+    .slice(-200)
+    .join('\n')
+  const badPattern = suspiciousPatterns.find((pattern) =>
+    tail.includes(pattern),
+  )
   if (badPattern) {
-    throw new Error(`Detected suspicious companion runtime error in ${errorLogPath}: ${badPattern}`)
+    throw new Error(
+      `Detected suspicious companion runtime error in ${errorLogPath}: ${badPattern}`,
+    )
   }
 }
 

@@ -6,7 +6,7 @@ export type SnippetProps = {
     id: string
     title: string
     content: string
-    tags: string[]
+    tags: Array<string>
     usageCount: number
   }>
   onUseSnippet: (snippetId: string) => void
@@ -25,7 +25,8 @@ export function ReusableSnippets({ snippets, onUseSnippet }: SnippetProps) {
     if (!trimmed) return snippets
 
     return snippets.filter((snippet) => {
-      const haystack = `${snippet.title}\n${snippet.content}\n${snippet.tags.join(' ')}`.toLowerCase()
+      const haystack =
+        `${snippet.title}\n${snippet.content}\n${snippet.tags.join(' ')}`.toLowerCase()
       return haystack.includes(trimmed)
     })
   }, [query, snippets])

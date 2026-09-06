@@ -186,7 +186,9 @@ type JobMutationInput = {
   profile?: string
 }
 
-function serializeDeliveryTargets(deliver?: string | Array<string>): string | undefined {
+function serializeDeliveryTargets(
+  deliver?: string | Array<string>,
+): string | undefined {
   if (typeof deliver === 'string') {
     const normalized = deliver.trim()
     return normalized || undefined

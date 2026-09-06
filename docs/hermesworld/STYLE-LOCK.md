@@ -25,6 +25,7 @@ Exact hex values:
 - **OBSIDIAN** `#0A0D12` — deepest dark
 
 Gradients:
+
 - **Gold gradient**: `#F1C56D` -> `#B8862B`
 - **World gradient**: `#0F1622` -> `#2E6A63`
 
@@ -51,6 +52,7 @@ Avoid: oversaturated neon, pure black, flat gray, off-palette colors.
 ### Icon language (locked from community brand sheet)
 
 Line-art icons, gold (#F1C56D) stroke, consistent weight. Canonical set:
+
 - Sigil (caduceus in circle)
 - Quest (lightbulb with mark)
 - Compass

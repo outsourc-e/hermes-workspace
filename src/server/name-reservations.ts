@@ -62,17 +62,19 @@ export type NameReservationRecord = {
 }
 
 export type NameReservationStore = {
-  findByNormalizedName(normalizedName: string): Promise<NameReservationRecord | null>
-  insertReservation(input: {
+  findByNormalizedName: (
+    normalizedName: string,
+  ) => Promise<NameReservationRecord | null>
+  insertReservation: (input: {
     desiredName: string
     normalizedName: string
     email: string
     wallet: string | null
     confirmationToken: string
     createdAt: string
-  }): Promise<NameReservationRecord>
-  countReservations(): Promise<number>
-  confirmByToken(token: string): Promise<NameReservationRecord | null>
+  }) => Promise<NameReservationRecord>
+  countReservations: () => Promise<number>
+  confirmByToken: (token: string) => Promise<NameReservationRecord | null>
 }
 
 export type ConfirmationEmailPayload = {
@@ -90,14 +92,18 @@ function getReservedNames(): Set<string> {
     .split(',')
     .map((value) => normalizeReservationName(value))
     .filter(Boolean)
-  return new Set([...DEFAULT_RESERVED_NAMES, ...extra].map(normalizeReservationName))
+  return new Set(
+    [...DEFAULT_RESERVED_NAMES, ...extra].map(normalizeReservationName),
+  )
 }
 
 function containsProfanity(normalizedName: string): boolean {
   return PROFANITY_TOKENS.some((token) => normalizedName.includes(token))
 }
 
-export function validateReservationInput(input: ReservationInput): ValidatedReservationInput {
+export function validateReservationInput(
+  input: ReservationInput,
+): ValidatedReservationInput {
   const desiredName = input.desiredName.trim()
   const normalizedName = normalizeReservationName(desiredName)
   const email = input.email.trim().toLowerCase()
@@ -127,11 +133,17 @@ export function validateReservationInput(input: ReservationInput): ValidatedRese
 
 export function assertNameAllowed(normalizedName: string): void {
   if (getReservedNames().has(normalizedName)) {
-    throw new ReservationValidationError('That name is reserved for admin/system use.', 409)
+    throw new ReservationValidationError(
+      'That name is reserved for admin/system use.',
+      409,
+    )
   }
 
   if (containsProfanity(normalizedName)) {
-    throw new ReservationValidationError('That name fails the profanity filter.', 409)
+    throw new ReservationValidationError(
+      'That name fails the profanity filter.',
+      409,
+    )
   }
 }
 
@@ -148,7 +160,9 @@ export async function createReservation(
   const validated = validateReservationInput(input)
   assertNameAllowed(validated.normalizedName)
 
-  const existing = await options.store.findByNormalizedName(validated.normalizedName)
+  const existing = await options.store.findByNormalizedName(
+    validated.normalizedName,
+  )
   if (existing) {
     throw new ReservationValidationError('That name is already reserved.', 409)
   }
@@ -159,7 +173,11 @@ export async function createReservation(
       ? crypto.randomUUID()
       : `${Date.now()}_${Math.random().toString(36).slice(2)}`)
   const now = options.now?.() || new Date()
-  const baseUrl = (options.baseUrl || process.env.HERMESWORLD_RESERVE_BASE_URL || 'https://hermes-world.ai').replace(/\/$/, '')
+  const baseUrl = (
+    options.baseUrl ||
+    process.env.HERMESWORLD_RESERVE_BASE_URL ||
+    'https://hermes-world.ai'
+  ).replace(/\/$/, '')
 
   const record = await options.store.insertReservation({
     ...validated,
@@ -187,7 +205,9 @@ export async function confirmReservation(
   return store.confirmByToken(normalizedToken)
 }
 
-export async function countReservations(store: NameReservationStore): Promise<number> {
+export async function countReservations(
+  store: NameReservationStore,
+): Promise<number> {
   return store.countReservations()
 }
 
@@ -223,7 +243,10 @@ function mapSupabaseRow(row: SupabaseReservationRow): NameReservationRecord {
   }
 }
 
-async function supabaseRequest(path: string, init: RequestInit): Promise<Response> {
+async function supabaseRequest(
+  path: string,
+  init: RequestInit,
+): Promise<Response> {
   const url = requireEnv('HERMESWORLD_SUPABASE_URL').replace(/\/$/, '')
   const key = requireEnv('HERMESWORLD_SUPABASE_SERVICE_ROLE_KEY')
   return fetch(`${url}/rest/v1/${path}`, {
@@ -266,9 +289,14 @@ export function createSupabaseReservationStore(): NameReservationStore {
       if (!response.ok) {
         const text = await response.text()
         if (response.status === 409 || text.includes('duplicate key')) {
-          throw new ReservationValidationError('That name is already reserved.', 409)
+          throw new ReservationValidationError(
+            'That name is already reserved.',
+            409,
+          )
         }
-        throw new Error(`Failed to create reservation (${response.status}): ${text}`)
+        throw new Error(
+          `Failed to create reservation (${response.status}): ${text}`,
+        )
       }
       const rows = (await response.json()) as Array<SupabaseReservationRow>
       return mapSupabaseRow(rows[0])
@@ -306,9 +334,15 @@ export async function sendReservationConfirmationEmail(
   payload: ConfirmationEmailPayload,
 ): Promise<void> {
   const apiKey = (process.env.RESEND_API_KEY || '').trim()
-  const from = (process.env.RESERVE_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || '').trim()
+  const from = (
+    process.env.RESERVE_FROM_EMAIL ||
+    process.env.RESEND_FROM_EMAIL ||
+    ''
+  ).trim()
   if (!apiKey || !from) {
-    throw new Error('Email delivery is not configured (missing RESEND_API_KEY or RESERVE_FROM_EMAIL).')
+    throw new Error(
+      'Email delivery is not configured (missing RESEND_API_KEY or RESERVE_FROM_EMAIL).',
+    )
   }
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -333,6 +367,8 @@ export async function sendReservationConfirmationEmail(
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Failed to send confirmation email (${response.status}): ${text}`)
+    throw new Error(
+      `Failed to send confirmation email (${response.status}): ${text}`,
+    )
   }
 }

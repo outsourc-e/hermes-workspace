@@ -140,8 +140,8 @@ export function useTapDebug(
     }
 
     function handleTouchStart(event: TouchEvent) {
+      if (event.touches.length === 0) return
       const touch = event.touches[0]
-      if (!touch) return
       logTap({ x: touch.clientX, y: touch.clientY }, 'touchstart', event.target)
     }
 

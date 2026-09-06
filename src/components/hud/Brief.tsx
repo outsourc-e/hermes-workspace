@@ -1,29 +1,29 @@
-import { memo, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { memo, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface BriefProps {
-  text: string;
-  subtitle: string;
-  onRegen?: () => void;
-  regenLoading?: boolean;
+  text: string
+  subtitle: string
+  onRegen?: () => void
+  regenLoading?: boolean
 }
 
-const STORAGE_KEY = 'hud.brief.expanded';
+const STORAGE_KEY = 'hud.brief.expanded'
 
 function readInitialExpanded(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') return false
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === '1';
+    return window.localStorage.getItem(STORAGE_KEY) === '1'
   } catch {
-    return false;
+    return false
   }
 }
 
 function persistExpanded(value: boolean): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
+    window.localStorage.setItem(STORAGE_KEY, value ? '1' : '0')
   } catch {
     // ignore quota / disabled storage
   }
@@ -36,37 +36,40 @@ function persistExpanded(value: boolean): void {
  * else the first bold "priority" item, else the first non-heading line.
  */
 function summarise(text: string): string {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const firstAction = lines.findIndex((l) => /^\*?\*?first action/i.test(l));
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  const firstAction = lines.findIndex((l) => /^\*?\*?first action/i.test(l))
   if (firstAction >= 0 && firstAction + 1 < lines.length) {
     const next = lines[firstAction + 1]
       .replace(/^[-*]\s+/, '')
       .replace(/[*_`]/g, '')
-      .trim();
-    if (next) return next;
+      .trim()
+    if (next) return next
   }
-  const priority = lines.find((l) => /^\d+\.\s+\*\*/.test(l));
+  const priority = lines.find((l) => /^\d+\.\s+\*\*/.test(l))
   if (priority) {
     return priority
       .replace(/^\d+\.\s+/, '')
       .replace(/[*_`]/g, '')
-      .trim();
+      .trim()
   }
-  const firstReal = lines.find((l) => !/^#/.test(l) && !/^[-*]\s*$/.test(l));
-  return firstReal ? firstReal.replace(/[*_`]/g, '').trim() : 'No content yet';
+  const firstReal = lines.find((l) => !/^#/.test(l) && !/^[-*]\s*$/.test(l))
+  return firstReal ? firstReal.replace(/[*_`]/g, '').trim() : 'No content yet'
 }
 
 function BriefImpl({ text, subtitle, onRegen, regenLoading }: BriefProps) {
-  const [expanded, setExpanded] = useState(readInitialExpanded);
-  const summary = summarise(text);
+  const [expanded, setExpanded] = useState(readInitialExpanded)
+  const summary = summarise(text)
 
   const toggle = () => {
     setExpanded((prev) => {
-      const next = !prev;
-      persistExpanded(next);
-      return next;
-    });
-  };
+      const next = !prev
+      persistExpanded(next)
+      return next
+    })
+  }
 
   return (
     <div>
@@ -108,7 +111,7 @@ function BriefImpl({ text, subtitle, onRegen, regenLoading }: BriefProps) {
         </button>
       )}
     </div>
-  );
+  )
 }
 
-export const Brief = memo(BriefImpl);
+export const Brief = memo(BriefImpl)

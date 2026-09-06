@@ -601,8 +601,8 @@ function messageMultipartSignature(
             return `t:${String((part as any).text ?? '').trim()}`
           if (part.type === 'thinking')
             return `h:${String((part as any).thinking ?? '').trim()}`
-          if (part.type === 'toolCall')
-            return `tc:${String((part as any).id ?? '')}:${String((part as any).name ?? '')}`
+          if ('id' in part && 'name' in part)
+            return `tc:${String(part.id ?? '')}:${String(part.name ?? '')}`
           return `p:${String((part as any).type ?? '')}`
         })
         .join('|')
@@ -665,7 +665,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSessionWaiting: (sessionKey, runId) => {
     const meta = {
-      since: get().waitingSessionMeta[sessionKey]?.since ?? Date.now(),
+      since: get().waitingSessionMeta[sessionKey].since,
       runId: runId ?? null,
     }
     const nextKeys = new Set(get().waitingSessionKeys)
@@ -1022,7 +1022,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // ToolCallPill can render them even after streaming state is cleared.
           // Fast tool runs clear streaming state before React renders — embedding
           // __streamToolCalls ensures pills survive in the history message.
-          const streamToolCallsToEmbed = streaming?.toolCalls?.length
+          const streamToolCallsToEmbed = streaming?.toolCalls.length
             ? streaming.toolCalls
             : undefined
           completeMessage = {

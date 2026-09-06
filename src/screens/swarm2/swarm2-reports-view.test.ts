@@ -31,7 +31,14 @@ describe('Swarm2 reports view model', () => {
           ],
         },
       ],
-      runtimes: [{ workerId: 'swarm5', displayName: 'Swarm5', artifacts: [], previews: [] }],
+      runtimes: [
+        {
+          workerId: 'swarm5',
+          displayName: 'Swarm5',
+          artifacts: [],
+          previews: [],
+        },
+      ],
     })
 
     expect(rows[0]).toMatchObject({
@@ -41,7 +48,9 @@ describe('Swarm2 reports view model', () => {
       stateLabel: 'Needs review',
       summary: 'Page is implemented.',
     })
-    expect(rows[0].artifacts[0].path).toBe('src/screens/swarm2/swarm2-reports-view.tsx')
+    expect(rows[0].artifacts[0].path).toBe(
+      'src/screens/swarm2/swarm2-reports-view.tsx',
+    )
   })
 
   it('surfaces runtime artifacts when no mission checkpoint exists', () => {
@@ -93,7 +102,9 @@ describe('Swarm2 reports view model', () => {
       stateLabel: 'Needs review',
       summary: 'Reviewer inbox is ready for Eric handoff',
     })
-    expect(rows[0].details.find((detail) => detail.label === 'Result')?.value).toBe('Reviewer inbox is ready for Eric handoff')
+    expect(
+      rows[0].details.find((detail) => detail.label === 'Result')?.value,
+    ).toBe('Reviewer inbox is ready for Eric handoff')
   })
 
   it('prioritizes blocked affordances from checkpoints and runtime state', () => {

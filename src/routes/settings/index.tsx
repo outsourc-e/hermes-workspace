@@ -21,7 +21,7 @@ import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
 import type { SettingsNavId } from '@/components/settings/settings-sidebar'
-import type {LocaleId} from '@/lib/i18n';
+import type { LocaleId } from '@/lib/i18n'
 import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
 import {
   SETTINGS_NAV_ITEMS,
@@ -32,7 +32,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useSettings } from '@/hooks/use-settings'
-import { LOCALE_LABELS,  getLocale, setLocale } from '@/lib/i18n'
+import { LOCALE_LABELS, getLocale, setLocale } from '@/lib/i18n'
 import { THEMES, getTheme, isDarkTheme, setTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
@@ -163,7 +163,7 @@ const THEME_PREVIEWS: Record<
     accent: '#b98a44',
     text: '#1a1f26',
   },
-  'matrix': {
+  matrix: {
     bg: '#020804',
     panel: '#07130A',
     border: 'rgba(0,255,65,0.28)',
@@ -184,7 +184,7 @@ const THEME_PREVIEWS: Record<
     accent: '#3b82f6',
     text: '#1F2328',
   },
-  'scifi': {
+  scifi: {
     bg: '#060b18',
     panel: '#0a1628',
     border: '#1a3a5c',
@@ -357,13 +357,13 @@ function SettingsRoute() {
           {activeSection === 'agent' && (
             <ClaudeConfigSection activeView="agent" />
           )}
-          {activeSection === 'routing' && (
+          {activeSection === ('routing' as SettingsSectionId) && (
             <ClaudeConfigSection activeView="routing" />
           )}
-          {activeSection === 'voice' && (
+          {activeSection === ('voice' as SettingsSectionId) && (
             <ClaudeConfigSection activeView="voice" />
           )}
-          {activeSection === 'display' && (
+          {activeSection === ('display' as SettingsSectionId) && (
             <ClaudeConfigSection activeView="display" />
           )}
 
@@ -1022,17 +1022,22 @@ function resolveCustomBaseUrlFromConfig(
   config: Record<string, unknown>,
   activeProvider: string,
 ): string {
-  const providersConfig = config.providers as Record<string, unknown> | undefined
+  const providersConfig = config.providers as
+    | Record<string, unknown>
+    | undefined
   const customBlock = (providersConfig?.manifest || providersConfig?.custom) as
     | Record<string, unknown>
     | undefined
-  let url = typeof customBlock?.base_url === 'string' ? customBlock.base_url.trim() : ''
+  let url =
+    typeof customBlock?.base_url === 'string' ? customBlock.base_url.trim() : ''
   if (!url && Array.isArray(config.custom_providers)) {
     const aid = activeProvider.trim().toLowerCase()
     for (const e of config.custom_providers) {
       if (!e || typeof e !== 'object' || Array.isArray(e)) continue
       const rec = e as Record<string, unknown>
-      const name = String(rec.name ?? '').trim().toLowerCase()
+      const name = String(rec.name ?? '')
+        .trim()
+        .toLowerCase()
       if (name && name === aid && typeof rec.base_url === 'string') {
         url = rec.base_url.trim()
         break
@@ -1063,9 +1068,7 @@ function readFallbackInputsFromConfig(config: Record<string, unknown>): {
   }
 }
 
-function normalizeCustomProviderEntry(
-  entry: Record<string, unknown>,
-): {
+function normalizeCustomProviderEntry(entry: Record<string, unknown>): {
   name: string
   title: string
   base_url: string
@@ -1074,9 +1077,11 @@ function normalizeCustomProviderEntry(
 } {
   const name = typeof entry.name === 'string' ? entry.name.trim() : ''
   const title = typeof entry.title === 'string' ? entry.title.trim() : ''
-  const base_url = typeof entry.base_url === 'string' ? entry.base_url.trim() : ''
+  const base_url =
+    typeof entry.base_url === 'string' ? entry.base_url.trim() : ''
   const api_key = typeof entry.api_key === 'string' ? entry.api_key : undefined
-  const api_mode = typeof entry.api_mode === 'string' ? entry.api_mode : undefined
+  const api_mode =
+    typeof entry.api_mode === 'string' ? entry.api_mode : undefined
   return { name, title, base_url, api_key, api_mode }
 }
 
@@ -1103,11 +1108,15 @@ function entryCoveredByCustomProviderList(
 }
 
 function readManifestBlockBaseUrl(config: Record<string, unknown>): string {
-  const providersConfig = config.providers as Record<string, unknown> | undefined
+  const providersConfig = config.providers as
+    | Record<string, unknown>
+    | undefined
   const customBlock = (providersConfig?.manifest || providersConfig?.custom) as
     | Record<string, unknown>
     | undefined
-  return typeof customBlock?.base_url === 'string' ? customBlock.base_url.trim() : ''
+  return typeof customBlock?.base_url === 'string'
+    ? customBlock.base_url.trim()
+    : ''
 }
 
 function deriveCustomProviderNameFromBaseUrl(url: string): string {
@@ -1123,7 +1132,9 @@ function deriveCustomProviderNameFromBaseUrl(url: string): string {
 /** e.g. Qwen3.6.Eclipse from model filename + URL hostname first label */
 function suggestCustomProviderTitle(model: string, baseUrl: string): string {
   let modelPart = (model || '').trim()
-  const lastSeg = modelPart.includes('/') ? modelPart.split('/').pop() || modelPart : modelPart
+  const lastSeg = modelPart.includes('/')
+    ? modelPart.split('/').pop() || modelPart
+    : modelPart
   modelPart = (lastSeg || 'model').replace(/\.gguf$/i, '')
   const dashIdx = modelPart.indexOf('-')
   if (dashIdx > 0) modelPart = modelPart.slice(0, dashIdx)
@@ -1161,7 +1172,11 @@ function mergeModelForManifestSave(
   modelInputTrimmed: string,
 ): Record<string, unknown> {
   const existing = config.model
-  if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
+  if (
+    typeof existing === 'object' &&
+    existing !== null &&
+    !Array.isArray(existing)
+  ) {
     const o = { ...(existing as Record<string, unknown>) }
     o.provider = 'manifest'
     if (typeof o.default !== 'string' || !o.default.trim()) {
@@ -1362,7 +1377,9 @@ function ClaudeConfigSection({
     data.config,
     data.activeProvider,
   )
-  const customProviderCatalogEntry = data.providers.find((p) => p.id === 'custom')
+  const customProviderCatalogEntry = data.providers.find(
+    (p) => p.id === 'custom',
+  )
   const customApiKeyConfigured = Boolean(customProviderCatalogEntry?.configured)
   const customEndpointConfigured =
     customApiKeyConfigured || Boolean(resolvedCustomBaseUrl)
@@ -1385,7 +1402,11 @@ function ClaudeConfigSection({
 
   const extraManifestNotInList =
     manifestBlockOnlyUrl &&
-    !entryCoveredByCustomProviderList('', manifestBlockOnlyUrl, customProviders) &&
+    !entryCoveredByCustomProviderList(
+      '',
+      manifestBlockOnlyUrl,
+      customProviders,
+    ) &&
     urlNormForDedupe(manifestBlockOnlyUrl) !==
       urlNormForDedupe(primaryConfigBaseUrl || '') &&
     !(
@@ -1404,11 +1425,15 @@ function ClaudeConfigSection({
     const n = name.trim()
     const u = base_url.trim()
     if (!n || !u) {
-      setSaveMessage('Provider id and base URL are both required to save a row.')
+      setSaveMessage(
+        'Provider id and base URL are both required to save a row.',
+      )
       setTimeout(() => setSaveMessage(null), 4000)
       return
     }
-    const others = customProviders.filter((e) => String(e.name ?? '').trim() !== n)
+    const others = customProviders.filter(
+      (e) => String(e.name ?? '').trim() !== n,
+    )
     const prev = customProviders.find((e) => String(e.name ?? '').trim() === n)
     const api_mode =
       prev && typeof prev.api_mode === 'string' && prev.api_mode
@@ -1443,7 +1468,9 @@ function ClaudeConfigSection({
     const title = addCpTitle.trim()
     const url = addCpBaseUrl.trim()
     if (!title) {
-      setSaveMessage('Add a title so you can recognize this endpoint (e.g. Qwen3.6.Eclipse).')
+      setSaveMessage(
+        'Add a title so you can recognize this endpoint (e.g. Qwen3.6.Eclipse).',
+      )
       setTimeout(() => setSaveMessage(null), 4000)
       return
     }
@@ -1465,7 +1492,9 @@ function ClaudeConfigSection({
 
   function saveCurrentToCustomProvidersList() {
     if (!providerInput.trim() || !baseUrlInput.trim()) {
-      setSaveMessage('Enter both provider and base URL in Model & Provider, then try again.')
+      setSaveMessage(
+        'Enter both provider and base URL in Model & Provider, then try again.',
+      )
       setTimeout(() => setSaveMessage(null), 4000)
       return
     }
@@ -1599,8 +1628,9 @@ function ClaudeConfigSection({
                 Fallback model (optional)
               </p>
               <p className="text-xs text-primary-600">
-                Used only if the primary model fails. Keep empty to disable — avoids mixing this
-                up with your main provider (for example OpenRouter only here, local primary above).
+                Used only if the primary model fails. Keep empty to disable —
+                avoids mixing this up with your main provider (for example
+                OpenRouter only here, local primary above).
               </p>
             </div>
             <Button
@@ -1610,14 +1640,18 @@ function ClaudeConfigSection({
               className="shrink-0"
               onClick={() => setShowFallbackRow((v) => !v)}
             >
-              {showFallbackRow ? 'Hide fallback fields' : 'Show fallback fields'}
+              {showFallbackRow
+                ? 'Hide fallback fields'
+                : 'Show fallback fields'}
             </Button>
           </div>
           {showFallbackRow ? (
             <div className="mt-3 space-y-3 border-t border-primary-200 pt-3">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="space-y-1">
-                  <span className="text-xs font-medium text-primary-600">Fallback provider</span>
+                  <span className="text-xs font-medium text-primary-600">
+                    Fallback provider
+                  </span>
                   <Input
                     value={fallbackProviderInput}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -1628,7 +1662,9 @@ function ClaudeConfigSection({
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-medium text-primary-600">Fallback model id</span>
+                  <span className="text-xs font-medium text-primary-600">
+                    Fallback model id
+                  </span>
                   <Input
                     value={fallbackModelInput}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -1640,7 +1676,9 @@ function ClaudeConfigSection({
                 </label>
               </div>
               <label className="block space-y-1">
-                <span className="text-xs font-medium text-primary-600">Fallback base URL</span>
+                <span className="text-xs font-medium text-primary-600">
+                  Fallback base URL
+                </span>
                 <Input
                   value={fallbackBaseUrlInput}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -1831,18 +1869,23 @@ function ClaudeConfigSection({
       >
         <div className="space-y-4 rounded-xl border border-primary-200 bg-primary-50/80 p-4">
           <div>
-            <p className="text-sm font-medium text-primary-900">Add custom provider</p>
+            <p className="text-sm font-medium text-primary-900">
+              Add custom provider
+            </p>
             <p className="mt-1 text-xs text-primary-600">
-              <span className="font-medium">Title</span> is for your list only (e.g.{' '}
-              <span className="font-mono">Qwen3.6.Eclipse</span> = model + host).{' '}
-              <span className="font-medium">Provider id</span> is the config name Hermes uses — leave
-              blank to derive a safe id from the title. Optional row API key is stored on this
-              provider entry, not in .env.
+              <span className="font-medium">Title</span> is for your list only
+              (e.g. <span className="font-mono">Qwen3.6.Eclipse</span> = model +
+              host). <span className="font-medium">Provider id</span> is the
+              config name Hermes uses — leave blank to derive a safe id from the
+              title. Optional row API key is stored on this provider entry, not
+              in .env.
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 md:col-span-2">
-              <span className="text-xs font-medium text-primary-600">Title</span>
+              <span className="text-xs font-medium text-primary-600">
+                Title
+              </span>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   value={addCpTitle}
@@ -1871,7 +1914,9 @@ function ClaudeConfigSection({
               </div>
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-medium text-primary-600">Provider id (optional)</span>
+              <span className="text-xs font-medium text-primary-600">
+                Provider id (optional)
+              </span>
               <Input
                 value={addCpProviderId}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -1882,7 +1927,9 @@ function ClaudeConfigSection({
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-medium text-primary-600">Base URL</span>
+              <span className="text-xs font-medium text-primary-600">
+                Base URL
+              </span>
               <Input
                 value={addCpBaseUrl}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -1903,7 +1950,10 @@ function ClaudeConfigSection({
                   setAddCpTitle((t) =>
                     t.trim()
                       ? t
-                      : suggestCustomProviderTitle(modelInput, baseUrlInput.trim()),
+                      : suggestCustomProviderTitle(
+                          modelInput,
+                          baseUrlInput.trim(),
+                        ),
                   )
                 }}
               >
@@ -1938,7 +1988,9 @@ function ClaudeConfigSection({
         <div className="overflow-x-auto rounded-xl border border-primary-200 bg-white/90">
           <div className="flex flex-col gap-2 border-b border-primary-200 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-primary-700">
-              <span className="font-medium text-primary-900">Saved &amp; detected endpoints</span>
+              <span className="font-medium text-primary-900">
+                Saved &amp; detected endpoints
+              </span>
               <span className="text-primary-600">
                 {' '}
                 (
@@ -1977,10 +2029,12 @@ function ClaudeConfigSection({
                     colSpan={5}
                     className="px-3 py-4 text-xs leading-relaxed text-primary-600"
                   >
-                    No rows in <span className="font-mono">custom_providers</span> yet, and no
-                    primary base URL or manifest URL was detected. Use{' '}
-                    <span className="font-medium">Add custom provider</span>, or set Model &amp;
-                    Provider and click &quot;Save current model setup to list&quot;.
+                    No rows in{' '}
+                    <span className="font-mono">custom_providers</span> yet, and
+                    no primary base URL or manifest URL was detected. Use{' '}
+                    <span className="font-medium">Add custom provider</span>, or
+                    set Model &amp; Provider and click &quot;Save current model
+                    setup to list&quot;.
                   </td>
                 </tr>
               ) : null}
@@ -1992,7 +2046,9 @@ function ClaudeConfigSection({
                     key={`saved-${key}-${index}`}
                     className="border-b border-primary-100 odd:bg-primary-50/40"
                   >
-                    <td className="px-3 py-2 align-top text-xs text-primary-600">Saved</td>
+                    <td className="px-3 py-2 align-top text-xs text-primary-600">
+                      Saved
+                    </td>
                     <td className="max-w-[160px] px-3 py-2 align-top text-xs font-medium text-primary-900 break-words">
                       {entry.title || '—'}
                     </td>
@@ -2022,7 +2078,11 @@ function ClaudeConfigSection({
                           onClick={() => removeCustomProviderAt(index)}
                           aria-label={`Remove ${entry.name || 'custom provider'}`}
                         >
-                          <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.5} />
+                          <HugeiconsIcon
+                            icon={Delete02Icon}
+                            size={16}
+                            strokeWidth={1.5}
+                          />
                         </Button>
                       </div>
                     </td>
@@ -2031,9 +2091,14 @@ function ClaudeConfigSection({
               })}
               {extraPrimaryNotInList ? (
                 <tr className="border-b border-primary-100 bg-amber-50/50">
-                  <td className="px-3 py-2 align-top text-xs text-amber-900">Active (not in list)</td>
+                  <td className="px-3 py-2 align-top text-xs text-amber-900">
+                    Active (not in list)
+                  </td>
                   <td className="max-w-[160px] px-3 py-2 align-top text-xs text-primary-800 break-words">
-                    {suggestCustomProviderTitle(modelInput, extraPrimaryNotInList.base_url)}
+                    {suggestCustomProviderTitle(
+                      modelInput,
+                      extraPrimaryNotInList.base_url,
+                    )}
                   </td>
                   <td className="px-3 py-2 align-top font-mono text-xs font-medium text-primary-900">
                     {extraPrimaryNotInList.name}
@@ -2051,7 +2116,9 @@ function ClaudeConfigSection({
                         onClick={() => {
                           setProviderInput(extraPrimaryNotInList.name)
                           setBaseUrlInput(extraPrimaryNotInList.base_url)
-                          void fetchModelsForProvider(extraPrimaryNotInList.name)
+                          void fetchModelsForProvider(
+                            extraPrimaryNotInList.name,
+                          )
                         }}
                       >
                         Apply
@@ -2082,11 +2149,14 @@ function ClaudeConfigSection({
               ) : null}
               {extraManifestNotInList ? (
                 <tr className="border-b border-primary-100 bg-sky-50/50">
-                  <td className="px-3 py-2 align-top text-xs text-sky-900">Manifest block</td>
+                  <td className="px-3 py-2 align-top text-xs text-sky-900">
+                    Manifest block
+                  </td>
                   <td className="max-w-[160px] px-3 py-2 align-top text-xs text-primary-800 break-words">
                     {(() => {
                       try {
-                        const h = new URL(extraManifestNotInList.base_url).hostname
+                        const h = new URL(extraManifestNotInList.base_url)
+                          .hostname
                         const short = h.split('.')[0] || h
                         return `Manifest.${short.charAt(0).toUpperCase()}${short.slice(1).toLowerCase()}`
                       } catch {
@@ -2108,17 +2178,21 @@ function ClaudeConfigSection({
                       disabled={saving}
                       onClick={() => {
                         const u = extraManifestNotInList.base_url
-                        persistCustomProviderRow(deriveCustomProviderNameFromBaseUrl(u), u, {
-                          title: (() => {
-                            try {
-                              const h = new URL(u).hostname
-                              const short = h.split('.')[0] || h
-                              return `Manifest.${short.charAt(0).toUpperCase()}${short.slice(1).toLowerCase()}`
-                            } catch {
-                              return 'Manifest'
-                            }
-                          })(),
-                        })
+                        persistCustomProviderRow(
+                          deriveCustomProviderNameFromBaseUrl(u),
+                          u,
+                          {
+                            title: (() => {
+                              try {
+                                const h = new URL(u).hostname
+                                const short = h.split('.')[0] || h
+                                return `Manifest.${short.charAt(0).toUpperCase()}${short.slice(1).toLowerCase()}`
+                              } catch {
+                                return 'Manifest'
+                              }
+                            })(),
+                          },
+                        )
                       }}
                     >
                       Add to list
@@ -2142,7 +2216,8 @@ function ClaudeConfigSection({
         >
           <div className="flex w-full max-w-sm flex-col gap-1">
             <p className="text-[11px] text-primary-500">
-              Leave blank if unused. Add only when your manifest integration requires this key.
+              Leave blank if unused. Add only when your manifest integration
+              requires this key.
             </p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
@@ -2162,7 +2237,9 @@ function ClaudeConfigSection({
                       onClick={() => {
                         void saveConfig({
                           env: {
-                            CUSTOM_API_KEY: customApiKey.trim() ? customApiKey.trim() : null,
+                            CUSTOM_API_KEY: customApiKey.trim()
+                              ? customApiKey.trim()
+                              : null,
                           },
                         })
                         setEditingCustomKey(false)
@@ -2185,7 +2262,9 @@ function ClaudeConfigSection({
                       style={{ color: 'var(--theme-muted)' }}
                     >
                       {customApiKeyConfigured
-                        ? customProviderCatalogEntry.maskedKeys['CUSTOM_API_KEY'] || 'Set'
+                        ? customProviderCatalogEntry?.maskedKeys[
+                            'CUSTOM_API_KEY'
+                          ] || 'Set'
                         : 'Not set'}
                     </span>
                     <Button
@@ -2214,8 +2293,8 @@ function ClaudeConfigSection({
         >
           <div className="flex w-full max-w-sm flex-col gap-1">
             <p className="text-[11px] text-primary-500">
-              This updates <span className="font-mono">providers.manifest</span> only. Primary model
-              base URL stays under Model &amp; Provider.
+              This updates <span className="font-mono">providers.manifest</span>{' '}
+              only. Primary model base URL stays under Model &amp; Provider.
             </p>
             <div className="flex items-center gap-2">
               <div className="flex-1">
@@ -2234,13 +2313,18 @@ function ClaudeConfigSection({
                       onClick={() => {
                         const u = customBaseUrl.trim()
                         if (!u) {
-                          setSaveMessage('Enter a manifest base URL, or cancel.')
+                          setSaveMessage(
+                            'Enter a manifest base URL, or cancel.',
+                          )
                           setTimeout(() => setSaveMessage(null), 3000)
                           return
                         }
                         void saveConfig({
                           config: {
-                            model: mergeModelForManifestSave(data.config, modelInput.trim()),
+                            model: mergeModelForManifestSave(
+                              data.config,
+                              modelInput.trim(),
+                            ),
                             providers: {
                               manifest: {
                                 type: 'openai',
@@ -2634,7 +2718,9 @@ function ClaudeConfigSection({
                 value={(sttGroq.model as string) || GROQ_STT_MODELS[0]}
                 onChange={(e) =>
                   void saveConfig({
-                    config: { stt: { groq: { ...sttGroq, model: e.target.value } } },
+                    config: {
+                      stt: { groq: { ...sttGroq, model: e.target.value } },
+                    },
                   })
                 }
                 className={selectClassName}

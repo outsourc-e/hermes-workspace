@@ -264,7 +264,8 @@ export function AgentCard({
             </div>
           ) : (
             <div className="text-emerald-100/40">
-              No runtime tail yet. Use Router for orchestration or Terminal for live tmux.
+              No runtime tail yet. Use Router for orchestration or Terminal for
+              live tmux.
             </div>
           )}
         </div>

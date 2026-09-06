@@ -6,21 +6,22 @@
     "prettier.config.js",
     "vite.config.ts"
   ],
-
+  "exclude": [
+    "node_modules",
+    "dist",
+    "playground-ws-worker",
+    "electron/server-bundle.cjs"
+  ],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
-
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
     "noEmit": true,
-
-    /* Linting */
     "skipLibCheck": true,
     "strict": true,
     "noUnusedLocals": false,
@@ -28,7 +29,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "three": [
+        "./node_modules/.pnpm/@types+three@0.184.0/node_modules/@types/three"
+      ]
     }
   }
 }

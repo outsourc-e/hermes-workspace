@@ -131,8 +131,7 @@ function ToolRow({
   const dot = statusDot(section.state, isStreamingActive)
   const color = statusColor(section.state, isStreamingActive)
 
-  const hasInputData =
-    section.input && Object.keys(section.input).length > 0
+  const hasInputData = section.input && Object.keys(section.input).length > 0
   const hasOutputData = !!(section.outputText || section.errorText)
   const canExpand = hasInputData || hasOutputData
 
@@ -143,7 +142,8 @@ function ToolRow({
         onClick={() => canExpand && setOpen((v) => !v)}
         className={cn(
           'group flex w-full items-baseline gap-2 px-3 py-1.5 text-left rounded-sm',
-          canExpand && 'hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]',
+          canExpand &&
+            'hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]',
           !canExpand && 'cursor-default',
         )}
       >
@@ -191,7 +191,11 @@ function ToolRow({
       {/* Output preview line — TUI-style ⎿ */}
       <div
         className="flex items-baseline gap-1.5 px-3 pl-7 pb-0.5 opacity-70"
-        style={{ color: isError ? 'var(--theme-danger, #ef4444)' : 'var(--theme-muted)' }}
+        style={{
+          color: isError
+            ? 'var(--theme-danger, #ef4444)'
+            : 'var(--theme-muted)',
+        }}
       >
         <span className="shrink-0 leading-none opacity-50">⎿</span>
         <span className="truncate min-w-0">{outputSummary}</span>
@@ -200,7 +204,8 @@ function ToolRow({
         <div
           className="mx-3 mt-2 mb-1 rounded border px-3 py-2 text-[11px]"
           style={{
-            background: 'var(--code-bg, color-mix(in srgb, var(--theme-card) 70%, transparent))',
+            background:
+              'var(--code-bg, color-mix(in srgb, var(--theme-card) 70%, transparent))',
             borderColor: 'var(--theme-border)',
           }}
         >
@@ -309,7 +314,8 @@ function ThinkingRow({
         <div
           className="mx-3 mt-2 mb-1 rounded border px-3 py-2 text-[11px]"
           style={{
-            background: 'var(--code-bg, color-mix(in srgb, var(--theme-card) 70%, transparent))',
+            background:
+              'var(--code-bg, color-mix(in srgb, var(--theme-card) 70%, transparent))',
             borderColor: 'var(--theme-border)',
           }}
         >
@@ -351,12 +357,11 @@ function TuiActivityCardComponent({
     return `${total} ${total === 1 ? 'tool' : 'tools'} · done`
   }, [toolSections, hasTools])
 
-  const summaryColor =
-    summary?.includes('failed')
-      ? 'var(--theme-danger, #ef4444)'
-      : summary?.includes('running')
-        ? 'var(--theme-accent, #6366f1)'
-        : 'var(--theme-success, #22c55e)'
+  const summaryColor = summary?.includes('failed')
+    ? 'var(--theme-danger, #ef4444)'
+    : summary?.includes('running')
+      ? 'var(--theme-accent, #6366f1)'
+      : 'var(--theme-success, #22c55e)'
 
   // During streaming with nothing to show yet, render a minimal "working" stub
   // so we don't pretend the agent is thinking when no thinking text was emitted.
@@ -370,8 +375,7 @@ function TuiActivityCardComponent({
       style={{
         background:
           'color-mix(in srgb, var(--theme-card2) 92%, var(--theme-bg) 8%)',
-        borderColor:
-          'color-mix(in srgb, var(--theme-border) 88%, transparent)',
+        borderColor: 'color-mix(in srgb, var(--theme-border) 88%, transparent)',
       }}
     >
       <div
@@ -379,8 +383,7 @@ function TuiActivityCardComponent({
         style={{
           borderColor:
             'color-mix(in srgb, var(--theme-border) 70%, transparent)',
-          background:
-            'color-mix(in srgb, var(--theme-card) 50%, transparent)',
+          background: 'color-mix(in srgb, var(--theme-card) 50%, transparent)',
         }}
       >
         <span
@@ -408,7 +411,7 @@ function TuiActivityCardComponent({
       <div className="flex flex-col gap-1.5 px-2 py-3">
         {hasThinking ? (
           <ThinkingRow
-            thinking={thinking!}
+            thinking={thinking}
             elapsedSeconds={thinkingElapsedSeconds}
             isStreaming={isStreaming}
             expandAll={expandAll}

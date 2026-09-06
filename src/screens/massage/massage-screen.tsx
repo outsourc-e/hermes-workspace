@@ -91,11 +91,10 @@ export function MassageScreen() {
   }
 
   function handleDraftClinicCode() {
-    toast({
-      title: 'Clinic-code drafting not wired up yet',
-      description:
-        'This will hand notes to Hermes/Claude for transcription and clinic-code drafting once the backend integration lands.',
-    })
+    toast(
+      'Clinic-code drafting not wired up yet — this will hand notes to Hermes/Claude for transcription and clinic-code drafting once the backend integration lands.',
+      { type: 'info' },
+    )
   }
 
   return (
@@ -106,8 +105,8 @@ export function MassageScreen() {
             Massage — Week
           </h1>
           <p className="text-xs text-[var(--theme-muted)]">
-            Patient schedule for Hilton and TADC. Notes are kept locally in
-            your browser.
+            Patient schedule for Hilton and TADC. Notes are kept locally in your
+            browser.
           </p>
         </div>
       </div>
@@ -137,11 +136,7 @@ export function MassageScreen() {
             onClick={handleDraftClinicCode}
             className="gap-2"
           >
-            <HugeiconsIcon
-              icon={SparklesIcon}
-              size={14}
-              strokeWidth={1.5}
-            />
+            <HugeiconsIcon icon={SparklesIcon} size={14} strokeWidth={1.5} />
             Draft clinic code with Hermes
           </Button>
         </div>
@@ -152,8 +147,8 @@ export function MassageScreen() {
           className="block min-h-[240px] w-full resize-y bg-transparent p-3 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none"
         />
         <div className="border-t border-[var(--theme-border)] px-3 py-2 text-[11px] text-[var(--theme-muted)]">
-          Transcription / dictation and structured clinic-code drafting will
-          run through Hermes once the backend route is implemented.
+          Transcription / dictation and structured clinic-code drafting will run
+          through Hermes once the backend route is implemented.
         </div>
       </div>
     </div>

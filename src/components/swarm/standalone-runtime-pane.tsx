@@ -82,14 +82,20 @@ export function StandaloneRuntimePane({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <TuiPill tone="live">Live TUI</TuiPill>
-                <TuiPill>{terminalTargets.length} terminal{terminalTargets.length === 1 ? '' : 's'}</TuiPill>
-                {roomIds.length > 0 ? <TuiPill tone="warn">room {roomIds.join(', ')}</TuiPill> : null}
+                <TuiPill>
+                  {terminalTargets.length} terminal
+                  {terminalTargets.length === 1 ? '' : 's'}
+                </TuiPill>
+                {roomIds.length > 0 ? (
+                  <TuiPill tone="warn">room {roomIds.join(', ')}</TuiPill>
+                ) : null}
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">
                 Swarm tmux control
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-emerald-50/55">
-                Native Swarm2 TUI cards attached directly to the worker tmux sessions. Click a terminal to focus and type.
+                Native Swarm2 TUI cards attached directly to the worker tmux
+                sessions. Click a terminal to focus and type.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -102,13 +108,16 @@ export function StandaloneRuntimePane({
 
         {terminalTargets.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-emerald-400/16 bg-emerald-500/5 px-4 py-12 text-center text-sm text-emerald-100/55">
-            Select a worker or add workers to the room to open tmux terminals here.
+            Select a worker or add workers to the room to open tmux terminals
+            here.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
             {terminalTargets.map((member) => {
               const runtime = runtimeByWorker.get(member.id)
-              const attached = Boolean(runtime?.tmuxAttachable && runtime.tmuxSession)
+              const attached = Boolean(
+                runtime?.tmuxAttachable && runtime.tmuxSession,
+              )
               const sessionLabel = attached
                 ? `tmux:${runtime?.tmuxSession}`
                 : 'shell:fallback'
@@ -139,13 +148,19 @@ export function StandaloneRuntimePane({
                           </span>
                         </div>
                         <div className="mt-2 flex flex-wrap items-baseline gap-2">
-                          <h3 className="text-lg font-semibold text-white">{member.id}</h3>
+                          <h3 className="text-lg font-semibold text-white">
+                            {member.id}
+                          </h3>
                           <span className="text-xs text-emerald-100/45">
-                            {member.displayName || member.role || 'Swarm worker'}
+                            {member.displayName ||
+                              member.role ||
+                              'Swarm worker'}
                           </span>
                         </div>
                         <p className="mt-1 line-clamp-2 text-sm text-emerald-50/62">
-                          {runtime?.currentTask ?? member.lastSessionTitle ?? 'Idle live worker session'}
+                          {runtime?.currentTask ??
+                            member.lastSessionTitle ??
+                            'Idle live worker session'}
                         </p>
                       </div>
                       <button
@@ -164,9 +179,15 @@ export function StandaloneRuntimePane({
                   </div>
 
                   <div className="grid gap-2 border-b border-white/8 bg-black/20 px-4 py-2 text-[11px] text-emerald-100/55 sm:grid-cols-3">
-                    <div className="truncate">PID {runtime?.pid != null ? runtime.pid : '—'}</div>
-                    <div className="truncate">started {relative(runtime?.startedAt)}</div>
-                    <div className="truncate font-mono">{runtime?.cwd ?? 'no cwd'}</div>
+                    <div className="truncate">
+                      PID {runtime?.pid != null ? runtime.pid : '—'}
+                    </div>
+                    <div className="truncate">
+                      started {relative(runtime?.startedAt)}
+                    </div>
+                    <div className="truncate font-mono">
+                      {runtime?.cwd ?? 'no cwd'}
+                    </div>
                   </div>
 
                   <div className="bg-[#050806] p-3">

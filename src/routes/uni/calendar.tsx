@@ -51,8 +51,8 @@ function UniCalendarRoute() {
             <span>No calendar configured.</span>
             <span className="text-xs">
               Set <code>VITE_UNI_CALENDAR_URL</code> in <code>.env</code> to a
-              Google Calendar embed URL (Settings → Integrate calendar →
-              Public URL).
+              Google Calendar embed URL (Settings → Integrate calendar → Public
+              URL).
             </span>
           </div>
         )}

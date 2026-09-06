@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildDashboardOverview,
-  type DashboardFetcher,
-} from './dashboard-aggregator'
+import { buildDashboardOverview } from './dashboard-aggregator'
+import type { DashboardFetcher } from './dashboard-aggregator'
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -131,9 +129,7 @@ describe('buildDashboardOverview', () => {
       name: 'Daily roll-up',
       lastError: 'connection refused',
     })
-    const cronIncident = overview.incidents.find(
-      (i) => i.id === 'cron-fail-a',
-    )
+    const cronIncident = overview.incidents.find((i) => i.id === 'cron-fail-a')
     expect(cronIncident?.severity).toBe('error')
     expect(cronIncident?.detail).toBe('connection refused')
   })

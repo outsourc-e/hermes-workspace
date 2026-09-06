@@ -154,7 +154,9 @@ export function CostLedgerCard({
                   </span>
                 </span>
               ) : (
-                <span title={`${row.sessions} sessions \u00b7 ${row.tokens.toLocaleString()} tokens`}>
+                <span
+                  title={`${row.sessions} sessions \u00b7 ${row.tokens.toLocaleString()} tokens`}
+                >
                   {formatCostUsd(row.cost)}
                 </span>
               )}

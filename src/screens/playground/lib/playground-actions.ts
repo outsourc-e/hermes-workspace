@@ -33,9 +33,15 @@ export type PlaygroundActionResult = {
   actor: PlaygroundActorRef
   message: string
   statePatch?: unknown
-  emittedEvents?: PlaygroundWorldEvent[]
-  suggestedNextActions?: PlaygroundAction[]
-  errorCode?: 'invalid_action' | 'locked' | 'out_of_range' | 'missing_item' | 'cooldown' | 'not_found'
+  emittedEvents?: Array<PlaygroundWorldEvent>
+  suggestedNextActions?: Array<PlaygroundAction>
+  errorCode?:
+    | 'invalid_action'
+    | 'locked'
+    | 'out_of_range'
+    | 'missing_item'
+    | 'cooldown'
+    | 'not_found'
 }
 
 export type PlaygroundWorldEvent = {
@@ -68,22 +74,26 @@ export type PlaygroundAgentWorldState = {
   sp?: number
   activeQuestId?: string
   activeObjectiveId?: string
-  unlockedWorlds: PlaygroundWorldId[]
-  inventory: PlaygroundItemId[]
-  equipped: Partial<Record<'weapon' | 'cloak' | 'head' | 'artifact', PlaygroundItemId>>
+  unlockedWorlds: Array<PlaygroundWorldId>
+  inventory: Array<PlaygroundItemId>
+  equipped: Partial<
+    Record<'weapon' | 'cloak' | 'head' | 'artifact', PlaygroundItemId>
+  >
   nearby: Array<{
     id: string
     kind: 'npc' | 'player' | 'item' | 'portal' | 'objective' | 'enemy'
     label: string
     distance: number
-    verbs: PlaygroundAction['kind'][]
+    verbs: Array<PlaygroundAction['kind']>
   }>
 }
 
 export function describeAction(action: PlaygroundAction): string {
   switch (action.kind) {
     case 'move_to':
-      return action.targetId ? `Move to ${action.targetId}` : `Move to ${action.x ?? 0}, ${action.z ?? 0}`
+      return action.targetId
+        ? `Move to ${action.targetId}`
+        : `Move to ${action.x ?? 0}, ${action.z ?? 0}`
     case 'talk_to':
       return `Talk to ${action.npcId}`
     case 'accept_quest':
@@ -97,7 +107,9 @@ export function describeAction(action: PlaygroundAction): string {
     case 'attack':
       return `Attack ${action.targetId}`
     case 'loot':
-      return action.itemId ? `Loot ${action.itemId}` : `Loot ${action.targetId ?? 'target'}`
+      return action.itemId
+        ? `Loot ${action.itemId}`
+        : `Loot ${action.targetId ?? 'target'}`
     case 'rest':
       return 'Rest'
   }

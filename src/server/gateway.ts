@@ -1,9 +1,17 @@
-import { randomUUID, generateKeyPairSync, createPrivateKey, createPublicKey, createHash, sign as cryptoSign } from 'node:crypto'
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  sign as cryptoSign,
+  generateKeyPairSync,
+  randomUUID,
+} from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import WebSocket from 'ws'
 import type { RawData } from 'ws'
+import type { ConnectionErrorKind } from '../lib/connection-errors'
 
 export type GatewayFrame =
   | { type: 'req'; id: string; method: string; params?: unknown }
@@ -37,7 +45,13 @@ type ConnectParams = {
   auth?: { token?: string; password?: string }
   role?: 'operator' | 'node'
   scopes?: Array<string>
-  device?: { id: string; publicKey: string; signature: string; signedAt: number; nonce?: string }
+  device?: {
+    id: string
+    publicKey: string
+    signature: string
+    signedAt: number
+    nonce?: string
+  }
 }
 
 type PendingRequest = {
@@ -57,46 +71,88 @@ type InflightRequest = {
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
 
 function base64UrlEncode(buf: Buffer): string {
-  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+  return buf
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
 }
 
 function derivePublicKeyRaw(pem: string): Buffer {
   const spki = createPublicKey(pem).export({ type: 'spki', format: 'der' })
-  if (spki.length === ED25519_SPKI_PREFIX.length + 32 &&
-      spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX))
+  if (
+    spki.length === ED25519_SPKI_PREFIX.length + 32 &&
+    spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX)
+  )
     return spki.subarray(ED25519_SPKI_PREFIX.length)
   return spki
 }
 
-type DeviceIdentity = { deviceId: string; publicKeyPem: string; privateKeyPem: string }
+type DeviceIdentity = {
+  deviceId: string
+  publicKeyPem: string
+  privateKeyPem: string
+}
 
 let _identity: DeviceIdentity | null = null
 function getDeviceIdentity(): DeviceIdentity {
   if (_identity) return _identity
   const idPath = path.join(
-    process.env.HERMES_HOME || process.env.CLAUDE_HOME || path.join(os.homedir(), '.hermes'),
-    'identity', 'claude-device.json')
+    process.env.HERMES_HOME ||
+      process.env.CLAUDE_HOME ||
+      path.join(os.homedir(), '.hermes'),
+    'identity',
+    'claude-device.json',
+  )
   try {
     if (fs.existsSync(idPath)) {
       const p = JSON.parse(fs.readFileSync(idPath, 'utf8'))
       if (p?.version === 1 && p.deviceId && p.publicKeyPem && p.privateKeyPem) {
-        _identity = { deviceId: p.deviceId, publicKeyPem: p.publicKeyPem, privateKeyPem: p.privateKeyPem }
+        _identity = {
+          deviceId: p.deviceId,
+          publicKeyPem: p.publicKeyPem,
+          privateKeyPem: p.privateKeyPem,
+        }
         return _identity
       }
     }
-  } catch { /* regenerate */ }
+  } catch {
+    /* regenerate */
+  }
   const { publicKey, privateKey } = generateKeyPairSync('ed25519')
   const pubPem = publicKey.export({ type: 'spki', format: 'pem' }).toString()
   const privPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()
-  const deviceId = createHash('sha256').update(derivePublicKeyRaw(pubPem)).digest('hex')
+  const deviceId = createHash('sha256')
+    .update(derivePublicKeyRaw(pubPem))
+    .digest('hex')
   fs.mkdirSync(path.dirname(idPath), { recursive: true })
-  fs.writeFileSync(idPath, JSON.stringify({ version: 1, deviceId, publicKeyPem: pubPem, privateKeyPem: privPem, createdAtMs: Date.now() }, null, 2) + '\n', { mode: 0o600 })
+  fs.writeFileSync(
+    idPath,
+    JSON.stringify(
+      {
+        version: 1,
+        deviceId,
+        publicKeyPem: pubPem,
+        privateKeyPem: privPem,
+        createdAtMs: Date.now(),
+      },
+      null,
+      2,
+    ) + '\n',
+    { mode: 0o600 },
+  )
   _identity = { deviceId, publicKeyPem: pubPem, privateKeyPem: privPem }
   return _identity
 }
 
 function signPayload(privPem: string, payload: string): string {
-  return base64UrlEncode(cryptoSign(null, Buffer.from(payload, 'utf8'), createPrivateKey(privPem)) as unknown as Buffer)
+  return base64UrlEncode(
+    cryptoSign(
+      null,
+      Buffer.from(payload, 'utf8'),
+      createPrivateKey(privPem),
+    ) as unknown as Buffer,
+  )
 }
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -108,14 +164,18 @@ const HANDSHAKE_TIMEOUT_MS = 15000
 const RPC_TIMEOUT_MS = 30000
 
 // ── Circuit breaker ───────────────────────────────────────────────
-const CIRCUIT_BREAKER_THRESHOLD = 15   // consecutive failures to trip (raised: one slow RPC shouldn't kill all)
+const CIRCUIT_BREAKER_THRESHOLD = 15 // consecutive failures to trip (raised: one slow RPC shouldn't kill all)
 const CIRCUIT_BREAKER_COOLDOWN_MS = 10000 // how long to stay open
 
 export function getGatewayConfig() {
   // Check if browser set a custom gateway URL (for network/mobile access)
-  const browserUrl = typeof window !== 'undefined' ? (window as any).__GATEWAY_URL__ : undefined
-  const url = browserUrl || process.env.CLAUDE_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
-  let token = process.env.CLAUDE_GATEWAY_TOKEN?.trim() || ''
+  const browserUrl =
+    typeof window !== 'undefined' ? (window as any).__GATEWAY_URL__ : undefined
+  const url =
+    browserUrl ||
+    process.env.CLAUDE_GATEWAY_URL?.trim() ||
+    'ws://127.0.0.1:18789'
+  const token = process.env.CLAUDE_GATEWAY_TOKEN?.trim() || ''
   const password = process.env.CLAUDE_GATEWAY_PASSWORD?.trim() || ''
 
   // Allow connecting without shared auth — device identity signature handles authentication.
@@ -136,7 +196,16 @@ export function buildConnectParams(
   const clientId = 'hermes-workspace-ui'
   const clientMode = 'ui'
   const version = nonce ? 'v2' : 'v1'
-  const parts = [version, identity.deviceId, clientId, clientMode, role, scopes.join(','), String(signedAtMs), token || '']
+  const parts = [
+    version,
+    identity.deviceId,
+    clientId,
+    clientMode,
+    role,
+    scopes.join(','),
+    String(signedAtMs),
+    token || '',
+  ]
   if (version === 'v2') parts.push(nonce || '')
   const signature = signPayload(identity.privateKeyPem, parts.join('|'))
 
@@ -178,14 +247,16 @@ class GatewayClient {
   private reconnectAttempts = 0
   private authenticated = false
   private destroyed = false
-  private _lastErrorKind: import('../lib/connection-errors').ConnectionErrorKind | null = null
+  private _lastErrorKind: ConnectionErrorKind | null = null
 
   // Circuit breaker: prevent request floods when gateway is unreachable
   private circuitFailures = 0
   private circuitOpen = false
   private circuitOpenedAt = 0
 
-  get lastErrorKind() { return this._lastErrorKind }
+  get lastErrorKind() {
+    return this._lastErrorKind
+  }
 
   private requestQueue: Array<PendingRequest> = []
   private inflight = new Map<string, InflightRequest>()
@@ -198,7 +269,11 @@ class GatewayClient {
     }
   }
 
-  getConnectionSnapshot(): { readyState: number; authenticated: boolean; errorKind: import('../lib/connection-errors').ConnectionErrorKind | null } {
+  getConnectionSnapshot(): {
+    readyState: number
+    authenticated: boolean
+    errorKind: ConnectionErrorKind | null
+  } {
     return {
       readyState: this.ws?.readyState ?? WebSocket.CLOSED,
       authenticated: this.authenticated,
@@ -217,7 +292,9 @@ class GatewayClient {
     // Circuit breaker: fast-fail when gateway is known-unreachable
     if (this.circuitOpen) {
       if (Date.now() - this.circuitOpenedAt < CIRCUIT_BREAKER_COOLDOWN_MS) {
-        throw new Error(`Gateway circuit breaker open (${this.circuitFailures} consecutive failures, cooling down)`)
+        throw new Error(
+          `Gateway circuit breaker open (${this.circuitFailures} consecutive failures, cooling down)`,
+        )
       }
       // Cooldown elapsed — allow one probe request through (half-open)
       this.circuitOpen = false
@@ -258,16 +335,25 @@ class GatewayClient {
         settled = true
         this.cleanupPendingRequest(requestId)
         // Don't count known-slow RPCs toward circuit breaker
-        const slowRpcs = ['sessions.usage', 'sessions.costs', 'usage.analytics', 'usage.summary']
+        const slowRpcs = [
+          'sessions.usage',
+          'sessions.costs',
+          'usage.analytics',
+          'usage.summary',
+        ]
         if (!slowRpcs.includes(method)) {
           this.circuitFailures += 1
         }
         if (this.circuitFailures >= CIRCUIT_BREAKER_THRESHOLD) {
           this.circuitOpen = true
           this.circuitOpenedAt = Date.now()
-          console.warn(`[gateway] Circuit breaker OPEN after ${this.circuitFailures} consecutive timeouts (last: ${method})`)
+          console.warn(
+            `[gateway] Circuit breaker OPEN after ${this.circuitFailures} consecutive timeouts (last: ${method})`,
+          )
         } else {
-          console.warn(`[gateway] RPC timeout after ${RPC_TIMEOUT_MS}ms for ${method} (${this.circuitFailures}/${CIRCUIT_BREAKER_THRESHOLD})`)
+          console.warn(
+            `[gateway] RPC timeout after ${RPC_TIMEOUT_MS}ms for ${method} (${this.circuitFailures}/${CIRCUIT_BREAKER_THRESHOLD})`,
+          )
         }
         reject(new Error('Gateway RPC timeout'))
       }, RPC_TIMEOUT_MS)
@@ -339,9 +425,14 @@ class GatewayClient {
           try {
             const parsed = new URL(url.replace(/^ws/, 'http'))
             return `${parsed.protocol}//${parsed.host}`
-          } catch { return 'http://127.0.0.1:18789' }
+          } catch {
+            return 'http://127.0.0.1:18789'
+          }
         })()
-        const ws = new WebSocket(url, { origin: gatewayOrigin, headers: { Origin: gatewayOrigin } })
+        const ws = new WebSocket(url, {
+          origin: gatewayOrigin,
+          headers: { Origin: gatewayOrigin },
+        })
 
         this.clearReconnectTimer()
         this.attachSocket(ws)
@@ -366,7 +457,10 @@ class GatewayClient {
           const originalHandler = (data: RawData) => {
             try {
               const f = JSON.parse(rawDataToString(data))
-              if ((f.type === 'event' || f.type === 'evt') && f.event === 'connect.challenge') {
+              if (
+                (f.type === 'event' || f.type === 'evt') &&
+                f.event === 'connect.challenge'
+              ) {
                 challengeNonce = f.payload?.nonce || undefined
                 if (!challengeResolved) {
                   challengeResolved = true
@@ -374,7 +468,9 @@ class GatewayClient {
                 }
                 return
               }
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
             // Forward non-challenge messages to normal handler
             this.handleMessage(data)
           }
@@ -391,7 +487,9 @@ class GatewayClient {
         })
         // Re-attach the normal message handler (challenge phase done)
         ws.removeAllListeners('message')
-        ws.on('message', (data: RawData) => { this.handleMessage(data) })
+        ws.on('message', (data: RawData) => {
+          this.handleMessage(data)
+        })
 
         const connectId = randomUUID()
         const connectReq: GatewayFrame = {
@@ -437,9 +535,14 @@ class GatewayClient {
         lastError = error instanceof Error ? error : new Error(String(error))
         // Classify the error for UI display
         try {
-          const { classifyConnectionError } = require('../lib/connection-errors') as typeof import('../lib/connection-errors')
+          const { classifyConnectionError } =
+            require('../lib/connection-errors') as {
+              classifyConnectionError: (e: unknown) => ConnectionErrorKind
+            }
           this._lastErrorKind = classifyConnectionError(lastError)
-        } catch { /* module may not be available in all contexts */ }
+        } catch {
+          /* module may not be available in all contexts */
+        }
         if (this.ws) {
           this.ws.terminate()
           this.ws = null
@@ -464,9 +567,11 @@ class GatewayClient {
     })
 
     ws.on('close', (code: number, reason: Buffer) => {
-      const reasonText = reason?.toString() || 'n/a'
+      const reasonText = reason.toString() || 'n/a'
       this.handleDisconnect(
-        new Error(`Gateway connection closed (code=${code}, reason=${reasonText})`),
+        new Error(
+          `Gateway connection closed (code=${code}, reason=${reasonText})`,
+        ),
       )
     })
 
@@ -710,7 +815,9 @@ class GatewayClient {
   }
 
   private cleanupPendingRequest(requestId: string): boolean {
-    const queueIndex = this.requestQueue.findIndex((pending) => pending.id === requestId)
+    const queueIndex = this.requestQueue.findIndex(
+      (pending) => pending.id === requestId,
+    )
     if (queueIndex >= 0) {
       this.requestQueue.splice(queueIndex, 1)
       return true
@@ -745,9 +852,8 @@ function rawDataToString(data: RawData): string {
 const GW_KEY = '__clawsuite_gateway_client__' as const
 const ACTIVE_SEND_RUNS_KEY = '__clawsuite_active_send_stream_runs__' as const
 declare global {
-  // eslint-disable-next-line no-var
   var __clawsuite_gateway_client__: GatewayClient | undefined
-  // eslint-disable-next-line no-var
+
   var __clawsuite_active_send_stream_runs__: Set<string> | undefined
 }
 const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined
@@ -758,16 +864,25 @@ if (existingClient) {
   // both would see a healthy singleton and both would fire ensureConnected(), causing an
   // HTTPError on the first request before the doubled handshake settles.
   const GW_LAST_RECONNECT_KEY = '__clawsuite_gateway_last_reconnect__' as const
-  const lastReconnect = (globalThis as any)[GW_LAST_RECONNECT_KEY] as number | undefined
+  const lastReconnect = (globalThis as any)[GW_LAST_RECONNECT_KEY] as
+    | number
+    | undefined
   const cooldownMs = 5_000
   const now = Date.now()
   const cooledDown = !lastReconnect || now - lastReconnect > cooldownMs
-  if ((!snapshot.authenticated || snapshot.readyState !== WebSocket.OPEN) && cooledDown) {
+  if (
+    (!snapshot.authenticated || snapshot.readyState !== WebSocket.OPEN) &&
+    cooledDown
+  ) {
     ;(globalThis as any)[GW_LAST_RECONNECT_KEY] = now
-    console.warn('[gateway] WARNING: Reused singleton is disconnected — triggering reconnect')
+    console.warn(
+      '[gateway] WARNING: Reused singleton is disconnected — triggering reconnect',
+    )
     existingClient.ensureConnected().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
-      console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
+      console.warn(
+        `[gateway] Reconnect attempt after singleton reuse failed: ${message}`,
+      )
     })
   }
 }
@@ -808,16 +923,19 @@ if (!(globalThis as any)[GW_UHR_KEY]) {
   // exits cleanly instead of hanging on an open socket.
   const shutdownHandler = () => {
     console.warn('[gateway] Received shutdown signal — cleaning up')
-    gatewayClient.shutdown().catch(() => {}).finally(() => {
-      process.exit(0)
-    })
+    gatewayClient
+      .shutdown()
+      .catch(() => {})
+      .finally(() => {
+        process.exit(0)
+      })
   }
   process.on('SIGTERM', shutdownHandler)
   process.on('SIGINT', shutdownHandler)
 }
 const activeSendStreamRuns =
-  (globalThis as any)[ACTIVE_SEND_RUNS_KEY] as Set<string> | undefined
-  ?? new Set<string>()
+  ((globalThis as any)[ACTIVE_SEND_RUNS_KEY] as Set<string> | undefined) ??
+  new Set<string>()
 ;(globalThis as any)[ACTIVE_SEND_RUNS_KEY] = activeSendStreamRuns
 
 export async function gatewayRpc<TPayload = unknown>(
@@ -845,8 +963,6 @@ export function hasActiveSendRun(runId: string | null | undefined): boolean {
   if (!runId) return false
   return activeSendStreamRuns.has(runId)
 }
-
-
 
 export async function gatewayConnectCheck(): Promise<void> {
   await gatewayClient.ensureConnected()

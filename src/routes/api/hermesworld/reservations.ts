@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
+  ReservationValidationError,
   countReservations,
   createReservation,
   createSupabaseReservationStore,
-  ReservationValidationError,
   sendReservationConfirmationEmail,
 } from '@/server/name-reservations'
 import {
@@ -23,6 +23,23 @@ export const Route = createFileRoute('/api/hermesworld/reservations')({
   server: {
     handlers: {
       GET: async () => {
+        // HermesWorld reservation store requires Supabase. If the env vars
+        // aren't configured, return 503 instead of bubbling a 500 — this is a
+        // configured-but-offline feature, not a server bug.
+        if (
+          !process.env.HERMESWORLD_SUPABASE_URL ||
+          !process.env.HERMESWORLD_SUPABASE_SERVICE_ROLE_KEY
+        ) {
+          return Response.json(
+            {
+              ok: false,
+              error:
+                'HermesWorld reservations not configured (missing HERMESWORLD_SUPABASE_URL / SERVICE_ROLE_KEY)',
+            },
+            { status: 503 },
+          )
+        }
+
         try {
           const store = createSupabaseReservationStore()
           const count = await countReservations(store)

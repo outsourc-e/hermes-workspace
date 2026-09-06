@@ -146,10 +146,7 @@ export function TokenMixCard({
                 style={{ color: 'var(--theme-text)' }}
               >
                 {formatTokens(s.value)}
-                <span
-                  className="ml-1"
-                  style={{ color: 'var(--theme-muted)' }}
-                >
+                <span className="ml-1" style={{ color: 'var(--theme-muted)' }}>
                   · {widthPct.toFixed(0)}%
                 </span>
               </span>

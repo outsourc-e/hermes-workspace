@@ -5,7 +5,10 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated, isLocalRequest } from '../../../server/auth-middleware'
+import {
+  isAuthenticated,
+  isLocalRequest,
+} from '../../../server/auth-middleware'
 import { getTodayEvents } from '../../../server/calendar-feeds'
 
 export const Route = createFileRoute('/api/calendar/today')({

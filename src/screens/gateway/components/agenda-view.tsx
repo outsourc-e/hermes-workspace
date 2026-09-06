@@ -47,19 +47,19 @@ type SectionKey =
 
 type NeedsAttentionItem =
   | {
-    id: string
-    title: string
-    type: 'mission'
-    status: 'needs_input' | 'failed'
-    at: number
-  }
+      id: string
+      title: string
+      type: 'mission'
+      status: 'needs_input' | 'failed'
+      at: number
+    }
   | {
-    id: string
-    title: string
-    type: 'run'
-    status: 'failed'
-    at: number
-  }
+      id: string
+      title: string
+      type: 'run'
+      status: 'failed'
+      at: number
+    }
 
 const PRIORITY_WEIGHT: Record<string, number> = {
   critical: 5,
@@ -89,9 +89,9 @@ function isDueToday(dueDate: string | undefined, now: Date): boolean {
 
   if (!Number.isNaN(parsed.getTime())) {
     return (
-      parsed.getFullYear() === now.getFullYear()
-      && parsed.getMonth() === now.getMonth()
-      && parsed.getDate() === now.getDate()
+      parsed.getFullYear() === now.getFullYear() &&
+      parsed.getMonth() === now.getMonth() &&
+      parsed.getDate() === now.getDate()
     )
   }
 
@@ -213,9 +213,12 @@ export function AgendaView({
   const nowTs = now.getTime()
   const greeting = getGreeting(now.getHours())
 
-  const needsAttention = useMemo<NeedsAttentionItem[]>(() => {
-    const missionAlerts: NeedsAttentionItem[] = activeMissions
-      .filter((mission) => mission.status === 'needs_input' || mission.status === 'failed')
+  const needsAttention = useMemo<Array<NeedsAttentionItem>>(() => {
+    const missionAlerts: Array<NeedsAttentionItem> = activeMissions
+      .filter(
+        (mission) =>
+          mission.status === 'needs_input' || mission.status === 'failed',
+      )
       .map((mission) => ({
         id: mission.id,
         title: mission.title,
@@ -224,7 +227,7 @@ export function AgendaView({
         at: mission.startedAt,
       }))
 
-    const failedRuns: NeedsAttentionItem[] = recentCompletions
+    const failedRuns: Array<NeedsAttentionItem> = recentCompletions
       .filter((completion) => completion.status === 'failed')
       .map((completion) => ({
         id: completion.id,
@@ -247,7 +250,8 @@ export function AgendaView({
       .filter((task) => isDueToday(task.dueDate, now))
       .slice()
       .sort((a, b) => {
-        const priorityDiff = getPriorityWeight(b.priority) - getPriorityWeight(a.priority)
+        const priorityDiff =
+          getPriorityWeight(b.priority) - getPriorityWeight(a.priority)
         if (priorityDiff !== 0) return priorityDiff
         return a.title.localeCompare(b.title)
       })
@@ -268,14 +272,16 @@ export function AgendaView({
       .slice(0, 5)
   }, [recentCompletions])
 
-  const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
-    attention: true,
-    active: true,
-    tasks: true,
-    upcoming: true,
-    completed: true,
-    agents: true,
-  })
+  const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(
+    {
+      attention: true,
+      active: true,
+      tasks: true,
+      upcoming: true,
+      completed: true,
+      agents: true,
+    },
+  )
 
   const toggleSection = (id: SectionKey) => {
     setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -284,8 +290,12 @@ export function AgendaView({
   return (
     <div className="space-y-3">
       <header className="rounded-xl border border-primary-800 bg-primary-900 p-4">
-        <p className="text-xs uppercase tracking-wide text-primary-400">Today overview</p>
-        <h2 className="mt-1 text-lg font-semibold text-primary-100">{greeting}</h2>
+        <p className="text-xs uppercase tracking-wide text-primary-400">
+          Today overview
+        </p>
+        <h2 className="mt-1 text-lg font-semibold text-primary-100">
+          {greeting}
+        </h2>
         <p className="text-xs text-primary-300">Here is your daily briefing.</p>
       </header>
 
@@ -300,10 +310,17 @@ export function AgendaView({
       >
         <ul className="space-y-2">
           {needsAttention.map((item) => (
-            <li key={`${item.type}-${item.id}`} className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2">
-              <p className="text-sm font-medium text-primary-100">{item.title}</p>
+            <li
+              key={`${item.type}-${item.id}`}
+              className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2"
+            >
+              <p className="text-sm font-medium text-primary-100">
+                {item.title}
+              </p>
               <p className="mt-0.5 text-xs text-primary-300">
-                {item.type === 'mission' ? `Mission ${formatStatus(item.status)}` : 'Failed run'}
+                {item.type === 'mission'
+                  ? `Mission ${formatStatus(item.status)}`
+                  : 'Failed run'}
                 {' · '}
                 {formatTimeAgo(item.at, nowTs)}
               </p>
@@ -322,8 +339,13 @@ export function AgendaView({
       >
         <ul className="space-y-2">
           {activeNow.map((mission) => (
-            <li key={mission.id} className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2">
-              <p className="text-sm font-medium text-primary-100">{mission.title}</p>
+            <li
+              key={mission.id}
+              className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2"
+            >
+              <p className="text-sm font-medium text-primary-100">
+                {mission.title}
+              </p>
               <p className="mt-0.5 text-xs text-primary-300">
                 {mission.agents} agent{mission.agents === 1 ? '' : 's'}
                 {' · '}
@@ -344,8 +366,13 @@ export function AgendaView({
       >
         <ul className="space-y-2">
           {tasksDueToday.map((task) => (
-            <li key={task.id} className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2">
-              <p className="text-sm font-medium text-primary-100">{task.title}</p>
+            <li
+              key={task.id}
+              className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2"
+            >
+              <p className="text-sm font-medium text-primary-100">
+                {task.title}
+              </p>
               <p className="mt-0.5 text-xs text-primary-300">
                 {task.priority}
                 {' · '}
@@ -367,8 +394,13 @@ export function AgendaView({
       >
         <ul className="space-y-2">
           {upcoming24h.map((cron) => (
-            <li key={cron.id} className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2">
-              <p className="text-sm font-medium text-primary-100">{cron.name}</p>
+            <li
+              key={cron.id}
+              className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2"
+            >
+              <p className="text-sm font-medium text-primary-100">
+                {cron.name}
+              </p>
               <p className="mt-0.5 text-xs text-primary-300">
                 {formatCountdown(cron.nextRunAt, nowTs)}
                 {' · '}
@@ -389,9 +421,14 @@ export function AgendaView({
       >
         <ul className="space-y-2">
           {recentlyCompleted.map((completion) => (
-            <li key={completion.id} className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2">
+            <li
+              key={completion.id}
+              className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2"
+            >
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium text-primary-100">{completion.title}</p>
+                <p className="text-sm font-medium text-primary-100">
+                  {completion.title}
+                </p>
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide',
@@ -403,7 +440,9 @@ export function AgendaView({
                   {completion.status}
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-primary-300">{formatTimeAgo(completion.completedAt, nowTs)}</p>
+              <p className="mt-0.5 text-xs text-primary-300">
+                {formatTimeAgo(completion.completedAt, nowTs)}
+              </p>
             </li>
           ))}
         </ul>
@@ -422,9 +461,14 @@ export function AgendaView({
             const isActive = agent.status === 'active'
             const isWaiting = agent.status === 'waiting_for_input'
             return (
-              <article key={agent.id} className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2">
+              <article
+                key={agent.id}
+                className="rounded-lg border border-primary-800 bg-primary-950/60 px-3 py-2"
+              >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-medium text-primary-100">{agent.name}</p>
+                  <p className="truncate text-sm font-medium text-primary-100">
+                    {agent.name}
+                  </p>
                   <span
                     className={cn(
                       'inline-block size-2 rounded-full',

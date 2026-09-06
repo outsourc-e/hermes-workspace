@@ -5,7 +5,20 @@ import { tanstackConfig } from '@tanstack/eslint-config'
 export default [
   ...tanstackConfig,
   {
-    ignores: ['eslint.config.js', 'prettier.config.js', 'vite.config.ts'],
+    ignores: [
+      'eslint.config.js',
+      'prettier.config.js',
+      'vite.config.ts',
+      // Plain JS / service-worker files not part of the tsconfig project —
+      // @typescript-eslint can't type-check them and throws fatal parsing errors.
+      'public/sw.js',
+      'scripts/generate-pwa-icons.js',
+      'server-entry.js',
+      'electron/server-bundle.cjs',
+      'electron/main.cjs',
+      'electron/preload.cjs',
+      'electron/prod-server.cjs',
+    ],
   },
   {
     // Block client-side imports of server-only MCP input types.

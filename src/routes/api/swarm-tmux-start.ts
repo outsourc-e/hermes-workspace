@@ -1,9 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
@@ -121,7 +121,7 @@ function startSession(
         if (error) {
           resolve({
             ok: false,
-            error: stderr?.toString().trim() || error.message,
+            error: stderr.toString().trim() || error.message,
           })
           return
         }
@@ -204,7 +204,7 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
         // pass `--model`, so this is the only way the roster value is
         // honored. Best-effort: unrecognised labels (typos, custom
         // models) are left as-is so a worker never gets wedged. See #236.
-        let modelSync: {
+        const modelSync: {
           attempted: boolean
           changed: boolean
           target?: string

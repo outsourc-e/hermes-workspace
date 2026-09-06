@@ -3,13 +3,19 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { listProfiles, readProfile, updateProfileConfig } from './profiles-browser'
+import {
+  listProfiles,
+  readProfile,
+  updateProfileConfig,
+} from './profiles-browser'
 
 describe('listProfiles', () => {
   let tempHome: string
 
   beforeEach(() => {
-    tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-workspace-profiles-'))
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'hermes-workspace-profiles-'),
+    )
     vi.spyOn(os, 'homedir').mockReturnValue(tempHome)
     delete process.env.HERMES_HOME
     delete process.env.CLAUDE_HOME
@@ -26,7 +32,11 @@ describe('listProfiles', () => {
     const namedProfileRoot = path.join(profilesRoot, 'jarvis')
 
     fs.mkdirSync(namedProfileRoot, { recursive: true })
-    fs.writeFileSync(path.join(hermesRoot, 'active_profile'), 'jarvis\n', 'utf-8')
+    fs.writeFileSync(
+      path.join(hermesRoot, 'active_profile'),
+      'jarvis\n',
+      'utf-8',
+    )
     fs.writeFileSync(
       path.join(hermesRoot, 'config.yaml'),
       'model: default-model\ndescription: Default operator\n',
@@ -43,10 +53,18 @@ describe('listProfiles', () => {
 
     expect(names).toContain('default')
     expect(names).toContain('jarvis')
-    expect(profiles.find((profile) => profile.name === 'default')?.active).toBe(false)
-    expect(profiles.find((profile) => profile.name === 'jarvis')?.active).toBe(true)
-    expect(profiles.find((profile) => profile.name === 'default')?.description).toBe('Default operator')
-    expect(profiles.find((profile) => profile.name === 'jarvis')?.description).toBe('Named operator')
+    expect(profiles.find((profile) => profile.name === 'default')?.active).toBe(
+      false,
+    )
+    expect(profiles.find((profile) => profile.name === 'jarvis')?.active).toBe(
+      true,
+    )
+    expect(
+      profiles.find((profile) => profile.name === 'default')?.description,
+    ).toBe('Default operator')
+    expect(
+      profiles.find((profile) => profile.name === 'jarvis')?.description,
+    ).toBe('Named operator')
   })
 
   it('skips profiles/default so only the root-backed default card renders', () => {
@@ -68,14 +86,18 @@ describe('listProfiles', () => {
     )
 
     const profiles = listProfiles()
-    const defaultProfiles = profiles.filter((profile) => profile.name === 'default')
+    const defaultProfiles = profiles.filter(
+      (profile) => profile.name === 'default',
+    )
 
     expect(defaultProfiles).toHaveLength(1)
     expect(defaultProfiles[0]?.path).toBe(hermesRoot)
     expect(defaultProfiles[0]?.model).toBe('root-model')
     expect(defaultProfiles[0]?.provider).toBe('openai')
     expect(defaultProfiles[0]?.description).toBe('Root default')
-    expect(profiles.find((profile) => profile.name === 'builder')?.provider).toBe('anthropic')
+    expect(
+      profiles.find((profile) => profile.name === 'builder')?.provider,
+    ).toBe('anthropic')
   })
 
   it('reads and updates profile descriptions from config.yaml', () => {

@@ -64,7 +64,7 @@ function formatMobileSessionTitle(rawTitle: string): string {
   return title
 }
 
-type ThinkingLevel = 'off' | 'low' | 'adaptive'
+type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'adaptive'
 
 type ChatHeaderProps = {
   activeTitle: string
@@ -299,7 +299,6 @@ function ChatHeaderComponent({
           </button>
 
           <div className="flex-1" />
-
         </div>
       </div>
     )

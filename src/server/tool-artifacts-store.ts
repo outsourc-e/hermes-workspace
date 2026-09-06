@@ -42,10 +42,10 @@ function ensureDataDir(): void {
 function loadIndex(): void {
   try {
     if (!existsSync(INDEX_FILE)) return
-    const parsed = JSON.parse(readFileSync(INDEX_FILE, 'utf-8')) as ArtifactIndex
-    if (parsed && typeof parsed === 'object' && parsed.artifacts) {
-      index = parsed
-    }
+    const parsed = JSON.parse(
+      readFileSync(INDEX_FILE, 'utf-8'),
+    ) as ArtifactIndex
+    index = parsed
   } catch {
     index = { artifacts: {} }
   }
@@ -87,7 +87,11 @@ function inferArtifactKind(toolName?: string, text?: string): ToolArtifactKind {
   if (name.includes('read_file') || name === 'read' || name === 'file_read') {
     return 'file_read'
   }
-  if (name.includes('terminal') || name.includes('exec') || name.includes('bash')) {
+  if (
+    name.includes('terminal') ||
+    name.includes('exec') ||
+    name.includes('bash')
+  ) {
     return 'terminal_log'
   }
   if (name.includes('skill')) return 'skill_doc'
@@ -101,9 +105,11 @@ export function listToolArtifacts(sessionId?: string): Array<ToolArtifact> {
     .sort((a, b) => b.createdAt - a.createdAt)
 }
 
-export function getToolArtifact(artifactId: string): (ToolArtifact & { content: string }) | null {
+export function getToolArtifact(
+  artifactId: string,
+): (ToolArtifact & { content: string }) | null {
   const artifact = index.artifacts[artifactId]
-  if (!artifact) return null
+
   try {
     const raw = readFileSync(artifact.contentPath, 'utf-8')
     const parsed = JSON.parse(raw) as { content?: unknown }
@@ -127,7 +133,9 @@ type CreateArtifactInput = {
   kind?: ToolArtifactKind
 }
 
-export function createOrUpdateToolArtifact(input: CreateArtifactInput): ToolArtifact {
+export function createOrUpdateToolArtifact(
+  input: CreateArtifactInput,
+): ToolArtifact {
   const stableKey = [
     input.sessionId,
     input.messageId || '',
@@ -137,7 +145,7 @@ export function createOrUpdateToolArtifact(input: CreateArtifactInput): ToolArti
   ].join('\n')
   const id = `toolout_${hashString(stableKey).slice(0, 16)}`
   const contentPath = artifactContentPath(input.sessionId, id)
-  const createdAt = index.artifacts[id]?.createdAt ?? Date.now()
+  const createdAt = index.artifacts[id].createdAt
   const kind = input.kind ?? inferArtifactKind(input.toolName, input.content)
   const title = input.title ?? `${input.toolName || 'tool'} output`
   const summary =
@@ -204,7 +212,8 @@ function compactContentForMessage(
     return [{ type: 'text', text: compactText }]
   }
   return originalContent.map((part) => {
-    if (!part || typeof part !== 'object') return part as Record<string, unknown>
+    if (!part || typeof part !== 'object')
+      return part as Record<string, unknown>
     const record = part as Record<string, unknown>
     if (record.type === 'text') return { ...record, text: compactText }
     if (record.type === 'tool_result') return { ...record, text: compactText }

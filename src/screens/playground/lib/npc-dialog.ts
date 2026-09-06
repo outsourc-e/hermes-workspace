@@ -22,7 +22,7 @@ export type DialogChoice = {
   /** Optional: progress this quest by id */
   completeQuest?: string
   /** Optional: grant items */
-  grantItems?: PlaygroundItemId[]
+  grantItems?: Array<PlaygroundItemId>
   /** Optional: grant skill XP */
   grantSkillXp?: Partial<Record<PlaygroundSkillId, number>>
   /** Optional: ends conversation */
@@ -40,9 +40,9 @@ export type NpcDialogTree = {
   /** Opening line shown when dialog starts */
   opening: string
   /** Lore line shown if player keeps talking */
-  lore: string[]
+  lore: Array<string>
   /** Quest/action choices the player can pick */
-  choices: DialogChoice[]
+  choices: Array<DialogChoice>
 }
 
 export const NPC_DIALOG: Record<string, NpcDialogTree> = {
@@ -320,7 +320,6 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     ],
   },
 
-
   shopkeeper: {
     id: 'shopkeeper',
     name: 'Dorian',
@@ -466,7 +465,6 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
     ],
   },
 
-
   innkeeper: {
     id: 'innkeeper',
     name: 'Hestia',
@@ -488,7 +486,8 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       {
         id: 'lore-inn',
         label: 'What is this Inn for?',
-        reply: 'Login lobby, save point, party finder, and the place new builders meet veterans without pressure.',
+        reply:
+          'Login lobby, save point, party finder, and the place new builders meet veterans without pressure.',
       },
     ],
   },
@@ -508,14 +507,16 @@ export const NPC_DIALOG: Record<string, NpcDialogTree> = {
       {
         id: 'first-vial',
         label: 'Buy a starter vial',
-        reply: 'Take this vial. Use it before a hard quest and your skill XP gain doubles.',
+        reply:
+          'Take this vial. Use it before a hard quest and your skill XP gain doubles.',
         grantItems: ['oracle-crystal'],
         grantSkillXp: { promptcraft: 40 },
       },
       {
         id: 'lore-shelves',
         label: 'What goes on these shelves?',
-        reply: 'Skill recipes, agent personas, prompt templates. The store catalogue maps to your real Hermes capabilities.',
+        reply:
+          'Skill recipes, agent personas, prompt templates. The store catalogue maps to your real Hermes capabilities.',
       },
     ],
   },

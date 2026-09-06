@@ -54,16 +54,16 @@ Runtime view attaches to tmux-backed workers when available. If tmux is not avai
 
 ## Core terms
 
-| Term | Meaning |
-| --- | --- |
-| Hermes Agent | A named, persistent worker with a role, profile, skills, and runtime state. |
-| Orchestrator | The Hermes Agent responsible for dispatch, drift detection, routing, and escalation. |
-| SwarmBrief | The canonical task shape sent from orchestrator to worker. |
-| Standing mission | A permanent responsibility a worker resumes when idle. |
-| Ad-hoc dispatch | A one-off task sent through the same checkpoint contract. |
-| Checkpoint | The proof-bearing status block returned by a worker. |
-| Greenlight Gate | Human approval boundary for irreversible or externally visible actions. |
-| Repair playbook | Known failures mapped to safe repairs before escalation. |
+| Term             | Meaning                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------ |
+| Hermes Agent     | A named, persistent worker with a role, profile, skills, and runtime state.          |
+| Orchestrator     | The Hermes Agent responsible for dispatch, drift detection, routing, and escalation. |
+| SwarmBrief       | The canonical task shape sent from orchestrator to worker.                           |
+| Standing mission | A permanent responsibility a worker resumes when idle.                               |
+| Ad-hoc dispatch  | A one-off task sent through the same checkpoint contract.                            |
+| Checkpoint       | The proof-bearing status block returned by a worker.                                 |
+| Greenlight Gate  | Human approval boundary for irreversible or externally visible actions.              |
+| Repair playbook  | Known failures mapped to safe repairs before escalation.                             |
 
 ## Mental model for users
 

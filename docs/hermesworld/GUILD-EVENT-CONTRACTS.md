@@ -33,7 +33,12 @@ type WalletAddress = string
 
 type PublicActorRef =
   | { kind: 'player'; playerId: PlayerId; displayName: string }
-  | { kind: 'agent'; agentId: AgentId; displayName: string; ownerPlayerId: PlayerId }
+  | {
+      kind: 'agent'
+      agentId: AgentId
+      displayName: string
+      ownerPlayerId: PlayerId
+    }
 
 type MoneyAmount = {
   currency: CurrencyCode
@@ -44,10 +49,22 @@ type PublicItemStack = {
   itemInstanceId?: ItemInstanceId
   itemDefinitionId: ItemDefinitionId
   displayName: string
-  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'founder' | 'event'
+  rarity:
+    | 'common'
+    | 'uncommon'
+    | 'rare'
+    | 'epic'
+    | 'legendary'
+    | 'founder'
+    | 'event'
   quantity: number
   iconUrl: string
-  binding: 'none' | 'bind_on_pickup' | 'bind_on_equip' | 'account_bound' | 'guild_bound'
+  binding:
+    | 'none'
+    | 'bind_on_pickup'
+    | 'bind_on_equip'
+    | 'account_bound'
+    | 'guild_bound'
   tradeable: boolean
   cosmeticOnly: boolean
 }
@@ -62,7 +79,14 @@ type SafeMutationResponse<T> = {
   requestId: UUID
   result?: T
   publicError?: {
-    code: 'invalid_input' | 'auth_required' | 'permission_denied' | 'rate_limited' | 'conflict' | 'not_found' | 'temporarily_unavailable'
+    code:
+      | 'invalid_input'
+      | 'auth_required'
+      | 'permission_denied'
+      | 'rate_limited'
+      | 'conflict'
+      | 'not_found'
+      | 'temporarily_unavailable'
     message: string
   }
 }
@@ -89,6 +113,7 @@ type WalletSignedSession = {
 ```
 
 Server responsibilities:
+
 - Resolve session to playerId.
 - Verify wallet signatures server-side.
 - Bind wallet sessions to player accounts server-side.
@@ -100,7 +125,14 @@ Server responsibilities:
 ### Public guild shape
 
 ```ts
-type GuildRole = 'founder' | 'leader' | 'officer' | 'raider' | 'trader' | 'member' | 'guest'
+type GuildRole =
+  | 'founder'
+  | 'leader'
+  | 'officer'
+  | 'raider'
+  | 'trader'
+  | 'member'
+  | 'guest'
 
 type GuildPermission =
   | 'invite_member'
@@ -130,7 +162,9 @@ type GuildPublicProfile = {
   agentCount: number
   hallThemeId?: string
   recruitment: 'open' | 'application' | 'invite_only' | 'closed'
-  tags: Array<'casual' | 'raiding' | 'pvp' | 'builders' | 'trading' | 'founders' | 'lore'>
+  tags: Array<
+    'casual' | 'raiding' | 'pvp' | 'builders' | 'trading' | 'founders' | 'lore'
+  >
   createdAt: ISODateTime
 }
 
@@ -176,6 +210,7 @@ type CreateGuildResponse = SafeMutationResponse<{
 ```
 
 Server validation:
+
 - Authenticate current player.
 - Enforce one active founder guild per player unless admin-granted.
 - Validate name/slug length, profanity, impersonation, reserved names.
@@ -184,6 +219,7 @@ Server validation:
 - Grant founder role and audit the creation.
 
 Private-only guild fields:
+
 - normalizedName collision index
 - moderation flags
 - creation IP hash / device risk
@@ -223,6 +259,7 @@ type AddAgentToGuildResponse = SafeMutationResponse<{
 ```
 
 Server rules:
+
 - Player must own/control the agent.
 - Guild must have available agent seats.
 - Agent capabilities are public summaries only; model credentials/provider configs remain private.
@@ -257,12 +294,14 @@ type GuildVaultWithdrawRequest = Idempotency & {
 ```
 
 Server rules:
+
 - Atomic transfer from player inventory to guild vault or back.
 - Permission check for withdraw/manage.
 - Ledger every mutation with actor, before/after, reason, requestId.
 - No client-writeable item stats.
 
 Private-only:
+
 - Full vault ledger
 - moderation/admin holds
 - dupe-detection tags
@@ -284,7 +323,13 @@ type WeekendWarPublicEvent = {
   startsAt: ISODateTime
   endsAt: ISODateTime
   registrationClosesAt: ISODateTime
-  status: 'scheduled' | 'registration_open' | 'live' | 'scoring_finalizing' | 'final' | 'cancelled'
+  status:
+    | 'scheduled'
+    | 'registration_open'
+    | 'live'
+    | 'scoring_finalizing'
+    | 'final'
+    | 'cancelled'
   participantCap: number
   publicRulesVersion: string
   visibleObjectives: Array<{
@@ -327,7 +372,13 @@ type WarActionIntent = Idempotency & {
   eventId: UUID
   guildId: GuildId
   actorId: string
-  actionType: 'capture_objective' | 'defend_objective' | 'damage_relic' | 'repair_relic' | 'support_ally' | 'scout_ping'
+  actionType:
+    | 'capture_objective'
+    | 'defend_objective'
+    | 'damage_relic'
+    | 'repair_relic'
+    | 'support_ally'
+    | 'scout_ping'
   targetObjectiveId?: string
   clientObservedAt: ISODateTime
   clientContext: {
@@ -365,12 +416,14 @@ type WarScoreboardPublic = {
 ```
 
 Server rules:
+
 - Ignore direct score values from client.
 - Score from validated server events, objective state machine, anti-cheat, and rate limits.
 - Publish delayed/smoothed public scores if needed to prevent automation/sniping.
 - Rewards are granted only after finalization job.
 
 Private-only war data:
+
 - scoring weights
 - anti-cheat thresholds
 - hidden tie breakers
@@ -426,7 +479,14 @@ type CreateRaidInstanceResponse = SafeMutationResponse<{
 type RaidActionIntent = Idempotency & {
   raidInstanceId: UUID
   actorId: string
-  actionType: 'attack' | 'heal' | 'shield' | 'interrupt' | 'scout' | 'use_item' | 'agent_assist'
+  actionType:
+    | 'attack'
+    | 'heal'
+    | 'shield'
+    | 'interrupt'
+    | 'scout'
+    | 'use_item'
+    | 'agent_assist'
   targetId?: string
   clientObservedAt: ISODateTime
   clientContext?: Record<string, string | number | boolean>
@@ -454,12 +514,14 @@ type RaidCompletionPublic = {
 ```
 
 Server rules:
+
 - Server controls HP, boss state, lockouts, completion, loot rolls, XP, currency grants.
 - Client may render boss mechanics and send action intents only.
 - Agent companions can fill roles but cannot bypass lockouts or loot eligibility.
 - Rare drops get item provenance tags server-side.
 
 Private-only raid data:
+
 - exact loot tables/drop rates
 - rare item seed
 - anti-cheat contribution thresholds
@@ -485,7 +547,14 @@ type LeaderboardPublicEntry = {
   kind: LeaderboardKind
   seasonId: string
   rank: number
-  actor: PublicActorRef | { kind: 'guild'; guildId: GuildId; displayName: string; banner: GuildPublicProfile['banner'] }
+  actor:
+    | PublicActorRef
+    | {
+        kind: 'guild'
+        guildId: GuildId
+        displayName: string
+        banner: GuildPublicProfile['banner']
+      }
   publicScore: number
   publicScoreLabel: string
   badgeIds: string[]
@@ -503,11 +572,13 @@ type GetLeaderboardResponse = {
 ```
 
 Server rules:
+
 - Scores are generated from private event logs, not client submission.
 - Use delayed publication for prize-sensitive competitions.
 - Manual moderation can hide entries; public response should say generic “entry under review”.
 
 Private-only:
+
 - score calculation formulas if exploitable
 - hidden disqualification reasons
 - raw event logs
@@ -522,7 +593,12 @@ Founders Vault is an event inventory tab for founder gifts, purchases, compensat
 ```ts
 type EventInventoryGrantPublic = {
   grantId: UUID
-  grantType: 'founder_gift' | 'purchase_delivery' | 'compensation' | 'season_reward' | 'event_reward'
+  grantType:
+    | 'founder_gift'
+    | 'purchase_delivery'
+    | 'compensation'
+    | 'season_reward'
+    | 'event_reward'
   displayTitle: string
   displayMessage: string
   grantedAt: ISODateTime
@@ -560,9 +636,19 @@ type PrivateCreateEventGrantRequest = {
   serviceRequestId: UUID
   targetPlayerId: PlayerId
   grantType: EventInventoryGrantPublic['grantType']
-  reasonCode: 'name_reservation' | 'manual_founder_approve' | 'store_purchase' | 'compensation' | 'season_transition' | 'admin_test'
+  reasonCode:
+    | 'name_reservation'
+    | 'manual_founder_approve'
+    | 'store_purchase'
+    | 'compensation'
+    | 'season_transition'
+    | 'admin_test'
   sourceRef?: string
-  items: Array<{ itemDefinitionId: ItemDefinitionId; quantity: number; privateRollSeed?: string }>
+  items: Array<{
+    itemDefinitionId: ItemDefinitionId
+    quantity: number
+    privateRollSeed?: string
+  }>
   currencies: MoneyAmount[]
   expiresAt?: ISODateTime
   operatorId?: string
@@ -570,12 +656,14 @@ type PrivateCreateEventGrantRequest = {
 ```
 
 Server rules:
+
 - Gift granting via private API only.
 - Claims are idempotent and atomic: grant state changes and inventory/currency delivery happen in one transaction.
 - Purchase delivery requires verified payment/webhook server-side.
 - Founder status/badges are public only after private grant approval.
 
 Private-only Founders Vault data:
+
 - grant reason code when sensitive
 - manual approver/operator ID
 - payment provider transaction IDs
@@ -592,17 +680,34 @@ Chat trade is a secure two-party offer window opened from chat, e.g. `/trade @us
 ```ts
 type TradeWindowPublicState = {
   tradeId: UUID
-  status: 'invited' | 'open' | 'locked' | 'confirming' | 'settled' | 'cancelled' | 'expired' | 'disputed'
+  status:
+    | 'invited'
+    | 'open'
+    | 'locked'
+    | 'confirming'
+    | 'settled'
+    | 'cancelled'
+    | 'expired'
+    | 'disputed'
   createdAt: ISODateTime
   expiresAt: ISODateTime
   participants: [PublicActorRef, PublicActorRef]
-  offers: Record<PlayerId, {
-    items: PublicItemStack[]
-    currencies: MoneyAmount[]
-    locked: boolean
-    confirmed: boolean
-    publicWarnings: Array<'balance_changed' | 'item_unavailable' | 'high_value_trade' | 'new_counterparty' | 'recent_offer_change'>
-  }>
+  offers: Record<
+    PlayerId,
+    {
+      items: PublicItemStack[]
+      currencies: MoneyAmount[]
+      locked: boolean
+      confirmed: boolean
+      publicWarnings: Array<
+        | 'balance_changed'
+        | 'item_unavailable'
+        | 'high_value_trade'
+        | 'new_counterparty'
+        | 'recent_offer_change'
+      >
+    }
+  >
   lastChangedBy?: PublicActorRef
   lastChangedAt: ISODateTime
 }
@@ -635,6 +740,7 @@ type TradeMutationResponse = SafeMutationResponse<{
 ```
 
 Settlement model:
+
 - Any offer update unlocks both participants and clears confirmations.
 - Client displays previews, warnings, and digest.
 - Server recomputes digest from canonical offer state.
@@ -643,6 +749,7 @@ Settlement model:
 - Agent-mediated trading can propose offers but cannot confirm above player-defined caps.
 
 Private-only trade data:
+
 - risk score
 - anti-RMT rules
 - high-value thresholds
@@ -657,11 +764,19 @@ Private-only trade data:
 ```ts
 type PublicWorldFeedEvent = {
   feedId: UUID
-  kind: 'guild_created' | 'war_objective_captured' | 'raid_completed' | 'leaderboard_finalized' | 'founder_gift_arrived' | 'market_milestone'
+  kind:
+    | 'guild_created'
+    | 'war_objective_captured'
+    | 'raid_completed'
+    | 'leaderboard_finalized'
+    | 'founder_gift_arrived'
+    | 'market_milestone'
   occurredAt: ISODateTime
   headline: string
   body?: string
-  actor?: PublicActorRef | { kind: 'guild'; guildId: GuildId; displayName: string }
+  actor?:
+    | PublicActorRef
+    | { kind: 'guild'; guildId: GuildId; displayName: string }
   guildId?: GuildId
   eventId?: UUID
   iconUrl?: string
@@ -669,6 +784,7 @@ type PublicWorldFeedEvent = {
 ```
 
 Feed redaction rules:
+
 - No exact reward amounts for prize-bearing events until publicly announced.
 - No private grant reasons.
 - No trade counterparty details unless both parties opted into public sharing.
@@ -702,7 +818,15 @@ type PrivateAuditEvent = {
     | 'trade.open'
     | 'trade.offer_update'
     | 'trade.settle'
-  entityType: 'guild' | 'war' | 'raid' | 'leaderboard' | 'grant' | 'trade' | 'inventory' | 'wallet'
+  entityType:
+    | 'guild'
+    | 'war'
+    | 'raid'
+    | 'leaderboard'
+    | 'grant'
+    | 'trade'
+    | 'inventory'
+    | 'wallet'
   entityId: UUID | string
   beforeHash?: string
   afterHash?: string
@@ -716,6 +840,7 @@ This ledger is never exposed directly to the browser. Public histories are separ
 ## 11. API surface summary
 
 Public/browser-callable:
+
 - GET /api/hermesworld/guilds/:guildId
 - POST /api/hermesworld/guilds/create
 - POST /api/hermesworld/guilds/:guildId/invites
@@ -740,6 +865,7 @@ Public/browser-callable:
 - GET /api/hermesworld/feed
 
 Private service-only:
+
 - POST /private/hermesworld/event-grants/create
 - POST /private/hermesworld/event-grants/revoke
 - POST /private/hermesworld/war/finalize-score
@@ -785,7 +911,7 @@ Never ship any of this in client code, static JSON, sourcemaps, public KV, publi
 - debug bypasses
 - private seeds/salts/commitments before reveal
 - database connection strings
-- any environment variable named or prefixed: PRIVATE_, ORACLE_, TREASURY_, WALLET_, SIGNER_, HMAC_, JWT_, SESSION_, RPC_, PAYMENT_, STRIPE_, KYC_, ADMIN_
+- any environment variable named or prefixed: PRIVATE*, ORACLE*, TREASURY*, WALLET*, SIGNER*, HMAC*, JWT*, SESSION*, RPC*, PAYMENT*, STRIPE*, KYC*, ADMIN\_
 
 ## 13. Minimal implementation order
 

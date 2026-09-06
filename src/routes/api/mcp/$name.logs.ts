@@ -22,7 +22,10 @@ export const Route = createFileRoute('/api/mcp/$name/logs')({
         }
         const name = (params as { name?: string }).name?.trim() || ''
         if (!name) {
-          return json({ ok: false, error: 'Missing server name' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Missing server name' },
+            { status: 400 },
+          )
         }
         const capabilities = await ensureGatewayProbed()
         if (capabilities.mcpFallback && !capabilities.mcp) {
@@ -50,14 +53,20 @@ export const Route = createFileRoute('/api/mcp/$name/logs')({
 
         let upstream: Response
         try {
-          upstream = await dashboardFetch(`/api/mcp/${encodeURIComponent(name)}/logs`, {
-            method: 'GET',
-            signal: upstreamController.signal,
-          })
+          upstream = await dashboardFetch(
+            `/api/mcp/${encodeURIComponent(name)}/logs`,
+            {
+              method: 'GET',
+              signal: upstreamController.signal,
+            },
+          )
         } catch (err) {
           request.signal.removeEventListener('abort', onClientAbort)
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            {
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+            },
             { status: 502 },
           )
         }
@@ -97,7 +106,9 @@ export const Route = createFileRoute('/api/mcp/$name/logs')({
               // Greet the client so EventSource fires `onopen` even if upstream
               // is silent for a while.
               controller.enqueue(
-                encoder.encode(`event: connected\ndata: ${JSON.stringify({ name })}\n\n`),
+                encoder.encode(
+                  `event: connected\ndata: ${JSON.stringify({ name })}\n\n`,
+                ),
               )
               while (!closed) {
                 const { done, value } = await reader.read()
@@ -108,7 +119,9 @@ export const Route = createFileRoute('/api/mcp/$name/logs')({
                 for (const line of text.split(/\r?\n/)) {
                   if (!line) continue
                   controller.enqueue(
-                    encoder.encode(`event: log\ndata: ${JSON.stringify({ line })}\n\n`),
+                    encoder.encode(
+                      `event: log\ndata: ${JSON.stringify({ line })}\n\n`,
+                    ),
                   )
                 }
               }
@@ -116,7 +129,9 @@ export const Route = createFileRoute('/api/mcp/$name/logs')({
               const msg = err instanceof Error ? err.message : String(err)
               try {
                 controller.enqueue(
-                  encoder.encode(`event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`),
+                  encoder.encode(
+                    `event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`,
+                  ),
                 )
               } catch {
                 /* ignore */

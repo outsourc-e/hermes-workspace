@@ -1,12 +1,15 @@
-import { useHUDConfig, useHUDConfigPatch } from './hooks/useHUDConfig';
+import { useHUDConfig, useHUDConfigPatch } from './hooks/useHUDConfig'
 
-interface Props { open: boolean; onClose: () => void; }
+interface Props {
+  open: boolean
+  onClose: () => void
+}
 
 export function CustomisePanel({ open, onClose }: Props) {
-  const { data: cfg } = useHUDConfig();
-  const patch = useHUDConfigPatch();
+  const { data: cfg } = useHUDConfig()
+  const patch = useHUDConfigPatch()
 
-  if (!open) return null;
+  if (!open) return null
 
   if (!cfg) {
     return (
@@ -18,7 +21,7 @@ export function CustomisePanel({ open, onClose }: Props) {
           loading…
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -28,10 +31,12 @@ export function CustomisePanel({ open, onClose }: Props) {
     >
       <div
         className="bg-[#0d1117] border border-[#21262d] rounded-lg p-6 max-w-md w-full"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <header className="flex justify-between items-center mb-4">
-          <h2 className="text-[#c4b5fd] font-bold tracking-wider text-sm">CUSTOMISE HUD</h2>
+          <h2 className="text-[#c4b5fd] font-bold tracking-wider text-sm">
+            CUSTOMISE HUD
+          </h2>
           <button
             onClick={onClose}
             className="text-[#8b949e] hover:text-white text-lg leading-none"
@@ -49,7 +54,9 @@ export function CustomisePanel({ open, onClose }: Props) {
               <input
                 type="checkbox"
                 checked={enabled}
-                onChange={e => patch.mutate({ widgets: { [id]: e.target.checked } })}
+                onChange={(e) =>
+                  patch.mutate({ widgets: { [id]: e.target.checked } })
+                }
               />
               <span className="text-sm text-[#e6edf3]">{id}</span>
             </label>
@@ -57,5 +64,5 @@ export function CustomisePanel({ open, onClose }: Props) {
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -25,6 +25,13 @@ import {
   updateSession as updateDashboardSession,
 } from './claude-dashboard-api'
 
+// ── Memory ───────────────────────────────────────────────────────
+
+// Memory is sourced from the local filesystem (memory-browser.ts), not from
+// the gateway REST API. The Hermes HTTP gateway has no /api/memory endpoint —
+// calling it returns 404. Read directly from $HERMES_HOME/memory/.
+import { listMemoryFiles } from './memory-browser'
+
 const _authHeaders = (): Record<string, string> =>
   BEARER_TOKEN ? { Authorization: `Bearer ${BEARER_TOKEN}` } : {}
 
@@ -404,19 +411,18 @@ export async function streamChat(
       const os = await import('node:os')
       const dir = path.join(os.tmpdir(), 'hermes-tool-debug')
       fs.mkdirSync(dir, { recursive: true })
-      const file = path.join(
-        dir,
-        `sse-${sessionId}-${Date.now()}.log`,
-      )
+      const file = path.join(dir, `sse-${sessionId}-${Date.now()}.log`)
       toolDebugStream = fs.createWriteStream(file, { flags: 'a' })
       console.log(`[claude-api][tool-debug] writing SSE dump to ${file}`)
-      toolDebugStream.write(`# session=${sessionId} ts=${new Date().toISOString()}\n`)
+      toolDebugStream.write(
+        `# session=${sessionId} ts=${new Date().toISOString()}\n`,
+      )
     } catch (err) {
       console.warn('[claude-api][tool-debug] failed to open dump file:', err)
     }
   }
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read()
     if (done) break
 
@@ -437,7 +443,9 @@ export async function streamChat(
         if (toolDebugStream) {
           // Truncate very long payloads so the dump stays human-readable.
           const trimmed =
-            dataStr.length > 4000 ? dataStr.slice(0, 4000) + '...[trunc]' : dataStr
+            dataStr.length > 4000
+              ? dataStr.slice(0, 4000) + '...[trunc]'
+              : dataStr
           toolDebugStream.write(`data: ${trimmed}\n\n`)
         }
         try {
@@ -473,10 +481,8 @@ export async function sendChat(
   })
 }
 
-// ── Memory ───────────────────────────────────────────────────────
-
 export async function getMemory(): Promise<unknown> {
-  return claudeGet('/api/memory')
+  return { files: listMemoryFiles() }
 }
 
 // ── Skills ───────────────────────────────────────────────────────
@@ -518,7 +524,9 @@ export async function patchConfig(
     })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
-      throw new Error(`Hermes dashboard PATCH /api/config: ${res.status} ${body}`)
+      throw new Error(
+        `Hermes dashboard PATCH /api/config: ${res.status} ${body}`,
+      )
     }
     return res.json() as Promise<Record<string, unknown>>
   }

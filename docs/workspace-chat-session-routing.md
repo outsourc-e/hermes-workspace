@@ -10,10 +10,10 @@ This document records the routing contract and the failure mode that caused rela
 
 There are two distinct header layers:
 
-| Layer | Headers | Purpose |
-| --- | --- | --- |
-| Workspace UI route resolution | `X-Hermes-Session-Key`, `X-Hermes-Friendly-Id` | Tells the browser which Workspace chat route/friendly ID is resolved for the visible conversation. |
-| Hermes Agent gateway continuation | `X-Hermes-Session-Id`, `X-Claude-Session-Id` | Tells the gateway which server-side Hermes session should receive the next chat completion request. |
+| Layer                             | Headers                                        | Purpose                                                                                             |
+| --------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Workspace UI route resolution     | `X-Hermes-Session-Key`, `X-Hermes-Friendly-Id` | Tells the browser which Workspace chat route/friendly ID is resolved for the visible conversation.  |
+| Hermes Agent gateway continuation | `X-Hermes-Session-Id`, `X-Claude-Session-Id`   | Tells the gateway which server-side Hermes session should receive the next chat completion request. |
 
 Do not conflate these. A response can correctly resolve a Workspace route while the next gateway request still loses server-side context if `X-Hermes-Session-Id` is missing.
 

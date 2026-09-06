@@ -21,11 +21,27 @@ export type RunLearningsProps = {
 type LearningCategory = RunLearningsProps['learnings'][number]['category']
 type CategoryFilter = 'all' | LearningCategory
 
-const FILTER_OPTIONS: Array<{ key: CategoryFilter; label: string; className?: string }> = [
+const FILTER_OPTIONS: Array<{
+  key: CategoryFilter
+  label: string
+  className?: string
+}> = [
   { key: 'all', label: 'All' },
-  { key: 'success', label: 'Success', className: 'border-emerald-700/60 bg-emerald-900/30 text-emerald-300' },
-  { key: 'failure', label: 'Failure', className: 'border-red-700/60 bg-red-900/30 text-red-300' },
-  { key: 'optimization', label: 'Optimization', className: 'border-sky-700/60 bg-sky-900/30 text-sky-300' },
+  {
+    key: 'success',
+    label: 'Success',
+    className: 'border-emerald-700/60 bg-emerald-900/30 text-emerald-300',
+  },
+  {
+    key: 'failure',
+    label: 'Failure',
+    className: 'border-red-700/60 bg-red-900/30 text-red-300',
+  },
+  {
+    key: 'optimization',
+    label: 'Optimization',
+    className: 'border-sky-700/60 bg-sky-900/30 text-sky-300',
+  },
 ]
 
 function relativeTime(ts: number, now: number): string {
@@ -38,8 +54,10 @@ function relativeTime(ts: number, now: number): string {
 }
 
 function categoryBadgeClass(category: LearningCategory): string {
-  if (category === 'success') return 'border-emerald-700/60 bg-emerald-900/30 text-emerald-300'
-  if (category === 'failure') return 'border-red-700/60 bg-red-900/30 text-red-300'
+  if (category === 'success')
+    return 'border-emerald-700/60 bg-emerald-900/30 text-emerald-300'
+  if (category === 'failure')
+    return 'border-red-700/60 bg-red-900/30 text-red-300'
   return 'border-sky-700/60 bg-sky-900/30 text-sky-300'
 }
 
@@ -63,9 +81,16 @@ async function copyText(value: string): Promise<void> {
   }
 }
 
-export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClose }: RunLearningsProps) {
+export function RunLearnings({
+  runId,
+  runTitle,
+  learnings,
+  onAddLearning,
+  onClose,
+}: RunLearningsProps) {
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>('all')
-  const [draftCategory, setDraftCategory] = useState<LearningCategory>('success')
+  const [draftCategory, setDraftCategory] =
+    useState<LearningCategory>('success')
   const [draftText, setDraftText] = useState('')
   const [now, setNow] = useState(() => Date.now())
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -95,7 +120,10 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
   const handleCopy = useCallback(async (id: string, text: string) => {
     await copyText(text)
     setCopiedId(id)
-    window.setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500)
+    window.setTimeout(
+      () => setCopiedId((current) => (current === id ? null : current)),
+      1500,
+    )
   }, [])
 
   return (
@@ -126,7 +154,8 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
               className={cn(
                 'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                 activeFilter === option.key
-                  ? option.className ?? 'border-accent-500 bg-accent-500/15 text-accent-300'
+                  ? (option.className ??
+                      'border-accent-500 bg-accent-500/15 text-accent-300')
                   : 'border-primary-700 bg-primary-900 text-primary-300 hover:border-primary-700 hover:bg-primary-800 hover:text-primary-100',
               )}
             >
@@ -168,11 +197,15 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
                           {relativeTime(learning.createdAt, now)}
                         </span>
                       </div>
-                      <p className="text-sm text-primary-100">{learning.text}</p>
+                      <p className="text-sm text-primary-100">
+                        {learning.text}
+                      </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => void handleCopy(learning.id, learning.text)}
+                      onClick={() =>
+                        void handleCopy(learning.id, learning.text)
+                      }
                       className="shrink-0 rounded-lg border border-primary-700 px-2 py-1 text-[11px] font-medium text-primary-300 transition-colors hover:bg-primary-800 hover:text-primary-100"
                     >
                       {copiedId === learning.id ? 'Copied' : 'Copy'}
@@ -185,7 +218,10 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-primary-800 px-4 py-3">
+      <form
+        onSubmit={handleSubmit}
+        className="border-t border-primary-800 px-4 py-3"
+      >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="sr-only" htmlFor="learning-category">
             Category
@@ -193,7 +229,9 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
           <select
             id="learning-category"
             value={draftCategory}
-            onChange={(event) => setDraftCategory(event.target.value as LearningCategory)}
+            onChange={(event) =>
+              setDraftCategory(event.target.value as LearningCategory)
+            }
             className="h-10 rounded-lg border border-primary-700 bg-primary-900 px-3 text-sm text-primary-100 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
           >
             <option value="success">Success</option>

@@ -36,7 +36,10 @@ describe('normalizeMcpServer', () => {
     })!
     expect(stdio.transportType).toBe('stdio')
     expect(stdio.command).toBe('npx')
-    expect(stdio.args).toEqual(['-y', '@modelcontextprotocol/server-filesystem'])
+    expect(stdio.args).toEqual([
+      '-y',
+      '@modelcontextprotocol/server-filesystem',
+    ])
 
     const http = normalizeMcpServer({
       name: 'linear',
@@ -84,7 +87,10 @@ describe('maskSecretsInPlace (secret echo guard)', () => {
   it('replaces all env values with the mask sentinel', () => {
     const s = normalizeMcpServer({
       name: 'gh',
-      env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_DO_NOT_LEAK', NON_SECRET: 'ok' },
+      env: {
+        GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_DO_NOT_LEAK',
+        NON_SECRET: 'ok',
+      },
     })!
     // Normalizer already masks env at read time.
     expect(Object.values(s.env)).toEqual([MASK_SENTINEL, MASK_SENTINEL])
@@ -118,8 +124,12 @@ describe('normalizeTestResult', () => {
   })
 
   it('returns latencyMs only when finite', () => {
-    expect(normalizeTestResult({ status: 'connected', latencyMs: 42 }).latencyMs).toBe(42)
-    expect(normalizeTestResult({ status: 'connected', latencyMs: 'fast' }).latencyMs).toBeUndefined()
+    expect(
+      normalizeTestResult({ status: 'connected', latencyMs: 42 }).latencyMs,
+    ).toBe(42)
+    expect(
+      normalizeTestResult({ status: 'connected', latencyMs: 'fast' }).latencyMs,
+    ).toBeUndefined()
   })
 
   it('normalizes discovered tools (drops empty names)', () => {
@@ -133,7 +143,9 @@ describe('normalizeTestResult', () => {
 
 describe('payloadContainsString', () => {
   it('finds nested matches', () => {
-    expect(payloadContainsString({ a: { b: ['x', 'sentinel'] } }, 'sentinel')).toBe(true)
+    expect(
+      payloadContainsString({ a: { b: ['x', 'sentinel'] } }, 'sentinel'),
+    ).toBe(true)
     expect(payloadContainsString({ a: { b: ['x'] } }, 'sentinel')).toBe(false)
   })
 })
@@ -211,7 +223,9 @@ describe('normalizeMcpServer (US-503 — authEnvRef population)', () => {
 describe('normalizeMcpServerFromConfig (Phase 1.5 fallback)', () => {
   it('returns null for empty name', () => {
     expect(normalizeMcpServerFromConfig('', {})).toBeNull()
-    expect(normalizeMcpServerFromConfig('   ', { transport: 'stdio' })).toBeNull()
+    expect(
+      normalizeMcpServerFromConfig('   ', { transport: 'stdio' }),
+    ).toBeNull()
   })
 
   it('normalizes a stdio entry', () => {
@@ -318,7 +332,9 @@ describe('normalizeMcpListFromConfig (Phase 1.5 fallback)', () => {
 
   it('unwraps `{ config: {...} }` envelope', () => {
     const list = normalizeMcpListFromConfig({
-      config: { mcp_servers: { gh: { transport: 'stdio', command: 'gh-mcp' } } },
+      config: {
+        mcp_servers: { gh: { transport: 'stdio', command: 'gh-mcp' } },
+      },
     })
     expect(list.length).toBe(1)
     expect(list[0].name).toBe('gh')

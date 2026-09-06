@@ -5,7 +5,7 @@
  */
 import type { AgoraProfile, AgoraUser } from './agora-types'
 
-const MOCK_PROFILES: AgoraProfile[] = [
+const MOCK_PROFILES: Array<AgoraProfile> = [
   {
     id: 'mock-athena',
     handle: 'athena',
@@ -61,7 +61,7 @@ const MOCK_PROFILES: AgoraProfile[] = [
 export function buildMockAgoraUsers(opts: {
   worldWidth: number
   worldHeight: number
-}): AgoraUser[] {
+}): Array<AgoraUser> {
   const { worldWidth, worldHeight } = opts
   // Cluster positions roughly around the room
   const positions = [
@@ -85,10 +85,13 @@ export function buildMockAgoraUsers(opts: {
  * Optional: gentle ambient drift so the lobby feels alive.
  * Returns next position for one user, slightly nudged.
  */
-export function driftUser(user: AgoraUser, opts: {
-  worldWidth: number
-  worldHeight: number
-}): AgoraUser {
+export function driftUser(
+  user: AgoraUser,
+  opts: {
+    worldWidth: number
+    worldHeight: number
+  },
+): AgoraUser {
   const dx = (Math.random() - 0.5) * 8
   const dy = (Math.random() - 0.5) * 8
   const nx = Math.max(40, Math.min(opts.worldWidth - 40, user.x + dx))
@@ -101,5 +104,11 @@ export function driftUser(user: AgoraUser, opts: {
       : dy > 0
         ? 'down'
         : 'up'
-  return { ...user, x: nx, y: ny, facing, isMoving: Math.abs(dx) + Math.abs(dy) > 1 }
+  return {
+    ...user,
+    x: nx,
+    y: ny,
+    facing,
+    isMoving: Math.abs(dx) + Math.abs(dy) > 1,
+  }
 }

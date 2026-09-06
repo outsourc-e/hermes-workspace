@@ -1,7 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, copyFileSync, renameSync, readdirSync, statSync } = vi.hoisted(() => ({
+const {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  unlinkSync,
+  copyFileSync,
+  renameSync,
+  readdirSync,
+  statSync,
+} = vi.hoisted(() => ({
   existsSync: vi.fn().mockReturnValue(false),
   readFileSync: vi.fn().mockReturnValue(''),
   writeFileSync: vi.fn().mockImplementation(() => {}),
@@ -14,7 +24,17 @@ const { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, copyFile
 }))
 
 vi.mock('node:fs', () => ({
-  default: { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, copyFileSync, renameSync, readdirSync, statSync },
+  default: {
+    existsSync,
+    readFileSync,
+    writeFileSync,
+    mkdirSync,
+    unlinkSync,
+    copyFileSync,
+    renameSync,
+    readdirSync,
+    statSync,
+  },
   existsSync,
   readFileSync,
   writeFileSync,
@@ -55,22 +75,45 @@ describe('profiles-browser', () => {
       const brokenPath = path.join(profilesRoot, 'broken')
 
       existsSync.mockImplementation((p: string) => {
-        return p === root || p === profilesRoot || p === kayPath || p === brokenPath
+        return (
+          p === root || p === profilesRoot || p === kayPath || p === brokenPath
+        )
       })
       readdirSync.mockImplementation((p: string) => {
         if (p === profilesRoot) {
           return [
-            { name: 'kay', isDirectory: () => false, isSymbolicLink: () => true },
-            { name: 'broken', isDirectory: () => false, isSymbolicLink: () => true },
-            { name: 'README.md', isDirectory: () => false, isSymbolicLink: () => false },
+            {
+              name: 'kay',
+              isDirectory: () => false,
+              isSymbolicLink: () => true,
+            },
+            {
+              name: 'broken',
+              isDirectory: () => false,
+              isSymbolicLink: () => true,
+            },
+            {
+              name: 'README.md',
+              isDirectory: () => false,
+              isSymbolicLink: () => false,
+            },
           ] as never
         }
         return []
       })
       statSync.mockImplementation((p: string) => {
-        if (p === kayPath) return { isDirectory: () => true, isFile: () => false, mtimeMs: 0 } as never
+        if (p === kayPath)
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+            mtimeMs: 0,
+          } as never
         if (p === brokenPath) throw new Error('broken symlink')
-        return { isDirectory: () => false, isFile: () => false, mtimeMs: 0 } as never
+        return {
+          isDirectory: () => false,
+          isFile: () => false,
+          mtimeMs: 0,
+        } as never
       })
 
       const mod = await loadMod()
@@ -88,14 +131,17 @@ describe('profiles-browser', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       existsSync.mockImplementation((p: string) => {
-        if (p === path.join('/home/testuser', '.hermes', 'profiles', 'jarvis')) return true
+        if (p === path.join('/home/testuser', '.hermes', 'profiles', 'jarvis'))
+          return true
         return false
       })
 
       const mod = await loadMod()
       mod.setActiveProfile('jarvis')
       expect(warnSpy).toHaveBeenCalledTimes(1)
-      expect(warnSpy.mock.calls[0][0]).toContain('Restart the Hermes Agent gateway')
+      expect(warnSpy.mock.calls[0][0]).toContain(
+        'Restart the Hermes Agent gateway',
+      )
 
       warnSpy.mockRestore()
     })
@@ -105,8 +151,10 @@ describe('profiles-browser', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       existsSync.mockImplementation((p: string) => {
-        if (p === path.join('/home/testuser', '.hermes', 'profiles', 'jarvis')) return true
-        if (p === path.join('/home/testuser', '.hermes', 'active_profile')) return true
+        if (p === path.join('/home/testuser', '.hermes', 'profiles', 'jarvis'))
+          return true
+        if (p === path.join('/home/testuser', '.hermes', 'active_profile'))
+          return true
         return false
       })
 
@@ -119,7 +167,9 @@ describe('profiles-browser', () => {
         expect.anything(),
         'utf-8',
       )
-      expect(unlinkSync).not.toHaveBeenCalledWith(path.join('/home/testuser', '.hermes', 'active_profile'))
+      expect(unlinkSync).not.toHaveBeenCalledWith(
+        path.join('/home/testuser', '.hermes', 'active_profile'),
+      )
       expect(warnSpy).toHaveBeenCalledTimes(1)
 
       warnSpy.mockRestore()
@@ -128,13 +178,16 @@ describe('profiles-browser', () => {
 
     it('clears active profile file when setting default', async () => {
       existsSync.mockImplementation((p: string) => {
-        if (p === path.join('/home/testuser', '.hermes', 'active_profile')) return true
+        if (p === path.join('/home/testuser', '.hermes', 'active_profile'))
+          return true
         return false
       })
 
       const mod = await loadMod()
       mod.setActiveProfile('default')
-      expect(unlinkSync).toHaveBeenCalledWith(path.join('/home/testuser', '.hermes', 'active_profile'))
+      expect(unlinkSync).toHaveBeenCalledWith(
+        path.join('/home/testuser', '.hermes', 'active_profile'),
+      )
     })
   })
 
@@ -157,7 +210,8 @@ describe('profiles-browser', () => {
         return false
       })
       readFileSync.mockImplementation((p: string) => {
-        if (p === path.join('/home/testuser', '.hermes', 'active_profile')) return 'jarvis\n'
+        if (p === path.join('/home/testuser', '.hermes', 'active_profile'))
+          return 'jarvis\n'
         if (p === configPath) return 'model: named-model\n'
         return ''
       })
@@ -197,8 +251,8 @@ describe('profiles-browser', () => {
         model: { provider: 'nous' },
       })
 
-      const writtenCall = writeFileSync.mock.calls.find(
-        (call) => (call[0] as string).endsWith('config.yaml'),
+      const writtenCall = writeFileSync.mock.calls.find((call) =>
+        (call[0] as string).endsWith('config.yaml'),
       )
       expect(writtenCall).toBeDefined()
       const writtenYaml = writtenCall![1] as string
@@ -227,8 +281,8 @@ describe('profiles-browser', () => {
         api_key: null,
       })
 
-      const writtenCall = writeFileSync.mock.calls.find(
-        (call) => (call[0] as string).endsWith('config.yaml'),
+      const writtenCall = writeFileSync.mock.calls.find((call) =>
+        (call[0] as string).endsWith('config.yaml'),
       )
       expect(writtenCall).toBeDefined()
       const writtenYaml = writtenCall![1] as string

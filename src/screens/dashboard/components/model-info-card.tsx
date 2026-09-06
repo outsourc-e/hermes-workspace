@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { CancelIcon } from '@hugeicons/core-free-icons'
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 function formatContext(n: number): string {
   if (!n || n <= 0) return '—'
@@ -58,7 +58,7 @@ export function ModelInfoCard({
   const supportsReasoning = readBoolCap(caps, 'supports_reasoning')
   const family =
     caps && typeof caps['model_family'] === 'string'
-      ? (caps['model_family'] as string)
+      ? caps['model_family']
       : null
 
   // Operational line: share of API calls served by this model in the
@@ -66,9 +66,7 @@ export function ModelInfoCard({
   // summary so the card never looks half-empty.
   const opsLine = useMemo(() => {
     if (modelInfo && analytics && analytics.totalApiCalls > 0) {
-      const match = analytics.topModels.find(
-        (m) => m.id === modelInfo.model,
-      )
+      const match = analytics.topModels.find((m) => m.id === modelInfo.model)
       if (match) {
         const pct = Math.round((match.calls / analytics.totalApiCalls) * 100)
         return `${pct}% of calls · ${match.sessions.toLocaleString()} sessions · ${analytics.windowDays}d`
@@ -168,18 +166,10 @@ export function ModelInfoCard({
               <CapabilityChip label="tools" value="✓" tone={palette.success} />
             ) : null}
             {supportsVision ? (
-              <CapabilityChip
-                label="vision"
-                value="✓"
-                tone={palette.success}
-              />
+              <CapabilityChip label="vision" value="✓" tone={palette.success} />
             ) : null}
             {supportsReasoning ? (
-              <CapabilityChip
-                label="reason"
-                value="✓"
-                tone={palette.success}
-              />
+              <CapabilityChip label="reason" value="✓" tone={palette.success} />
             ) : null}
           </div>
 
@@ -258,7 +248,7 @@ function ModelInventoryModal({
         const list = (data?.data ?? data?.models ?? []) as Array<
           Record<string, unknown>
         >
-        if (cancelled) return
+
         setModels(
           list
             .map((m) => ({
@@ -269,11 +259,11 @@ function ModelInventoryModal({
             .filter((m) => m.id),
         )
       } catch (err) {
-        if (!cancelled) {
+        {
           setError(err instanceof Error ? err.message : 'failed to load')
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       }
     })()
     return () => {

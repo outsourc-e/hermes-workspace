@@ -113,13 +113,13 @@ A failing log usually shows `core=[]` and `missing=[health,...]` — that means 
 
 ### Common causes
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `core=[]` and `missing=[health,...]` | Workspace probed before agent was ready | Wait 30s and reload, or `POST /api/gateway-reprobe`. Cache TTL drops to 15s in disconnected state. |
-| `core=[health,chatCompletions]` but no `models` | Older agent image (pre-`/v1/models`) | Update: `docker compose pull && docker compose up -d` |
-| All probes 401 | `HERMES_API_TOKEN` doesn't match agent's `API_SERVER_KEY` | Check both `.env` values are the same. They must match exactly. |
-| Workspace UI shows "Connection refused" | Workspace using `127.0.0.1` instead of the service name | Set `HERMES_API_URL=http://hermes-agent:8642` (or whichever service name). |
-| Agent restart loops with `API_SERVER_KEY required` | Agent bound to 0.0.0.0 without a key | Set `API_SERVER_KEY` in `.env` (mandatory for non-loopback bind). |
+| Symptom                                            | Cause                                                     | Fix                                                                                                |
+| -------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `core=[]` and `missing=[health,...]`               | Workspace probed before agent was ready                   | Wait 30s and reload, or `POST /api/gateway-reprobe`. Cache TTL drops to 15s in disconnected state. |
+| `core=[health,chatCompletions]` but no `models`    | Older agent image (pre-`/v1/models`)                      | Update: `docker compose pull && docker compose up -d`                                              |
+| All probes 401                                     | `HERMES_API_TOKEN` doesn't match agent's `API_SERVER_KEY` | Check both `.env` values are the same. They must match exactly.                                    |
+| Workspace UI shows "Connection refused"            | Workspace using `127.0.0.1` instead of the service name   | Set `HERMES_API_URL=http://hermes-agent:8642` (or whichever service name).                         |
+| Agent restart loops with `API_SERVER_KEY required` | Agent bound to 0.0.0.0 without a key                      | Set `API_SERVER_KEY` in `.env` (mandatory for non-loopback bind).                                  |
 
 ## Synology NAS / external host setups
 

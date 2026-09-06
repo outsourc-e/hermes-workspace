@@ -28,8 +28,11 @@ export function SpotifyWidget() {
 
   useEffect(() => {
     fetch('/api/spotify/now')
-      .then(r => r.json())
-      .then(d => { setTrack(d); setLoading(false) })
+      .then((r) => r.json())
+      .then((d) => {
+        setTrack(d)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
 
@@ -55,7 +58,8 @@ export function SpotifyWidget() {
     )
   }
 
-  const progress = track.durationMs > 0 ? (track.progressMs / track.durationMs) * 100 : 0
+  const progress =
+    track.durationMs > 0 ? (track.progressMs / track.durationMs) * 100 : 0
 
   return (
     <div className="flex flex-col gap-3">
@@ -63,8 +67,12 @@ export function SpotifyWidget() {
         <span className="text-xs font-medium text-[var(--theme-muted)] uppercase tracking-wider">
           {track.isPlaying ? '▶ Now Playing' : '⏸ Paused'}
         </span>
-        <svg className="h-3 w-3 text-[var(--theme-accent)]" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479 1.061.241 1.571-.239.421-.661.48-1.021.24z"/>
+        <svg
+          className="h-3 w-3 text-[var(--theme-accent)]"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479 1.061.241 1.571-.239.421-.661.48-1.021.24z" />
         </svg>
       </div>
 
@@ -77,18 +85,29 @@ export function SpotifyWidget() {
           />
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-[var(--theme-text)]">{track.name}</div>
-          <div className="truncate text-xs text-[var(--theme-muted)]">{track.artist}</div>
+          <div className="truncate text-sm font-medium text-[var(--theme-text)]">
+            {track.name}
+          </div>
+          <div className="truncate text-xs text-[var(--theme-muted)]">
+            {track.artist}
+          </div>
         </div>
       </div>
 
       {track.isPlaying && (
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-[var(--theme-muted)]">{formatTime(track.progressMs)}</span>
+          <span className="text-[10px] text-[var(--theme-muted)]">
+            {formatTime(track.progressMs)}
+          </span>
           <div className="h-1 flex-1 rounded-full bg-[var(--theme-border)]">
-            <div className="h-full rounded-full bg-[var(--theme-accent)]" style={{ width: `${progress}%` }} />
+            <div
+              className="h-full rounded-full bg-[var(--theme-accent)]"
+              style={{ width: `${progress}%` }}
+            />
           </div>
-          <span className="text-[10px] text-[var(--theme-muted)]">{formatTime(track.durationMs)}</span>
+          <span className="text-[10px] text-[var(--theme-muted)]">
+            {formatTime(track.durationMs)}
+          </span>
         </div>
       )}
     </div>

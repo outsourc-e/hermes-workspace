@@ -59,6 +59,7 @@ Claude-Workspace 2.1.0 is out.
 It ships **Swarm**: a built-in multi-agent workspace where one ClaudeAgent can orchestrate persistent worker agents with live checkpoints, Board, inbox/review flow, and better routing between orchestrator and workers.
 
 Also in 2.1.0:
+
 - stronger long-run SSE chat reliability
 - approval banner fix
 - portable session deletion fix

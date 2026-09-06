@@ -6,8 +6,20 @@ export type MissionCheckpoint = {
   name?: string
   goal?: string
   processType: 'sequential' | 'hierarchical' | 'parallel'
-  team: Array<{ id: string; name: string; modelId: string; roleDescription: string; goal: string; backstory: string }>
-  tasks: Array<{ id: string; title: string; status: string; assignedTo?: string }>
+  team: Array<{
+    id: string
+    name: string
+    modelId: string
+    roleDescription: string
+    goal: string
+    backstory: string
+  }>
+  tasks: Array<{
+    id: string
+    title: string
+    status: string
+    assignedTo?: string
+  }>
   agentSessionMap: Record<string, string>
   agentSessions?: Record<string, string>
   agentSessionModelMap?: Record<string, string>
@@ -25,8 +37,13 @@ const MAX_HISTORY = 20
 
 export function saveMissionCheckpoint(cp: MissionCheckpoint): void {
   try {
-    localStorage.setItem(CURRENT_KEY, JSON.stringify({ ...cp, updatedAt: Date.now() }))
-  } catch { /* ignore quota errors */ }
+    localStorage.setItem(
+      CURRENT_KEY,
+      JSON.stringify({ ...cp, updatedAt: Date.now() }),
+    )
+  } catch {
+    /* ignore quota errors */
+  }
 }
 
 export function loadMissionCheckpoint(): MissionCheckpoint | null {
@@ -34,7 +51,9 @@ export function loadMissionCheckpoint(): MissionCheckpoint | null {
     const raw = localStorage.getItem(CURRENT_KEY)
     if (!raw) return null
     return JSON.parse(raw) as MissionCheckpoint
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 export function clearMissionCheckpoint(): void {
@@ -44,17 +63,23 @@ export function clearMissionCheckpoint(): void {
 export function archiveMissionToHistory(cp: MissionCheckpoint): void {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
-    const history: MissionCheckpoint[] = raw ? (JSON.parse(raw) as MissionCheckpoint[]) : []
+    const history: Array<MissionCheckpoint> = raw
+      ? (JSON.parse(raw) as Array<MissionCheckpoint>)
+      : []
     history.unshift({ ...cp, completedAt: Date.now() })
     if (history.length > MAX_HISTORY) history.splice(MAX_HISTORY)
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
-export function loadMissionHistory(): MissionCheckpoint[] {
+export function loadMissionHistory(): Array<MissionCheckpoint> {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     if (!raw) return []
-    return JSON.parse(raw) as MissionCheckpoint[]
-  } catch { return [] }
+    return JSON.parse(raw) as Array<MissionCheckpoint>
+  } catch {
+    return []
+  }
 }

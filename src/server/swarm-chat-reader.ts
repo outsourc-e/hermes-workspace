@@ -139,7 +139,10 @@ print(json.dumps({
 }))
 `
 
-export function readWorkerMessages(profilePath: string, limit: number): SwarmChatReadResult {
+export function readWorkerMessages(
+  profilePath: string,
+  limit: number,
+): SwarmChatReadResult {
   const dbPath = join(profilePath, 'state.db')
   if (!existsSync(dbPath)) {
     return {

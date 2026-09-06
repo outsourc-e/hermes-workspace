@@ -4,16 +4,18 @@
  * GET /api/uni-brain?action=search&q=<query> — grep .md files
  * POST /api/uni-brain?action=resync           — trigger vault sync
  */
-import { createFileRoute } from '@tanstack/react-router'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-} from 'node:fs'
-import { join, resolve, relative, isAbsolute, extname, basename } from 'node:path'
+  basename,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 const execFileAsync = promisify(execFile)
@@ -22,9 +24,11 @@ const VAULT_ROOT = '/root/.hermes/uni-brain'
 const SYNC_SCRIPT = '/root/.hermes/scripts/sync-uni-brain.sh'
 
 function isLocalRequest(request: Request): boolean {
-  const maybeAddress = (request as unknown as { remoteAddress?: string }).remoteAddress
+  const maybeAddress = (request as unknown as { remoteAddress?: string })
+    .remoteAddress
   const ip = (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
-  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip)) return true
+  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip))
+    return true
   if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return true
   if (/^192\.168\./.test(ip)) return true
   if (/^10\./.test(ip)) return true
@@ -46,12 +50,13 @@ function guardAuth(request: Request): Response | null {
  * Returns null if the resolved path escapes VAULT_ROOT.
  */
 function safeResolve(relPath: string): string | null {
-  const clean = (relPath ?? '').replace(/\0/g, '').trim()
-  const resolved = clean === '' || clean === '.'
-    ? VAULT_ROOT
-    : isAbsolute(clean)
-      ? null  // reject absolute paths
-      : resolve(VAULT_ROOT, clean)
+  const clean = relPath.replace(/\0/g, '').trim()
+  const resolved =
+    clean === '' || clean === '.'
+      ? VAULT_ROOT
+      : isAbsolute(clean)
+        ? null // reject absolute paths
+        : resolve(VAULT_ROOT, clean)
 
   if (!resolved) return null
 
@@ -78,10 +83,13 @@ async function handleList(request: Request): Promise<Response> {
   }
 
   if (!existsSync(dir)) {
-    return new Response(JSON.stringify({ error: 'Path not found', entries: [] }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ error: 'Path not found', entries: [] }),
+      {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    )
   }
 
   const stat = statSync(dir)
@@ -93,7 +101,12 @@ async function handleList(request: Request): Promise<Response> {
   }
 
   const names = readdirSync(dir)
-  const entries: Array<{ name: string; type: 'file' | 'dir'; size?: number; modified?: string }> = []
+  const entries: Array<{
+    name: string
+    type: 'file' | 'dir'
+    size?: number
+    modified?: string
+  }> = []
 
   for (const name of names) {
     if (name.startsWith('.')) continue
@@ -184,7 +197,7 @@ async function handleSearch(request: Request): Promise<Response> {
     const { stdout } = await execFileAsync(
       'grep',
       ['-rn', '--include=*.md', '-m', '50', '-i', '--', query, VAULT_ROOT],
-      { timeout: 10_000 }
+      { timeout: 10_000 },
     )
 
     const matches = stdout
@@ -214,10 +227,13 @@ async function handleSearch(request: Request): Promise<Response> {
         headers: { 'Content-Type': 'application/json' },
       })
     }
-    return new Response(JSON.stringify({ error: 'Search failed', matches: [] }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ error: 'Search failed', matches: [] }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    )
   }
 }
 
@@ -233,10 +249,16 @@ async function handleResync(request: Request): Promise<Response> {
     })
   } catch (e) {
     // Sync failure is non-fatal (home PC may be offline)
-    return new Response(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    )
   }
 }
 

@@ -139,7 +139,7 @@ type ChatSidebarProps = {
 type NavItemDef = {
   kind: 'link' | 'button'
   to?: string
-  search?: Record<string, unknown>
+  search?: never
   hash?: string
   icon: unknown
   label: string
@@ -223,7 +223,8 @@ function NavItem({
               style={
                 item.badge === 'NEW'
                   ? {
-                      background: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
+                      background:
+                        'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
                       color: '#0b1320',
                       boxShadow: '0 0 8px rgba(250,204,21,0.4)',
                       letterSpacing: '0.08em',
@@ -560,7 +561,9 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'claude')
+      handleOpenSettings(
+        detail.section === 'appearance' ? 'appearance' : 'claude',
+      )
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
@@ -634,7 +637,8 @@ function ChatSidebarComponent({
   useEffect(() => {
     if (workRoutes.includes(pathname)) setLastRoute('work', pathname)
     if (personalRoutes.includes(pathname)) setLastRoute('personal', pathname)
-    if (universityRoutes.includes(pathname)) setLastRoute('university', pathname)
+    if (universityRoutes.includes(pathname))
+      setLastRoute('university', pathname)
     if (agentRoutes.includes(pathname)) setLastRoute('agents', pathname)
   }, [pathname])
 

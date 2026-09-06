@@ -89,7 +89,9 @@ function ArtifactsTab() {
         >
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium">{artifact.text}</span>
-            <span style={{ color: 'var(--theme-accent)' }}>{artifact.time}</span>
+            <span style={{ color: 'var(--theme-accent)' }}>
+              {artifact.time}
+            </span>
           </div>
         </div>
       ))}
@@ -229,8 +231,8 @@ function MemoryTab() {
           const list = Array.isArray(json?.files) ? json.files : []
           setFiles(
             list.map((entry: Record<string, unknown>) => ({
-              path: String(entry?.path || ''),
-              name: String(entry?.name || entry?.path || ''),
+              path: String(entry.path || ''),
+              name: String(entry.name || entry.path || ''),
             })),
           )
           setLoading(false)
@@ -325,7 +327,6 @@ function SkillsTab() {
   const grouped: Record<string, Array<SkillItem>> = {}
   for (const skill of skills) {
     const cat = skill.category || 'Uncategorized'
-    if (!grouped[cat]) grouped[cat] = []
     grouped[cat].push(skill)
   }
 
@@ -405,13 +406,12 @@ function McpTab() {
         const list = Array.isArray(json?.servers) ? json.servers : []
         setServers(
           list.map((entry: Record<string, unknown>) => ({
-            id: String(entry?.id || entry?.name || ''),
-            name: String(entry?.name || ''),
-            enabled: Boolean(entry?.enabled),
-            status:
-              typeof entry?.status === 'string' ? entry.status : undefined,
+            id: String(entry.id || entry.name || ''),
+            name: String(entry.name || ''),
+            enabled: Boolean(entry.enabled),
+            status: typeof entry.status === 'string' ? entry.status : undefined,
             discoveredToolsCount:
-              typeof entry?.discoveredToolsCount === 'number'
+              typeof entry.discoveredToolsCount === 'number'
                 ? entry.discoveredToolsCount
                 : undefined,
           })),
@@ -507,7 +507,9 @@ function LogsTab() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}) {
+export function InspectorPanel({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const isOpen = useInspectorStore((s) => s.isOpen)
   const memoryAvailable = useFeatureAvailable('memory')
   const skillsAvailable = useFeatureAvailable('skills')

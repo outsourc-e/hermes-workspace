@@ -6,7 +6,7 @@
  * iframe. Locks serving to a small list of trusted prefixes so the route
  * can never be used to exfiltrate arbitrary user files.
  */
-import { statSync, readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { extname, resolve as resolvePath } from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
@@ -31,10 +31,12 @@ const MIME_BY_EXT: Record<string, string> = {
   '.ico': 'image/x-icon',
 }
 
-function allowedPrefixes(): string[] {
+function allowedPrefixes(): Array<string> {
   const home = os.homedir()
   const claudeHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? resolvePath(home, '.hermes')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    resolvePath(home, '.hermes')
   return [
     '/tmp',
     `${home}/tmp`,
@@ -82,7 +84,9 @@ export const Route = createFileRoute('/api/preview-file')({
             return new Response('File too large for preview', { status: 413 })
           }
           const body = readFileSync(abs)
-          const mime = MIME_BY_EXT[extname(abs).toLowerCase()] ?? 'application/octet-stream'
+          const mime =
+            MIME_BY_EXT[extname(abs).toLowerCase()] ??
+            'application/octet-stream'
           return new Response(body, {
             status: 200,
             headers: {

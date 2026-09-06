@@ -1,44 +1,50 @@
-import { memo, useEffect, useMemo, useState } from 'react';
-import { Tile } from './Tile';
-import type { WidgetSnapshot } from '../../server/hud/types';
-import { useHUDConfig } from './hooks/useHUDConfig';
+import { memo, useEffect, useMemo, useState } from 'react'
+import { Tile } from './Tile'
+import { useHUDConfig } from './hooks/useHUDConfig'
+import type { WidgetSnapshot } from '../../server/hud/types'
 
 export interface MCTileSpec {
-  id: string;
-  snapshot: WidgetSnapshot<{ value: string; sub?: string; tone?: 'ok'|'warn'|'err'|'info' }>;
-  label: string;
+  id: string
+  snapshot: WidgetSnapshot<{
+    value: string
+    sub?: string
+    tone?: 'ok' | 'warn' | 'err' | 'info'
+  }>
+  label: string
 }
-interface MissionControlProps { tiles: MCTileSpec[]; }
+interface MissionControlProps {
+  tiles: Array<MCTileSpec>
+}
 
-const STORAGE_KEY = 'hud.mc.showHealthy';
+const STORAGE_KEY = 'hud.mc.showHealthy'
 
 function readInitialShowHealthy(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') return false
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === '1';
+    return window.localStorage.getItem(STORAGE_KEY) === '1'
   } catch {
-    return false;
+    return false
   }
 }
 
 function persistShowHealthy(value: boolean): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
+    window.localStorage.setItem(STORAGE_KEY, value ? '1' : '0')
   } catch {
     // ignore
   }
 }
 
 function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
-  return isMobile;
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return isMobile
 }
 
 /**
@@ -47,39 +53,39 @@ function useIsMobile() {
  * widgets are surfaced regardless because they want attention.
  */
 function isHealthy(tile: MCTileSpec): boolean {
-  if (tile.snapshot.state !== 'loaded') return false;
-  return tile.snapshot.data?.tone === 'ok';
+  if (tile.snapshot.state !== 'loaded') return false
+  return tile.snapshot.data?.tone === 'ok'
 }
 
 function MissionControlImpl({ tiles }: MissionControlProps) {
-  const { data: cfg } = useHUDConfig();
-  const isMobile = useIsMobile();
-  const [showHealthy, setShowHealthy] = useState(readInitialShowHealthy);
+  const { data: cfg } = useHUDConfig()
+  const isMobile = useIsMobile()
+  const [showHealthy, setShowHealthy] = useState(readInitialShowHealthy)
 
   const visible = useMemo(() => {
-    const mobileSet = new Set(cfg?.mobile_tiles ?? []);
+    const mobileSet = new Set(cfg?.mobile_tiles ?? [])
     return isMobile && cfg?.mobile_tiles?.length
       ? tiles.filter((t) => mobileSet.has(t.id as any))
-      : tiles;
-  }, [isMobile, cfg?.mobile_tiles, tiles]);
+      : tiles
+  }, [isMobile, cfg?.mobile_tiles, tiles])
 
   const { problems, healthy } = useMemo(() => {
-    const p: MCTileSpec[] = [];
-    const h: MCTileSpec[] = [];
-    for (const t of visible) (isHealthy(t) ? h : p).push(t);
-    return { problems: p, healthy: h };
-  }, [visible]);
+    const p: Array<MCTileSpec> = []
+    const h: Array<MCTileSpec> = []
+    for (const t of visible) (isHealthy(t) ? h : p).push(t)
+    return { problems: p, healthy: h }
+  }, [visible])
 
   const toggleHealthy = () => {
     setShowHealthy((prev) => {
-      const next = !prev;
-      persistShowHealthy(next);
-      return next;
-    });
-  };
+      const next = !prev
+      persistShowHealthy(next)
+      return next
+    })
+  }
 
-  const renderedTiles = showHealthy ? visible : problems;
-  const hasHealthyCollapsed = !showHealthy && healthy.length > 0;
+  const renderedTiles = showHealthy ? visible : problems
+  const hasHealthyCollapsed = !showHealthy && healthy.length > 0
 
   return (
     <div className="bg-[#0d1117] border border-[#21262d] rounded-lg p-4">
@@ -135,7 +141,7 @@ function MissionControlImpl({ tiles }: MissionControlProps) {
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export const MissionControl = memo(MissionControlImpl);
+export const MissionControl = memo(MissionControlImpl)

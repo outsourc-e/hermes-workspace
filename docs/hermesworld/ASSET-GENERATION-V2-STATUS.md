@@ -28,4 +28,3 @@ Use `docs/hermesworld/PROMPT-LIBRARY.md` for the exact repeatable prompts and st
 ## Resume command
 
 After setting `FAL_KEY` in the Hermes runtime environment, rerun the asset generation lane against this branch and commit the generated assets.
-

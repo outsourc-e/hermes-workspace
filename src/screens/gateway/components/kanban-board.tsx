@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { cn } from '@/lib/utils'
-import type { HubTask, TaskStatus, TaskPriority } from './task-board'
-import { useTaskStore, type Task as StoreTask, type TaskStatus as StoreTaskStatus } from '@/stores/task-store'
 import { addApproval } from '../lib/approvals-store'
+import type { HubTask, TaskPriority, TaskStatus } from './task-board'
+import type {
+  Task as StoreTask,
+  TaskStatus as StoreTaskStatus,
+} from '@/stores/task-store'
+import { cn } from '@/lib/utils'
+import { useTaskStore } from '@/stores/task-store'
 
 type AgentOption = { id: string; name: string }
 
@@ -13,14 +17,14 @@ type KanbanColumn = {
   label: string
 }
 
-const DEFAULT_COLUMNS: KanbanColumn[] = [
+const DEFAULT_COLUMNS: Array<KanbanColumn> = [
   { key: 'backlog', label: 'Backlog' },
   { key: 'in_progress', label: 'In Progress' },
   { key: 'review', label: 'Review' },
   { key: 'done', label: 'Done' },
 ]
 
-const COMPACT_COLUMNS: KanbanColumn[] = [
+const COMPACT_COLUMNS: Array<KanbanColumn> = [
   { key: 'backlog', label: 'Todo' },
   { key: 'in_progress', label: 'WIP' },
   { key: 'review', label: 'Review' },
@@ -46,7 +50,8 @@ function isKanbanColumnStatus(value: string): value is KanbanColumnStatus {
 }
 
 function mapTaskStatusToColumn(status: TaskStatus): KanbanColumnStatus {
-  if (isKanbanColumnStatus(status as string)) return status as unknown as KanbanColumnStatus
+  if (isKanbanColumnStatus(status as string))
+    return status as unknown as KanbanColumnStatus
   if (status === 'inbox') return 'backlog'
   if (status === 'assigned') return 'in_progress'
   return status === 'done' ? 'done' : status
@@ -57,7 +62,9 @@ function mapColumnToTaskStatus(status: KanbanColumnStatus): TaskStatus {
   return status as unknown as TaskStatus
 }
 
-function mapColumnToStoreTaskStatus(status: KanbanColumnStatus): StoreTaskStatus {
+function mapColumnToStoreTaskStatus(
+  status: KanbanColumnStatus,
+): StoreTaskStatus {
   return status
 }
 
@@ -69,8 +76,12 @@ function mapStoreTaskPriority(priority: StoreTask['priority']): TaskPriority {
 }
 
 function mapStoreTaskToHubTask(task: StoreTask): HubTask {
-  const createdAt = Number.isFinite(Date.parse(task.createdAt)) ? Date.parse(task.createdAt) : Date.now()
-  const updatedAt = Number.isFinite(Date.parse(task.updatedAt)) ? Date.parse(task.updatedAt) : createdAt
+  const createdAt = Number.isFinite(Date.parse(task.createdAt))
+    ? Date.parse(task.createdAt)
+    : Date.now()
+  const updatedAt = Number.isFinite(Date.parse(task.updatedAt))
+    ? Date.parse(task.updatedAt)
+    : createdAt
   return {
     id: task.id,
     title: task.title,
@@ -92,11 +103,15 @@ function formatTimeInColumn(updatedAt: number): string {
   const hours = Math.floor(totalMinutes / 60)
   if (hours < 24) {
     const minutes = totalMinutes % 60
-    return minutes > 0 ? `${hours}h ${minutes}m in column` : `${hours}h in column`
+    return minutes > 0
+      ? `${hours}h ${minutes}m in column`
+      : `${hours}h in column`
   }
   const days = Math.floor(hours / 24)
   const remainingHours = hours % 24
-  return remainingHours > 0 ? `${days}d ${remainingHours}h in column` : `${days}d in column`
+  return remainingHours > 0
+    ? `${days}d ${remainingHours}h in column`
+    : `${days}d in column`
 }
 
 function appendNote(description: string, note: string): string {
@@ -113,10 +128,10 @@ function truncateCompactTitle(title: string): string {
 }
 
 export type KanbanBoardProps = {
-  tasks: HubTask[]
+  tasks: Array<HubTask>
   onUpdateTask: (task: HubTask) => void
   onDeleteTask: (taskId: string) => void
-  agents: AgentOption[]
+  agents: Array<AgentOption>
   missionId?: string
   onAssignAgent?: (taskId: string, agentId: string) => void
   compact?: boolean
@@ -132,9 +147,13 @@ export function KanbanBoard({
   compact = false,
 }: KanbanBoardProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
-  const [dragOverColumn, setDragOverColumn] = useState<KanbanColumnStatus | null>(null)
+  const [dragOverColumn, setDragOverColumn] =
+    useState<KanbanColumnStatus | null>(null)
   const [menuTaskId, setMenuTaskId] = useState<string | null>(null)
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  })
   const [noteDraft, setNoteDraft] = useState('')
   const columns = compact ? COMPACT_COLUMNS : DEFAULT_COLUMNS
   const updateTaskStatus = useTaskStore((state) => state.updateTaskStatus)
@@ -156,10 +175,13 @@ export function KanbanBoard({
     return Array.from(merged.values())
   }, [missionId, missionTasks, tasks])
 
-  const agentNameById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents])
+  const agentNameById = useMemo(
+    () => new Map(agents.map((agent) => [agent.id, agent.name])),
+    [agents],
+  )
 
   const tasksByColumn = useMemo(() => {
-    const grouped: Record<KanbanColumnStatus, HubTask[]> = {
+    const grouped: Record<KanbanColumnStatus, Array<HubTask>> = {
       backlog: [],
       in_progress: [],
       review: [],
@@ -170,8 +192,7 @@ export function KanbanBoard({
       const key = mapTaskStatusToColumn(task.status)
       grouped[key].push(task)
     })
-
-    ;(Object.keys(grouped) as KanbanColumnStatus[]).forEach((status) => {
+    ;(Object.keys(grouped) as Array<KanbanColumnStatus>).forEach((status) => {
       grouped[status].sort((left, right) => right.updatedAt - left.updatedAt)
     })
 
@@ -208,12 +229,16 @@ export function KanbanBoard({
     if (nextColumn === 'review') {
       const task = mergedTasks.find((t) => t.id === taskId)
       if (task) {
-        const agentName = task.agentId ? (agentNameById.get(task.agentId) ?? task.agentId) : 'Unassigned'
+        const agentName = task.agentId
+          ? (agentNameById.get(task.agentId) ?? task.agentId)
+          : 'Unassigned'
         addApproval({
           agentId: task.agentId ?? 'unassigned',
           agentName,
           action: `Review task: ${task.title}`,
-          context: task.description || `Task "${task.title}" has been moved to Review and is awaiting approval.`,
+          context:
+            task.description ||
+            `Task "${task.title}" has been moved to Review and is awaiting approval.`,
           source: 'agent',
         })
       }
@@ -232,14 +257,16 @@ export function KanbanBoard({
                 key={column.key}
                 onDragOver={(event) => {
                   event.preventDefault()
-                  if (dragOverColumn !== column.key) setDragOverColumn(column.key)
+                  if (dragOverColumn !== column.key)
+                    setDragOverColumn(column.key)
                 }}
                 onDragLeave={() => {
                   if (dragOverColumn === column.key) setDragOverColumn(null)
                 }}
                 onDrop={(event) => {
                   event.preventDefault()
-                  const taskId = event.dataTransfer.getData('text/plain') || draggedTaskId
+                  const taskId =
+                    event.dataTransfer.getData('text/plain') || draggedTaskId
                   if (taskId) moveTask(taskId, column.key)
                   setDraggedTaskId(null)
                   setDragOverColumn(null)
@@ -247,7 +274,8 @@ export function KanbanBoard({
                 className={cn(
                   'flex min-h-0 min-w-0 flex-col rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]',
                   'max-h-[calc(100vh-15rem)] lg:max-h-[calc(100vh-13rem)]',
-                  dragOverColumn === column.key && 'border-orange-400/70 bg-[var(--theme-card2)]',
+                  dragOverColumn === column.key &&
+                    'border-orange-400/70 bg-[var(--theme-card2)]',
                 )}
               >
                 <header className="flex items-center justify-between border-b border-[var(--theme-border)] px-3 py-2.5">
@@ -267,7 +295,9 @@ export function KanbanBoard({
                   ) : null}
 
                   {columnTasks.map((task) => {
-                    const assignee = task.agentId ? agentNameById.get(task.agentId) ?? task.agentId : 'Unassigned'
+                    const assignee = task.agentId
+                      ? (agentNameById.get(task.agentId) ?? task.agentId)
+                      : 'Unassigned'
 
                     return (
                       <article
@@ -285,7 +315,10 @@ export function KanbanBoard({
                         onContextMenu={(event) => {
                           event.preventDefault()
                           setMenuTaskId(task.id)
-                          setMenuPosition({ x: event.clientX, y: event.clientY })
+                          setMenuPosition({
+                            x: event.clientX,
+                            y: event.clientY,
+                          })
                           setNoteDraft('')
                         }}
                         className={cn(
@@ -297,30 +330,55 @@ export function KanbanBoard({
                           title={task.title}
                           className={cn(
                             'font-semibold text-[var(--theme-text)]',
-                            compact ? 'truncate text-[12px] leading-4' : 'line-clamp-2 text-sm',
+                            compact
+                              ? 'truncate text-[12px] leading-4'
+                              : 'line-clamp-2 text-sm',
                           )}
                         >
-                          {compact ? truncateCompactTitle(task.title) : task.title}
+                          {compact
+                            ? truncateCompactTitle(task.title)
+                            : task.title}
                         </h4>
 
-                        <div className={cn('flex items-center justify-between gap-2', compact ? 'mt-1.5' : 'mt-2')}>
+                        <div
+                          className={cn(
+                            'flex items-center justify-between gap-2',
+                            compact ? 'mt-1.5' : 'mt-2',
+                          )}
+                        >
                           <span
                             className={cn(
                               'rounded-full border font-semibold uppercase tracking-wide',
                               PRIORITY_BADGES[task.priority],
-                              compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]',
+                              compact
+                                ? 'px-1.5 py-0.5 text-[9px]'
+                                : 'px-2 py-0.5 text-[10px]',
                             )}
                           >
                             {PRIORITY_LABELS[task.priority]}
                           </span>
-                          <span className={cn('truncate text-[var(--theme-muted)]', compact ? 'max-w-[84px] text-[10px]' : 'text-[11px]')}>
+                          <span
+                            className={cn(
+                              'truncate text-[var(--theme-muted)]',
+                              compact
+                                ? 'max-w-[84px] text-[10px]'
+                                : 'text-[11px]',
+                            )}
+                          >
                             {assignee}
                           </span>
                         </div>
 
                         {onAssignAgent ? (
                           <div className={cn(compact ? 'mt-1.5' : 'mt-2')}>
-                            <label className={cn('mb-1 block font-medium uppercase tracking-wide text-[var(--theme-muted)]', compact ? 'text-[9px]' : 'text-[10px]')}>Assign</label>
+                            <label
+                              className={cn(
+                                'mb-1 block font-medium uppercase tracking-wide text-[var(--theme-muted)]',
+                                compact ? 'text-[9px]' : 'text-[10px]',
+                              )}
+                            >
+                              Assign
+                            </label>
                             <select
                               value={task.agentId ?? ''}
                               onChange={(event) => {
@@ -335,18 +393,27 @@ export function KanbanBoard({
                               }}
                               className={cn(
                                 'w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 text-[var(--theme-text)] outline-none',
-                                compact ? 'py-1 text-[10px]' : 'py-1 text-[11px]',
+                                compact
+                                  ? 'py-1 text-[10px]'
+                                  : 'py-1 text-[11px]',
                               )}
                             >
                               <option value="">Unassigned</option>
                               {agents.map((agent) => (
-                                <option key={agent.id} value={agent.id}>{agent.name}</option>
+                                <option key={agent.id} value={agent.id}>
+                                  {agent.name}
+                                </option>
                               ))}
                             </select>
                           </div>
                         ) : null}
 
-                        <p className={cn('text-[var(--theme-muted)]', compact ? 'mt-1.5 text-[10px]' : 'mt-2 text-[11px]')}>
+                        <p
+                          className={cn(
+                            'text-[var(--theme-muted)]',
+                            compact ? 'mt-1.5 text-[10px]' : 'mt-2 text-[11px]',
+                          )}
+                        >
                           {formatTimeInColumn(task.updatedAt)}
                         </p>
                       </article>
@@ -368,26 +435,42 @@ export function KanbanBoard({
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">Task Actions</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+            Task Actions
+          </p>
 
-          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Change priority</label>
+          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">
+            Change priority
+          </label>
           <div className="mb-3 grid grid-cols-2 gap-1">
-            {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((priority) => (
-              <button
-                key={priority}
-                type="button"
-                onClick={() => {
-                  updateTask(menuTaskId, (task) => ({ ...task, priority, updatedAt: Date.now() }))
-                  setMenuTaskId(null)
-                }}
-                className={cn('rounded-md border px-2 py-1 text-left text-[11px] font-medium transition-colors', PRIORITY_BADGES[priority], 'hover:brightness-110')}
-              >
-                {PRIORITY_LABELS[priority]}
-              </button>
-            ))}
+            {(Object.keys(PRIORITY_LABELS) as Array<TaskPriority>).map(
+              (priority) => (
+                <button
+                  key={priority}
+                  type="button"
+                  onClick={() => {
+                    updateTask(menuTaskId, (task) => ({
+                      ...task,
+                      priority,
+                      updatedAt: Date.now(),
+                    }))
+                    setMenuTaskId(null)
+                  }}
+                  className={cn(
+                    'rounded-md border px-2 py-1 text-left text-[11px] font-medium transition-colors',
+                    PRIORITY_BADGES[priority],
+                    'hover:brightness-110',
+                  )}
+                >
+                  {PRIORITY_LABELS[priority]}
+                </button>
+              ),
+            )}
           </div>
 
-          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Reassign agent</label>
+          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">
+            Reassign agent
+          </label>
           <select
             className="mb-3 w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none"
             defaultValue=""
@@ -403,11 +486,15 @@ export function KanbanBoard({
           >
             <option value="">Unassigned</option>
             {agents.map((agent) => (
-              <option key={agent.id} value={agent.id}>{agent.name}</option>
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
             ))}
           </select>
 
-          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Add note</label>
+          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">
+            Add note
+          </label>
           <textarea
             value={noteDraft}
             onChange={(event) => setNoteDraft(event.target.value)}

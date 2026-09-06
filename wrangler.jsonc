@@ -5,10 +5,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   "vars": {
     "HERMES_PUBLIC_DEPLOY": "1",
-    "VITE_PLAYGROUND_STATS_URL": "https://hermes-playground-ws.myaurora-agi.workers.dev/stats"
-  }
+    "VITE_PLAYGROUND_STATS_URL": "https://hermes-playground-ws.myaurora-agi.workers.dev/stats",
+  },
 }

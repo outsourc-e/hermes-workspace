@@ -1,27 +1,37 @@
-import type { ReactNode } from 'react';
-import type { WidgetState } from '../../server/hud/types';
+import type { ReactNode } from 'react'
+import type { WidgetState } from '../../server/hud/types'
 
 interface WidgetShellProps {
-  state: WidgetState;
-  title: string;
-  fetchedAt?: number;
-  error?: { message: string; code?: string };
-  children: ReactNode;
-  className?: string;
+  state: WidgetState
+  title: string
+  fetchedAt?: number
+  error?: { message: string; code?: string }
+  children: ReactNode
+  className?: string
 }
 
-export function WidgetShell({ state, title, fetchedAt, error, children, className = '' }: WidgetShellProps) {
-  if (state === 'disabled') return null;
+export function WidgetShell({
+  state,
+  title,
+  fetchedAt,
+  error,
+  children,
+  className = '',
+}: WidgetShellProps) {
+  if (state === 'disabled') return null
 
   if (state === 'loading') {
     return (
       <div className={`relative ${className}`} aria-label={`${title} loading`}>
-        <div data-testid="skeleton" className="animate-pulse bg-[#161b22] rounded h-full min-h-[36px]" />
+        <div
+          data-testid="skeleton"
+          className="animate-pulse bg-[#161b22] rounded h-full min-h-[36px]"
+        />
       </div>
-    );
+    )
   }
 
-  const ageMin = fetchedAt ? Math.round((Date.now() - fetchedAt) / 60000) : null;
+  const ageMin = fetchedAt ? Math.round((Date.now() - fetchedAt) / 60000) : null
 
   return (
     <div className={`relative ${className}`}>
@@ -42,5 +52,5 @@ export function WidgetShell({ state, title, fetchedAt, error, children, classNam
         </button>
       )}
     </div>
-  );
+  )
 }

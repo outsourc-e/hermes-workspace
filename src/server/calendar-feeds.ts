@@ -11,21 +11,18 @@
  * On fetch failure, serves stale data with a warning flag.
  */
 
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import nodeIcal from 'node-ical'
 
 // Pull off named members via the default export — `import * as ical from 'node-ical'`
 // resolves to an interop namespace whose runtime shape varies between vite-bundled
 // SSR and plain Node ESM (tsx), where `parseICS` lands on `default` rather than
 // the namespace itself. Bind via the default to work in both.
-const parseICS = nodeIcal.parseICS ?? (nodeIcal as { default?: typeof nodeIcal }).default?.parseICS
-const expandRecurringEvent =
-  (nodeIcal as unknown as { expandRecurringEvent?: typeof nodeIcal.expandRecurringEvent })
-    .expandRecurringEvent ??
-  ((nodeIcal as { default?: { expandRecurringEvent?: typeof nodeIcal.expandRecurringEvent } })
-    .default?.expandRecurringEvent)
+
+const parseICS = nodeIcal.parseICS
+const expandRecurringEvent = nodeIcal.expandRecurringEvent
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -62,7 +59,7 @@ export type CalendarEvent = {
 
 export type FeedFetchResult = {
   feed_id: string
-  events: CalendarEvent[]
+  events: Array<CalendarEvent>
   status: FeedStatus
   last_fetched: number
   error?: string
@@ -78,12 +75,12 @@ function hermesHome(): string {
   )
 }
 
-function loadFeedsConfig(): FeedConfig[] {
+function loadFeedsConfig(): Array<FeedConfig> {
   const cfgPath = join(hermesHome(), 'calendar', 'feeds.json')
   if (!existsSync(cfgPath)) return []
   try {
     const raw = readFileSync(cfgPath, 'utf8')
-    const parsed = JSON.parse(raw) as { feeds?: FeedConfig[] }
+    const parsed = JSON.parse(raw) as { feeds?: Array<FeedConfig> }
     return parsed.feeds?.filter((f) => f.enabled) ?? []
   } catch {
     console.error('[calendar-feeds] Failed to parse feeds.json')
@@ -137,14 +134,17 @@ function buildCaldavQuery(start: Date, end: Date): string {
 }
 
 function formatCalDate(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  return d
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '')
 }
 
 async function fetchFeedEvents(
   feed: FeedConfig,
   start: Date,
   end: Date,
-): Promise<{ icsData: string[]; status: FeedStatus; error?: string }> {
+): Promise<{ icsData: Array<string>; status: FeedStatus; error?: string }> {
   if (feed.source_type === 'caldav') {
     return fetchCaldavFeed(feed, start, end)
   }
@@ -157,7 +157,7 @@ async function fetchCaldavFeed(
   feed: FeedConfig,
   start: Date,
   end: Date,
-): Promise<{ icsData: string[]; status: FeedStatus; error?: string }> {
+): Promise<{ icsData: Array<string>; status: FeedStatus; error?: string }> {
   const username = loadEnvVar(feed.auth_env?.user_var ?? 'ICLOUD_APPLE_ID')
   const password = loadEnvVar(feed.auth_env?.pass_var ?? 'ICLOUD_APP_PASSWORD')
 
@@ -174,8 +174,8 @@ async function fetchCaldavFeed(
       method: 'REPORT',
       headers: {
         'Content-Type': 'application/xml; charset=utf-8',
-        'Depth': '1',
-        'Authorization':
+        Depth: '1',
+        Authorization:
           'Basic ' + Buffer.from(`${username}:${password}`).toString('base64'),
       },
       body,
@@ -192,7 +192,7 @@ async function fetchCaldavFeed(
 
     const xml = await r.text()
     // Parse multi-status XML response to extract calendar-data elements
-    const icsData: string[] = []
+    const icsData: Array<string> = []
     const regex = /<C:calendar-data[^>]*>([\s\S]*?)<\/C:calendar-data>/g
     let match: RegExpExecArray | null
     while ((match = regex.exec(xml)) !== null) {
@@ -213,7 +213,7 @@ async function fetchHttpIcalFeed(
   feed: FeedConfig,
   start: Date,
   end: Date,
-): Promise<{ icsData: string[]; status: FeedStatus; error?: string }> {
+): Promise<{ icsData: Array<string>; status: FeedStatus; error?: string }> {
   try {
     const url = feed.url.startsWith('webcal://')
       ? feed.url.replace('webcal://', 'https://')
@@ -241,7 +241,12 @@ async function fetchHttpIcalFeed(
 
 function buildCalendarEvent(
   feed: FeedConfig,
-  vevent: { uid?: string; summary?: string; location?: string; description?: string },
+  vevent: {
+    uid?: string
+    summary?: string
+    location?: string
+    description?: string
+  },
   instanceStart: Date,
   instanceEnd: Date,
   isFullDay: boolean,
@@ -285,18 +290,18 @@ function buildCalendarEvent(
 }
 
 export function parseIcsData(
-  icsArray: string[],
+  icsArray: Array<string>,
   feed: FeedConfig,
   start: Date,
   end: Date,
-): CalendarEvent[] {
-  const events: CalendarEvent[] = []
+): Array<CalendarEvent> {
+  const events: Array<CalendarEvent> = []
 
   for (const icsText of icsArray) {
     try {
       const parsed = parseICS(icsText)
       for (const [_key, obj] of Object.entries(parsed)) {
-        if (obj.type !== 'VEVENT') continue
+        if (obj?.type !== 'VEVENT') continue
         const ev = obj as {
           uid?: string
           summary?: string
@@ -319,22 +324,21 @@ export function parseIcsData(
         // (node-ical handles RRULE / EXDATE / RECURRENCE-ID overrides).
         if (ev.rrule) {
           try {
-            if (!expandRecurringEvent) {
-              // Older node-ical without RRULE expansion — fall back to
-              // single-occurrence handling below.
-              throw new Error('expandRecurringEvent unavailable')
-            }
-            const instances = expandRecurringEvent(ev as Parameters<typeof expandRecurringEvent>[0], {
-              from: start,
-              to: end,
-              expandOngoing: true,
-            }) as Array<{ start: Date; end: Date; isFullDay: boolean }>
+            const instances = expandRecurringEvent(
+              ev as Parameters<typeof expandRecurringEvent>[0],
+              {
+                from: start,
+                to: end,
+                expandOngoing: true,
+              },
+            ) as Array<{ start: Date; end: Date; isFullDay: boolean }>
             for (const inst of instances) {
               events.push(
                 buildCalendarEvent(
                   feed,
                   ev,
                   inst.start,
+                  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS narrows incorrectly, the LHS can be null/undefined at runtime
                   inst.end ?? inst.start,
                   inst.isFullDay,
                   true,
@@ -368,7 +372,10 @@ export function parseIcsData(
         )
       }
     } catch (parseErr: unknown) {
-      console.error(`[calendar-feeds] Failed to parse ICS for ${feed.id}:`, parseErr)
+      console.error(
+        `[calendar-feeds] Failed to parse ICS for ${feed.id}:`,
+        parseErr,
+      )
     }
   }
 
@@ -402,7 +409,11 @@ function getCached(feedId: string): FeedFetchResult | null {
   return entry.data
 }
 
-function setCached(feedId: string, data: FeedFetchResult, ttl_ms: number): void {
+function setCached(
+  feedId: string,
+  data: FeedFetchResult,
+  ttl_ms: number,
+): void {
   cache.set(feedId, { data, fetched_at: Date.now(), ttl_ms })
 }
 
@@ -430,7 +441,7 @@ export async function fetchSingleFeed(
           result = {
             ...stale,
             status: 'stale',
-            error: null,
+            error: undefined,
             last_fetched: Date.now(),
           }
         } else {
@@ -483,7 +494,7 @@ export async function fetchSingleFeed(
 export async function fetchAllFeeds(
   start: Date,
   end: Date,
-): Promise<FeedFetchResult[]> {
+): Promise<Array<FeedFetchResult>> {
   const feeds = loadFeedsConfig()
   return Promise.all(feeds.map((f) => fetchSingleFeed(f, start, end)))
 }
@@ -491,7 +502,7 @@ export async function fetchAllFeeds(
 // ── Public API ───────────────────────────────────────────────────────────
 
 export async function getWeekEvents(): Promise<{
-  events: CalendarEvent[]
+  events: Array<CalendarEvent>
   feed_statuses: Record<string, FeedStatus>
   last_updated: number
 }> {
@@ -504,7 +515,7 @@ export async function getWeekEvents(): Promise<{
 
   const results = await fetchAllFeeds(start, end)
 
-  const allEvents: CalendarEvent[] = []
+  const allEvents: Array<CalendarEvent> = []
   const feedStatuses: Record<string, FeedStatus> = {}
 
   for (const r of results) {
@@ -534,7 +545,7 @@ function adelaideDateKey(d: Date): string {
 }
 
 export async function getTodayEvents(): Promise<{
-  events: CalendarEvent[]
+  events: Array<CalendarEvent>
   feed_statuses: Record<string, FeedStatus>
   last_updated: number
 }> {
@@ -551,7 +562,7 @@ export async function getTodayEvents(): Promise<{
 
   const results = await fetchAllFeeds(start, end)
 
-  let allEvents: CalendarEvent[] = []
+  let allEvents: Array<CalendarEvent> = []
   const feedStatuses: Record<string, FeedStatus> = {}
 
   for (const r of results) {

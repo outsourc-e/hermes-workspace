@@ -2,13 +2,9 @@
  * GET  /api/share/:id  — retrieve share content
  * DELETE /api/share/:id — delete a share
  */
-import { createFileRoute } from '@tanstack/react-router'
-import {
-  existsSync,
-  readFileSync,
-  rmSync,
-} from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import type { ShareMeta } from './index'
 
@@ -27,16 +23,24 @@ function safeId(id: string): boolean {
 }
 
 function isLocalRequest(request: Request): boolean {
-  const maybeAddress = (request as unknown as { remoteAddress?: string }).remoteAddress
+  const maybeAddress = (request as unknown as { remoteAddress?: string })
+    .remoteAddress
   const ip = (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
-  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip)) return true
+  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip))
+    return true
   if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return true
   if (/^192\.168\./.test(ip)) return true
   if (/^10\./.test(ip)) return true
   return false
 }
 
-async function handleGET({ request, params }: { request: Request; params: Record<string, string> }): Promise<Response> {
+async function handleGET({
+  request,
+  params,
+}: {
+  request: Request
+  params: Record<string, string>
+}): Promise<Response> {
   if (!isAuthenticated(request) && !isLocalRequest(request)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
@@ -44,7 +48,7 @@ async function handleGET({ request, params }: { request: Request; params: Record
     })
   }
 
-  const id = params.id ?? ''
+  const id = params.id
 
   if (!safeId(id)) {
     return new Response('Not found', { status: 404 })
@@ -90,7 +94,13 @@ async function handleGET({ request, params }: { request: Request; params: Record
   }
 }
 
-async function handleDELETE({ request, params }: { request: Request; params: Record<string, string> }): Promise<Response> {
+async function handleDELETE({
+  request,
+  params,
+}: {
+  request: Request
+  params: Record<string, string>
+}): Promise<Response> {
   if (!isAuthenticated(request) && !isLocalRequest(request)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
@@ -98,7 +108,7 @@ async function handleDELETE({ request, params }: { request: Request; params: Rec
     })
   }
 
-  const id = params.id ?? ''
+  const id = params.id
 
   if (!safeId(id)) {
     return new Response(JSON.stringify({ error: 'Not found' }), {

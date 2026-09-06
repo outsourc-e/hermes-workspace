@@ -133,8 +133,7 @@ export function CacheEfficiencyCard({
           aria-hidden
         >
           {dailyRates.map((rate, idx) => {
-            const heightPct =
-              max > 0 ? Math.max(6, (rate / max) * 100) : 6
+            const heightPct = max > 0 ? Math.max(6, (rate / max) * 100) : 6
             return (
               <div
                 key={idx}

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   __resetHubCacheForTests,
@@ -27,7 +27,11 @@ afterEach(() => {
     process.env.HERMES_HOME = originalHome
   }
   __resetHubCacheForTests()
-  try { rmSync(tmpHome, { recursive: true, force: true }) } catch { /* ignore */ }
+  try {
+    rmSync(tmpHome, { recursive: true, force: true })
+  } catch {
+    /* ignore */
+  }
 })
 
 describe('getCache / setCache', () => {
@@ -68,8 +72,8 @@ describe('getCache / setCache', () => {
   it('isolates different source keys', () => {
     setCache('mcp-get', { payload: 'a' })
     setCache('local', { payload: 'b' })
-    expect((getCache('mcp-get') as { payload: unknown })?.payload).toBe('a')
-    expect((getCache('local') as { payload: unknown })?.payload).toBe('b')
+    expect((getCache('mcp-get') as { payload: unknown }).payload).toBe('a')
+    expect((getCache('local') as { payload: unknown }).payload).toBe('b')
   })
 
   it('persists to disk (survives memory clear)', () => {
@@ -78,7 +82,7 @@ describe('getCache / setCache', () => {
     const result = getCache('mcp-get')
     expect(result).not.toBeNull()
     expect(result?.etag).toBe('"v1"')
-    expect((result?.payload as Record<string, unknown>)?.data).toBe('persisted')
+    expect((result?.payload as Record<string, unknown>).data).toBe('persisted')
   })
 })
 
@@ -88,7 +92,9 @@ describe('touchCache', () => {
     const before = getCache('mcp-get')!.fetchedAt
     // Small sleep to ensure timestamp differs
     const start = Date.now()
-    while (Date.now() === start) { /* spin */ }
+    while (Date.now() === start) {
+      /* spin */
+    }
     touchCache('mcp-get')
     const after = getCache('mcp-get')!
     expect(after.payload).toBe('original')
@@ -123,7 +129,9 @@ describe('touchCache', () => {
     // expiresAt is the memory TTL (capped at 30min by promotion); expiresAtDisk
     // carries the true disk expiry so callers can distinguish the two.
     const twentyThreeHoursMs = 23 * 60 * 60 * 1_000
-    expect(fromDisk.expiresAtDisk).toBeGreaterThan(Date.now() + twentyThreeHoursMs)
+    expect(fromDisk.expiresAtDisk).toBeGreaterThan(
+      Date.now() + twentyThreeHoursMs,
+    )
   })
 })
 

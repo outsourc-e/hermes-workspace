@@ -57,8 +57,14 @@ export function UptimeWidget() {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-[var(--theme-muted)]">LATENCY</span>
-          <span className={`text-sm font-bold ${health && health.latencyMs > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {health ? (health.latencyMs < 0 ? 'offline' : `${health.latencyMs}ms`) : '—'}
+          <span
+            className={`text-sm font-bold ${health && health.latencyMs > 0 ? 'text-emerald-400' : 'text-red-400'}`}
+          >
+            {health
+              ? health.latencyMs < 0
+                ? 'offline'
+                : `${health.latencyMs}ms`
+              : '—'}
           </span>
         </div>
         <div className="flex items-center justify-between">

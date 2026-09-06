@@ -100,8 +100,7 @@ export function SettingsSidebar({ activeId }: { activeId: SettingsNavId }) {
 export function SettingsMobilePills({ activeId }: { activeId: SettingsNavId }) {
   const activeClass =
     'bg-[var(--theme-accent)] text-[var(--theme-bg)] font-semibold'
-  const inactiveClass =
-    'bg-primary-100 text-primary-600 hover:bg-primary-200'
+  const inactiveClass = 'bg-primary-100 text-primary-600 hover:bg-primary-200'
   return (
     <div className="scrollbar-none flex gap-1.5 overflow-x-auto pb-2 md:hidden">
       {SETTINGS_NAV_ITEMS.map((item) => {

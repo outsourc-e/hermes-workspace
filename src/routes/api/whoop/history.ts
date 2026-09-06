@@ -4,11 +4,11 @@
  * Returns the last 7 days of Whoop data from the personal-projects pipeline.
  * Each day's snapshot is stored as separate JSON files.
  */
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-import { readdirSync, readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 
 const WHOOP_DIR = join(homedir(), '.hermes/repos/nw-personal-projects/whoop')
 
@@ -26,14 +26,14 @@ export const Route = createFileRoute('/api/whoop/history')({
       GET: async () => {
         if (!existsSync(WHOOP_DIR)) return json([])
 
-        let files: string[] = []
+        let files: Array<string> = []
         try {
-          files = readdirSync(WHOOP_DIR).filter(f => f.endsWith('.json'))
+          files = readdirSync(WHOOP_DIR).filter((f) => f.endsWith('.json'))
         } catch {
           return json([])
         }
 
-        const days: DayEntry[] = []
+        const days: Array<DayEntry> = []
         const cutoff = new Date()
         cutoff.setDate(cutoff.getDate() - 7)
 
@@ -47,13 +47,18 @@ export const Route = createFileRoute('/api/whoop/history')({
             if (date >= cutoff) {
               days.push({
                 date: dateStr,
-                recoveryPct: typeof d.recovery_pct === 'number' ? d.recovery_pct : null,
+                recoveryPct:
+                  typeof d.recovery_pct === 'number' ? d.recovery_pct : null,
                 hrvMs: typeof d.hrv_ms === 'number' ? d.hrv_ms : null,
-                dayStrain: typeof d.day_strain === 'number' ? d.day_strain : null,
-                sleepHours: typeof d.sleep_hours === 'number' ? d.sleep_hours : null,
+                dayStrain:
+                  typeof d.day_strain === 'number' ? d.day_strain : null,
+                sleepHours:
+                  typeof d.sleep_hours === 'number' ? d.sleep_hours : null,
               })
             }
-          } catch { /* skip invalid files */ }
+          } catch {
+            /* skip invalid files */
+          }
         }
 
         days.sort((a, b) => a.date.localeCompare(b.date))

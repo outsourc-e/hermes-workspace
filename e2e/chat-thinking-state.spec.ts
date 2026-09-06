@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 test.describe('Chat thinking state #449', () => {
-  test('should not show stale thinking state after page refresh for completed session', async ({ page }) => {
+  test('should not show stale thinking state after page refresh for completed session', async ({
+    page,
+  }) => {
     // This test simulates the exact bug scenario described in Issue #449:
     // User had a conversation, the stream completed (clearing waiting state),
     // page refreshes, and the assistant briefly shows "thinking" state.
@@ -10,15 +12,18 @@ test.describe('Chat thinking state #449', () => {
     const SESSION_PATH = '/chat/20260515_150106_4be3a000'
 
     // Inject a stale waiting entry for THIS session before the page loads
-    await page.addInitScript((sessionKey) => {
-      window.sessionStorage.setItem(
-        `claude_waiting_${sessionKey}`,
-        JSON.stringify({
-          since: Date.now() - 30000, // 30s ago — within the 120s TTL
-          runId: 'stale-run-id',
-        }),
-      )
-    }, SESSION_PATH.replace('/chat/', ''))
+    await page.addInitScript(
+      (sessionKey) => {
+        window.sessionStorage.setItem(
+          `claude_waiting_${sessionKey}`,
+          JSON.stringify({
+            since: Date.now() - 30000, // 30s ago — within the 120s TTL
+            runId: 'stale-run-id',
+          }),
+        )
+      },
+      SESSION_PATH.replace('/chat/', ''),
+    )
 
     // Navigate directly to the session
     await page.goto(SESSION_PATH)

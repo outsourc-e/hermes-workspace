@@ -131,6 +131,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         if (isDone.current) return
         isDone.current = true
         clearTimeout(failureTimer)
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- pollTimer narrowed after assignment
         if (autoStartTimer) clearTimeout(autoStartTimer)
         if (pollTimer) clearTimeout(pollTimer)
         onConnectedRef.current(status)
@@ -145,10 +146,10 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
     return () => {
       isDone.current = true
       if (pollTimer) clearTimeout(pollTimer)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- pollTimer narrowed after assignment
       if (autoStartTimer) clearTimeout(autoStartTimer)
       clearTimeout(failureTimer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -255,9 +256,9 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               Welcome! Let&apos;s connect your backend
             </p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace works with any OpenAI-compatible backend. Hermes Agent
-              gateway APIs unlock enhanced features automatically when they are
-              available.
+              Hermes Workspace works with any OpenAI-compatible backend. Hermes
+              Agent gateway APIs unlock enhanced features automatically when
+              they are available.
             </p>
 
             {/* Auto-start section */}

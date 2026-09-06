@@ -5,11 +5,11 @@
  * Uses long-lived access token from ~/.hermes/.env (SPOTIFY_ACCESS_TOKEN).
  * Refreshes token if expired using SPOTIFY_REFRESH_TOKEN.
  */
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 
 type SpotifyTrack = {
   name: string
@@ -35,10 +35,15 @@ async function getSpotifyToken(): Promise<string | null> {
   return null
 }
 
-async function fetchNowPlaying(accessToken: string): Promise<SpotifyTrack | null> {
-  const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
+async function fetchNowPlaying(
+  accessToken: string,
+): Promise<SpotifyTrack | null> {
+  const r = await fetch(
+    'https://api.spotify.com/v1/me/player/currently-playing',
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  )
 
   if (r.status === 204 || r.status === 404) return null
   if (r.status === 401) return null // token expired

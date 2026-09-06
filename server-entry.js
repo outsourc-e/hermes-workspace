@@ -128,7 +128,8 @@ async function tryServeStatic(req, res) {
     } catch {
       res.writeHead(404, {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control':
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
       })
       res.end('Asset not found')
       return true

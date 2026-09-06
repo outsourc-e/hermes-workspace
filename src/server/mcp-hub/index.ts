@@ -41,9 +41,7 @@ async function getInstalledNames(): Promise<Set<string>> {
 
     // Config may be wrapped in { config: {...} } shape
     const root =
-      config && typeof config === 'object' && 'config' in config
-        ? config.config
-        : config
+      typeof config === 'object' && 'config' in config ? config.config : config
 
     const mcp =
       root && typeof root === 'object'

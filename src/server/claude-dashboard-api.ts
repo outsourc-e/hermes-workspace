@@ -1,7 +1,4 @@
-import {
-  dashboardFetch,
-  CLAUDE_DASHBOARD_URL,
-} from './gateway-capabilities'
+import { CLAUDE_DASHBOARD_URL, dashboardFetch } from './gateway-capabilities'
 
 export type DashboardSession = {
   id: string
@@ -67,7 +64,7 @@ export type EnvVarInfo = {
   url?: string | null
   category?: string
   is_password?: boolean
-  tools?: string[]
+  tools?: Array<string>
   advanced?: boolean
 }
 
@@ -91,7 +88,7 @@ export type ToolsetInfo = {
   description: string
   enabled: boolean
   configured: boolean
-  tools: string[]
+  tools: Array<string>
 }
 
 export type DashboardStatus = {
@@ -115,15 +112,16 @@ async function dashboardJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function listSessions(limit = 50, offset = 0): Promise<{
-  sessions: DashboardSession[]
+export async function listSessions(
+  limit = 50,
+  offset = 0,
+): Promise<{
+  sessions: Array<DashboardSession>
   total: number
   limit: number
   offset: number
 }> {
-  return dashboardJson(
-    `/api/sessions?limit=${limit}&offset=${offset}`,
-  )
+  return dashboardJson(`/api/sessions?limit=${limit}&offset=${offset}`)
 }
 
 export async function getSession(id: string): Promise<DashboardSession> {
@@ -131,14 +129,16 @@ export async function getSession(id: string): Promise<DashboardSession> {
 }
 
 export async function getSessionMessages(id: string): Promise<{
-  messages: DashboardMessage[]
+  messages: Array<DashboardMessage>
   session_started?: number
   model?: string
 }> {
   return dashboardJson(`/api/sessions/${encodeURIComponent(id)}/messages`)
 }
 
-export async function searchSessions(q: string): Promise<SessionSearchResponse> {
+export async function searchSessions(
+  q: string,
+): Promise<SessionSearchResponse> {
   return dashboardJson(`/api/sessions/search?q=${encodeURIComponent(q)}`)
 }
 
@@ -177,7 +177,7 @@ export async function forkSession(
   })
 }
 
-export async function getSkills(): Promise<SkillInfo[]> {
+export async function getSkills(): Promise<Array<SkillInfo>> {
   return dashboardJson('/api/skills')
 }
 
@@ -198,7 +198,7 @@ export async function getConfig(): Promise<Record<string, unknown>> {
 
 export async function getConfigSchema(): Promise<{
   fields: Record<string, unknown>
-  category_order: string[]
+  category_order: Array<string>
 }> {
   return dashboardJson('/api/config/schema')
 }
@@ -255,16 +255,13 @@ export async function saveConfig(
 ): Promise<{ ok: boolean }> {
   let merged: Record<string, unknown> = config
   try {
-    const current = await getConfig()
+    const current = (await getConfig()) as Record<string, unknown> | undefined
     // Dashboards have historically wrapped the config in `{ config: {...} }`.
     // Support both shapes defensively.
     const base =
       current && typeof current === 'object' && 'config' in current
-        ? ((current as Record<string, unknown>).config as Record<
-            string,
-            unknown
-          >)
-        : (current as Record<string, unknown>)
+        ? (current.config as Record<string, unknown>)
+        : current
     if (base && typeof base === 'object') {
       merged = deepMerge(base, config)
     }
@@ -313,7 +310,7 @@ export async function deleteEnvVar(key: string): Promise<{ ok: boolean }> {
   })
 }
 
-export async function getCronJobs(): Promise<CronJob[]> {
+export async function getCronJobs(): Promise<Array<CronJob>> {
   return dashboardJson('/api/cron/jobs')
 }
 
@@ -362,7 +359,7 @@ export async function getModelInfo(): Promise<Record<string, unknown>> {
   return dashboardJson('/api/model/info')
 }
 
-export async function getToolsets(): Promise<ToolsetInfo[]> {
+export async function getToolsets(): Promise<Array<ToolsetInfo>> {
   return dashboardJson('/api/tools/toolsets')
 }
 

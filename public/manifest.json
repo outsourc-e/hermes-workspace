@@ -6,19 +6,11 @@
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
-  "display_override": [
-    "window-controls-overlay",
-    "standalone",
-    "browser"
-  ],
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "orientation": "any",
   "background_color": "#0A0E1A",
   "theme_color": "#031A1A",
-  "categories": [
-    "productivity",
-    "utilities",
-    "developer"
-  ],
+  "categories": ["productivity", "utilities", "developer"],
   "icons": [
     {
       "src": "/claude-icon-192.png",

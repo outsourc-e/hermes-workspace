@@ -161,7 +161,7 @@ export function McpScreen() {
               </div>
 
               {hubQuery.data?.warnings && hubQuery.data.warnings.length > 0 ? (
-                hubQuery.data.results && hubQuery.data.results.length > 0 ? (
+                hubQuery.data.results.length > 0 ? (
                   <p className="text-xs text-amber-700 dark:text-amber-300">
                     ⚠ One or more sources unavailable; showing local results.
                     <span className="ml-1 text-[11px] text-primary-500">

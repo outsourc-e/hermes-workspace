@@ -41,7 +41,10 @@ export function ClinitrackWidget() {
 
   const isOk = status?.ok
   const lastChecked = status?.checkedAt
-    ? new Date(status.checkedAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(status.checkedAt).toLocaleTimeString('en-AU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
     : '—'
 
   return (

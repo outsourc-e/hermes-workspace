@@ -105,19 +105,22 @@ Output format: Signal cards with: Market, Direction (YES/NO), Materiality (0-1),
   'pc1-coder': {
     emoji: '💻',
     description: 'Local coding model (Qwen3-Coder 30B)',
-    systemPrompt: 'You are a coding assistant running on local hardware. Focus on code generation, refactoring, and debugging. Be concise.',
+    systemPrompt:
+      'You are a coding assistant running on local hardware. Focus on code generation, refactoring, and debugging. Be concise.',
     color: '#06b6d4',
   },
   'pc1-planner': {
     emoji: '📋',
     description: 'Local planning model (Qwen3-30B Sonnet distill)',
-    systemPrompt: 'You are a planning assistant. Break down complex tasks into actionable steps. Create clear task lists with dependencies and priorities.',
+    systemPrompt:
+      'You are a planning assistant. Break down complex tasks into actionable steps. Create clear task lists with dependencies and priorities.',
     color: '#14b8a6',
   },
   'pc1-critic': {
     emoji: '🔍',
     description: 'Local critic model (Qwen3-14B Opus distill)',
-    systemPrompt: 'You are a code and content reviewer. Find bugs, logical errors, and improvements. Be thorough but constructive.',
+    systemPrompt:
+      'You are a code and content reviewer. Find bugs, logical errors, and improvements. Be thorough but constructive.',
     color: '#f97316',
   },
 }

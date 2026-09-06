@@ -8,7 +8,10 @@ export const Route = createFileRoute('/jarvis')({
 
 function JarvisPage() {
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-[#0a0e1a] text-[#e0f0ff] overflow-auto" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
+    <div
+      className="fixed inset-0 w-screen h-screen bg-[#0a0e1a] text-[#e0f0ff] overflow-auto"
+      style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
         
@@ -78,10 +81,12 @@ function JarvisMain() {
   const [Comp, setComp] = React.useState<React.ComponentType<any> | null>(null)
   React.useEffect(() => {
     let cancelled = false
-    import('../screens/jarvis/jarvis-screen').then(m => {
+    import('../screens/jarvis/jarvis-screen').then((m) => {
       if (!cancelled) setComp(() => m.default)
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (!Comp) {

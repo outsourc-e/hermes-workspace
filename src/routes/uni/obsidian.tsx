@@ -1,10 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { BrainIcon, FolderOpenIcon, File01Icon, SearchIcon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import {
+  ArrowLeft01Icon,
+  BrainIcon,
+  File01Icon,
+  FolderOpenIcon,
+  SearchIcon,
+} from '@hugeicons/core-free-icons'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export const Route = createFileRoute('/uni/obsidian')({
@@ -22,7 +28,7 @@ interface VaultEntry {
 }
 
 interface ListResponse {
-  entries: VaultEntry[]
+  entries: Array<VaultEntry>
 }
 
 interface SearchMatch {
@@ -32,7 +38,7 @@ interface SearchMatch {
 }
 
 interface SearchResponse {
-  matches: SearchMatch[]
+  matches: Array<SearchMatch>
 }
 
 // ─── Tree node ────────────────────────────────────────────────────────────────
@@ -56,7 +62,10 @@ function TreeNode({
 
   const { data } = useQuery<ListResponse>({
     queryKey: ['uni-brain-list', relPath],
-    queryFn: () => fetch(`/api/uni-brain?action=list&path=${encodeURIComponent(relPath)}`).then((r) => r.json()),
+    queryFn: () =>
+      fetch(
+        `/api/uni-brain?action=list&path=${encodeURIComponent(relPath)}`,
+      ).then((r) => r.json()),
     enabled: type === 'dir' && expanded,
     staleTime: 60_000,
   })
@@ -74,7 +83,12 @@ function TreeNode({
         }`}
         style={{ paddingLeft: `${8 + depth * 14}px` }}
       >
-        <HugeiconsIcon icon={File01Icon} size={11} strokeWidth={1.5} className="shrink-0" />
+        <HugeiconsIcon
+          icon={File01Icon}
+          size={11}
+          strokeWidth={1.5}
+          className="shrink-0"
+        />
         <span className="truncate">{name}</span>
       </button>
     )
@@ -88,7 +102,12 @@ function TreeNode({
         className="flex w-full items-center gap-1.5 rounded px-2 py-0.5 text-left text-[11px] text-[#8b949e] transition hover:bg-[#161b22] hover:text-[#c9d1d9]"
         style={{ paddingLeft: `${8 + depth * 14}px` }}
       >
-        <HugeiconsIcon icon={FolderOpenIcon} size={11} strokeWidth={1.5} className="shrink-0 text-[#58a6ff]" />
+        <HugeiconsIcon
+          icon={FolderOpenIcon}
+          size={11}
+          strokeWidth={1.5}
+          className="shrink-0 text-[#58a6ff]"
+        />
         <span className="truncate">{name}</span>
         <span className="ml-auto text-[#4d5566]">{expanded ? '▾' : '▸'}</span>
       </button>
@@ -126,13 +145,17 @@ function SearchResults({
   const { data, isFetching } = useQuery<SearchResponse>({
     queryKey: ['uni-brain-search', query],
     queryFn: () =>
-      fetch(`/api/uni-brain?action=search&q=${encodeURIComponent(query)}`).then((r) => r.json()),
+      fetch(`/api/uni-brain?action=search&q=${encodeURIComponent(query)}`).then(
+        (r) => r.json(),
+      ),
     enabled: query.length > 1,
     staleTime: 30_000,
   })
 
-  if (isFetching) return <p className="px-2 py-1 text-[10px] text-[#6e7681]">searching…</p>
-  if (!data || data.matches.length === 0) return <p className="px-2 py-1 text-[10px] text-[#4d5566]">no results</p>
+  if (isFetching)
+    return <p className="px-2 py-1 text-[10px] text-[#6e7681]">searching…</p>
+  if (!data || data.matches.length === 0)
+    return <p className="px-2 py-1 text-[10px] text-[#4d5566]">no results</p>
 
   return (
     <ul className="flex flex-col gap-0.5">
@@ -143,7 +166,9 @@ function SearchResults({
             onClick={() => onNavigate(m.path)}
             className="w-full rounded px-2 py-1 text-left hover:bg-[#161b22]"
           >
-            <p className="truncate text-[10px] text-[#58a6ff]">{m.path}:{m.line}</p>
+            <p className="truncate text-[10px] text-[#58a6ff]">
+              {m.path}:{m.line}
+            </p>
             <p className="truncate text-[10px] text-[#6e7681]">{m.snippet}</p>
           </button>
         </li>
@@ -158,8 +183,13 @@ function ContentPane({ filePath }: { filePath: string | null }) {
   const { data: content, isLoading } = useQuery<string>({
     queryKey: ['uni-brain-read', filePath],
     queryFn: () =>
-      fetch(`/api/uni-brain?action=read&path=${encodeURIComponent(filePath!)}`)
-        .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status} ${r.statusText}`)))),
+      fetch(
+        `/api/uni-brain?action=read&path=${encodeURIComponent(filePath!)}`,
+      ).then((r) =>
+        r.ok
+          ? r.text()
+          : Promise.reject(new Error(`${r.status} ${r.statusText}`)),
+      ),
     enabled: !!filePath,
     staleTime: 120_000,
   })
@@ -168,7 +198,12 @@ function ContentPane({ filePath }: { filePath: string | null }) {
     return (
       <div className="flex h-full items-center justify-center text-[#4d5566]">
         <div className="text-center font-mono text-sm">
-          <HugeiconsIcon icon={BrainIcon} size={32} strokeWidth={1} className="mx-auto mb-2 opacity-30" />
+          <HugeiconsIcon
+            icon={BrainIcon}
+            size={32}
+            strokeWidth={1}
+            className="mx-auto mb-2 opacity-30"
+          />
           <p>Select a note to read</p>
         </div>
       </div>
@@ -195,7 +230,9 @@ function ContentPane({ filePath }: { filePath: string | null }) {
 
   return (
     <div className="h-full overflow-y-auto px-6 py-5">
-      <p className="mb-3 font-mono text-[10px] text-[#4d5566] tracking-widest uppercase">{filePath}</p>
+      <p className="mb-3 font-mono text-[10px] text-[#4d5566] tracking-widest uppercase">
+        {filePath}
+      </p>
       <div className="prose prose-invert prose-sm max-w-none font-serif text-[13px] leading-relaxed text-[#e6edf3] [&>*:first-child]:mt-0 [&>p]:my-2 [&>ul]:my-2 [&>ol]:my-2 [&>h1]:text-base [&>h2]:text-[15px] [&>h3]:text-[13px] [&_strong]:text-[#c4b5fd] [&_code]:bg-[#161b22] [&_code]:px-1 [&_code]:rounded [&_a]:text-[#58a6ff] [&_a]:no-underline [&_a:hover]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-[#30363d] [&_blockquote]:pl-3 [&_blockquote]:text-[#8b949e]">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{processed}</ReactMarkdown>
       </div>
@@ -228,13 +265,16 @@ function ObsidianRoute() {
   // Root list
   const { data: rootData, isLoading: rootLoading } = useQuery<ListResponse>({
     queryKey: ['uni-brain-list', ''],
-    queryFn: () => fetch('/api/uni-brain?action=list&path=').then((r) => r.json()),
+    queryFn: () =>
+      fetch('/api/uni-brain?action=list&path=').then((r) => r.json()),
     staleTime: 60_000,
   })
 
   const resyncMutation = useMutation<void, Error>({
     mutationFn: () =>
-      fetch('/api/uni-brain?action=resync', { method: 'POST' }).then((r) => r.json()),
+      fetch('/api/uni-brain?action=resync', { method: 'POST' }).then((r) =>
+        r.json(),
+      ),
     onSuccess: () => {
       setResyncDisabled(true)
       setTimeout(() => setResyncDisabled(false), 30_000)
@@ -266,12 +306,18 @@ function ObsidianRoute() {
           <select
             className="w-full bg-[#0d1117] text-xs text-[#c9d1d9] outline-none"
             value={activeFile ?? ''}
-            onChange={(e) => { if (e.target.value) handleFileClick(e.target.value) }}
+            onChange={(e) => {
+              if (e.target.value) handleFileClick(e.target.value)
+            }}
           >
             <option value="">— Select note —</option>
-            {entries.filter((e) => e.type === 'file').map((e) => (
-              <option key={e.name} value={e.name}>{e.name}</option>
-            ))}
+            {entries
+              .filter((e) => e.type === 'file')
+              .map((e) => (
+                <option key={e.name} value={e.name}>
+                  {e.name}
+                </option>
+              ))}
           </select>
         </div>
       )}
@@ -281,8 +327,15 @@ function ObsidianRoute() {
         <aside className="flex w-56 shrink-0 flex-col border-r border-[#21262d] bg-[#0d1117]">
           {/* Sidebar header */}
           <div className="flex items-center gap-1.5 border-b border-[#21262d] px-2 py-2">
-            <HugeiconsIcon icon={BrainIcon} size={14} strokeWidth={1.5} className="text-[#c4b5fd]" />
-            <span className="flex-1 text-[11px] font-bold tracking-widest text-[#c4b5fd]">UNI BRAIN</span>
+            <HugeiconsIcon
+              icon={BrainIcon}
+              size={14}
+              strokeWidth={1.5}
+              className="text-[#c4b5fd]"
+            />
+            <span className="flex-1 text-[11px] font-bold tracking-widest text-[#c4b5fd]">
+              UNI BRAIN
+            </span>
             <button
               type="button"
               onClick={() => resyncMutation.mutate()}
@@ -297,7 +350,12 @@ function ObsidianRoute() {
           {/* Search */}
           <div className="border-b border-[#21262d] px-2 py-1.5">
             <div className="flex items-center gap-1 rounded border border-[#21262d] bg-[#161b22] px-2 py-1">
-              <HugeiconsIcon icon={SearchIcon} size={10} strokeWidth={1.5} className="text-[#4d5566]" />
+              <HugeiconsIcon
+                icon={SearchIcon}
+                size={10}
+                strokeWidth={1.5}
+                className="text-[#4d5566]"
+              />
               <input
                 type="text"
                 value={searchQuery}
@@ -308,7 +366,10 @@ function ObsidianRoute() {
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => { setSearchQuery(''); setSearchActive(false) }}
+                  onClick={() => {
+                    setSearchQuery('')
+                    setSearchActive(false)
+                  }}
                   className="text-[#4d5566] hover:text-[#c9d1d9] text-[10px]"
                 >
                   ×
@@ -322,7 +383,9 @@ function ObsidianRoute() {
             {searchActive ? (
               <SearchResults query={searchQuery} onNavigate={handleFileClick} />
             ) : rootLoading ? (
-              <p className="px-3 py-2 text-[10px] text-[#6e7681]">loading vault…</p>
+              <p className="px-3 py-2 text-[10px] text-[#6e7681]">
+                loading vault…
+              </p>
             ) : entries.length === 0 ? (
               <p className="px-3 py-2 text-[10px] text-[#4d5566]">
                 Vault empty — click ↻ to sync from home PC

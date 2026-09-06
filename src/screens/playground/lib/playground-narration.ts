@@ -14,7 +14,10 @@ import type { PlaygroundWorldId } from './playground-rpg'
 const STORAGE_KEY = 'hermes.playground.narration.played'
 const MUTE_KEY = 'hermes.playground.narration.muted'
 
-const NARRATION: Record<PlaygroundWorldId, { name: string; lines: string[] }> = {
+const NARRATION: Record<
+  PlaygroundWorldId,
+  { name: string; lines: Array<string> }
+> = {
   training: {
     name: 'Training Grounds',
     lines: [
@@ -97,7 +100,10 @@ loadPersist()
 function persistPlayed() {
   if (typeof window === 'undefined') return
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...state.played]))
+    window.sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([...state.played]),
+    )
   } catch {}
 }
 
@@ -132,30 +138,41 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   })
 }
 
-export function isNarrationMuted(): boolean { return state.muted }
+export function isNarrationMuted(): boolean {
+  return state.muted
+}
 
 export function setNarrationMuted(muted: boolean) {
   state.muted = muted
   if (typeof window !== 'undefined') {
-    try { window.localStorage.setItem(MUTE_KEY, muted ? '1' : '0') } catch {}
+    try {
+      window.localStorage.setItem(MUTE_KEY, muted ? '1' : '0')
+    } catch {}
   }
   if (muted) cancelNarration()
 }
 
 export function cancelNarration() {
   if (!state.enabled) return
-  try { window.speechSynthesis.cancel() } catch {}
+  try {
+    window.speechSynthesis.cancel()
+  } catch {}
   state.utterance = null
 }
 
-export function speakLines(lines: string[], opts: { rate?: number; pitch?: number; volume?: number } = {}) {
+export function speakLines(
+  lines: Array<string>,
+  opts: { rate?: number; pitch?: number; volume?: number } = {},
+) {
   if (!state.enabled || state.muted) return
   if (typeof window === 'undefined') return
   cancelNarration()
   if (!state.preferred) state.preferred = pickVoice()
   const synth = window.speechSynthesis
   // Browsers can stall after long pages; resume() is harmless when not paused.
-  try { synth.resume() } catch {}
+  try {
+    synth.resume()
+  } catch {}
   for (const line of lines) {
     const u = new SpeechSynthesisUtterance(line)
     if (state.preferred) u.voice = state.preferred
@@ -175,7 +192,7 @@ export function autoNarrateWorld(world: PlaygroundWorldId): boolean {
   if (!state.enabled || state.muted) return false
   if (state.played.has(world)) return false
   const data = NARRATION[world]
-  if (!data) return false
+
   state.played.add(world)
   persistPlayed()
   // Slight delay so it doesn't collide with the world transition sound.
@@ -186,12 +203,12 @@ export function autoNarrateWorld(world: PlaygroundWorldId): boolean {
 /** Force-play a world's narration (e.g. from a "What is this?" button). */
 export function narrateWorldNow(world: PlaygroundWorldId) {
   const data = NARRATION[world]
-  if (!data) return
+
   speakLines(data.lines)
 }
 
-export function narrationLinesFor(world: PlaygroundWorldId): string[] {
-  return NARRATION[world]?.lines ?? []
+export function narrationLinesFor(world: PlaygroundWorldId): Array<string> {
+  return NARRATION[world].lines
 }
 
 /** Reset session-played state (useful for a fresh demo recording). */

@@ -42,7 +42,12 @@ function createDefaultTab(
 ): TerminalTab {
   return {
     id: crypto.randomUUID(),
-    title: target === 'vm' ? `VM ${counter}` : target === 'home-pc' ? 'Home PC' : 'MacBook',
+    title:
+      target === 'vm'
+        ? `VM ${counter}`
+        : target === 'home-pc'
+          ? 'Home PC'
+          : 'MacBook',
     cwd,
     target,
     sessionId: null,

@@ -6,19 +6,19 @@ A skill is not a vibe. It is a procedure: when to use it, what commands to run, 
 
 ## Bundled swarm skills
 
-| Skill | Use it for |
-| --- | --- |
-| `swarm-orchestrator` | Orchestrator loop, dispatch, drift detection, re-prompts, escalation, mission routing. |
-| `swarm-worker-core` | Base worker contract: phases, checkpoints, runtime state, blockers, handoffs. |
-| `swarm-review-learning-loop` | Capture review learnings, recurring failures, and skill improvements after tasks. |
-| `byte-verified-code-review` | Review diffs with byte-level proof for naming-sensitive and generated-file changes. |
-| `swarm-bench-worker` | Benchmark/lab work for local models, runtime experiments, and result logging. |
-| `swarm-pr-worker` | GitHub issue/PR workflow, triage, patching, PR prep, review feedback. |
-| `swarm-ui-worker` | UI implementation lane for Hermes Workspace surfaces. |
-| `swarm-dev-runtime` | Runtime contracts, backend APIs, lifecycle, health, and repair wiring. |
-| `swarm-memory` | File-backed memory expectations for workers and orchestrator history. |
-| `swarm-orchestration-loop` | Canonical orchestration/review loop for persistent worker fleets. |
-| `swarm-review-learning-loop` | Shared loop for turning task outcomes into durable improvements. |
+| Skill                        | Use it for                                                                             |
+| ---------------------------- | -------------------------------------------------------------------------------------- |
+| `swarm-orchestrator`         | Orchestrator loop, dispatch, drift detection, re-prompts, escalation, mission routing. |
+| `swarm-worker-core`          | Base worker contract: phases, checkpoints, runtime state, blockers, handoffs.          |
+| `swarm-review-learning-loop` | Capture review learnings, recurring failures, and skill improvements after tasks.      |
+| `byte-verified-code-review`  | Review diffs with byte-level proof for naming-sensitive and generated-file changes.    |
+| `swarm-bench-worker`         | Benchmark/lab work for local models, runtime experiments, and result logging.          |
+| `swarm-pr-worker`            | GitHub issue/PR workflow, triage, patching, PR prep, review feedback.                  |
+| `swarm-ui-worker`            | UI implementation lane for Hermes Workspace surfaces.                                  |
+| `swarm-dev-runtime`          | Runtime contracts, backend APIs, lifecycle, health, and repair wiring.                 |
+| `swarm-memory`               | File-backed memory expectations for workers and orchestrator history.                  |
+| `swarm-orchestration-loop`   | Canonical orchestration/review loop for persistent worker fleets.                      |
+| `swarm-review-learning-loop` | Shared loop for turning task outcomes into durable improvements.                       |
 
 Some installations may name the byte review skill differently. If the exact skill is not present, use the available review skill that enforces byte checks, diff review, tests, build, smoke, and verdict discipline.
 
@@ -40,19 +40,19 @@ The important rule is that the worker's runtime must be able to resolve the skil
 
 ## Role-to-skill defaults
 
-| Role | Default skills |
-| --- | --- |
-| Orchestrator | `swarm-orchestrator`, `swarm-worker-core`, `swarm-review-learning-loop`, `self-improvement` |
-| Builder | `swarm-worker-core`, `byte-verified-code-review` |
-| Reviewer | `swarm-worker-core`, `byte-verified-code-review`, `swarm-review-learning-loop` |
-| Triage | `swarm-worker-core`, `byte-verified-code-review`, `swarm-review-learning-loop` |
-| Lab | `swarm-worker-core`, `pc1-ollama-gguf-bench`, `swarm-bench-worker` |
-| Sage | `swarm-worker-core`, `last30days`, `pdf-and-paper-deep-reading` |
-| Scribe | `swarm-worker-core`, `last30days`, `creative-writing` |
-| Foundation | `swarm-worker-core` |
-| QA | `swarm-worker-core`, `byte-verified-code-review` |
-| Mirror Integrations | `swarm-worker-core`, `claude-promo`, `songwriting-and-ai-music` |
-| Custom | no default skills |
+| Role                | Default skills                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| Orchestrator        | `swarm-orchestrator`, `swarm-worker-core`, `swarm-review-learning-loop`, `self-improvement` |
+| Builder             | `swarm-worker-core`, `byte-verified-code-review`                                            |
+| Reviewer            | `swarm-worker-core`, `byte-verified-code-review`, `swarm-review-learning-loop`              |
+| Triage              | `swarm-worker-core`, `byte-verified-code-review`, `swarm-review-learning-loop`              |
+| Lab                 | `swarm-worker-core`, `pc1-ollama-gguf-bench`, `swarm-bench-worker`                          |
+| Sage                | `swarm-worker-core`, `last30days`, `pdf-and-paper-deep-reading`                             |
+| Scribe              | `swarm-worker-core`, `last30days`, `creative-writing`                                       |
+| Foundation          | `swarm-worker-core`                                                                         |
+| QA                  | `swarm-worker-core`, `byte-verified-code-review`                                            |
+| Mirror Integrations | `swarm-worker-core`, `claude-promo`, `songwriting-and-ai-music`                             |
+| Custom              | no default skills                                                                           |
 
 ## What each core skill contributes
 
@@ -166,18 +166,22 @@ Recommended sections:
 # My Skill
 
 ## Trigger
+
 When to use it.
 
 ## Steps
+
 1. Exact first step.
 2. Exact second step.
 3. Verification.
 
 ## Pitfalls
+
 - Known failure mode.
 - Exact unblock action.
 
 ## Output contract
+
 What the worker must return.
 ```
 

@@ -119,7 +119,13 @@ export function SpeechBubble({
           ...style,
         }}
       >
-        <div style={{ display: portraitSrc ? 'flex' : 'block', gap: compact ? 8 : 12, alignItems: 'flex-start' }}>
+        <div
+          style={{
+            display: portraitSrc ? 'flex' : 'block',
+            gap: compact ? 8 : 12,
+            alignItems: 'flex-start',
+          }}
+        >
           {portraitSrc ? (
             <img
               src={portraitSrc}
@@ -137,7 +143,8 @@ export function SpeechBubble({
                 boxShadow: `0 0 14px ${tokens.glow}`,
               }}
               onError={(event) => {
-                ;(event.currentTarget as HTMLImageElement).style.display = 'none'
+                ;(event.currentTarget as HTMLImageElement).style.display =
+                  'none'
               }}
             />
           ) : null}

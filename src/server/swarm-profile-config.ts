@@ -14,13 +14,27 @@
  * matches, so re-running on a healthy profile is free.
  */
 
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
 
 export type ConfigSyncResult =
-  | { ok: true; changed: boolean; previous?: { provider: string; default: string } }
+  | {
+      ok: true
+      changed: boolean
+      previous?: { provider: string; default: string }
+    }
   | { ok: false; error: string }
 
 export type ProfileBootstrapResult = {
@@ -51,8 +65,15 @@ export type SwarmWorkerIdentity = {
  * the operator's non-secret config.yaml and linking the private .env locally.
  * The config is copied (not symlinked) because per-worker model sync edits it.
  */
-export function ensureSwarmProfileConfig(profilePath: string): ProfileBootstrapResult {
-  const result: ProfileBootstrapResult = { ok: true, configCreated: false, envLinked: false, authLinked: false }
+export function ensureSwarmProfileConfig(
+  profilePath: string,
+): ProfileBootstrapResult {
+  const result: ProfileBootstrapResult = {
+    ok: true,
+    configCreated: false,
+    envLinked: false,
+    authLinked: false,
+  }
   try {
     mkdirSync(profilePath, { recursive: true })
 
@@ -102,11 +123,19 @@ export function ensureSwarmProfileConfig(profilePath: string): ProfileBootstrapR
     }
 
     if (!existsSync(configPath)) {
-      return { ...result, ok: false, error: `config.yaml missing at ${configPath}` }
+      return {
+        ...result,
+        ok: false,
+        error: `config.yaml missing at ${configPath}`,
+      }
     }
     return result
   } catch (err) {
-    return { ...result, ok: false, error: err instanceof Error ? err.message : String(err) }
+    return {
+      ...result,
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
   }
 }
 
@@ -115,9 +144,17 @@ export function renderSwarmWorkerIdentity(worker: SwarmWorkerIdentity): string {
   const role = worker.role?.trim() || 'Worker'
   const specialty = worker.specialty?.trim() || 'General execution'
   const model = worker.model?.trim() || 'Unspecified'
-  const mission = worker.mission?.trim() || 'Execute assigned swarm work and checkpoint progress.'
-  const skills = worker.skills && worker.skills.length > 0 ? worker.skills.join(', ') : 'swarm-worker-core'
-  const capabilities = worker.capabilities && worker.capabilities.length > 0 ? worker.capabilities.join(', ') : 'not declared'
+  const mission =
+    worker.mission?.trim() ||
+    'Execute assigned swarm work and checkpoint progress.'
+  const skills =
+    worker.skills && worker.skills.length > 0
+      ? worker.skills.join(', ')
+      : 'swarm-worker-core'
+  const capabilities =
+    worker.capabilities && worker.capabilities.length > 0
+      ? worker.capabilities.join(', ')
+      : 'not declared'
 
   return [
     `# IDENTITY.md — ${name}`,
@@ -139,7 +176,10 @@ export function renderSwarmWorkerIdentity(worker: SwarmWorkerIdentity): string {
   ].join('\n')
 }
 
-export function syncSwarmProfileIdentity(profilePath: string, worker: SwarmWorkerIdentity): ConfigSyncResult {
+export function syncSwarmProfileIdentity(
+  profilePath: string,
+  worker: SwarmWorkerIdentity,
+): ConfigSyncResult {
   if (!existsSync(profilePath)) {
     return { ok: false, error: `profile path missing: ${profilePath}` }
   }
@@ -148,14 +188,19 @@ export function syncSwarmProfileIdentity(profilePath: string, worker: SwarmWorke
   const next = renderSwarmWorkerIdentity(worker)
   try {
     mkdirSync(identityDir, { recursive: true })
-    const current = existsSync(identityPath) ? readFileSync(identityPath, 'utf8') : ''
+    const current = existsSync(identityPath)
+      ? readFileSync(identityPath, 'utf8')
+      : ''
     if (current === next) return { ok: true, changed: false }
     const tmpPath = `${identityPath}.tmp-${process.pid}-${Date.now()}`
     writeFileSync(tmpPath, next, 'utf8')
     renameSync(tmpPath, identityPath)
     return { ok: true, changed: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
   }
 }
 
@@ -208,10 +253,7 @@ export function syncSwarmProfileModel(
       ? existingModel.default
       : ''
 
-  if (
-    existingProvider === next.provider &&
-    existingDefault === next.default
-  ) {
+  if (existingProvider === next.provider && existingDefault === next.default) {
     return {
       ok: true,
       changed: false,
@@ -219,9 +261,10 @@ export function syncSwarmProfileModel(
     }
   }
 
-  const previous = existingProvider || existingDefault
-    ? { provider: existingProvider, default: existingDefault }
-    : undefined
+  const previous =
+    existingProvider || existingDefault
+      ? { provider: existingProvider, default: existingDefault }
+      : undefined
 
   // Update in place to preserve any sibling fields (e.g. `model.alternates`).
   const merged = existingModel ? { ...existingModel } : {}

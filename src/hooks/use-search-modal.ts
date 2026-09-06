@@ -24,7 +24,9 @@ function loadRecentSearches(): Array<string> {
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter((v): v is string => typeof v === 'string').slice(0, RECENT_SEARCHES_LIMIT)
+    return parsed
+      .filter((v): v is string => typeof v === 'string')
+      .slice(0, RECENT_SEARCHES_LIMIT)
   } catch {
     return []
   }

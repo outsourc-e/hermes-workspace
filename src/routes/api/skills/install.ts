@@ -25,8 +25,7 @@ export const Route = createFileRoute('/api/skills/install')({
             category?: string
             force?: boolean
           }
-          const identifier =
-            (body.identifier || body.skillId || '').trim()
+          const identifier = (body.identifier || body.skillId || '').trim()
           if (!identifier) {
             return json(
               { ok: false, error: 'identifier or skillId required' },

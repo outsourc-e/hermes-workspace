@@ -1,6 +1,14 @@
-import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  Component,
+  Suspense,
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
-import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
+import { PlaygroundChat } from './components/playground-chat'
 import { PlaygroundHeroCanvas } from './components/playground-hero-canvas'
 import { PlaygroundHud } from './components/playground-hud'
 import { PlaygroundMinimap } from './components/playground-minimap'
@@ -11,34 +19,74 @@ import { KeyboardShortcutsOverlay } from './components/keyboard-shortcuts-overla
 import { PhotosensitiveWarningSplash } from './components/photosensitive-warning-splash'
 import { useHermesWorldSettings } from './components/hermesworld-settings'
 import { usePlaygroundRpg } from './hooks/use-playground-rpg'
-import { playgroundAudio, usePlaygroundAudioMuted } from './lib/playground-audio'
-import { autoNarrateWorld, cancelNarration, isNarrationMuted, narrateWorldNow, setNarrationMuted } from './lib/playground-narration'
+import {
+  playgroundAudio,
+  usePlaygroundAudioMuted,
+} from './lib/playground-audio'
+import {
+  autoNarrateWorld,
+  cancelNarration,
+  isNarrationMuted,
+  narrateWorldNow,
+  setNarrationMuted,
+} from './lib/playground-narration'
 import { botsFor } from './lib/playground-bots'
-import { PLAYGROUND_WORLDS, itemById, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
+import { PLAYGROUND_WORLDS, itemById } from './lib/playground-rpg'
+import type { ChatMessage } from './components/playground-chat'
+import type { ReactNode } from 'react'
+import type { PlaygroundItemId, PlaygroundWorldId } from './lib/playground-rpg'
 import type { RemotePlayer } from './hooks/use-playground-multiplayer'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
-
-const PlaygroundAdminPanel = lazy(() => import('./components/playground-admin-panel').then((module) => ({ default: module.PlaygroundAdminPanel })))
-const PlaygroundCustomizer = lazy(() => import('./components/playground-customizer').then((module) => ({ default: module.PlaygroundCustomizer })))
-const PlaygroundDialog = lazy(() => import('./components/playground-dialog').then((module) => ({ default: module.PlaygroundDialog })))
-const PlaygroundJournal = lazy(() => import('./components/playground-journal').then((module) => ({ default: module.PlaygroundJournal })))
-const PlaygroundMap = lazy(() => import('./components/playground-map').then((module) => ({ default: module.PlaygroundMap })))
-const PlaygroundSidePanel = lazy(() => import('./components/playground-sidepanel').then((module) => ({ default: module.PlaygroundSidePanel })))
-const SettingsPanel = lazy(() => import('./components/settings-panel').then((module) => ({ default: module.SettingsPanel })))
+const PlaygroundAdminPanel = lazy(() =>
+  import('./components/playground-admin-panel').then((module) => ({
+    default: module.PlaygroundAdminPanel,
+  })),
+)
+const PlaygroundCustomizer = lazy(() =>
+  import('./components/playground-customizer').then((module) => ({
+    default: module.PlaygroundCustomizer,
+  })),
+)
+const PlaygroundDialog = lazy(() =>
+  import('./components/playground-dialog').then((module) => ({
+    default: module.PlaygroundDialog,
+  })),
+)
+const PlaygroundJournal = lazy(() =>
+  import('./components/playground-journal').then((module) => ({
+    default: module.PlaygroundJournal,
+  })),
+)
+const PlaygroundMap = lazy(() =>
+  import('./components/playground-map').then((module) => ({
+    default: module.PlaygroundMap,
+  })),
+)
+const PlaygroundSidePanel = lazy(() =>
+  import('./components/playground-sidepanel').then((module) => ({
+    default: module.PlaygroundSidePanel,
+  })),
+)
+const SettingsPanel = lazy(() =>
+  import('./components/settings-panel').then((module) => ({
+    default: module.SettingsPanel,
+  })),
+)
 
 function LazyPanelBoundary({ children }: { children: ReactNode }) {
   return <Suspense fallback={null}>{children}</Suspense>
 }
 
-const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = {
-  training: { name: 'Training Grounds', accent: '#5eead4' },
-  agora: { name: 'Agora Commons', accent: '#d9b35f' },
-  forge: { name: 'The Forge', accent: '#22d3ee' },
-  grove: { name: 'The Grove', accent: '#34d399' },
-  oracle: { name: 'Oracle Temple', accent: '#a78bfa' },
-  arena: { name: 'Benchmark Arena', accent: '#fb7185' },
-}
+const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> =
+  {
+    training: { name: 'Training Grounds', accent: '#5eead4' },
+    agora: { name: 'Agora Commons', accent: '#d9b35f' },
+    forge: { name: 'The Forge', accent: '#22d3ee' },
+    grove: { name: 'The Grove', accent: '#34d399' },
+    oracle: { name: 'Oracle Temple', accent: '#a78bfa' },
+    arena: { name: 'Benchmark Arena', accent: '#fb7185' },
+  }
 
 const FORGE_INTRO_STORAGE_KEY = 'hermes-playground-forge-intro-seen'
 const FORGE_FALLBACK_FLAVOR =
@@ -73,7 +121,9 @@ export function PlaygroundScreen() {
   const audioMuted = usePlaygroundAudioMuted()
   const [settings] = useHermesWorldSettings()
   const [launched, setLaunched] = useState(false)
-  const [world, setWorld] = useState<PlaygroundWorldId>(rpg.state.playerProfile.lastZone)
+  const [world, setWorld] = useState<PlaygroundWorldId>(
+    rpg.state.playerProfile.lastZone,
+  )
   const [dialogNpc, setDialogNpc] = useState<string | null>(null)
   const [nearbyNpc, setNearbyNpc] = useState<string | null>(null)
   const [journalOpen, setJournalOpen] = useState(false)
@@ -86,10 +136,16 @@ export function PlaygroundScreen() {
   const [mapOpen, setMapOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [tutorialCompleteOpen, setTutorialCompleteOpen] = useState(false)
-  const [forgeIntro, setForgeIntro] = useState<ForgeIntroState>({ open: false, flavor: '', loading: false })
+  const [forgeIntro, setForgeIntro] = useState<ForgeIntroState>({
+    open: false,
+    flavor: '',
+    loading: false,
+  })
   const [transitioning, setTransitioning] = useState(false)
   const [monsterHp, setMonsterHp] = useState(44)
-  const [remotePlayers, setRemotePlayers] = useState<Record<string, RemotePlayer>>({})
+  const [remotePlayers, setRemotePlayers] = useState<
+    Record<string, RemotePlayer>
+  >({})
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isNarrow, setIsNarrow] = useState(false)
   const [objectivePulseKey, setObjectivePulseKey] = useState(0)
@@ -108,7 +164,8 @@ export function PlaygroundScreen() {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const fromUrl = params.get('admin') === '1'
-    const fromStorage = window.localStorage.getItem('hermes-playground-admin') === '1'
+    const fromStorage =
+      window.localStorage.getItem('hermes-playground-admin') === '1'
     setAdminMode(fromUrl || fromStorage)
   }, [])
   const toggleAdminMode = () => {
@@ -131,9 +188,12 @@ export function PlaygroundScreen() {
   const activeQuest = rpg.activeQuest
   const currentObjective = rpg.currentObjective
   const forgeUnlocked = rpg.state.unlockedWorlds.includes('forge')
-  const monsterDefeated = rpg.state.completedQuests.includes('training-bonus-wisp')
+  const monsterDefeated = rpg.state.completedQuests.includes(
+    'training-bonus-wisp',
+  )
   const remotePlayersInZone = useMemo(
-    () => Object.values(remotePlayers).filter((player) => player.world === world),
+    () =>
+      Object.values(remotePlayers).filter((player) => player.world === world),
     [remotePlayers, world],
   )
   // Diplomacy: mark meet-builder objective the first time we see another
@@ -149,7 +209,8 @@ export function PlaygroundScreen() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    forgeIntroSeenRef.current = window.localStorage.getItem(FORGE_INTRO_STORAGE_KEY) === '1'
+    forgeIntroSeenRef.current =
+      window.localStorage.getItem(FORGE_INTRO_STORAGE_KEY) === '1'
   }, [])
 
   useEffect(() => {
@@ -194,20 +255,35 @@ export function PlaygroundScreen() {
   }, [activeQuest?.id, currentObjective?.id])
 
   useEffect(() => {
-    if (activeQuest?.id === 'training-q1' && rpg.state.playerProfile.questProgress['training-q1'].completedObjectives.length > 0 && !rpg.state.completedQuests.includes('training-q1')) {
+    if (
+      activeQuest?.id === 'training-q1' &&
+      rpg.state.playerProfile.questProgress['training-q1'].completedObjectives
+        .length > 0 &&
+      !rpg.state.completedQuests.includes('training-q1')
+    ) {
       setOnboardingHintOpen(true)
       const id = window.setTimeout(() => setOnboardingHintOpen(false), 8000)
       const onJump = () => setOnboardingHintOpen(false)
-      window.addEventListener('hermesworld-player-jumped', onJump, { once: true })
-      return () => { window.clearTimeout(id); window.removeEventListener('hermesworld-player-jumped', onJump) }
+      window.addEventListener('hermesworld-player-jumped', onJump, {
+        once: true,
+      })
+      return () => {
+        window.clearTimeout(id)
+        window.removeEventListener('hermesworld-player-jumped', onJump)
+      }
     }
-  }, [activeQuest?.id, rpg.state.playerProfile.questProgress, rpg.state.completedQuests])
+  }, [
+    activeQuest?.id,
+    rpg.state.playerProfile.questProgress,
+    rpg.state.completedQuests,
+  ])
 
   useEffect(() => {
     for (const toast of rpg.toasts) {
       if (heardToastIds.current.has(toast.id)) continue
       heardToastIds.current.add(toast.id)
-      if (toast.kind === 'quest' || toast.kind === 'title') playgroundAudio.playQuestComplete()
+      if (toast.kind === 'quest' || toast.kind === 'title')
+        playgroundAudio.playQuestComplete()
       if (toast.kind === 'item') playgroundAudio.playRewardPickup()
     }
   }, [rpg.toasts])
@@ -281,14 +357,24 @@ export function PlaygroundScreen() {
   }, [world])
 
   useEffect(() => {
-    ;(window as any).__hermesPlaygroundOpenDialog = (id: string) => setDialogNpc(id)
-    return () => { try { delete (window as any).__hermesPlaygroundOpenDialog } catch {} }
+    ;(window as any).__hermesPlaygroundOpenDialog = (id: string) =>
+      setDialogNpc(id)
+    return () => {
+      try {
+        delete (window as any).__hermesPlaygroundOpenDialog
+      } catch {}
+    }
   }, [])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
         if (event.key === 'Escape') target.blur()
         return
       }
@@ -305,14 +391,32 @@ export function PlaygroundScreen() {
       if (key === 't') setChatCollapsed(false)
       if (key === 'f') setFocusMode((value) => !value)
       // Auto-engage focus mode on first movement so the world isn't blocked by panels
-      const movementKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']
+      const movementKeys = [
+        'w',
+        'a',
+        's',
+        'd',
+        'arrowup',
+        'arrowdown',
+        'arrowleft',
+        'arrowright',
+      ]
       if (movementKeys.includes(key) && !focusModeAutoEngagedRef.current) {
         focusModeAutoEngagedRef.current = true
         setFocusMode(true)
       }
       if (event.key === 'Escape') {
-        const closingAny = journalOpen || !!dialogNpc || mapOpen || archiveOpen || tutorialCompleteOpen || settingsOpen
-        if (!closingAny) { setSettingsOpen(true); return }
+        const closingAny =
+          journalOpen ||
+          !!dialogNpc ||
+          mapOpen ||
+          archiveOpen ||
+          tutorialCompleteOpen ||
+          settingsOpen
+        if (!closingAny) {
+          setSettingsOpen(true)
+          return
+        }
         setSettingsOpen(false)
         setJournalOpen(false)
         setDialogNpc(null)
@@ -325,15 +429,35 @@ export function PlaygroundScreen() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [archiveOpen, dialogNpc, journalOpen, mapOpen, nearbyNpc, settingsOpen, tutorialCompleteOpen])
+  }, [
+    archiveOpen,
+    dialogNpc,
+    journalOpen,
+    mapOpen,
+    nearbyNpc,
+    settingsOpen,
+    tutorialCompleteOpen,
+  ])
 
   const equippedVisuals = useMemo(() => {
-    const weapon = rpg.state.playerProfile.equipped.weapon ? itemById(rpg.state.playerProfile.equipped.weapon) : null
-    const cloak = rpg.state.playerProfile.equipped.cloak ? itemById(rpg.state.playerProfile.equipped.cloak) : null
-    const head = rpg.state.playerProfile.equipped.head ? itemById(rpg.state.playerProfile.equipped.head) : null
-    const artifact = rpg.state.playerProfile.equipped.artifact ? itemById(rpg.state.playerProfile.equipped.artifact) : null
+    const weapon = rpg.state.playerProfile.equipped.weapon
+      ? itemById(rpg.state.playerProfile.equipped.weapon)
+      : null
+    const cloak = rpg.state.playerProfile.equipped.cloak
+      ? itemById(rpg.state.playerProfile.equipped.cloak)
+      : null
+    const head = rpg.state.playerProfile.equipped.head
+      ? itemById(rpg.state.playerProfile.equipped.head)
+      : null
+    const artifact = rpg.state.playerProfile.equipped.artifact
+      ? itemById(rpg.state.playerProfile.equipped.artifact)
+      : null
     return {
-      accent: artifact?.accent || head?.accent || weapon?.accent || rpg.state.playerProfile.avatarConfig.outfitAccent,
+      accent:
+        artifact?.accent ||
+        head?.accent ||
+        weapon?.accent ||
+        rpg.state.playerProfile.avatarConfig.outfitAccent,
       cape: cloak?.accent || rpg.state.playerProfile.avatarConfig.cape,
       artifact: artifact?.accent || null,
       weapon:
@@ -383,10 +507,18 @@ export function PlaygroundScreen() {
         new CustomEvent('hermes-playground-self-chat-bubble', { detail: body }),
       )
     } catch {}
-    try { (window as any).__hermesPlaygroundSendChat?.(body) } catch {}
+    try {
+      ;(window as any).__hermesPlaygroundSendChat?.(body)
+    } catch {}
   }
 
-  function handleIncomingChat(msg: { id: string; name: string; color: string; text: string; ts: number }) {
+  function handleIncomingChat(msg: {
+    id: string
+    name: string
+    color: string
+    text: string
+    ts: number
+  }) {
     // Defensive: never accept a chat that we sent ourselves — the server tries
     // to filter, but old chat ring entries from previous selfIds can leak.
     if (msg.name === (rpg.state.playerProfile.displayName || 'You')) return
@@ -468,7 +600,14 @@ export function PlaygroundScreen() {
       void enterForgeFromTraining()
       return
     }
-    const order: Array<PlaygroundWorldId> = ['training', 'forge', 'agora', 'grove', 'oracle', 'arena']
+    const order: Array<PlaygroundWorldId> = [
+      'training',
+      'forge',
+      'agora',
+      'grove',
+      'oracle',
+      'arena',
+    ]
     const unlocked = order.filter((id) => rpg.state.unlockedWorlds.includes(id))
     const currentIndex = unlocked.indexOf(world)
     const next = unlocked[(currentIndex + 1) % unlocked.length] ?? world
@@ -485,7 +624,10 @@ export function PlaygroundScreen() {
       rpg.markObjective('training-q1', 'speak-athena')
       rpg.markObjective('training-q1', 'claim-sigil')
     }
-    if ((npcId === 'athena' && choiceId === 'training-build') || (npcId === 'pan' && choiceId === 'forge-demo')) {
+    if (
+      (npcId === 'athena' && choiceId === 'training-build') ||
+      (npcId === 'pan' && choiceId === 'forge-demo')
+    ) {
       rpg.markObjective('training-q5', 'build-something')
     }
   }
@@ -499,20 +641,28 @@ export function PlaygroundScreen() {
       const flavor = await generateForgeFlavor()
       setForgeIntro({ open: true, flavor, loading: false })
     }
-    window.setTimeout(() => {
-      setWorld('forge')
-      rpg.setLastZone('forge')
-      if (showIntro) {
-        forgeIntroSeenRef.current = true
-        try { window.localStorage.setItem(FORGE_INTRO_STORAGE_KEY, '1') } catch {}
-      }
-      window.setTimeout(() => {
-        setTransitioning(false)
+    window.setTimeout(
+      () => {
+        setWorld('forge')
+        rpg.setLastZone('forge')
         if (showIntro) {
-          window.setTimeout(() => setForgeIntro({ open: false, flavor: '', loading: false }), 1700)
+          forgeIntroSeenRef.current = true
+          try {
+            window.localStorage.setItem(FORGE_INTRO_STORAGE_KEY, '1')
+          } catch {}
         }
-      }, 350)
-    }, showIntro ? 1650 : 280)
+        window.setTimeout(() => {
+          setTransitioning(false)
+          if (showIntro) {
+            window.setTimeout(
+              () => setForgeIntro({ open: false, flavor: '', loading: false }),
+              1700,
+            )
+          }
+        }, 350)
+      },
+      showIntro ? 1650 : 280,
+    )
   }
 
   async function generateForgeFlavor() {
@@ -561,7 +711,16 @@ export function PlaygroundScreen() {
 
   return (
     <PlaygroundErrorBoundary fallback={<RouteFallback />}>
-      <div className="relative overflow-hidden" style={{ width: '100%', height: '100vh', minHeight: 640, background: '#07131a', color: 'white' }}>
+      <div
+        className="relative overflow-hidden"
+        style={{
+          width: '100%',
+          height: '100vh',
+          minHeight: 640,
+          background: '#07131a',
+          color: 'white',
+        }}
+      >
         <PlaygroundWorld3D
           worldId={world}
           onPortal={handlePortal}
@@ -604,11 +763,22 @@ export function PlaygroundScreen() {
           </LazyPanelBoundary>
         ) : null}
         {journalOpen ? (
-          <LazyPanelBoundary><PlaygroundJournal open={journalOpen} onClose={() => setJournalOpen(false)} state={rpg.state} /></LazyPanelBoundary>
+          <LazyPanelBoundary>
+            <PlaygroundJournal
+              open={journalOpen}
+              onClose={() => setJournalOpen(false)}
+              state={rpg.state}
+            />
+          </LazyPanelBoundary>
         ) : null}
         {customizerOpen ? (
           <LazyPanelBoundary>
-            <PlaygroundCustomizer open={customizerOpen} onClose={() => setCustomizerOpen(false)} value={rpg.state.playerProfile.avatarConfig} onChange={rpg.setAvatarConfig} />
+            <PlaygroundCustomizer
+              open={customizerOpen}
+              onClose={() => setCustomizerOpen(false)}
+              value={rpg.state.playerProfile.avatarConfig}
+              onChange={rpg.setAvatarConfig}
+            />
           </LazyPanelBoundary>
         ) : null}
         {mapOpen ? (
@@ -666,7 +836,10 @@ export function PlaygroundScreen() {
         <PlaygroundHud
           state={rpg.state}
           activeQuestTitle={activeQuest?.title ?? 'Training Complete'}
-          objectiveLabel={currentObjective?.label ?? 'Forge Gate unlocked. Keep exploring the Playground.'}
+          objectiveLabel={
+            currentObjective?.label ??
+            'Forge Gate unlocked. Keep exploring the Playground.'
+          }
           objectiveHint={currentObjective?.hint}
           objectiveTarget={currentObjective?.target ?? null}
           levelProgress={rpg.levelProgress}
@@ -680,29 +853,31 @@ export function PlaygroundScreen() {
           <LazyPanelBoundary>
             <PlaygroundSidePanel
               state={rpg.state}
-            currentWorld={world}
-            worlds={PLAYGROUND_WORLDS}
-            onSelectWorld={(next) => {
-              if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
-            }}
-            onReset={rpg.resetRpg}
-            onReplayTutorial={() => {
-              rpg.replayTutorial()
-              setTutorialCompleteOpen(false)
-              setArchiveOpen(false)
-              setJournalOpen(false)
-              setMapOpen(false)
-              setMobileMenuOpen(false)
-              setWorld('training')
-              try { window.localStorage.removeItem(FORGE_INTRO_STORAGE_KEY) } catch {}
-              forgeIntroSeenRef.current = false
-            }}
-            onOpenInventory={rpg.openInventory}
-            onEquipItem={rpg.equipItem}
-            onUnequipSlot={rpg.unequipSlot}
-            worldAccent={WORLD_META[world].accent}
-            open={!isNarrow || mobileMenuOpen}
-            onOpenChange={setMobileMenuOpen}
+              currentWorld={world}
+              worlds={PLAYGROUND_WORLDS}
+              onSelectWorld={(next) => {
+                if (rpg.state.unlockedWorlds.includes(next)) setWorld(next)
+              }}
+              onReset={rpg.resetRpg}
+              onReplayTutorial={() => {
+                rpg.replayTutorial()
+                setTutorialCompleteOpen(false)
+                setArchiveOpen(false)
+                setJournalOpen(false)
+                setMapOpen(false)
+                setMobileMenuOpen(false)
+                setWorld('training')
+                try {
+                  window.localStorage.removeItem(FORGE_INTRO_STORAGE_KEY)
+                } catch {}
+                forgeIntroSeenRef.current = false
+              }}
+              onOpenInventory={rpg.openInventory}
+              onEquipItem={rpg.equipItem}
+              onUnequipSlot={rpg.unequipSlot}
+              worldAccent={WORLD_META[world].accent}
+              open={!isNarrow || mobileMenuOpen}
+              onOpenChange={setMobileMenuOpen}
             />
           </LazyPanelBoundary>
         ) : null}
@@ -710,15 +885,30 @@ export function PlaygroundScreen() {
         <button
           type="button"
           onClick={() => setFocusMode((v) => !v)}
-          aria-label={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
-          title={focusMode ? 'Exit focus mode (F or Esc)' : 'Focus mode — hide side rail (F)'}
+          aria-label={
+            focusMode
+              ? 'Exit focus mode (F or Esc)'
+              : 'Focus mode — hide side rail (F)'
+          }
+          title={
+            focusMode
+              ? 'Exit focus mode (F or Esc)'
+              : 'Focus mode — hide side rail (F)'
+          }
           className="pointer-events-auto fixed right-3 top-[230px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[16px] text-white shadow-xl backdrop-blur-xl md:flex"
           style={{
-            boxShadow: focusMode ? `0 0 14px ${WORLD_META[world].accent}88` : '0 8px 22px rgba(0,0,0,.55)',
-            borderColor: focusMode ? WORLD_META[world].accent : 'rgba(255,255,255,0.15)',
+            boxShadow: focusMode
+              ? `0 0 14px ${WORLD_META[world].accent}88`
+              : '0 8px 22px rgba(0,0,0,.55)',
+            borderColor: focusMode
+              ? WORLD_META[world].accent
+              : 'rgba(255,255,255,0.15)',
           }}
         >
-          <span aria-hidden="true" style={{ filter: focusMode ? 'none' : 'grayscale(0.4)' }}>
+          <span
+            aria-hidden="true"
+            style={{ filter: focusMode ? 'none' : 'grayscale(0.4)' }}
+          >
             {focusMode ? '👁️' : '👁'}
           </span>
         </button>
@@ -728,7 +918,10 @@ export function PlaygroundScreen() {
           aria-label="Open settings"
           title="Settings (Esc)"
           className="pointer-events-auto fixed right-3 top-[314px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
-          style={{ boxShadow: '0 8px 22px rgba(0,0,0,.55)', borderColor: 'rgba(241,197,109,0.42)' }}
+          style={{
+            boxShadow: '0 8px 22px rgba(0,0,0,.55)',
+            borderColor: 'rgba(241,197,109,0.42)',
+          }}
         >
           ⚙
         </button>
@@ -739,11 +932,25 @@ export function PlaygroundScreen() {
           title={adminMode ? 'Hide admin panel' : 'Show admin panel'}
           className="pointer-events-auto fixed right-3 top-[314px] z-[71] hidden h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/70 text-[15px] text-white shadow-xl backdrop-blur-xl md:flex"
           style={{
-            boxShadow: adminMode ? '0 0 14px rgba(251,191,36,0.55)' : '0 8px 22px rgba(0,0,0,.55)',
-            borderColor: adminMode ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)',
+            boxShadow: adminMode
+              ? '0 0 14px rgba(251,191,36,0.55)'
+              : '0 8px 22px rgba(0,0,0,.55)',
+            borderColor: adminMode
+              ? 'rgba(251,191,36,0.6)'
+              : 'rgba(255,255,255,0.15)',
           }}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             {adminMode ? <path d="m9 12 2 2 4-4" /> : null}
           </svg>
@@ -752,16 +959,22 @@ export function PlaygroundScreen() {
           type="button"
           onClick={() => setMobileMenuOpen(true)}
           className="pointer-events-auto fixed right-3 top-12 z-[72] rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white shadow-xl backdrop-blur-xl md:hidden"
-          >
+        >
           Menu
         </button>
         <KeyboardShortcutsOverlay />
         <MobileAbilityControls />
         <OnboardingHintCard open={onboardingHintOpen} />
-        <PhotosensitiveWarningSplash onOpenSettings={() => setSettingsOpen(true)} />
+        <PhotosensitiveWarningSplash
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
         {settingsOpen ? (
           <LazyPanelBoundary>
-            <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} signedInName={rpg.state.playerProfile.displayName || null} />
+            <SettingsPanel
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              signedInName={rpg.state.playerProfile.displayName || null}
+            />
           </LazyPanelBoundary>
         ) : null}
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
@@ -802,15 +1015,21 @@ export function PlaygroundScreen() {
             setWorld('training')
           }}
         />
-        <ForgeArrivalOverlay open={forgeIntro.open} flavor={forgeIntro.flavor} loading={forgeIntro.loading} />
+        <ForgeArrivalOverlay
+          open={forgeIntro.open}
+          flavor={forgeIntro.flavor}
+          loading={forgeIntro.loading}
+        />
         <LowHpOverlay active={lowHpActive} />
         <CameraPresetToast />
-        <TransitionLoadingScreen active={transitioning} worldName={WORLD_META[world].name} />
+        <TransitionLoadingScreen
+          active={transitioning}
+          worldName={WORLD_META[world].name}
+        />
       </div>
     </PlaygroundErrorBoundary>
   )
 }
-
 
 type PlaygroundRightRailProps = {
   focusMode: boolean
@@ -836,20 +1055,36 @@ function PlaygroundRightRail({
   onToggleAdmin,
 }: PlaygroundRightRailProps) {
   const hudAccent = accent === '#d9b35f' ? '#F1C56D' : accent
-  const railItems: Array<{ label: string; glyph: string; onClick: () => void; active?: boolean }> = [
-    { label: focusMode ? 'Exit focus' : 'Sigil focus', glyph: '☤', onClick: onToggleFocus, active: focusMode },
+  const railItems: Array<{
+    label: string
+    glyph: string
+    onClick: () => void
+    active?: boolean
+  }> = [
+    {
+      label: focusMode ? 'Exit focus' : 'Sigil focus',
+      glyph: '☤',
+      onClick: onToggleFocus,
+      active: focusMode,
+    },
     { label: 'Inventory', glyph: '▣', onClick: onOpenInventory },
     { label: 'Quest scroll', glyph: '?', onClick: onOpenJournal },
     { label: 'Map', glyph: '◇', onClick: onOpenMap },
     { label: 'Settings', glyph: '⚙', onClick: onOpenSettings },
-    { label: adminMode ? 'Hide admin' : 'Admin shield', glyph: '⌂', onClick: onToggleAdmin, active: adminMode },
+    {
+      label: adminMode ? 'Hide admin' : 'Admin shield',
+      glyph: '⌂',
+      onClick: onToggleAdmin,
+      active: adminMode,
+    },
   ]
   return (
     <div
       className="pointer-events-auto fixed right-[20px] top-[214px] z-[72] hidden flex-col items-center gap-2 rounded-[24px] border px-2 py-3 text-[#F4E9D3] shadow-2xl backdrop-blur-xl md:flex"
       style={{
         borderColor: `${hudAccent}66`,
-        background: 'linear-gradient(180deg, rgba(15,22,34,.9), rgba(10,13,18,.84)), radial-gradient(circle at 50% 0%, rgba(241,197,109,.2), transparent 62%)',
+        background:
+          'linear-gradient(180deg, rgba(15,22,34,.9), rgba(10,13,18,.84)), radial-gradient(circle at 50% 0%, rgba(241,197,109,.2), transparent 62%)',
         boxShadow: `0 18px 42px rgba(0,0,0,.62), 0 0 24px ${hudAccent}2e, inset 0 1px 0 rgba(244,233,211,.12)`,
       }}
     >
@@ -864,8 +1099,12 @@ function PlaygroundRightRail({
           style={{
             borderColor: item.active ? hudAccent : 'rgba(184,134,43,.4)',
             color: item.active ? '#0A0D12' : hudAccent,
-            background: item.active ? 'linear-gradient(180deg, #F1C56D, #B8862B)' : 'linear-gradient(180deg, rgba(27,36,51,.72), rgba(10,13,18,.78))',
-            boxShadow: item.active ? `0 0 18px ${hudAccent}66` : 'inset 0 1px 0 rgba(244,233,211,.1)',
+            background: item.active
+              ? 'linear-gradient(180deg, #F1C56D, #B8862B)'
+              : 'linear-gradient(180deg, rgba(27,36,51,.72), rgba(10,13,18,.78))',
+            boxShadow: item.active
+              ? `0 0 18px ${hudAccent}66`
+              : 'inset 0 1px 0 rgba(244,233,211,.1)',
           }}
         >
           {item.glyph}
@@ -879,10 +1118,16 @@ function MobileAbilityControls() {
   const [crouching, setCrouching] = useState(false)
   const emitCrouch = (active: boolean) => {
     setCrouching(active)
-    try { window.dispatchEvent(new CustomEvent('hermesworld-mobile-crouch', { detail: { active } })) } catch {}
+    try {
+      window.dispatchEvent(
+        new CustomEvent('hermesworld-mobile-crouch', { detail: { active } }),
+      )
+    } catch {}
   }
   const jump = () => {
-    try { window.dispatchEvent(new CustomEvent('hermesworld-mobile-jump')) } catch {}
+    try {
+      window.dispatchEvent(new CustomEvent('hermesworld-mobile-jump'))
+    } catch {}
   }
   return (
     <>
@@ -897,7 +1142,12 @@ function MobileAbilityControls() {
         type="button"
         onClick={() => emitCrouch(!crouching)}
         className="pointer-events-auto fixed bottom-[104px] left-4 z-[74] rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-xl backdrop-blur-xl md:hidden"
-        style={{ background: crouching ? 'rgba(241,197,109,.24)' : 'rgba(0,0,0,.68)', borderColor: crouching ? 'rgba(241,197,109,.55)' : 'rgba(255,255,255,.15)' }}
+        style={{
+          background: crouching ? 'rgba(241,197,109,.24)' : 'rgba(0,0,0,.68)',
+          borderColor: crouching
+            ? 'rgba(241,197,109,.55)'
+            : 'rgba(255,255,255,.15)',
+        }}
       >
         {crouching ? 'Crouch on' : 'Crouch'}
       </button>
@@ -909,13 +1159,25 @@ function OnboardingHintCard({ open }: { open: boolean }) {
   if (!open) return null
   return (
     <div className="pointer-events-none fixed left-1/2 top-[108px] z-[92] w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-amber-200/35 bg-black/76 p-3 text-white shadow-2xl backdrop-blur-xl">
-      <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200/70">Training hint</div>
-      <div className="mt-1 text-sm font-black text-[#F1C56D]">Move • Talk • Jump • Crouch</div>
+      <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200/70">
+        Training hint
+      </div>
+      <div className="mt-1 text-sm font-black text-[#F1C56D]">
+        Move • Talk • Jump • Crouch
+      </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/72">
-        <span><kbd className="text-amber-100">WASD</kbd> Move</span>
-        <span><kbd className="text-amber-100">E</kbd> Talk</span>
-        <span><kbd className="text-amber-100">Space</kbd> Jump</span>
-        <span><kbd className="text-amber-100">Ctrl</kbd> Crouch</span>
+        <span>
+          <kbd className="text-amber-100">WASD</kbd> Move
+        </span>
+        <span>
+          <kbd className="text-amber-100">E</kbd> Talk
+        </span>
+        <span>
+          <kbd className="text-amber-100">Space</kbd> Jump
+        </span>
+        <span>
+          <kbd className="text-amber-100">Ctrl</kbd> Crouch
+        </span>
       </div>
     </div>
   )
@@ -964,7 +1226,13 @@ function TitleScreen({
         <div className="relative h-[400px] overflow-hidden">
           <PlaygroundHeroCanvas />
           {/* Vignette */}
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 95%)' }} />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(circle at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 95%)',
+            }}
+          />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
             <div
               className="mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] backdrop-blur-md"
@@ -1030,7 +1298,8 @@ function TitleScreen({
               className="rounded-2xl border p-5"
               style={{
                 borderColor: 'rgba(245, 217, 122, 0.18)',
-                background: 'linear-gradient(180deg, rgba(245,217,122,0.04) 0%, rgba(0,0,0,0.3) 100%)',
+                background:
+                  'linear-gradient(180deg, rgba(245,217,122,0.04) 0%, rgba(0,0,0,0.3) 100%)',
                 boxShadow: 'inset 0 1px 0 rgba(245,217,122,0.06)',
               }}
             >
@@ -1042,7 +1311,9 @@ function TitleScreen({
               </div>
               <input
                 value={displayName}
-                onChange={(event) => onChangeDisplayName(event.target.value.slice(0, 24))}
+                onChange={(event) =>
+                  onChangeDisplayName(event.target.value.slice(0, 24))
+                }
                 placeholder="Enter your builder name..."
                 maxLength={24}
                 className="mt-3 w-full rounded-xl border-2 bg-black/40 px-4 py-3.5 text-base text-white outline-none placeholder:text-white/25"
@@ -1069,7 +1340,8 @@ function TitleScreen({
                   style={{
                     borderColor: '#facc15',
                     color: '#0b1320',
-                    background: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
+                    background:
+                      'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
                     boxShadow: canEnter
                       ? '0 0 30px rgba(250,204,21,0.45), inset 0 1px 0 rgba(255,255,255,0.5)'
                       : 'none',
@@ -1080,9 +1352,21 @@ function TitleScreen({
               </div>
             </div>
             <div className="grid gap-2 text-[12px] sm:grid-cols-3">
-              <PremiumFeatureCard icon="❁" title="Six Worlds" desc="Training Grounds → Forge → Arena" />
-              <PremiumFeatureCard icon="⛔" title="Live Multiplayer" desc="Walk with builders worldwide" />
-              <PremiumFeatureCard icon="🔮" title="Hermes Skills" desc="Promptcraft · Memory · Diplomacy" />
+              <PremiumFeatureCard
+                icon="❁"
+                title="Six Worlds"
+                desc="Training Grounds → Forge → Arena"
+              />
+              <PremiumFeatureCard
+                icon="⛔"
+                title="Live Multiplayer"
+                desc="Walk with builders worldwide"
+              />
+              <PremiumFeatureCard
+                icon="🔮"
+                title="Hermes Skills"
+                desc="Promptcraft · Memory · Diplomacy"
+              />
             </div>
           </div>
 
@@ -1090,10 +1374,14 @@ function TitleScreen({
             className="rounded-2xl border p-5 text-sm text-white/80"
             style={{
               borderColor: 'rgba(34,211,238,0.18)',
-              background: 'linear-gradient(180deg, rgba(34,211,238,0.04) 0%, rgba(0,0,0,0.3) 100%)',
+              background:
+                'linear-gradient(180deg, rgba(34,211,238,0.04) 0%, rgba(0,0,0,0.3) 100%)',
             }}
           >
-            <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: 'rgba(34,211,238,0.85)' }}>
+            <div
+              className="text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: 'rgba(34,211,238,0.85)' }}
+            >
               ◈ Your Path
             </div>
             <ol className="mt-4 space-y-3 text-[13px]">
@@ -1107,7 +1395,11 @@ function TitleScreen({
                 <li key={i} className="flex items-start gap-3">
                   <span
                     className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold"
-                    style={{ borderColor: 'rgba(34,211,238,0.35)', color: '#22d3ee', background: 'rgba(34,211,238,0.08)' }}
+                    style={{
+                      borderColor: 'rgba(34,211,238,0.35)',
+                      color: '#22d3ee',
+                      background: 'rgba(34,211,238,0.08)',
+                    }}
                   >
                     {i + 1}
                   </span>
@@ -1145,7 +1437,15 @@ function TitleStars() {
   )
 }
 
-function PremiumFeatureCard({ icon, title, desc }: { icon: string; title: string; desc: string }) {
+function PremiumFeatureCard({
+  icon,
+  title,
+  desc,
+}: {
+  icon: string
+  title: string
+  desc: string
+}) {
   return (
     <div
       className="rounded-xl border p-3"
@@ -1155,8 +1455,12 @@ function PremiumFeatureCard({ icon, title, desc }: { icon: string; title: string
       }}
     >
       <div className="flex items-center gap-2">
-        <span className="text-[14px]" style={{ color: '#fbbf24' }}>{icon}</span>
-        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">{title}</span>
+        <span className="text-[14px]" style={{ color: '#fbbf24' }}>
+          {icon}
+        </span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">
+          {title}
+        </span>
       </div>
       <div className="mt-1 text-[11px] text-white/55">{desc}</div>
     </div>
@@ -1164,7 +1468,11 @@ function PremiumFeatureCard({ icon, title, desc }: { icon: string; title: string
 }
 
 function FeatureCard({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-white/10 bg-white/5 p-3">{children}</div>
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+      {children}
+    </div>
+  )
 }
 
 function ArchiveBriefingModal({
@@ -1178,18 +1486,44 @@ function ArchiveBriefingModal({
 }) {
   if (!open) return null
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-[560px] rounded-3xl border border-violet-300/30 bg-[#070b14] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/80">Archive Podium</div>
+    <div
+      className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[560px] rounded-3xl border border-violet-300/30 bg-[#070b14] p-5 text-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-violet-200/80">
+          Archive Podium
+        </div>
         <div className="mt-1 text-xl font-extrabold">Docs and Memory Loop</div>
         <div className="mt-4 space-y-3 text-sm text-white/80">
-          <p><strong>Docs:</strong> `docs/playground/README.md` explains the worlds, systems, and multiplayer wiring.</p>
-          <p><strong>Memory:</strong> Hermes saves project intent in `memory/goals/...` so the next iteration starts with context, recall, and less drift.</p>
-          <p><strong>Builder habit:</strong> read the spec, inspect the state shape, ship the smallest slice, then verify with a clean build.</p>
+          <p>
+            <strong>Docs:</strong> `docs/playground/README.md` explains the
+            worlds, systems, and multiplayer wiring.
+          </p>
+          <p>
+            <strong>Memory:</strong> Hermes saves project intent in
+            `memory/goals/...` so the next iteration starts with context,
+            recall, and less drift.
+          </p>
+          <p>
+            <strong>Builder habit:</strong> read the spec, inspect the state
+            shape, ship the smallest slice, then verify with a clean build.
+          </p>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5">Close</button>
-          <button onClick={onAcknowledge} className="rounded-xl border border-violet-300/40 bg-violet-400/15 px-4 py-2 text-sm font-bold text-violet-100 hover:bg-violet-400/25">
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5"
+          >
+            Close
+          </button>
+          <button
+            onClick={onAcknowledge}
+            className="rounded-xl border border-violet-300/40 bg-violet-400/15 px-4 py-2 text-sm font-bold text-violet-100 hover:bg-violet-400/25"
+          >
             Mark Briefing Read
           </button>
         </div>
@@ -1209,9 +1543,17 @@ function TutorialCompleteModal({
 }) {
   if (!open) return null
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-[520px] rounded-3xl border border-cyan-300/35 bg-[#070b14] p-5 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">Training Complete</div>
+    <div
+      className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[520px] rounded-3xl border border-cyan-300/35 bg-[#070b14] p-5 text-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">
+          Training Complete
+        </div>
         <div className="mt-1 text-xl font-extrabold">Initiate Builder</div>
         <div className="mt-3 space-y-2 text-sm text-white/80">
           <p>You learned the full builder loop:</p>
@@ -1224,10 +1566,16 @@ function TutorialCompleteModal({
           </ul>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5">
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/5"
+          >
             Later
           </button>
-          <button onClick={onStepThroughForgeGate} className="rounded-xl border border-cyan-300/40 bg-cyan-400/15 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-cyan-400/25">
+          <button
+            onClick={onStepThroughForgeGate}
+            className="rounded-xl border border-cyan-300/40 bg-cyan-400/15 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-cyan-400/25"
+          >
             Step through the Forge Gate
           </button>
         </div>
@@ -1249,10 +1597,16 @@ function ForgeArrivalOverlay({
   return (
     <div className="pointer-events-none fixed inset-0 z-[118] flex items-center justify-center bg-[#030712]/78 p-4 backdrop-blur-md">
       <div className="w-full max-w-[560px] rounded-3xl border border-cyan-300/30 bg-[#07131a]/92 p-6 text-center text-white shadow-2xl">
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">Forge Gate</div>
-        <div className="mt-2 text-2xl font-extrabold text-cyan-100">Generating world...</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">
+          Forge Gate
+        </div>
+        <div className="mt-2 text-2xl font-extrabold text-cyan-100">
+          Generating world...
+        </div>
         <div className="mt-4 text-sm text-white/76">
-          {loading ? 'Pan is hardening the first blueprint into a playable space.' : flavor}
+          {loading
+            ? 'Pan is hardening the first blueprint into a playable space.'
+            : flavor}
         </div>
       </div>
     </div>
@@ -1271,7 +1625,9 @@ function NearbyBuildersChip({ players }: { players: Array<RemotePlayer> }) {
       className="pointer-events-auto fixed top-[210px] z-[70] hidden w-[220px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block"
       style={{ left: chromeLeft }}
     >
-      <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Builders Nearby</div>
+      <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">
+        Builders Nearby
+      </div>
       <div className="space-y-1">
         {players.map((player) => (
           <button
@@ -1279,13 +1635,29 @@ function NearbyBuildersChip({ players }: { players: Array<RemotePlayer> }) {
             type="button"
             onClick={() => {
               setPingedId(player.id)
-              window.dispatchEvent(new CustomEvent('hermes-playground-ping-remote', { detail: player.id }))
-              window.setTimeout(() => setPingedId((current) => (current === player.id ? null : current)), 2000)
+              window.dispatchEvent(
+                new CustomEvent('hermes-playground-ping-remote', {
+                  detail: player.id,
+                }),
+              )
+              window.setTimeout(
+                () =>
+                  setPingedId((current) =>
+                    current === player.id ? null : current,
+                  ),
+                2000,
+              )
             }}
             className="flex w-full items-center justify-between rounded-xl border border-white/8 bg-white/5 px-2 py-1.5 text-left hover:bg-white/10"
           >
             <span className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full" style={{ background: player.color, boxShadow: `0 0 10px ${player.color}` }} />
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{
+                  background: player.color,
+                  boxShadow: `0 0 10px ${player.color}`,
+                }}
+              />
               <span className="text-[11px] font-semibold">{player.name}</span>
             </span>
             <span className="text-[9px] uppercase tracking-[0.12em] text-white/40">
@@ -1306,7 +1678,9 @@ function LowHpOverlay({ active }: { active: boolean }) {
         opacity: active ? 1 : 0,
         background:
           'radial-gradient(circle at center, transparent 56%, rgba(127,29,29,0.16) 76%, rgba(153,27,27,0.32) 100%)',
-        animation: active ? 'hermes-low-hp-pulse 2.8s ease-in-out infinite' : 'none',
+        animation: active
+          ? 'hermes-low-hp-pulse 2.8s ease-in-out infinite'
+          : 'none',
       }}
     >
       <style>{`
@@ -1331,7 +1705,8 @@ function CameraPresetToast() {
       return () => window.clearTimeout(id)
     }
     window.addEventListener('hermes-playground-camera-preset', onPreset)
-    return () => window.removeEventListener('hermes-playground-camera-preset', onPreset)
+    return () =>
+      window.removeEventListener('hermes-playground-camera-preset', onPreset)
   }, [])
   if (!name) return null
   return (
@@ -1357,11 +1732,19 @@ const HERMES_LORE_LINES = [
 ]
 
 /** Loading screen shown during world transitions — rotating Hermes lore + spinner. */
-function TransitionLoadingScreen({ active, worldName }: { active: boolean; worldName: string }) {
+function TransitionLoadingScreen({
+  active,
+  worldName,
+}: {
+  active: boolean
+  worldName: string
+}) {
   const [lore, setLore] = useState(HERMES_LORE_LINES[0])
   useEffect(() => {
     if (!active) return
-    setLore(HERMES_LORE_LINES[Math.floor(Math.random() * HERMES_LORE_LINES.length)])
+    setLore(
+      HERMES_LORE_LINES[Math.floor(Math.random() * HERMES_LORE_LINES.length)],
+    )
   }, [active])
   return (
     <div
@@ -1382,12 +1765,14 @@ function TransitionLoadingScreen({ active, worldName }: { active: boolean; world
         <div
           className="text-[44px] leading-none font-black"
           style={{
-            background: 'linear-gradient(180deg, #ffffff 0%, #f5d97a 50%, #c89c2a 100%)',
+            background:
+              'linear-gradient(180deg, #ffffff 0%, #f5d97a 50%, #c89c2a 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             textShadow: '0 0 30px rgba(245,217,122,0.4)',
-            fontFamily: 'Cinzel, "Trajan Pro", "Cormorant Garamond", Georgia, serif',
+            fontFamily:
+              'Cinzel, "Trajan Pro", "Cormorant Garamond", Georgia, serif',
             letterSpacing: '0.04em',
           }}
         >
@@ -1401,7 +1786,8 @@ function TransitionLoadingScreen({ active, worldName }: { active: boolean; world
             <div
               className="h-full rounded-full"
               style={{
-                background: 'linear-gradient(90deg, transparent, #facc15, transparent)',
+                background:
+                  'linear-gradient(90deg, transparent, #facc15, transparent)',
                 animation: 'hermes-loading-bar 1.4s linear infinite',
                 width: '40%',
               }}
@@ -1433,7 +1819,9 @@ function PlaygroundHelpHud({ worldName }: { worldName: string }) {
       </button>
       {open && (
         <div className="rounded-xl border border-white/10 bg-black/85 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-white/80 backdrop-blur-xl">
-          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1 Strike · 2 Dash · 3 Bolt · 4 Summon · E talk · J journal · M map · T chat · F focus · Drag mouse to rotate camera
+          Click ground = walk · Click NPC = talk · WASD · Shift sprint · 1
+          Strike · 2 Dash · 3 Bolt · 4 Summon · E talk · J journal · M map · T
+          chat · F focus · Drag mouse to rotate camera
         </div>
       )}
     </div>
@@ -1456,7 +1844,9 @@ function PlaygroundUtilityDock({
   narrationMuted: boolean
 }) {
   const [isFullscreen, setIsFullscreen] = useState(
-    typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false,
+    typeof document !== 'undefined'
+      ? Boolean(document.fullscreenElement)
+      : false,
   )
   useEffect(() => {
     const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement))
@@ -1467,7 +1857,7 @@ function PlaygroundUtilityDock({
     const canvas = document.querySelector('canvas')
     if (!canvas) return
     try {
-      const dataUrl = (canvas).toDataURL('image/png')
+      const dataUrl = canvas.toDataURL('image/png')
       const a = document.createElement('a')
       a.href = dataUrl
       a.download = `hermesworld-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
@@ -1547,10 +1937,13 @@ function RouteFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050b12] p-6 text-white">
       <div className="max-w-[520px] rounded-3xl border border-amber-300/25 bg-[#070b14] p-5 shadow-2xl">
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200/80">HermesWorld</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200/80">
+          HermesWorld
+        </div>
         <div className="mt-1 text-xl font-extrabold">Route fallback active</div>
         <p className="mt-3 text-sm text-white/75">
-          The 3D route failed to render in this browser context. Reload the page or open `/agora` for the lightweight fallback.
+          The 3D route failed to render in this browser context. Reload the page
+          or open `/agora` for the lightweight fallback.
         </p>
       </div>
     </div>

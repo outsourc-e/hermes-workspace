@@ -54,7 +54,7 @@ export function KeyboardShortcutsModal() {
         if (
           tag === 'input' ||
           tag === 'textarea' ||
-          (event.target as HTMLElement)?.isContentEditable
+          (event.target as HTMLElement).isContentEditable
         ) {
           return
         }

@@ -17,7 +17,7 @@ export type Task = {
   project?: string
   missionId?: string
   assignedAgent?: string
-  tags: string[]
+  tags: Array<string>
   dueDate?: string
   reminder?: string
   createdAt: string
@@ -31,19 +31,19 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   done: 'Done',
 }
 
-export const STATUS_ORDER: TaskStatus[] = [
+export const STATUS_ORDER: Array<TaskStatus> = [
   'backlog',
   'in_progress',
   'review',
   'done',
 ]
 
-export const PRIORITY_ORDER: TaskPriority[] = ['P0', 'P1', 'P2', 'P3']
+export const PRIORITY_ORDER: Array<TaskPriority> = ['P0', 'P1', 'P2', 'P3']
 
 /** Seed data from real Swarm tasks */
-const SEED_TASKS: Task[] = []
+const SEED_TASKS: Array<Task> = []
 
-function normalizeTaskList(payload: unknown): Task[] {
+function normalizeTaskList(payload: unknown): Array<Task> {
   if (
     !payload ||
     typeof payload !== 'object' ||
@@ -52,7 +52,7 @@ function normalizeTaskList(payload: unknown): Task[] {
     return []
   }
 
-  const tasks = (payload as { tasks: unknown[] }).tasks
+  const tasks = (payload as { tasks: Array<unknown> }).tasks
   return tasks.filter((task): task is Task => {
     if (!task || typeof task !== 'object') return false
     const maybeTask = task as Partial<Task>
@@ -100,7 +100,7 @@ async function readApiError(response: Response): Promise<string> {
 }
 
 type TaskStore = {
-  tasks: Task[]
+  tasks: Array<Task>
   afterSync: boolean
   syncFromApi: () => Promise<void>
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
@@ -111,8 +111,10 @@ type TaskStore = {
   moveTask: (id: string, status: TaskStatus) => Promise<void>
   deleteTask: (id: string) => Promise<void>
   // Mission-scoped selectors + actions (CS-020)
-  getTasksByMission: (missionId: string) => Task[]
-  upsertMissionTasks: (tasks: Array<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => void
+  getTasksByMission: (missionId: string) => Array<Task>
+  upsertMissionTasks: (
+    tasks: Array<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>,
+  ) => void
   updateTaskStatus: (taskId: string, status: TaskStatus) => void
 }
 
@@ -157,13 +159,17 @@ export const useTaskStore = create<TaskStore>()(
         }).catch(() => null)
 
         if (!response) {
-          set((state) => ({ tasks: state.tasks.filter((t) => t.id !== task.id) }))
+          set((state) => ({
+            tasks: state.tasks.filter((t) => t.id !== task.id),
+          }))
           throw new Error('Failed to create task')
         }
 
         if (!response.ok) {
           const message = await readApiError(response)
-          set((state) => ({ tasks: state.tasks.filter((t) => t.id !== task.id) }))
+          set((state) => ({
+            tasks: state.tasks.filter((t) => t.id !== task.id),
+          }))
           throw new Error(message)
         }
 
@@ -259,19 +265,33 @@ export const useTaskStore = create<TaskStore>()(
       },
       upsertMissionTasks: (tasks) => {
         const now = new Date().toISOString()
-        const newTasks: Task[] = tasks.map((t) => ({
+        const newTasks: Array<Task> = tasks.map((t) => ({
           ...t,
           id: `mission-${t.missionId ?? 'unknown'}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           createdAt: now,
           updatedAt: now,
         }))
         set((state) => ({
-          tasks: [...state.tasks.filter((existing) => !newTasks.some((n) => n.title === existing.title && n.missionId === existing.missionId)), ...newTasks],
+          tasks: [
+            ...state.tasks.filter(
+              (existing) =>
+                !newTasks.some(
+                  (n) =>
+                    n.title === existing.title &&
+                    n.missionId === existing.missionId,
+                ),
+            ),
+            ...newTasks,
+          ],
         }))
       },
       updateTaskStatus: (taskId, status) => {
         set((state) => ({
-          tasks: state.tasks.map((t) => t.id === taskId ? { ...t, status, updatedAt: new Date().toISOString() } : t),
+          tasks: state.tasks.map((t) =>
+            t.id === taskId
+              ? { ...t, status, updatedAt: new Date().toISOString() }
+              : t,
+          ),
         }))
       },
     }),

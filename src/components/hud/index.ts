@@ -1,10 +1,10 @@
-export { HUDShell } from './HUDShell';
-export { WidgetShell } from './WidgetShell';
-export { Brief } from './Brief';
-export { BentoRow } from './BentoRow';
-export { Timeline } from './Timeline';
-export { MissionControl } from './MissionControl';
-export { InboxRail } from './InboxRail';
-export type { TimelineEvent } from './Timeline';
-export type { MCTileSpec } from './MissionControl';
-export type { InboxItemData } from './InboxItem';
+export { HUDShell } from './HUDShell'
+export { WidgetShell } from './WidgetShell'
+export { Brief } from './Brief'
+export { BentoRow } from './BentoRow'
+export { Timeline } from './Timeline'
+export { MissionControl } from './MissionControl'
+export { InboxRail } from './InboxRail'
+export type { TimelineEvent } from './Timeline'
+export type { MCTileSpec } from './MissionControl'
+export type { InboxItemData } from './InboxItem'

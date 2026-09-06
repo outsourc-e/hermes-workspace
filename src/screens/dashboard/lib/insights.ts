@@ -56,7 +56,7 @@ export function buildInsights(
     }
     if (peakVal > 0) {
       const top = analytics.topModels[0]
-      const driver = top ? `, driven by ${formatModelName(top.id)}` : ''
+      const driver = `, driven by ${formatModelName(top.id)}`
       out.push({
         tone: 'info',
         text: `Usage peaked ${shortDate(daily[peakIdx].day)} (${formatTokens(peakVal)} tokens)${driver}.`,
@@ -70,7 +70,8 @@ export function buildInsights(
     let priorCache = 0
     let recentCache = 0
     for (let i = 0; i < mid; i += 1) priorCache += daily[i].cacheReadTokens
-    for (let i = mid; i < daily.length; i += 1) recentCache += daily[i].cacheReadTokens
+    for (let i = mid; i < daily.length; i += 1)
+      recentCache += daily[i].cacheReadTokens
     if (priorCache > 0) {
       const delta = ((recentCache - priorCache) / priorCache) * 100
       if (Math.abs(delta) >= 5) {
@@ -87,12 +88,14 @@ export function buildInsights(
   if (cron && cron.nextRunAt) {
     const nextMs = Date.parse(cron.nextRunAt)
     if (Number.isFinite(nextMs) && nextMs - Date.now() < -7 * 86_400_000) {
-      ops.push(
-        `${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`,
-      )
+      ops.push(`${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`)
     }
   }
-  if (status && status.gatewayState === 'running' && status.activeAgents === 0) {
+  if (
+    status &&
+    status.gatewayState === 'running' &&
+    status.activeAgents === 0
+  ) {
     ops.push('no active runs')
   }
   if (status?.restartRequested) ops.push('restart pending')

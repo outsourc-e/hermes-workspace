@@ -76,12 +76,12 @@ function readDisk(): Record<string, CachedProbe> {
       !parsed ||
       typeof parsed !== 'object' ||
       Array.isArray(parsed) ||
-      (parsed as DiskSchema).version !== 1 ||
-      typeof (parsed as DiskSchema).probes !== 'object'
+      typeof (parsed as Record<string, unknown>).version !== 'number' ||
+      typeof (parsed as Record<string, unknown>).probes !== 'object'
     ) {
       return {}
     }
-    return (parsed as DiskSchema).probes as Record<string, CachedProbe>
+    return (parsed as DiskSchema).probes
   } catch {
     // Corrupt or unreadable — start fresh
     return {}
@@ -109,10 +109,18 @@ function writeDisk(probes: Record<string, CachedProbe>): void {
   // but linkSync + unlinkSync mirrors the presets-store pattern used here).
   try {
     // Remove existing file if present so linkSync doesn't fail with EEXIST.
-    try { unlinkSync(path) } catch { /* not present */ }
+    try {
+      unlinkSync(path)
+    } catch {
+      /* not present */
+    }
     linkSync(tmp, path)
   } finally {
-    try { unlinkSync(tmp) } catch { /* ignore */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -126,7 +134,10 @@ const cache = new Map<string, CachedProbe>(Object.entries(readDisk()))
 // Public API
 // ---------------------------------------------------------------------------
 
-export function setProbe(name: string, entry: Omit<CachedProbe, 'testedAt' | 'stale'>): void {
+export function setProbe(
+  name: string,
+  entry: Omit<CachedProbe, 'testedAt' | 'stale'>,
+): void {
   const probe: CachedProbe = { ...entry, testedAt: Date.now() }
   cache.set(name, probe)
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { SwarmRosterSchema, SwarmRosterUpsertSchema, isSwarmWorkerId } from './swarm-roster'
+import {
+  SwarmRosterSchema,
+  SwarmRosterUpsertSchema,
+  isSwarmWorkerId,
+} from './swarm-roster'
 
 describe('swarm roster semantic workers', () => {
   it('accepts both legacy swarm ids and semantic profile ids for upsert', () => {
@@ -15,11 +19,25 @@ describe('swarm roster semantic workers', () => {
       maxConcurrentTasks: 1,
     }
 
-    expect(SwarmRosterUpsertSchema.parse({ ...baseWorker, id: ' builder ' }).id).toBe('builder')
-    expect(SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'swarm13' }).success).toBe(true)
-    expect(SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'builder' }).success).toBe(true)
-    expect(SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'km-agent' }).success).toBe(true)
-    expect(SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'ops-watch' }).success).toBe(true)
+    expect(
+      SwarmRosterUpsertSchema.parse({ ...baseWorker, id: ' builder ' }).id,
+    ).toBe('builder')
+    expect(
+      SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'swarm13' })
+        .success,
+    ).toBe(true)
+    expect(
+      SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'builder' })
+        .success,
+    ).toBe(true)
+    expect(
+      SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'km-agent' })
+        .success,
+    ).toBe(true)
+    expect(
+      SwarmRosterUpsertSchema.safeParse({ ...baseWorker, id: 'ops-watch' })
+        .success,
+    ).toBe(true)
     expect(isSwarmWorkerId('builder')).toBe(true)
     expect(isSwarmWorkerId('km-agent')).toBe(true)
     expect(isSwarmWorkerId('../bad')).toBe(false)

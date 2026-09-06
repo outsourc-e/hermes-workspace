@@ -3,8 +3,8 @@ import * as path from 'node:path'
 import {
   getWorkspacePluginRoots,
   parseSwarmPluginManifest,
-  type SwarmPluginDescriptor,
 } from './swarm-foundation'
+import type { SwarmPluginDescriptor } from './swarm-foundation'
 
 export type WorkspacePluginInfo = SwarmPluginDescriptor
 
@@ -55,7 +55,7 @@ export function formatWorkspacePluginsMessage(): string {
   for (const plugin of plugins) {
     const status = plugin.enabled ? '✓' : '✗'
     const version = plugin.version ? ` v${plugin.version}` : ''
-    const source = plugin.source ? ` [${plugin.source}]` : ''
+    const source = ` [${plugin.source}]`
     const description = plugin.description ? ` — ${plugin.description}` : ''
     const boundary = ` <${plugin.boundary}>`
     const scopes = [

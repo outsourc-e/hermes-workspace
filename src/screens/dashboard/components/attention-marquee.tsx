@@ -69,8 +69,7 @@ export function AttentionMarquee({
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12"
         style={{
-          background:
-            'linear-gradient(90deg, transparent, var(--theme-card))',
+          background: 'linear-gradient(90deg, transparent, var(--theme-card))',
         }}
       />
 
@@ -78,9 +77,7 @@ export function AttentionMarquee({
         className="flex min-w-0 flex-1 overflow-hidden whitespace-nowrap"
         style={{ maskImage: 'linear-gradient(90deg, black 96%, transparent)' }}
       >
-        <div
-          className="oc-marquee-track flex shrink-0 items-center gap-6 pl-3 will-change-transform"
-        >
+        <div className="oc-marquee-track flex shrink-0 items-center gap-6 pl-3 will-change-transform">
           {tracks.map((item, idx) => {
             const handleClick = () => {
               if (item.href) {
@@ -108,11 +105,9 @@ export function AttentionMarquee({
                 style={{ color: SEVERITY_COLOR[item.severity] }}
               >
                 <span aria-hidden className="text-[12px]">
-                  {SOURCE_GLYPH[item.source] ?? '•'}
+                  {SOURCE_GLYPH[item.source]}
                 </span>
-                <span style={{ color: 'var(--theme-text)' }}>
-                  {item.label}
-                </span>
+                <span style={{ color: 'var(--theme-text)' }}>{item.label}</span>
                 {item.detail ? (
                   <span style={{ color: 'var(--theme-muted)' }}>
                     · {item.detail}

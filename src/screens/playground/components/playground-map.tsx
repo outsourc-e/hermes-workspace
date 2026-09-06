@@ -1,20 +1,48 @@
-import { PLAYGROUND_WORLDS, type PlaygroundWorldId } from '../lib/playground-rpg'
+import { PLAYGROUND_WORLDS } from '../lib/playground-rpg'
+import type { PlaygroundWorldId } from '../lib/playground-rpg'
 
 type Props = {
   open: boolean
   onClose: () => void
   currentWorld: PlaygroundWorldId
-  unlocked: PlaygroundWorldId[]
+  unlocked: Array<PlaygroundWorldId>
   onTravel: (id: PlaygroundWorldId) => void
 }
 
-const WORLD_LAYOUT: Record<PlaygroundWorldId, { x: number; y: number; lore: string }> = {
-  training: { x: 34, y: 58, lore: 'Starter zone. Arrival Circle, Trainer’s Ring, Archive Podium, and the Forge Gate.' },
-  agora: { x: 50, y: 50, lore: 'Starting plaza. Marble pillars, agent citizens, the first portal.' },
-  forge: { x: 78, y: 38, lore: 'Generated cyberpunk workshop. Where prompts harden into tools.' },
-  grove: { x: 20, y: 35, lore: 'Bioluminescent forest. Music, rituals, community quests.' },
-  oracle: { x: 22, y: 75, lore: 'Quiet archive of lore and memory. Floating crystals.' },
-  arena: { x: 80, y: 75, lore: 'Colosseum for model duels. The Kimi Sigil waits inside.' },
+const WORLD_LAYOUT: Record<
+  PlaygroundWorldId,
+  { x: number; y: number; lore: string }
+> = {
+  training: {
+    x: 34,
+    y: 58,
+    lore: 'Starter zone. Arrival Circle, Trainer’s Ring, Archive Podium, and the Forge Gate.',
+  },
+  agora: {
+    x: 50,
+    y: 50,
+    lore: 'Starting plaza. Marble pillars, agent citizens, the first portal.',
+  },
+  forge: {
+    x: 78,
+    y: 38,
+    lore: 'Generated cyberpunk workshop. Where prompts harden into tools.',
+  },
+  grove: {
+    x: 20,
+    y: 35,
+    lore: 'Bioluminescent forest. Music, rituals, community quests.',
+  },
+  oracle: {
+    x: 22,
+    y: 75,
+    lore: 'Quiet archive of lore and memory. Floating crystals.',
+  },
+  arena: {
+    x: 80,
+    y: 75,
+    lore: 'Colosseum for model duels. The Kimi Sigil waits inside.',
+  },
 }
 
 const PATHS: Array<[PlaygroundWorldId, PlaygroundWorldId]> = [
@@ -28,7 +56,13 @@ const PATHS: Array<[PlaygroundWorldId, PlaygroundWorldId]> = [
   ['grove', 'oracle'],
 ]
 
-export function PlaygroundMap({ open, onClose, currentWorld, unlocked, onTravel }: Props) {
+export function PlaygroundMap({
+  open,
+  onClose,
+  currentWorld,
+  unlocked,
+  onTravel,
+}: Props) {
   if (!open) return null
   return (
     <div
@@ -46,10 +80,15 @@ export function PlaygroundMap({ open, onClose, currentWorld, unlocked, onTravel 
       >
         <div className="flex items-center justify-between border-b-2 border-cyan-400/30 bg-cyan-400/10 px-4 py-3">
           <div>
-            <div className="text-base font-bold text-cyan-300" style={{ textShadow: '0 0 10px rgba(56,189,248,.6)' }}>
+            <div
+              className="text-base font-bold text-cyan-300"
+              style={{ textShadow: '0 0 10px rgba(56,189,248,.6)' }}
+            >
               World Map · Hermes Realm
             </div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/55">Press M to close</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/55">
+              Press M to close
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -70,7 +109,11 @@ export function PlaygroundMap({ open, onClose, currentWorld, unlocked, onTravel 
           />
 
           {/* Connection paths */}
-          <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+          >
             {PATHS.map(([from, to], i) => {
               const a = WORLD_LAYOUT[from]
               const b = WORLD_LAYOUT[to]
@@ -82,7 +125,9 @@ export function PlaygroundMap({ open, onClose, currentWorld, unlocked, onTravel 
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  stroke={both ? 'rgba(56,189,248,.5)' : 'rgba(255,255,255,.12)'}
+                  stroke={
+                    both ? 'rgba(56,189,248,.5)' : 'rgba(255,255,255,.12)'
+                  }
                   strokeWidth={0.4}
                   strokeDasharray={both ? '0' : '1.4'}
                 />
@@ -106,12 +151,24 @@ export function PlaygroundMap({ open, onClose, currentWorld, unlocked, onTravel 
                 <div
                   className="relative flex h-14 w-14 items-center justify-center rounded-full border-2 transition-transform group-hover:scale-110 group-disabled:opacity-40"
                   style={{
-                    borderColor: active ? w.accent : locked ? 'rgba(255,255,255,.15)' : w.accent + '88',
-                    background: active ? `${w.accent}33` : locked ? 'rgba(0,0,0,.6)' : 'rgba(0,0,0,.45)',
-                    boxShadow: active ? `0 0 30px ${w.accent}` : `0 0 14px ${w.accent}55`,
+                    borderColor: active
+                      ? w.accent
+                      : locked
+                        ? 'rgba(255,255,255,.15)'
+                        : w.accent + '88',
+                    background: active
+                      ? `${w.accent}33`
+                      : locked
+                        ? 'rgba(0,0,0,.6)'
+                        : 'rgba(0,0,0,.45)',
+                    boxShadow: active
+                      ? `0 0 30px ${w.accent}`
+                      : `0 0 14px ${w.accent}55`,
                   }}
                 >
-                  <span className="text-xl">{locked ? '🔒' : active ? '●' : '◯'}</span>
+                  <span className="text-xl">
+                    {locked ? '🔒' : active ? '●' : '◯'}
+                  </span>
                 </div>
                 <div
                   className="mt-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em]"
@@ -132,7 +189,8 @@ export function PlaygroundMap({ open, onClose, currentWorld, unlocked, onTravel 
         </div>
 
         <div className="border-t border-white/10 bg-black/50 p-3 text-[11px] text-white/60">
-          <span className="text-cyan-300">{unlocked.length}</span> of {PLAYGROUND_WORLDS.length} realms unlocked. Click a node to travel.
+          <span className="text-cyan-300">{unlocked.length}</span> of{' '}
+          {PLAYGROUND_WORLDS.length} realms unlocked. Click a node to travel.
         </div>
       </div>
     </div>

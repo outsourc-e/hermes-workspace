@@ -2,18 +2,18 @@
  * POST /api/share  — create a new share (text or file)
  * GET  /api/share  — list recent 50 shares
  */
-import { createFileRoute } from '@tanstack/react-router'
 import {
-  mkdirSync,
   existsSync,
-  readdirSync,
+  mkdirSync,
   readFileSync,
-  writeFileSync,
+  readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
 
 const SHARE_DIR = '/root/.hermes/share'
@@ -57,7 +57,9 @@ function pruneExpired(): void {
     const files = readdirSync(SHARE_DIR).filter((f) => f.endsWith('.json'))
     for (const file of files) {
       try {
-        const meta = JSON.parse(readFileSync(join(SHARE_DIR, file), 'utf8')) as ShareMeta
+        const meta = JSON.parse(
+          readFileSync(join(SHARE_DIR, file), 'utf8'),
+        ) as ShareMeta
         if (meta.expiresAt < now) {
           rmSync(join(SHARE_DIR, file), { force: true })
           const bin = join(SHARE_DIR, file.replace('.json', '.bin'))
@@ -73,9 +75,11 @@ function pruneExpired(): void {
 }
 
 function isLocalRequest(request: Request): boolean {
-  const maybeAddress = (request as unknown as { remoteAddress?: string }).remoteAddress
+  const maybeAddress = (request as unknown as { remoteAddress?: string })
+    .remoteAddress
   const ip = (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
-  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip)) return true
+  if (['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1'].includes(ip))
+    return true
   if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return true
   if (/^192\.168\./.test(ip)) return true
   if (/^10\./.test(ip)) return true
@@ -98,7 +102,9 @@ async function handleGET({ request }: { request: Request }): Promise<Response> {
       .filter((f) => f.endsWith('.json'))
       .map((f) => {
         try {
-          return JSON.parse(readFileSync(join(SHARE_DIR, f), 'utf8')) as ShareMeta
+          return JSON.parse(
+            readFileSync(join(SHARE_DIR, f), 'utf8'),
+          ) as ShareMeta
         } catch {
           return null
         }
@@ -119,7 +125,11 @@ async function handleGET({ request }: { request: Request }): Promise<Response> {
   }
 }
 
-async function handlePOST({ request }: { request: Request }): Promise<Response> {
+async function handlePOST({
+  request,
+}: {
+  request: Request
+}): Promise<Response> {
   if (!isAuthenticated(request) && !isLocalRequest(request)) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
@@ -138,20 +148,26 @@ async function handlePOST({ request }: { request: Request }): Promise<Response> 
   try {
     if (contentType.includes('application/json')) {
       // Text share
-      const body = await request.json() as { kind?: string; content?: string }
+      const body = (await request.json()) as { kind?: string; content?: string }
       if (body.kind !== 'text' || typeof body.content !== 'string') {
-        return new Response(JSON.stringify({ error: 'Expected {kind:"text", content: string}' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return new Response(
+          JSON.stringify({ error: 'Expected {kind:"text", content: string}' }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
       }
 
       const textBuf = Buffer.from(body.content, 'utf8')
       if (textBuf.length > MAX_TEXT_BYTES) {
-        return new Response(JSON.stringify({ error: 'Text too large (max 1 MB)' }), {
-          status: 413,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return new Response(
+          JSON.stringify({ error: 'Text too large (max 1 MB)' }),
+          {
+            status: 413,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
       }
 
       const meta: ShareMeta = {
@@ -166,7 +182,12 @@ async function handlePOST({ request }: { request: Request }): Promise<Response> 
       writeFileSync(metaPath(id), JSON.stringify(meta))
 
       return new Response(
-        JSON.stringify({ ok: true, id, downloadUrl: `/api/share/${id}`, expiresAt }),
+        JSON.stringify({
+          ok: true,
+          id,
+          downloadUrl: `/api/share/${id}`,
+          expiresAt,
+        }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
     } else if (contentType.includes('multipart/form-data')) {
@@ -174,17 +195,23 @@ async function handlePOST({ request }: { request: Request }): Promise<Response> 
       const formData = await request.formData()
       const file = formData.get('file') as File | null
       if (!file) {
-        return new Response(JSON.stringify({ error: 'No file field in form' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return new Response(
+          JSON.stringify({ error: 'No file field in form' }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
       }
 
       if (file.size > MAX_FILE_BYTES) {
-        return new Response(JSON.stringify({ error: 'File too large (max 50 MB)' }), {
-          status: 413,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        return new Response(
+          JSON.stringify({ error: 'File too large (max 50 MB)' }),
+          {
+            status: 413,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
       }
 
       const buf = Buffer.from(await file.arrayBuffer())
@@ -201,14 +228,22 @@ async function handlePOST({ request }: { request: Request }): Promise<Response> 
       writeFileSync(metaPath(id), JSON.stringify(meta))
 
       return new Response(
-        JSON.stringify({ ok: true, id, downloadUrl: `/api/share/${id}`, expiresAt }),
+        JSON.stringify({
+          ok: true,
+          id,
+          downloadUrl: `/api/share/${id}`,
+          expiresAt,
+        }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
     } else {
-      return new Response(JSON.stringify({ error: 'Unsupported content-type' }), {
-        status: 415,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return new Response(
+        JSON.stringify({ error: 'Unsupported content-type' }),
+        {
+          status: 415,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error'

@@ -12,7 +12,12 @@ export type ExportableMissionReport = {
   duration: number
   completedAt: number
   report: string
-  artifacts: Array<{ name?: string; type?: string; path?: string; url?: string }>
+  artifacts: Array<{
+    name?: string
+    type?: string
+    path?: string
+    url?: string
+  }>
   [key: string]: unknown
 }
 
@@ -24,7 +29,7 @@ function formatDuration(ms: number): string {
 }
 
 function generateMarkdown(report: ExportableMissionReport): string {
-  const lines: string[] = []
+  const lines: Array<string> = []
   const completedDate = report.completedAt
     ? new Date(report.completedAt).toLocaleString()
     : 'Unknown'
@@ -55,7 +60,9 @@ function generateMarkdown(report: ExportableMissionReport): string {
     lines.push('## Artifacts')
     lines.push('')
     for (const a of report.artifacts) {
-      lines.push(`- **${a.name ?? 'Untitled'}** (${a.type ?? 'file'})${a.path ? ` — \`${a.path}\`` : ''}`)
+      lines.push(
+        `- **${a.name ?? 'Untitled'}** (${a.type ?? 'file'})${a.path ? ` — \`${a.path}\`` : ''}`,
+      )
     }
     lines.push('')
   }
@@ -69,12 +76,18 @@ function generateMarkdown(report: ExportableMissionReport): string {
   }
 
   lines.push('---')
-  lines.push(`*Exported from ClawSuite Agent Hub on ${new Date().toLocaleString()}*`)
+  lines.push(
+    `*Exported from ClawSuite Agent Hub on ${new Date().toLocaleString()}*`,
+  )
 
   return lines.join('\n')
 }
 
-export function ExportMissionButton({ report }: { report: ExportableMissionReport }) {
+export function ExportMissionButton({
+  report,
+}: {
+  report: ExportableMissionReport
+}) {
   const [copied, setCopied] = useState(false)
 
   const handleDownload = useCallback(() => {

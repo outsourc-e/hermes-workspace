@@ -2,12 +2,15 @@
  * useAgentBehaviors — Manages the living office simulation loop.
  * Each agent gets independent activity cycles, break schedules, chat visits, and movement.
  */
-import { useEffect, useRef, useCallback, useState } from 'react'
-import { assignPersona, releasePersona } from '@/lib/agent-personas'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SwarmSession } from '@/stores/agent-swarm-store'
+import type {
+  AgentActivity,
+  AgentBehaviorState,
+} from '@/components/agent-swarm/agent-behaviors'
+import { assignPersona, releasePersona } from '@/lib/agent-personas'
 import {
-  type AgentActivity,
-  type AgentBehaviorState,
+  DESK_POSITIONS,
   createBehaviorState,
   getBreakType,
   getExpression,
@@ -15,7 +18,6 @@ import {
   getRandomMessage,
   isAtTarget,
   lerpPosition,
-  DESK_POSITIONS,
 } from '@/components/agent-swarm/agent-behaviors'
 
 const TICK_MS = 1000
@@ -238,8 +240,7 @@ export function useAgentBehaviors(
               state.chatMessage = null
             } else {
               // At break location
-              const breakType =
-                (state.chatTarget as AgentActivity) ?? 'water_break'
+              const breakType = state.chatTarget as AgentActivity
               state.activity = breakType
               state.expression = getExpression(breakType)
               state.activityStartTime = now
@@ -279,9 +280,10 @@ export function useAgentBehaviors(
 
           const session1 = runningSessions[idx1]
           const session2 = runningSessions[idx2]
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see runtime-safety comment above
           if (session1 && session2) {
-            const key1 = session1.key ?? session1.friendlyId ?? ''
-            const key2 = session2.key ?? session2.friendlyId ?? ''
+            const key1 = session1.key || session1.friendlyId || ''
+            const key2 = session2.key || session2.friendlyId || ''
             const state1 = statesRef.current.get(key1)
             const state2 = statesRef.current.get(key2)
 

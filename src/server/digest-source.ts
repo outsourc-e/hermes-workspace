@@ -52,7 +52,7 @@ export async function findLatestDigestFile(
     .filter((e): e is { name: string; date: string } => e !== null)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
   const newest = dated[0]
-  if (!newest) return null
+
   return { filePath: path.join(dir, newest.name), date: newest.date }
 }
 

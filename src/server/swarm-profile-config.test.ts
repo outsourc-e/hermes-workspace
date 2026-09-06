@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
 import * as yaml from 'yaml'
-import { syncSwarmProfileIdentity, syncSwarmProfileModel } from './swarm-profile-config'
+import {
+  syncSwarmProfileIdentity,
+  syncSwarmProfileModel,
+} from './swarm-profile-config'
 
 function makeProfile(initial: Record<string, unknown>): string {
   const dir = mkdtempSync(join(tmpdir(), 'swarm-profile-cfg-'))
@@ -147,7 +150,6 @@ describe('syncSwarmProfileModel', () => {
   })
 })
 
-
 describe('syncSwarmProfileIdentity', () => {
   it('writes profile-local identity with name, role, mission, capabilities, and stable machine ID', () => {
     const dir = mkdtempSync(join(tmpdir(), 'swarm-profile-id-'))
@@ -156,7 +158,8 @@ describe('syncSwarmProfileIdentity', () => {
         id: 'swarm5',
         name: 'Builder',
         role: 'Primary Builder',
-        specialty: 'full-stack implementation across Hermes Workspace and Swarm2',
+        specialty:
+          'full-stack implementation across Hermes Workspace and Swarm2',
         model: 'GPT-5.5',
         mission: 'Ship focused product slices with tests and clean diffs.',
         skills: ['swarm-ui-worker', 'swarm-worker-core'],
@@ -169,9 +172,15 @@ describe('syncSwarmProfileIdentity', () => {
       expect(identity).toContain('- Name: Builder')
       expect(identity).toContain('- Worker ID: swarm5')
       expect(identity).toContain('- Role: Primary Builder')
-      expect(identity).toContain('- Mission: Ship focused product slices with tests and clean diffs.')
-      expect(identity).toContain('- Capabilities: code-editing, ui-implementation')
-      expect(identity).toContain('The worker ID is a stable machine identifier only')
+      expect(identity).toContain(
+        '- Mission: Ship focused product slices with tests and clean diffs.',
+      )
+      expect(identity).toContain(
+        '- Capabilities: code-editing, ui-implementation',
+      )
+      expect(identity).toContain(
+        'The worker ID is a stable machine identifier only',
+      )
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

@@ -129,12 +129,72 @@ export const AVATAR_PRESETS: Record<string, AvatarConfig> = {
   },
 }
 
-export const SKIN_TONES = ['#f5e1c8', '#fde7c3', '#fcd9a4', '#e7c089', '#c89a6b', '#a07248', '#7c4f2c', '#4a2f1a']
-export const HAIR_COLORS = ['#0b1220', '#3f2511', '#7c4a1f', '#a16207', '#fcd34d', '#fef3c7', '#94a3b8', '#22d3ee', '#a78bfa', '#f472b6', '#34d399', '#fb7185']
-export const EYE_COLORS = ['#0b1220', '#1e3a8a', '#0e7490', '#15803d', '#7c2d12', '#a78bfa']
-export const OUTFIT_COLORS = ['#2dd4bf', '#22d3ee', '#a78bfa', '#fb7185', '#facc15', '#34d399', '#f472b6', '#38bdf8', '#fbbf24', '#fde68a', '#1f2937', '#7c2d12']
-export const ACCENT_COLORS = ['#facc15', '#fbbf24', '#fde68a', '#22d3ee', '#a78bfa', '#fff', '#fb7185']
-export const PORTRAITS = ['hermes', 'athena', 'apollo', 'iris', 'nike', 'pan', 'chronos', 'eros', 'artemis']
+export const SKIN_TONES = [
+  '#f5e1c8',
+  '#fde7c3',
+  '#fcd9a4',
+  '#e7c089',
+  '#c89a6b',
+  '#a07248',
+  '#7c4f2c',
+  '#4a2f1a',
+]
+export const HAIR_COLORS = [
+  '#0b1220',
+  '#3f2511',
+  '#7c4a1f',
+  '#a16207',
+  '#fcd34d',
+  '#fef3c7',
+  '#94a3b8',
+  '#22d3ee',
+  '#a78bfa',
+  '#f472b6',
+  '#34d399',
+  '#fb7185',
+]
+export const EYE_COLORS = [
+  '#0b1220',
+  '#1e3a8a',
+  '#0e7490',
+  '#15803d',
+  '#7c2d12',
+  '#a78bfa',
+]
+export const OUTFIT_COLORS = [
+  '#2dd4bf',
+  '#22d3ee',
+  '#a78bfa',
+  '#fb7185',
+  '#facc15',
+  '#34d399',
+  '#f472b6',
+  '#38bdf8',
+  '#fbbf24',
+  '#fde68a',
+  '#1f2937',
+  '#7c2d12',
+]
+export const ACCENT_COLORS = [
+  '#facc15',
+  '#fbbf24',
+  '#fde68a',
+  '#22d3ee',
+  '#a78bfa',
+  '#fff',
+  '#fb7185',
+]
+export const PORTRAITS = [
+  'hermes',
+  'athena',
+  'apollo',
+  'iris',
+  'nike',
+  'pan',
+  'chronos',
+  'eros',
+  'artemis',
+]
 
 const KEY = 'hermes-playground-avatar-config'
 

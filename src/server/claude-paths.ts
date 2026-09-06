@@ -8,7 +8,9 @@ function isProfilesChild(pathValue: string): boolean {
 
 function isProfileHome(pathValue: string): boolean {
   const parts = normalize(pathValue).split(sep).filter(Boolean)
-  return parts.length >= 3 && parts.at(-3) === 'profiles' && parts.at(-1) === 'home'
+  return (
+    parts.length >= 3 && parts.at(-3) === 'profiles' && parts.at(-1) === 'home'
+  )
 }
 
 function hermesRootFromProfile(pathValue: string): string | null {

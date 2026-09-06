@@ -4,8 +4,8 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import {
   ensureDiscovery,
   forceDiscovery,
-  getDiscoveryStatus,
   getDiscoveredModels,
+  getDiscoveryStatus,
   isProviderConfigured,
 } from '../../server/local-provider-discovery'
 

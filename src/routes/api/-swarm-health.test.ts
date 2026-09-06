@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { parseModelAuthEventsFromText, resolveWorkerWrapperName, summarizeSwarmHealth } from './swarm-health'
+import {
+  parseModelAuthEventsFromText,
+  resolveWorkerWrapperName,
+  summarizeSwarmHealth,
+} from './swarm-health'
 
 describe('swarm-health model/auth readiness', () => {
   it('uses roster wrapper aliases when resolving semantic worker wrappers', () => {
-    expect(resolveWorkerWrapperName('builder', { wrapper: 'builder:task' })).toBe('builder:task')
-    expect(resolveWorkerWrapperName('builder', { wrapper: '  ' })).toBe('builder')
+    expect(
+      resolveWorkerWrapperName('builder', { wrapper: 'builder:task' }),
+    ).toBe('builder:task')
+    expect(resolveWorkerWrapperName('builder', { wrapper: '  ' })).toBe(
+      'builder',
+    )
     expect(resolveWorkerWrapperName('swarm5', null)).toBe('swarm5')
   })
 
@@ -23,7 +31,9 @@ describe('swarm-health model/auth readiness', () => {
   })
 
   it('detects Copilot classic PAT validation failures as primary auth failures', () => {
-    const events = parseModelAuthEventsFromText('2026-05-04 18:38:04,950 WARNING cli: Copilot token validation failed: Token from `gh auth token` is a classic PAT (ghp_*). Classic PATs are not supported by the Copilot API.')
+    const events = parseModelAuthEventsFromText(
+      '2026-05-04 18:38:04,950 WARNING cli: Copilot token validation failed: Token from `gh auth token` is a classic PAT (ghp_*). Classic PATs are not supported by the Copilot API.',
+    )
 
     expect(events.authErrorCount).toBe(1)
     expect(events.modelAuthStatus).toBe('primary-auth-failed')
@@ -56,7 +66,17 @@ describe('swarm-health model/auth readiness', () => {
       fallbackModel: null,
     }
     const summary = summarizeSwarmHealth([
-      { ...workerBase, workerId: 'swarm2', recentAuthErrors: 1, recentFallbacks: 1, modelAuthStatus: 'fallback-active', primaryAuthOk: false, fallbackActive: true, fallbackProvider: 'minimax', fallbackModel: 'MiniMax-M2.7' },
+      {
+        ...workerBase,
+        workerId: 'swarm2',
+        recentAuthErrors: 1,
+        recentFallbacks: 1,
+        modelAuthStatus: 'fallback-active',
+        primaryAuthOk: false,
+        fallbackActive: true,
+        fallbackProvider: 'minimax',
+        fallbackModel: 'MiniMax-M2.7',
+      },
       { ...workerBase, workerId: 'swarm5' },
     ])
 

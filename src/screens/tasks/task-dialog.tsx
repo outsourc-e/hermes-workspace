@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react'
+import type {
+  ClaudeTask,
+  CreateTaskInput,
+  TaskAssignee,
+  TaskColumn,
+  TaskPriority,
+} from '@/lib/tasks-api'
 import {
   DialogContent,
+  DialogDescription,
   DialogRoot,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { ClaudeTask, CreateTaskInput, TaskColumn, TaskPriority, TaskAssignee } from '@/lib/tasks-api'
 import { COLUMN_LABELS, COLUMN_ORDER } from '@/lib/tasks-api'
 
 type Props = {
@@ -20,7 +26,15 @@ type Props = {
   isSubmitting: boolean
 }
 
-export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees, onSubmit, isSubmitting }: Props) {
+export function TaskDialog({
+  open,
+  onOpenChange,
+  task,
+  defaultColumn,
+  assignees,
+  onSubmit,
+  isSubmitting,
+}: Props) {
   const isEdit = Boolean(task)
 
   const [title, setTitle] = useState('')
@@ -60,7 +74,10 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
       column,
       priority,
       assignee: assignee || null,
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      tags: tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
       due_date: dueDate || null,
     })
   }
@@ -78,14 +95,19 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(520px,95vw)] border-[var(--theme-border)] bg-[var(--theme-bg)] overflow-hidden">
         {/* Accent top border */}
-        <div className="h-[3px] w-full" style={{ background: 'var(--theme-accent)' }} />
+        <div
+          className="h-[3px] w-full"
+          style={{ background: 'var(--theme-accent)' }}
+        />
 
         <div className="p-5">
           <DialogTitle className="text-base font-semibold text-[var(--theme-text)] mb-1">
             {isEdit ? 'Edit Task' : 'New Task'}
           </DialogTitle>
           <DialogDescription className="text-xs text-[var(--theme-muted)] mb-4">
-            {isEdit ? 'Update the task details below.' : 'Fill in the details for your new task.'}
+            {isEdit
+              ? 'Update the task details below.'
+              : 'Fill in the details for your new task.'}
           </DialogDescription>
 
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -94,7 +116,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
               <input
                 className={inputClass}
                 value={title}
-                onChange={e => setTitle(e.target.value)}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder="What needs to be done?"
                 required
                 autoFocus
@@ -107,7 +129,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                 className={cn(inputClass, 'resize-none')}
                 rows={3}
                 value={description}
-                onChange={e => setDescription(e.target.value)}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional details..."
               />
             </div>
@@ -119,10 +141,12 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={column}
-                  onChange={e => setColumn(e.target.value as TaskColumn)}
+                  onChange={(e) => setColumn(e.target.value as TaskColumn)}
                 >
-                  {COLUMN_ORDER.map(col => (
-                    <option key={col} value={col}>{COLUMN_LABELS[col]}</option>
+                  {COLUMN_ORDER.map((col) => (
+                    <option key={col} value={col}>
+                      {COLUMN_LABELS[col]}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -132,7 +156,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={priority}
-                  onChange={e => setPriority(e.target.value as TaskPriority)}
+                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 >
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
@@ -148,15 +172,18 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={assignee}
-                  onChange={e => setAssignee(e.target.value)}
+                  onChange={(e) => setAssignee(e.target.value)}
                 >
                   <option value="">Unassigned</option>
                   {assignees.map(({ id, label }) => (
-                    <option key={id} value={id}>{label}</option>
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
                   ))}
                 </select>
                 <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
-                  Assignee is separate from status. Dragging a card changes its column only.
+                  Assignee is separate from status. Dragging a card changes its
+                  column only.
                 </p>
               </div>
               <div>
@@ -166,7 +193,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
+                  onChange={(e) => setDueDate(e.target.value)}
                 />
               </div>
             </div>
@@ -176,13 +203,15 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
               <input
                 className={inputClass}
                 value={tags}
-                onChange={e => setTags(e.target.value)}
+                onChange={(e) => setTags(e.target.value)}
                 placeholder="frontend, bug, research"
               />
             </div>
 
             <div className="flex items-center justify-between pt-2">
-              <p className="text-[10px] text-[var(--theme-muted)]">Press Esc to cancel</p>
+              <p className="text-[10px] text-[var(--theme-muted)]">
+                Press Esc to cancel
+              </p>
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -199,7 +228,11 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, assignees,
                   disabled={isSubmitting || !title.trim()}
                   style={{ background: 'var(--theme-accent)', color: 'white' }}
                 >
-                  {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Task'}
+                  {isSubmitting
+                    ? 'Saving...'
+                    : isEdit
+                      ? 'Save Changes'
+                      : 'Create Task'}
                 </Button>
               </div>
             </div>

@@ -18,5 +18,5 @@ export function useFeatureAvailable(feature: EnhancedFeature): boolean {
     refetchInterval: 60_000,
   })
 
-  return data?.capabilities?.[feature] === true
+  return data?.capabilities[feature] === true
 }

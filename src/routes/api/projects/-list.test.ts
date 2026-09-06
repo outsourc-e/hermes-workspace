@@ -2,7 +2,7 @@
  * Tests for GET /api/projects/list — fetchRepoData helper logic
  * Tests the data-shaping/parsing logic without real GitHub CLI calls.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 // ─── Inline the parsing logic under test ─────────────────────────────────────
 // We extract + test the pure parsing functions here so we can unit-test
@@ -14,32 +14,47 @@ interface RepoData {
   owner: string
   name: string
   openPRs: number
-  prTitles: string[]
+  prTitles: Array<string>
   latestCI: RepoCIStatus
   latestCIWorkflow?: string
   lastCommit?: { sha: string; message: string; date: string; author: string }
 }
 
-function parsePRs(stdout: string): { openPRs: number; prTitles: string[] } {
+function parsePRs(stdout: string): {
+  openPRs: number
+  prTitles: Array<string>
+} {
   try {
     const prs = JSON.parse(stdout) as Array<{ number: number; title: string }>
-    return { openPRs: prs.length, prTitles: prs.slice(0, 3).map((p) => p.title) }
+    return {
+      openPRs: prs.length,
+      prTitles: prs.slice(0, 3).map((p) => p.title),
+    }
   } catch {
     return { openPRs: 0, prTitles: [] }
   }
 }
 
-function parseCI(stdout: string): { latestCI: RepoCIStatus; latestCIWorkflow?: string } {
+function parseCI(stdout: string): {
+  latestCI: RepoCIStatus
+  latestCIWorkflow?: string
+} {
   try {
-    const runs = JSON.parse(stdout) as Array<{ conclusion: string; name: string }>
+    const runs = JSON.parse(stdout) as Array<{
+      conclusion: string
+      name: string
+    }>
     if (!runs.length) return { latestCI: 'unknown' }
     const run = runs[0]
-    const c = (run.conclusion ?? '').toLowerCase()
+    const c = run.conclusion.toLowerCase()
     const latestCI: RepoCIStatus =
-      c === 'success' ? 'success'
-      : c === 'failure' ? 'failure'
-      : c === 'cancelled' ? 'cancelled'
-      : 'unknown'
+      c === 'success'
+        ? 'success'
+        : c === 'failure'
+          ? 'failure'
+          : c === 'cancelled'
+            ? 'cancelled'
+            : 'unknown'
     return { latestCI, latestCIWorkflow: run.name }
   } catch {
     return { latestCI: 'unknown' }
@@ -54,8 +69,11 @@ function parseCommit(stdout: string): RepoData['lastCommit'] | undefined {
   }
 }
 
-function getTrackedRepos(env: string): string[] {
-  return env.split(',').map((r) => r.trim()).filter(Boolean)
+function getTrackedRepos(env: string): Array<string> {
+  return env
+    .split(',')
+    .map((r) => r.trim())
+    .filter(Boolean)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -73,15 +91,29 @@ describe('GET /api/projects/list — happy path parsing', () => {
   })
 
   it('parseCI maps conclusion correctly', () => {
-    expect(parseCI(JSON.stringify([{ conclusion: 'success', name: 'CI' }])).latestCI).toBe('success')
-    expect(parseCI(JSON.stringify([{ conclusion: 'failure', name: 'CI' }])).latestCI).toBe('failure')
-    expect(parseCI(JSON.stringify([{ conclusion: 'cancelled', name: 'CI' }])).latestCI).toBe('cancelled')
-    expect(parseCI(JSON.stringify([{ conclusion: '', name: 'CI' }])).latestCI).toBe('unknown')
+    expect(
+      parseCI(JSON.stringify([{ conclusion: 'success', name: 'CI' }])).latestCI,
+    ).toBe('success')
+    expect(
+      parseCI(JSON.stringify([{ conclusion: 'failure', name: 'CI' }])).latestCI,
+    ).toBe('failure')
+    expect(
+      parseCI(JSON.stringify([{ conclusion: 'cancelled', name: 'CI' }]))
+        .latestCI,
+    ).toBe('cancelled')
+    expect(
+      parseCI(JSON.stringify([{ conclusion: '', name: 'CI' }])).latestCI,
+    ).toBe('unknown')
     expect(parseCI('[]').latestCI).toBe('unknown')
   })
 
   it('parseCommit parses JSON output', () => {
-    const obj = { sha: 'abc1234', message: 'chore: update', date: '2026-05-25T21:00:00Z', author: 'Nick' }
+    const obj = {
+      sha: 'abc1234',
+      message: 'chore: update',
+      date: '2026-05-25T21:00:00Z',
+      author: 'Nick',
+    }
     const result = parseCommit(JSON.stringify(obj))
     expect(result?.sha).toBe('abc1234')
     expect(result?.author).toBe('Nick')
@@ -95,7 +127,9 @@ describe('GET /api/projects/list — empty repo list', () => {
   })
 
   it('parses comma-separated repos', () => {
-    const repos = getTrackedRepos('SPACEMAN1898/CliniTrack-Suite,SPACEMAN1898/another')
+    const repos = getTrackedRepos(
+      'SPACEMAN1898/CliniTrack-Suite,SPACEMAN1898/another',
+    )
     expect(repos).toHaveLength(2)
     expect(repos[0]).toBe('SPACEMAN1898/CliniTrack-Suite')
   })

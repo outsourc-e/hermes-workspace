@@ -59,14 +59,20 @@ export const Route = createFileRoute('/api/hermes-tasks')({
           const task = createTask({
             id: typeof body.id === 'string' ? body.id : undefined,
             title: body.title,
-            description: typeof body.description === 'string' ? body.description : '',
+            description:
+              typeof body.description === 'string' ? body.description : '',
             column: isTaskColumn(body.column) ? body.column : undefined,
             priority: isTaskPriority(body.priority) ? body.priority : undefined,
             assignee: typeof body.assignee === 'string' ? body.assignee : null,
-            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+            tags: Array.isArray(body.tags)
+              ? body.tags.filter(
+                  (tag): tag is string => typeof tag === 'string',
+                )
+              : [],
             due_date: typeof body.due_date === 'string' ? body.due_date : null,
             position: typeof body.position === 'number' ? body.position : 0,
-            created_by: typeof body.created_by === 'string' ? body.created_by : 'user',
+            created_by:
+              typeof body.created_by === 'string' ? body.created_by : 'user',
           })
 
           return jsonResponse({ task }, 201)

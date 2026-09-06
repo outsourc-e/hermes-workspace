@@ -137,7 +137,9 @@ describe('VtCapitalScreen', () => {
   it('renders a plugin-scoped observability cockpit, not a generic dashboard clone', async () => {
     const { container, unmount } = await renderScreen()
 
-    expect(container.querySelector('[data-plugin-surface="vt-capital"]')).not.toBeNull()
+    expect(
+      container.querySelector('[data-plugin-surface="vt-capital"]'),
+    ).not.toBeNull()
     expect(container.textContent).toContain('Plugin VT Capital')
     expect(container.textContent).toContain('Modalità osservazione')
     expect(container.textContent).toContain('Esecuzione disattivata')
@@ -150,7 +152,9 @@ describe('VtCapitalScreen', () => {
     expect(container.textContent).toContain('Ultimo order.executed')
     expect(container.textContent).toContain('demo_guardian_intraday')
     expect(container.textContent).toContain('DUPLICATE_OPEN_ORDER')
-    expect(global.fetch).toHaveBeenCalledWith('/api/vt-capital', { cache: 'no-store' })
+    expect(global.fetch).toHaveBeenCalledWith('/api/vt-capital', {
+      cache: 'no-store',
+    })
 
     await unmount()
   })

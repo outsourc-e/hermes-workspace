@@ -22,26 +22,26 @@ The first version must be simple, inspectable, and durable:
 
 These paths are locked. Do not substitute Claude/OpenClaw profile paths for worker-local memory.
 
-| Layer | Canonical path |
-| --- | --- |
-| Worker profile root | `~/.hermes/profiles/<workerId>/` |
-| Worker chat DB | `~/.hermes/profiles/<workerId>/state.db` |
-| Worker runtime state | `~/.hermes/profiles/<workerId>/runtime.json` |
-| Worker memory root | `~/.hermes/profiles/<workerId>/memory/` |
-| Worker curated memory | `~/.hermes/profiles/<workerId>/memory/MEMORY.md` |
-| Worker identity file | `~/.hermes/profiles/<workerId>/memory/IDENTITY.md` |
-| Worker role/persona file | `~/.hermes/profiles/<workerId>/memory/SOUL.md` |
-| Worker mission memory | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/` |
-| Worker mission summary | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/SUMMARY.md` |
-| Worker mission event log | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/events.jsonl` |
-| Worker episodic logs | `~/.hermes/profiles/<workerId>/memory/episodes/YYYY-MM-DD.md` |
-| Worker handoffs | `~/.hermes/profiles/<workerId>/memory/handoffs/<missionId>.md` |
-| Swarm control-plane runtime | `/Users/aurora/hermes-workspace/.runtime/` |
-| Swarm mission ledger | `/Users/aurora/hermes-workspace/.runtime/swarm-missions.json` |
-| Swarm roster/source of truth | `/Users/aurora/hermes-workspace/swarm.yaml` |
-| Shared swarm handoffs | `/Users/aurora/.openclaw/workspace/memory/handoffs/swarm/` |
-| Shared swarm archive/memory | `/Users/aurora/.openclaw/workspace/memory/swarm/` |
-| Completed mission archive | `/Users/aurora/.openclaw/workspace/memory/swarm/missions/<missionId>/` |
+| Layer                        | Canonical path                                                           |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| Worker profile root          | `~/.hermes/profiles/<workerId>/`                                         |
+| Worker chat DB               | `~/.hermes/profiles/<workerId>/state.db`                                 |
+| Worker runtime state         | `~/.hermes/profiles/<workerId>/runtime.json`                             |
+| Worker memory root           | `~/.hermes/profiles/<workerId>/memory/`                                  |
+| Worker curated memory        | `~/.hermes/profiles/<workerId>/memory/MEMORY.md`                         |
+| Worker identity file         | `~/.hermes/profiles/<workerId>/memory/IDENTITY.md`                       |
+| Worker role/persona file     | `~/.hermes/profiles/<workerId>/memory/SOUL.md`                           |
+| Worker mission memory        | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/`             |
+| Worker mission summary       | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/SUMMARY.md`   |
+| Worker mission event log     | `~/.hermes/profiles/<workerId>/memory/missions/<missionId>/events.jsonl` |
+| Worker episodic logs         | `~/.hermes/profiles/<workerId>/memory/episodes/YYYY-MM-DD.md`            |
+| Worker handoffs              | `~/.hermes/profiles/<workerId>/memory/handoffs/<missionId>.md`           |
+| Swarm control-plane runtime  | `/Users/aurora/hermes-workspace/.runtime/`                               |
+| Swarm mission ledger         | `/Users/aurora/hermes-workspace/.runtime/swarm-missions.json`            |
+| Swarm roster/source of truth | `/Users/aurora/hermes-workspace/swarm.yaml`                              |
+| Shared swarm handoffs        | `/Users/aurora/.openclaw/workspace/memory/handoffs/swarm/`               |
+| Shared swarm archive/memory  | `/Users/aurora/.openclaw/workspace/memory/swarm/`                        |
+| Completed mission archive    | `/Users/aurora/.openclaw/workspace/memory/swarm/missions/<missionId>/`   |
 
 Explicitly wrong paths:
 
@@ -203,7 +203,14 @@ Files:
 `events.jsonl` event shape:
 
 ```json
-{"at":"2026-04-28T00:00:00.000Z","type":"dispatch","workerId":"swarm5","missionId":"mission-...","assignmentId":"assign-...","summary":"Dispatched builder task"}
+{
+  "at": "2026-04-28T00:00:00.000Z",
+  "type": "dispatch",
+  "workerId": "swarm5",
+  "missionId": "mission-...",
+  "assignmentId": "assign-...",
+  "summary": "Dispatched builder task"
+}
 ```
 
 Event types:
@@ -317,9 +324,7 @@ Returns:
   "workerId": "swarm5",
   "kind": "mission",
   "path": "...",
-  "files": [
-    { "name": "SUMMARY.md", "path": "...", "content": "..." }
-  ]
+  "files": [{ "name": "SUMMARY.md", "path": "...", "content": "..." }]
 }
 ```
 

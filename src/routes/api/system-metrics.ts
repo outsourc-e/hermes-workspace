@@ -64,14 +64,16 @@ function readMemory() {
 }
 
 function readDisk() {
-  const diskPath = process.env.HERMES_WORKSPACE_METRICS_DISK_PATH || os.homedir()
+  const diskPath =
+    process.env.HERMES_WORKSPACE_METRICS_DISK_PATH || os.homedir()
 
   try {
     const stats = fs.statfsSync(diskPath)
     const totalBytes = stats.blocks * stats.bsize
     const freeBytes = stats.bavail * stats.bsize
     const usedBytes = Math.max(0, totalBytes - freeBytes)
-    const usedPercent = totalBytes > 0 ? clampPercent((usedBytes / totalBytes) * 100) : 0
+    const usedPercent =
+      totalBytes > 0 ? clampPercent((usedBytes / totalBytes) * 100) : 0
 
     return {
       path: diskPath,

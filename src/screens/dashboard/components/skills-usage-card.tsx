@@ -24,7 +24,7 @@ export function SkillsUsageCard({
 }) {
   const navigate = useNavigate()
   const hasUsage = !!usage && usage.topSkills.length > 0
-  const top = hasUsage ? usage!.topSkills : []
+  const top = hasUsage ? usage.topSkills : []
   const max = top[0]?.totalCount || 1
 
   return (
@@ -61,7 +61,7 @@ export function SkillsUsageCard({
           style={{ color: 'var(--theme-muted)' }}
         >
           {hasUsage
-            ? `${usage!.distinctSkills} of ${installedCount} used`
+            ? `${usage.distinctSkills} of ${installedCount} used`
             : `${installedCount} installed`}
           {' · manage →'}
         </span>

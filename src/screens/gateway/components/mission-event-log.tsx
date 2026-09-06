@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AiBrain01Icon,
   AlertDiamondIcon,
   ArrowTurnBackwardIcon,
+  Chat01Icon,
   CheckmarkCircle02Icon,
   PlayCircleIcon,
   Rocket01Icon,
-  Task01Icon,
-  AiBrain01Icon,
-  Chat01Icon,
   Target01Icon,
+  Task01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AnimatePresence, motion } from 'motion/react'
-import { cn } from '@/lib/utils'
 import type { MissionEvent } from '@/screens/gateway/lib/mission-events'
+import { cn } from '@/lib/utils'
 
 type MissionEventLogProps = {
-  events: MissionEvent[]
+  events: Array<MissionEvent>
   agentNames?: Record<string, string>
   className?: string
 }
@@ -38,27 +38,56 @@ const FILTER_OPTIONS: Array<{ key: EventFilter; label: string }> = [
 function getEventVisual(eventType: MissionEvent['type']): EventVisual {
   switch (eventType) {
     case 'agent.spawned':
-      return { icon: Rocket01Icon, toneClassName: 'border-sky-500/30 bg-sky-500/10 text-sky-300' }
+      return {
+        icon: Rocket01Icon,
+        toneClassName: 'border-sky-500/30 bg-sky-500/10 text-sky-300',
+      }
     case 'agent.started':
-      return { icon: PlayCircleIcon, toneClassName: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }
+      return {
+        icon: PlayCircleIcon,
+        toneClassName:
+          'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+      }
     case 'agent.thinking':
-      return { icon: AiBrain01Icon, toneClassName: 'border-violet-500/30 bg-violet-500/10 text-violet-300' }
+      return {
+        icon: AiBrain01Icon,
+        toneClassName: 'border-violet-500/30 bg-violet-500/10 text-violet-300',
+      }
     case 'agent.output':
-      return { icon: Chat01Icon, toneClassName: 'border-primary-700 bg-primary-800/70 text-primary-300' }
+      return {
+        icon: Chat01Icon,
+        toneClassName: 'border-primary-700 bg-primary-800/70 text-primary-300',
+      }
     case 'agent.completed':
-      return { icon: CheckmarkCircle02Icon, toneClassName: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }
+      return {
+        icon: CheckmarkCircle02Icon,
+        toneClassName:
+          'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+      }
     case 'agent.failed':
-      return { icon: AlertDiamondIcon, toneClassName: 'border-red-500/30 bg-red-500/10 text-red-300' }
+      return {
+        icon: AlertDiamondIcon,
+        toneClassName: 'border-red-500/30 bg-red-500/10 text-red-300',
+      }
     case 'agent.retrying':
-      return { icon: ArrowTurnBackwardIcon, toneClassName: 'border-accent-500/30 bg-accent-500/10 text-accent-300' }
+      return {
+        icon: ArrowTurnBackwardIcon,
+        toneClassName: 'border-accent-500/30 bg-accent-500/10 text-accent-300',
+      }
     case 'mission.started':
     case 'mission.completed':
     case 'mission.aborted':
-      return { icon: Target01Icon, toneClassName: 'border-accent-500/30 bg-accent-500/10 text-accent-300' }
+      return {
+        icon: Target01Icon,
+        toneClassName: 'border-accent-500/30 bg-accent-500/10 text-accent-300',
+      }
     case 'task.assigned':
     case 'task.completed':
     case 'task.failed':
-      return { icon: Task01Icon, toneClassName: 'border-sky-500/30 bg-sky-500/10 text-sky-300' }
+      return {
+        icon: Task01Icon,
+        toneClassName: 'border-sky-500/30 bg-sky-500/10 text-sky-300',
+      }
   }
 }
 
@@ -70,7 +99,10 @@ function formatTimestamp(timestamp: number): string {
   })
 }
 
-function getAgentLabel(event: MissionEvent, agentNames?: Record<string, string>): string {
+function getAgentLabel(
+  event: MissionEvent,
+  agentNames?: Record<string, string>,
+): string {
   if ('agentId' in event.payload) {
     return agentNames?.[event.payload.agentId] ?? event.payload.agentId
   }
@@ -78,7 +110,10 @@ function getAgentLabel(event: MissionEvent, agentNames?: Record<string, string>)
   return 'Mission'
 }
 
-function getEventDescription(event: MissionEvent, agentNames?: Record<string, string>): string {
+function getEventDescription(
+  event: MissionEvent,
+  agentNames?: Record<string, string>,
+): string {
   switch (event.type) {
     case 'agent.spawned':
       return `spawned session ${event.payload.sessionKey} on ${event.payload.model}`
@@ -93,7 +128,9 @@ function getEventDescription(event: MissionEvent, agentNames?: Record<string, st
     case 'agent.completed':
       return `completed with ${event.payload.tokenCount} tokens`
     case 'agent.failed':
-      return event.payload.willRetry ? `failed and will retry: ${event.payload.error}` : `failed: ${event.payload.error}`
+      return event.payload.willRetry
+        ? `failed and will retry: ${event.payload.error}`
+        : `failed: ${event.payload.error}`
     case 'agent.retrying':
       return `retry ${event.payload.retryCount} spawned as ${event.payload.newSessionKey}`
     case 'mission.started':
@@ -103,7 +140,8 @@ function getEventDescription(event: MissionEvent, agentNames?: Record<string, st
     case 'mission.aborted':
       return `aborted: ${event.payload.reason}`
     case 'task.assigned': {
-      const agentName = agentNames?.[event.payload.agentId] ?? event.payload.agentId
+      const agentName =
+        agentNames?.[event.payload.agentId] ?? event.payload.agentId
       return `assigned ${event.payload.taskId} to ${agentName}`
     }
     case 'task.completed':
@@ -117,12 +155,22 @@ function matchesFilter(event: MissionEvent, filter: EventFilter): boolean {
   if (filter === 'all') return true
   if (filter === 'agent') return event.type.startsWith('agent.')
   if (filter === 'task') return event.type.startsWith('task.')
-  return event.type === 'agent.failed' || event.type === 'task.failed' || event.type === 'mission.aborted'
+  return (
+    event.type === 'agent.failed' ||
+    event.type === 'task.failed' ||
+    event.type === 'mission.aborted'
+  )
 }
 
-export function MissionEventLog({ events, agentNames, className }: MissionEventLogProps) {
+export function MissionEventLog({
+  events,
+  agentNames,
+  className,
+}: MissionEventLogProps) {
   const [filter, setFilter] = useState<EventFilter>('all')
-  const [expandedOutputIds, setExpandedOutputIds] = useState<Record<string, boolean>>({})
+  const [expandedOutputIds, setExpandedOutputIds] = useState<
+    Record<string, boolean>
+  >({})
   const endRef = useRef<HTMLDivElement | null>(null)
 
   const filteredEvents = useMemo(
@@ -193,7 +241,11 @@ export function MissionEventLog({ events, agentNames, className }: MissionEventL
                           visual.toneClassName,
                         )}
                       >
-                        <HugeiconsIcon icon={visual.icon} size={15} strokeWidth={1.8} />
+                        <HugeiconsIcon
+                          icon={visual.icon}
+                          size={15}
+                          strokeWidth={1.8}
+                        />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
@@ -234,19 +286,22 @@ export function MissionEventLog({ events, agentNames, className }: MissionEventL
                           </div>
                         ) : null}
 
-                        {event.type === 'agent.completed' && event.payload.finalOutput ? (
+                        {event.type === 'agent.completed' &&
+                        event.payload.finalOutput ? (
                           <p className="mt-2 line-clamp-2 text-xs text-primary-300">
                             {event.payload.finalOutput}
                           </p>
                         ) : null}
 
-                        {event.type === 'mission.completed' && event.payload.report ? (
+                        {event.type === 'mission.completed' &&
+                        event.payload.report ? (
                           <p className="mt-2 line-clamp-2 text-xs text-primary-300">
                             {event.payload.report}
                           </p>
                         ) : null}
 
-                        {event.type === 'task.completed' && event.payload.result ? (
+                        {event.type === 'task.completed' &&
+                        event.payload.result ? (
                           <p className="mt-2 line-clamp-2 text-xs text-primary-300">
                             {event.payload.result}
                           </p>

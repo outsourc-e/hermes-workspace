@@ -33,24 +33,70 @@ export function PlaygroundHeroCanvas() {
     ro.observe(canvas)
 
     const stars: Array<{ x: number; y: number; r: number; tw: number }> = []
-    for (let i = 0; i < 90; i++) stars.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.4 + 0.2, tw: Math.random() * Math.PI * 2 })
+    for (let i = 0; i < 90; i++)
+      stars.push({
+        x: Math.random(),
+        y: Math.random(),
+        r: Math.random() * 1.4 + 0.2,
+        tw: Math.random() * Math.PI * 2,
+      })
 
-    const orbiters: Array<{ phase: number; orbit: number; speed: number; size: number; color: string }> = []
+    const orbiters: Array<{
+      phase: number
+      orbit: number
+      speed: number
+      size: number
+      color: string
+    }> = []
     // Gold-warm palette to match HermesWorld branding
-    const palette = ['#facc15', '#fbbf24', '#fde68a', '#22d3ee', '#a78bfa', '#fb7185', '#34d399']
-    for (let i = 0; i < 42; i++) orbiters.push({ phase: Math.random() * Math.PI * 2, orbit: 0.18 + Math.random() * 0.22, speed: 0.4 + Math.random() * 0.5, size: 1.5 + Math.random() * 2.4, color: palette[Math.floor(Math.random() * palette.length)] })
+    const palette = [
+      '#facc15',
+      '#fbbf24',
+      '#fde68a',
+      '#22d3ee',
+      '#a78bfa',
+      '#fb7185',
+      '#34d399',
+    ]
+    for (let i = 0; i < 42; i++)
+      orbiters.push({
+        phase: Math.random() * Math.PI * 2,
+        orbit: 0.18 + Math.random() * 0.22,
+        speed: 0.4 + Math.random() * 0.5,
+        size: 1.5 + Math.random() * 2.4,
+        color: palette[Math.floor(Math.random() * palette.length)],
+      })
 
     // Agent network nodes — fixed positions on the ring, connected with thin lines.
     const agentNodes: Array<{ a: number; r: number; color: string }> = []
-    const agentColors = ['#facc15', '#22d3ee', '#a78bfa', '#34d399', '#fb7185', '#fbbf24']
-    for (let i = 0; i < 6; i++) agentNodes.push({ a: (i / 6) * Math.PI * 2, r: 1.0, color: agentColors[i] })
+    const agentColors = [
+      '#facc15',
+      '#22d3ee',
+      '#a78bfa',
+      '#34d399',
+      '#fb7185',
+      '#fbbf24',
+    ]
+    for (let i = 0; i < 6; i++)
+      agentNodes.push({
+        a: (i / 6) * Math.PI * 2,
+        r: 1.0,
+        color: agentColors[i],
+      })
 
     let t = 0
     const draw = () => {
       if (!mounted) return
       t += 0.008
       // Background
-      const g = ctx.createRadialGradient(w / 2, h * 0.45, 20, w / 2, h * 0.45, Math.max(w, h) * 0.9)
+      const g = ctx.createRadialGradient(
+        w / 2,
+        h * 0.45,
+        20,
+        w / 2,
+        h * 0.45,
+        Math.max(w, h) * 0.9,
+      )
       g.addColorStop(0, '#0d1d2c')
       g.addColorStop(0.45, '#0a121e')
       g.addColorStop(1, '#06080f')
@@ -168,7 +214,13 @@ export function PlaygroundHeroCanvas() {
   return (
     <canvas
       ref={ref}
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        display: 'block',
+      }}
       aria-hidden
     />
   )

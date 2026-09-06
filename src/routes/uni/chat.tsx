@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { MessageMultiple01Icon } from '@hugeicons/core-free-icons'
@@ -19,10 +19,10 @@ type Message = {
 type ApiMessage = { role: 'user' | 'assistant' | 'system'; content: string }
 
 function buildApiMessages(
-  history: Message[],
+  history: Array<Message>,
   draft: string,
-): ApiMessage[] {
-  const msgs: ApiMessage[] = history.map((m) => ({
+): Array<ApiMessage> {
+  const msgs: Array<ApiMessage> = history.map((m) => ({
     role: m.role,
     content: m.text,
   }))
@@ -40,11 +40,13 @@ async function* parseSSEModelStream(
   const decoder = new TextDecoder()
   let buffer = ''
 
+  let done = false
   try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
+    while (!done) {
+      const result = await reader.read()
+      done = result.done
+      if (result.done) break
+      buffer += decoder.decode(result.value, { stream: true })
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
       for (const line of lines) {
@@ -122,7 +124,7 @@ function UniChatRoute() {
         fullText += chunk
         setMessages((prev) => {
           const last = prev[prev.length - 1]
-          if (last?.id === assistantId) {
+          if (last.id === assistantId) {
             return [...prev.slice(0, -1), { ...last, text: fullText }]
           }
           return prev
@@ -183,9 +185,10 @@ function UniChatRoute() {
                   <span className="mr-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     {m.role}
                   </span>
-                  {m.text || (m.role === 'assistant' && loading ? (
-                    <span className="opacity-50">…</span>
-                  ) : null)}
+                  {m.text ||
+                    (m.role === 'assistant' && loading ? (
+                      <span className="opacity-50">…</span>
+                    ) : null)}
                 </li>
               ))}
               <li ref={bottomRef} />

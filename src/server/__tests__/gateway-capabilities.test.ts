@@ -1,12 +1,14 @@
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { existsSync, readFileSync, writeFileSync, mkdirSync } = vi.hoisted(() => ({
-  existsSync: vi.fn().mockReturnValue(false),
-  readFileSync: vi.fn().mockReturnValue(''),
-  writeFileSync: vi.fn().mockImplementation(() => {}),
-  mkdirSync: vi.fn().mockImplementation(() => {}),
-}))
+const { existsSync, readFileSync, writeFileSync, mkdirSync } = vi.hoisted(
+  () => ({
+    existsSync: vi.fn().mockReturnValue(false),
+    readFileSync: vi.fn().mockReturnValue(''),
+    writeFileSync: vi.fn().mockImplementation(() => {}),
+    mkdirSync: vi.fn().mockImplementation(() => {}),
+  }),
+)
 
 vi.mock('node:fs', () => ({
   default: { existsSync, readFileSync, writeFileSync, mkdirSync },
@@ -118,7 +120,9 @@ describe('gateway-capabilities', () => {
           },
           ['health', 'sessions'],
         ),
-      ).toBe(`[gateway] Missing Hermes APIs detected. ${mod.CLAUDE_UPGRADE_INSTRUCTIONS}`)
+      ).toBe(
+        `[gateway] Missing Hermes APIs detected. ${mod.CLAUDE_UPGRADE_INSTRUCTIONS}`,
+      )
     })
   })
 
@@ -150,7 +154,8 @@ describe('gateway-capabilities', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        text: async () => '<html><head><script>window.__HERMES_SESSION_TOKEN__="fresh-token";</script></head></html>',
+        text: async () =>
+          '<html><head><script>window.__HERMES_SESSION_TOKEN__="fresh-token";</script></head></html>',
       })
 
       const mod = await loadMod()
@@ -166,63 +171,71 @@ describe('gateway-capabilities', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        text: async () => '<html><head><script>window.__HERMES_SESSION_TOKEN__="live-token";</script></head></html>',
+        text: async () =>
+          '<html><head><script>window.__HERMES_SESSION_TOKEN__="live-token";</script></head></html>',
       })
 
       const mod = await loadMod()
       await expect(mod.fetchDashboardToken()).resolves.toBe('live-token')
-      expect(fetchMock.mock.calls.some(([url]) => url === 'http://127.0.0.1:9119/')).toBe(true)
+      expect(
+        fetchMock.mock.calls.some(([url]) => url === 'http://127.0.0.1:9119/'),
+      ).toBe(true)
     })
   })
 
   it('does not mark Conductor available when dashboard returns SPA HTML fallback', async () => {
     process.env.HERMES_API_URL = 'http://gateway.test'
     process.env.CLAUDE_DASHBOARD_URL = 'http://dashboard.test'
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input)
-      if (url === 'http://dashboard.test/api/status') {
-        return new Response(JSON.stringify({ version: '0.12.0' }), {
-          headers: { 'content-type': 'application/json' },
-        })
-      }
-      if (url === 'http://dashboard.test/') {
-        return new Response("<script>window.__CLAUDE_SESSION_TOKEN__ = 'test-token'</script>", {
-          headers: { 'content-type': 'text/html' },
-        })
-      }
-      if (url === 'http://dashboard.test/api/conductor/missions') {
-        return new Response('<!doctype html><div id="root"></div>', {
-          status: 200,
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-        })
-      }
-      if (url === 'http://dashboard.test/api/plugins/kanban/board') {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url === 'http://dashboard.test/api/status') {
+          return new Response(JSON.stringify({ version: '0.12.0' }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://dashboard.test/') {
+          return new Response(
+            "<script>window.__CLAUDE_SESSION_TOKEN__ = 'test-token'</script>",
+            {
+              headers: { 'content-type': 'text/html' },
+            },
+          )
+        }
+        if (url === 'http://dashboard.test/api/conductor/missions') {
+          return new Response('<!doctype html><div id="root"></div>', {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          })
+        }
+        if (url === 'http://dashboard.test/api/plugins/kanban/board') {
+          return new Response(JSON.stringify({ ok: true }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://dashboard.test/api/mcp') {
+          return new Response('not found', { status: 404 })
+        }
+        if (url === 'http://dashboard.test/api/config') {
+          return new Response(JSON.stringify({ config: { mcp_servers: {} } }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://gateway.test/v1/chat/completions') {
+          return new Response('', { status: 405 })
+        }
+        if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') {
+          return new Response('', { status: 404 })
+        }
+        if (url === 'http://gateway.test/api/mcp') {
+          return new Response('', { status: 404 })
+        }
         return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
           headers: { 'content-type': 'application/json' },
         })
-      }
-      if (url === 'http://dashboard.test/api/mcp') {
-        return new Response('not found', { status: 404 })
-      }
-      if (url === 'http://dashboard.test/api/config') {
-        return new Response(JSON.stringify({ config: { mcp_servers: {} } }), {
-          headers: { 'content-type': 'application/json' },
-        })
-      }
-      if (url === 'http://gateway.test/v1/chat/completions') {
-        return new Response('', { status: 405 })
-      }
-      if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') {
-        return new Response('', { status: 404 })
-      }
-      if (url === 'http://gateway.test/api/mcp') {
-        return new Response('', { status: 404 })
-      }
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
-    })
+      },
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     const mod = await loadMod()
@@ -239,36 +252,44 @@ describe('gateway-capabilities', () => {
   it('marks Conductor available when dashboard returns JSON from missions API', async () => {
     process.env.HERMES_API_URL = 'http://gateway.test'
     process.env.CLAUDE_DASHBOARD_URL = 'http://dashboard.test'
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url === 'http://dashboard.test/api/status') {
-        return new Response(JSON.stringify({ version: '0.12.0' }), {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url === 'http://dashboard.test/api/status') {
+          return new Response(JSON.stringify({ version: '0.12.0' }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://dashboard.test/') {
+          return new Response(
+            "<script>window.__CLAUDE_SESSION_TOKEN__ = 'test-token'</script>",
+            {
+              headers: { 'content-type': 'text/html' },
+            },
+          )
+        }
+        if (url === 'http://dashboard.test/api/conductor/missions') {
+          return new Response(JSON.stringify({ missions: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://dashboard.test/api/config') {
+          return new Response(JSON.stringify({ config: { mcp_servers: {} } }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        if (url === 'http://gateway.test/v1/chat/completions')
+          return new Response('', { status: 405 })
+        if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream')
+          return new Response('', { status: 404 })
+        if (url.endsWith('/api/mcp')) return new Response('', { status: 404 })
+        return new Response(JSON.stringify({ ok: true }), {
           headers: { 'content-type': 'application/json' },
         })
-      }
-      if (url === 'http://dashboard.test/') {
-        return new Response("<script>window.__CLAUDE_SESSION_TOKEN__ = 'test-token'</script>", {
-          headers: { 'content-type': 'text/html' },
-        })
-      }
-      if (url === 'http://dashboard.test/api/conductor/missions') {
-        return new Response(JSON.stringify({ missions: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      }
-      if (url === 'http://dashboard.test/api/config') {
-        return new Response(JSON.stringify({ config: { mcp_servers: {} } }), {
-          headers: { 'content-type': 'application/json' },
-        })
-      }
-      if (url === 'http://gateway.test/v1/chat/completions') return new Response('', { status: 405 })
-      if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') return new Response('', { status: 404 })
-      if (url.endsWith('/api/mcp')) return new Response('', { status: 404 })
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { 'content-type': 'application/json' },
-      })
-    }))
+      }),
+    )
 
     const mod = await loadMod()
     const caps = await mod.probeGateway({ force: true })

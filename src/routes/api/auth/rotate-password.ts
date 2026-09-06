@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 
 const ENV_PATH = process.env.HUD_ENV_FILE || '/root/hermes-workspace/.env'
@@ -33,7 +33,10 @@ export const Route = createFileRoute('/api/auth/rotate-password')({
     handlers: {
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Authentication required' }, { status: 401 })
+          return json(
+            { ok: false, error: 'Authentication required' },
+            { status: 401 },
+          )
         }
 
         const body = (await request.json().catch(() => ({}))) as {
@@ -53,9 +56,15 @@ export const Route = createFileRoute('/api/auth/rotate-password')({
             value = randomBytes(32).toString('base64url')
           }
         } else if (kind === 'pin' && !/^\d{4}$/.test(value)) {
-          return json({ ok: false, error: 'PIN must be exactly 4 digits' }, { status: 400 })
+          return json(
+            { ok: false, error: 'PIN must be exactly 4 digits' },
+            { status: 400 },
+          )
         } else if (kind === 'password' && value.length < 8) {
-          return json({ ok: false, error: 'Password must be at least 8 characters' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Password must be at least 8 characters' },
+            { status: 400 },
+          )
         }
 
         // Update the .env file (replace existing line or append)
@@ -69,7 +78,9 @@ export const Route = createFileRoute('/api/auth/rotate-password')({
         if (lineRe.test(envContent)) {
           envContent = envContent.replace(lineRe, `${envKey}=${value}`)
         } else {
-          envContent += (envContent.endsWith('\n') || envContent === '' ? '' : '\n') + `${envKey}=${value}\n`
+          envContent +=
+            (envContent.endsWith('\n') || envContent === '' ? '' : '\n') +
+            `${envKey}=${value}\n`
         }
         writeFileSync(ENV_PATH, envContent, { encoding: 'utf8', mode: 0o600 })
 
@@ -80,9 +91,10 @@ export const Route = createFileRoute('/api/auth/rotate-password')({
           ok: true,
           kind,
           value,
-          note: kind === 'pin'
-            ? 'PIN works only from tailnet (100.x.x.x), loopback, or LAN.'
-            : 'Existing 30-day session cookies remain valid; new logins use the new password.',
+          note:
+            kind === 'pin'
+              ? 'PIN works only from tailnet (100.x.x.x), loopback, or LAN.'
+              : 'Existing 30-day session cookies remain valid; new logins use the new password.',
         })
       },
     },

@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Editor } from '@monaco-editor/react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  Folder01Icon,
-  LinkSquare02Icon,
-  Delete01Icon,
+  ArrowDown01Icon,
+  CheckmarkCircle01Icon,
   CloudUploadIcon,
   Copy01Icon,
-  CheckmarkCircle01Icon,
-  ArrowDown01Icon,
+  Delete01Icon,
+  Folder01Icon,
+  LinkSquare02Icon,
 } from '@hugeicons/core-free-icons'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { FileExplorerSidebar } from '@/components/file-explorer'
@@ -73,7 +73,7 @@ interface ShareMeta {
 }
 
 interface ShareListResponse {
-  shares: ShareMeta[]
+  shares: Array<ShareMeta>
 }
 
 interface ShareCreateResponse {
@@ -120,10 +120,17 @@ function SharePanel() {
     enabled: open,
   })
 
-  const createMutation = useMutation<ShareCreateResponse, Error, FormData | { kind: 'text'; content: string }>({
+  const createMutation = useMutation<
+    ShareCreateResponse,
+    Error,
+    FormData | { kind: 'text'; content: string }
+  >({
     mutationFn: async (payload) => {
       if (payload instanceof FormData) {
-        const res = await fetch('/api/share/', { method: 'POST', body: payload })
+        const res = await fetch('/api/share/', {
+          method: 'POST',
+          body: payload,
+        })
         if (!res.ok) throw new Error(await res.text())
         return res.json()
       } else {
@@ -176,7 +183,7 @@ function SharePanel() {
   function onDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
     const file = e.dataTransfer.files[0]
-    if (file) setSelectedFile(file)
+    setSelectedFile(file)
   }
 
   function onDragOver(e: React.DragEvent<HTMLDivElement>) {
@@ -194,7 +201,9 @@ function SharePanel() {
         className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-[#8b949e] hover:text-[#c9d1d9] transition"
       >
         <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={1.5} />
-        <span className="font-semibold text-[#c4b5fd]">Share with my devices</span>
+        <span className="font-semibold text-[#c4b5fd]">
+          Share with my devices
+        </span>
         <span className="ml-1 text-[#6e7681]">({shares.length})</span>
         <span className="ml-auto">{open ? '▲' : '▼'}</span>
       </button>
@@ -207,7 +216,10 @@ function SharePanel() {
               <button
                 key={t}
                 type="button"
-                onClick={() => { setTab(t); setLastResult(null) }}
+                onClick={() => {
+                  setTab(t)
+                  setLastResult(null)
+                }}
                 className={`rounded px-3 py-1 text-xs transition ${
                   tab === t
                     ? 'bg-[#21262d] text-[#c4b5fd]'
@@ -239,7 +251,9 @@ function SharePanel() {
                   {createMutation.isPending ? '…sharing' : 'Share'}
                 </button>
                 {createMutation.isError && (
-                  <span className="text-[10px] text-[#f85149]">{createMutation.error?.message}</span>
+                  <span className="text-[10px] text-[#f85149]">
+                    {createMutation.error.message}
+                  </span>
                 )}
               </div>
             </div>
@@ -255,9 +269,16 @@ function SharePanel() {
                 onClick={() => fileInputRef.current?.click()}
                 className="flex min-h-[80px] cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-[#30363d] bg-[#0d1117] px-4 py-4 text-xs text-[#6e7681] hover:border-[#58a6ff] hover:text-[#c9d1d9] transition"
               >
-                <HugeiconsIcon icon={CloudUploadIcon} size={20} strokeWidth={1.5} className="mb-1" />
+                <HugeiconsIcon
+                  icon={CloudUploadIcon}
+                  size={20}
+                  strokeWidth={1.5}
+                  className="mb-1"
+                />
                 {selectedFile ? (
-                  <span className="text-[#c4b5fd]">{selectedFile.name} ({fmtBytes(selectedFile.size)})</span>
+                  <span className="text-[#c4b5fd]">
+                    {selectedFile.name} ({fmtBytes(selectedFile.size)})
+                  </span>
                 ) : (
                   <span>Drop file here or click to pick (max 50 MB)</span>
                 )}
@@ -278,7 +299,9 @@ function SharePanel() {
                   {createMutation.isPending ? '…uploading' : 'Upload'}
                 </button>
                 {createMutation.isError && (
-                  <span className="text-[10px] text-[#f85149]">{createMutation.error?.message}</span>
+                  <span className="text-[10px] text-[#f85149]">
+                    {createMutation.error.message}
+                  </span>
                 )}
               </div>
             </div>
@@ -288,12 +311,18 @@ function SharePanel() {
           {lastResult && (
             <div className="mt-2 rounded border border-[#238636] bg-[#1a3a1a] px-3 py-2 text-xs">
               <p className="mb-1 text-[#3fb950]">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={12} strokeWidth={1.5} className="inline mr-1" />
+                <HugeiconsIcon
+                  icon={CheckmarkCircle01Icon}
+                  size={12}
+                  strokeWidth={1.5}
+                  className="inline mr-1"
+                />
                 Shared! URL:
               </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 break-all text-[#58a6ff]">
-                  {window.location.origin}{lastResult.downloadUrl}
+                  {window.location.origin}
+                  {lastResult.downloadUrl}
                 </code>
                 <button
                   type="button"
@@ -301,10 +330,20 @@ function SharePanel() {
                   className="shrink-0 text-[#6e7681] hover:text-[#c4b5fd]"
                   title="Copy URL"
                 >
-                  {copiedId === lastResult.id
-                    ? <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={1.5} className="text-[#3fb950]" />
-                    : <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={1.5} />
-                  }
+                  {copiedId === lastResult.id ? (
+                    <HugeiconsIcon
+                      icon={CheckmarkCircle01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                      className="text-[#3fb950]"
+                    />
+                  ) : (
+                    <HugeiconsIcon
+                      icon={Copy01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                    />
+                  )}
                 </button>
               </div>
             </div>
@@ -312,11 +351,16 @@ function SharePanel() {
 
           {/* Shares list */}
           <div className="mt-3">
-            <p className="mb-1.5 text-[10px] uppercase tracking-widest text-[#4d5566]">Recent shares</p>
-            {listLoading && <p className="text-[11px] text-[#6e7681]">loading…</p>}
+            <p className="mb-1.5 text-[10px] uppercase tracking-widest text-[#4d5566]">
+              Recent shares
+            </p>
+            {listLoading && (
+              <p className="text-[11px] text-[#6e7681]">loading…</p>
+            )}
             {!listLoading && shares.length === 0 && (
               <p className="text-[11px] text-[#4d5566]">
-                No shares yet. Paste text or drop a file above to share it across your tailnet.
+                No shares yet. Paste text or drop a file above to share it
+                across your tailnet.
               </p>
             )}
             <ul className="flex flex-col gap-1.5">
@@ -325,22 +369,38 @@ function SharePanel() {
                   key={s.id}
                   className="flex items-center gap-2 rounded border border-[#21262d] bg-[#0d1117] px-2.5 py-1.5 text-[11px]"
                 >
-                  <span className="shrink-0 text-[#6e7681]">{s.kind === 'text' ? '✎' : '⬆'}</span>
+                  <span className="shrink-0 text-[#6e7681]">
+                    {s.kind === 'text' ? '✎' : '⬆'}
+                  </span>
                   <span className="flex-1 truncate text-[#c9d1d9]">
                     {s.kind === 'file' ? s.filename : s.textPreview}
                   </span>
-                  <span className="shrink-0 text-[#4d5566]">{fmtBytes(s.size)}</span>
-                  <span className="shrink-0 text-[#4d5566]">{fmtAge(s.created)}</span>
+                  <span className="shrink-0 text-[#4d5566]">
+                    {fmtBytes(s.size)}
+                  </span>
+                  <span className="shrink-0 text-[#4d5566]">
+                    {fmtAge(s.created)}
+                  </span>
                   <button
                     type="button"
                     onClick={() => copyUrl(`/api/share/${s.id}`, s.id)}
                     title="Copy URL"
                     className="shrink-0 text-[#6e7681] hover:text-[#58a6ff] transition"
                   >
-                    {copiedId === s.id
-                      ? <HugeiconsIcon icon={CheckmarkCircle01Icon} size={13} strokeWidth={1.5} className="text-[#3fb950]" />
-                      : <HugeiconsIcon icon={Copy01Icon} size={13} strokeWidth={1.5} />
-                    }
+                    {copiedId === s.id ? (
+                      <HugeiconsIcon
+                        icon={CheckmarkCircle01Icon}
+                        size={13}
+                        strokeWidth={1.5}
+                        className="text-[#3fb950]"
+                      />
+                    ) : (
+                      <HugeiconsIcon
+                        icon={Copy01Icon}
+                        size={13}
+                        strokeWidth={1.5}
+                      />
+                    )}
                   </button>
                   <a
                     href={`/api/share/${s.id}`}
@@ -349,7 +409,11 @@ function SharePanel() {
                     title="Download"
                     className="shrink-0 text-[#6e7681] hover:text-[#58a6ff] transition"
                   >
-                    <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={1.5} />
+                    <HugeiconsIcon
+                      icon={ArrowDown01Icon}
+                      size={13}
+                      strokeWidth={1.5}
+                    />
                   </a>
                   <button
                     type="button"
@@ -357,7 +421,11 @@ function SharePanel() {
                     title="Delete"
                     className="shrink-0 text-[#6e7681] hover:text-[#f85149] transition"
                   >
-                    <HugeiconsIcon icon={Delete01Icon} size={13} strokeWidth={1.5} />
+                    <HugeiconsIcon
+                      icon={Delete01Icon}
+                      size={13}
+                      strokeWidth={1.5}
+                    />
                   </button>
                 </li>
               ))}

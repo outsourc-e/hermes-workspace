@@ -11,9 +11,7 @@ describe('rewriteLocalMediaSources', () => {
 
   it('rewrites html image MEDIA tokens that point to local files without corrupting quotes', () => {
     expect(
-      rewriteLocalMediaSources(
-        '<img src="MEDIA:/tmp/cat.png" alt="cat" />',
-      ),
+      rewriteLocalMediaSources('<img src="MEDIA:/tmp/cat.png" alt="cat" />'),
     ).toBe('<img src="/api/media?path=%2Ftmp%2Fcat.png" alt="cat" />')
   })
 
@@ -22,7 +20,9 @@ describe('rewriteLocalMediaSources', () => {
       rewriteLocalMediaSources('![cat](MEDIA:https://example.com/cat.png)'),
     ).toBe('![cat](MEDIA:https://example.com/cat.png)')
     expect(
-      rewriteLocalMediaSources('<img src="MEDIA:https://example.com/cat.png" />'),
+      rewriteLocalMediaSources(
+        '<img src="MEDIA:https://example.com/cat.png" />',
+      ),
     ).toBe('<img src="MEDIA:https://example.com/cat.png" />')
   })
 

@@ -7,15 +7,19 @@
  * - Speech bubbles above users with active messages
  * - Click-to-walk for mobile/desktop
  */
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useRef } from 'react'
 import { AgoraAvatar } from './agora-avatar'
-import type { AgoraMessage, AgoraUser, AgoraWorld as TWorld } from '../lib/agora-types'
+import type {
+  AgoraMessage,
+  AgoraUser,
+  AgoraWorld as TWorld,
+} from '../lib/agora-types'
 
 interface AgoraWorldProps {
   world: TWorld
   self: AgoraUser
-  others: AgoraUser[]
+  others: Array<AgoraUser>
   activeBubbles: Map<string, AgoraMessage>
   onTapWalk?: (worldX: number, worldY: number) => void
   onSelectUser?: (user: AgoraUser) => void
@@ -71,7 +75,8 @@ export function AgoraWorld({
           borderRadius: '50%',
           background:
             'radial-gradient(circle at center, color-mix(in srgb, var(--theme-accent) 18%, transparent), transparent 70%)',
-          border: '1px dashed color-mix(in srgb, var(--theme-accent) 30%, transparent)',
+          border:
+            '1px dashed color-mix(in srgb, var(--theme-accent) 30%, transparent)',
         }}
       />
       {/* Decorative corner pillars */}
@@ -93,7 +98,8 @@ export function AgoraWorld({
             borderRadius: '4px 4px 0 0',
             background:
               'linear-gradient(180deg, color-mix(in srgb, var(--theme-accent) 35%, transparent), color-mix(in srgb, var(--theme-border) 70%, transparent))',
-            border: '1px solid color-mix(in srgb, var(--theme-border) 80%, transparent)',
+            border:
+              '1px solid color-mix(in srgb, var(--theme-border) 80%, transparent)',
           }}
         />
       ))}
@@ -162,7 +168,8 @@ export function AgoraWorld({
       })}
 
       {/* Movement hint */}
-      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] opacity-60"
+      <div
+        className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] opacity-60"
         style={{
           background: 'color-mix(in srgb, var(--theme-bg) 80%, transparent)',
           border: '1px solid var(--theme-border)',

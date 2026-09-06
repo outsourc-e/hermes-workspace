@@ -2,10 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
-import {
-  readKnowledgeBaseConfig,
-  type KnowledgeBaseSource,
-} from './knowledge-config'
+import { readKnowledgeBaseConfig } from './knowledge-config'
+import type { KnowledgeBaseSource } from './knowledge-config'
 
 export type WikiPageMeta = {
   path: string
@@ -29,7 +27,12 @@ export type WikiLink = {
 }
 
 export type KnowledgeGraph = {
-  nodes: Array<{ id: string; title: string; type?: string; tags: Array<string> }>
+  nodes: Array<{
+    id: string
+    title: string
+    type?: string
+    tags: Array<string>
+  }>
   edges: Array<{ source: string; target: string }>
 }
 
@@ -147,12 +150,27 @@ class GitHubKnowledgeProvider {
     const safeRepo = repo.replace('/', '_')
     const safePath = repoPath.replace(/^\//, '').replace(/\//g, '_')
     this.branch = branch
-    const base = path.join(os.homedir(), '.claude', 'knowledge-cache', 'github', safeRepo, branch, safePath)
+    const base = path.join(
+      os.homedir(),
+      '.claude',
+      'knowledge-cache',
+      'github',
+      safeRepo,
+      branch,
+      safePath,
+    )
     this.cacheDir = base
   }
 
   private get cacheRoot(): string {
-    return path.join(os.homedir(), '.claude', 'knowledge-cache', 'github', this.repo.replace('/', '_'), this.branch)
+    return path.join(
+      os.homedir(),
+      '.claude',
+      'knowledge-cache',
+      'github',
+      this.repo.replace('/', '_'),
+      this.branch,
+    )
   }
 
   /** Fetch + decode the GitHub repo into the local cache directory. */
@@ -169,7 +187,9 @@ class GitHubKnowledgeProvider {
   /** Check whether the local cache is present and non-empty. */
   isCached(): boolean {
     try {
-      return fs.existsSync(this.cacheDir) && fs.readdirSync(this.cacheDir).length > 0
+      return (
+        fs.existsSync(this.cacheDir) && fs.readdirSync(this.cacheDir).length > 0
+      )
     } catch {
       return false
     }
@@ -182,7 +202,10 @@ class GitHubKnowledgeProvider {
   private async fetchDir(dirPath: string): Promise<void> {
     const url = `https://api.github.com/repos/${this.repo}/contents/${dirPath}?ref=${this.branch}`
     const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'hermes-workspace' },
+      headers: {
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'hermes-workspace',
+      },
     })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
@@ -209,18 +232,27 @@ class GitHubKnowledgeProvider {
     }
   }
 
-  private async fetchFile(entry: { path: string; sha: string }): Promise<string> {
+  private async fetchFile(entry: {
+    path: string
+    sha: string
+  }): Promise<string> {
     const url = `https://api.github.com/repos/${this.repo}/contents/${entry.path}?ref=${this.branch}`
     const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'hermes-workspace' },
+      headers: {
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'hermes-workspace',
+      },
     })
     if (!res.ok) {
       throw new Error(`GitHub API ${res.status} for ${entry.path}`)
     }
     const data = (await res.json()) as { content?: string; encoding?: string }
-    if (!data.content) throw new Error(`No content in GitHub response for ${entry.path}`)
+    if (!data.content)
+      throw new Error(`No content in GitHub response for ${entry.path}`)
     if (data.encoding === 'base64') {
-      return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8')
+      return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString(
+        'utf-8',
+      )
     }
     return data.content.replace(/\n/g, '')
   }
@@ -233,7 +265,11 @@ function getKnowledgeRoot(): string {
   const source = config.source
 
   if (source.type === 'github') {
-    const provider = new GitHubKnowledgeProvider(source.repo, source.branch, source.path)
+    const provider = new GitHubKnowledgeProvider(
+      source.repo,
+      source.branch,
+      source.path,
+    )
     return provider.root
   }
 
@@ -279,7 +315,11 @@ export async function syncKnowledgeSource(): Promise<{
     return { source, success: true }
   }
   try {
-    const provider = new GitHubKnowledgeProvider(source.repo, source.branch, source.path)
+    const provider = new GitHubKnowledgeProvider(
+      source.repo,
+      source.branch,
+      source.path,
+    )
     await provider.sync()
     return { source, success: true }
   } catch (err) {

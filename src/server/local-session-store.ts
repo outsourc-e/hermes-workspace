@@ -36,6 +36,8 @@ function loadFromDisk(): void {
     if (existsSync(SESSIONS_FILE)) {
       const raw = readFileSync(SESSIONS_FILE, 'utf-8')
       const parsed = JSON.parse(raw) as StoreData
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS infers non-null but field may still be null/undefined at runtime
       if (parsed.sessions && parsed.messages) {
         store = parsed
       }
@@ -68,6 +70,7 @@ export function ensureLocalSession(
   sessionId: string,
   model?: string,
 ): LocalSession {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: defensive check; lint can't see store mutation
   if (!store.sessions[sessionId]) {
     store.sessions[sessionId] = {
       id: sessionId,
@@ -88,6 +91,7 @@ export function updateLocalSessionTitle(
   title: string,
 ): void {
   const session = store.sessions[sessionId]
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS infers non-null but field may still be null/undefined at runtime
   if (session) {
     session.title = title
     session.updatedAt = Date.now()
@@ -97,6 +101,7 @@ export function updateLocalSessionTitle(
 
 export function touchLocalSession(sessionId: string): void {
   const session = store.sessions[sessionId]
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS infers non-null but field may still be null/undefined at runtime
   if (session) session.updatedAt = Date.now()
 }
 
@@ -115,6 +120,7 @@ export function appendLocalMessage(
   message: LocalMessage,
 ): void {
   ensureLocalSession(sessionId)
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: defensive check; lint can't see store mutation
   if (!store.messages[sessionId]) store.messages[sessionId] = []
   store.messages[sessionId].push(message)
   if (store.messages[sessionId].length > MAX_MESSAGES_PER_SESSION) {
@@ -123,6 +129,7 @@ export function appendLocalMessage(
     )
   }
   const session = store.sessions[sessionId]
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS infers non-null but field may still be null/undefined at runtime
   if (session) {
     session.messageCount = store.messages[sessionId].length
     session.updatedAt = Date.now()

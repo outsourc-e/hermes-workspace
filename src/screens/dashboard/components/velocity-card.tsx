@@ -6,7 +6,10 @@ function formatNumber(n: number): string {
   return n.toLocaleString()
 }
 
-function deltaText(curr: number, prev: number): {
+function deltaText(
+  curr: number,
+  prev: number,
+): {
   text: string
   tone: string
 } {

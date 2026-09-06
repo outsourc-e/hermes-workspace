@@ -24,7 +24,8 @@ export const Route = createFileRoute('/api/digest-summary')({
           {
             headers: {
               // Digests refresh once daily; aggressive cache is fine.
-              'Cache-Control': 'private, max-age=300, stale-while-revalidate=600',
+              'Cache-Control':
+                'private, max-age=300, stale-while-revalidate=600',
             },
           },
         )

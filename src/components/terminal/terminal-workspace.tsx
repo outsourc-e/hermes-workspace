@@ -16,7 +16,10 @@ import type { Terminal } from 'xterm'
 import type * as XtermModule from 'xterm'
 import type * as WebLinksAddonModule from 'xterm-addon-web-links'
 import type { DebugAnalysis } from '@/components/terminal/debug-panel'
-import type { TerminalTab, TerminalTargetId } from '@/stores/terminal-panel-store'
+import type {
+  TerminalTab,
+  TerminalTargetId,
+} from '@/stores/terminal-panel-store'
 import { DebugPanel } from '@/components/terminal/debug-panel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -84,7 +87,8 @@ const TERMINAL_TARGETS: Record<
 }
 
 function getTerminalTarget(tab: TerminalTab) {
-  return TERMINAL_TARGETS[tab.target ?? 'vm'] ?? TERMINAL_TARGETS.vm
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety: TS infers non-null but field may still be null/undefined at runtime
+  return TERMINAL_TARGETS[tab.target] || TERMINAL_TARGETS.vm
 }
 
 function toDebugAnalysis(value: unknown): DebugAnalysis | null {
@@ -484,7 +488,8 @@ export function TerminalWorkspace({
       }
 
       // Flush any remaining buffered writes
-      clearTimeout(flushTimer as ReturnType<typeof setTimeout>)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+      clearTimeout(flushTimer ?? undefined)
       flushWrites()
 
       const latestTab = useTerminalPanelStore

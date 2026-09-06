@@ -21,10 +21,8 @@ import {
   dashboardFetch,
   gatewayFetch,
 } from '../../../server/gateway-capabilities'
-import {
-  buildDashboardOverview,
-  type DashboardFetcher,
-} from '../../../server/dashboard-aggregator'
+import { buildDashboardOverview } from '../../../server/dashboard-aggregator'
+import type { DashboardFetcher } from '../../../server/dashboard-aggregator'
 
 const overviewFetcher: DashboardFetcher = (path) => dashboardFetch(path)
 // Gateway fetcher hits the gateway URL (8645/8642), which is where
@@ -61,8 +59,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
               // upstream), but cache for a few seconds so a noisy client
               // doesn't hammer the dashboard. Stale-while-revalidate keeps
               // the UI snappy while fresh data lands.
-              'Cache-Control':
-                'private, max-age=5, stale-while-revalidate=20',
+              'Cache-Control': 'private, max-age=5, stale-while-revalidate=20',
             },
           })
         } catch (err) {

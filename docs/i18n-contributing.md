@@ -60,7 +60,6 @@ Then in the component:
 
 ```tsx
 import { t } from '@/lib/i18n'
-
 ;<button>{t('common.retry')}</button>
 ```
 

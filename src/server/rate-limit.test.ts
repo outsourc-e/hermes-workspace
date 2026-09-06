@@ -21,9 +21,7 @@ describe('getClientIp (#125)', () => {
   it("falls back to 'local' when TRUST_PROXY is unset", async () => {
     delete process.env.TRUST_PROXY
     const { getClientIp } = await import('./rate-limit')
-    const ip = getClientIp(
-      makeRequest({ 'x-forwarded-for': '198.51.100.5' }),
-    )
+    const ip = getClientIp(makeRequest({ 'x-forwarded-for': '198.51.100.5' }))
     expect(ip).toBe('local')
   })
 

@@ -1,12 +1,18 @@
 import {
   createKanbanCard,
-  listKanbanCards,
-  type KanbanBackendMeta,
   getKanbanBackendMeta,
+  listKanbanCards,
   updateKanbanCard,
 } from './kanban-backend'
+import type { KanbanBackendMeta } from './kanban-backend'
 
-export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done'
+export type TaskColumn =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'review'
+  | 'blocked'
+  | 'done'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
 export type ClaudeTaskRecord = {
@@ -16,7 +22,7 @@ export type ClaudeTaskRecord = {
   column: TaskColumn
   priority: TaskPriority
   assignee: string | null
-  tags: string[]
+  tags: Array<string>
   due_date: string | null
   position: number
   created_by: string
@@ -37,7 +43,7 @@ type CreateTaskInput = {
   column?: TaskColumn
   priority?: TaskPriority
   assignee?: string | null
-  tags?: string[]
+  tags?: Array<string>
   due_date?: string | null
   created_by?: string
 }
@@ -66,7 +72,9 @@ function mapKanbanStatusToTaskColumn(status: string): TaskColumn {
   }
 }
 
-function mapTaskColumnToKanbanStatus(column: TaskColumn): 'backlog' | 'ready' | 'running' | 'review' | 'blocked' | 'done' {
+function mapTaskColumnToKanbanStatus(
+  column: TaskColumn,
+): 'backlog' | 'ready' | 'running' | 'review' | 'blocked' | 'done' {
   switch (column) {
     case 'todo':
       return 'ready'
@@ -114,7 +122,9 @@ export function getClaudeTasksBackendMeta(): KanbanBackendMeta {
   return getKanbanBackendMeta()
 }
 
-export async function listClaudeTasks(filters: TaskFilters = {}): Promise<ClaudeTaskRecord[]> {
+export async function listClaudeTasks(
+  filters: TaskFilters = {},
+): Promise<Array<ClaudeTaskRecord>> {
   let tasks = (await listKanbanCards()).map(mapCardToTask)
   if (!filters.includeDone) {
     tasks = tasks.filter((task) => task.column !== 'done')
@@ -128,16 +138,22 @@ export async function listClaudeTasks(filters: TaskFilters = {}): Promise<Claude
   if (filters.priority) {
     tasks = tasks.filter((task) => task.priority === filters.priority)
   }
-  return tasks.sort((a, b) => b.position - a.position || a.title.localeCompare(b.title))
+  return tasks.sort(
+    (a, b) => b.position - a.position || a.title.localeCompare(b.title),
+  )
 }
 
-export async function getClaudeTask(taskId: string): Promise<ClaudeTaskRecord | null> {
+export async function getClaudeTask(
+  taskId: string,
+): Promise<ClaudeTaskRecord | null> {
   const tasks = await listKanbanCards()
   const card = tasks.find((entry) => entry.id === taskId)
   return card ? mapCardToTask(card) : null
 }
 
-export async function createClaudeTask(input: CreateTaskInput): Promise<ClaudeTaskRecord> {
+export async function createClaudeTask(
+  input: CreateTaskInput,
+): Promise<ClaudeTaskRecord> {
   const card = await createKanbanCard({
     title: input.title,
     spec: input.description ?? '',
@@ -148,19 +164,28 @@ export async function createClaudeTask(input: CreateTaskInput): Promise<ClaudeTa
   return mapCardToTask(card)
 }
 
-export async function updateClaudeTask(taskId: string, updates: UpdateTaskInput): Promise<ClaudeTaskRecord | null> {
+export async function updateClaudeTask(
+  taskId: string,
+  updates: UpdateTaskInput,
+): Promise<ClaudeTaskRecord | null> {
   const card = await updateKanbanCard(taskId, {
     title: typeof updates.title === 'string' ? updates.title : undefined,
-    spec: typeof updates.description === 'string' ? updates.description : undefined,
+    spec:
+      typeof updates.description === 'string' ? updates.description : undefined,
     assignedWorker:
       updates.assignee === null || typeof updates.assignee === 'string'
         ? updates.assignee
         : undefined,
-    status: updates.column ? mapTaskColumnToKanbanStatus(updates.column) : undefined,
+    status: updates.column
+      ? mapTaskColumnToKanbanStatus(updates.column)
+      : undefined,
   })
   return card ? mapCardToTask(card) : null
 }
 
-export async function moveClaudeTask(taskId: string, column: TaskColumn): Promise<ClaudeTaskRecord | null> {
+export async function moveClaudeTask(
+  taskId: string,
+  column: TaskColumn,
+): Promise<ClaudeTaskRecord | null> {
   return updateClaudeTask(taskId, { column })
 }

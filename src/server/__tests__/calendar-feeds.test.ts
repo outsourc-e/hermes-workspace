@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseIcsData, getDeadlines, type FeedConfig } from '../calendar-feeds'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { getDeadlines, parseIcsData } from '../calendar-feeds'
+import type { FeedConfig } from '../calendar-feeds'
 
 // ── parseIcsData ─────────────────────────────────────────────────────────
 
@@ -96,8 +97,13 @@ describe('parseIcsData', () => {
       dtstart: '20270101T090000Z',
       dtend: '20270101T100000Z',
     })
-    const events = parseIcsData([before, inside, after], TEST_FEED, windowStart, windowEnd)
-    expect(events.map(e => e.id)).toEqual(['inside'])
+    const events = parseIcsData(
+      [before, inside, after],
+      TEST_FEED,
+      windowStart,
+      windowEnd,
+    )
+    expect(events.map((e) => e.id)).toEqual(['inside'])
   })
 
   it('detects all-day events by exact 24h duration starting at midnight', () => {
@@ -127,7 +133,12 @@ describe('parseIcsData', () => {
       'END:VEVENT',
       'END:VCALENDAR',
     ].join('\r\n')
-    const events = parseIcsData([calWithVtodo], TEST_FEED, windowStart, windowEnd)
+    const events = parseIcsData(
+      [calWithVtodo],
+      TEST_FEED,
+      windowStart,
+      windowEnd,
+    )
     expect(events).toHaveLength(1)
     expect(events[0].id).toBe('evt-1')
   })
@@ -139,8 +150,13 @@ describe('parseIcsData', () => {
       dtend: '20260610T100000Z',
     })
     const garbage = 'this is not valid ICS data at all'
-    const events = parseIcsData([garbage, good], TEST_FEED, windowStart, windowEnd)
-    expect(events.map(e => e.id)).toContain('good')
+    const events = parseIcsData(
+      [garbage, good],
+      TEST_FEED,
+      windowStart,
+      windowEnd,
+    )
+    expect(events.map((e) => e.id)).toContain('good')
   })
 })
 
@@ -171,12 +187,22 @@ describe('getDeadlines', () => {
     rmSync(tmpHome, { recursive: true, force: true })
   })
 
-  function writeDeadlines(deadlines: Array<{ id: string; date: string; assessment?: string; unit?: string; type?: string; is_hurdle?: boolean; weight?: string }>) {
+  function writeDeadlines(
+    deadlines: Array<{
+      id: string
+      date: string
+      assessment?: string
+      unit?: string
+      type?: string
+      is_hurdle?: boolean
+      weight?: string
+    }>,
+  ) {
     writeFileSync(
       join(tmpHome, 'calendar', 'uni-deadlines.json'),
       JSON.stringify({
         semester: { name: 'Semester 1 2026' },
-        deadlines: deadlines.map(d => ({
+        deadlines: deadlines.map((d) => ({
           assessment: 'Default',
           unit: 'UNIT1',
           type: 'Written',
@@ -196,8 +222,8 @@ describe('getDeadlines', () => {
       return d.toISOString().split('T')[0]
     }
     writeDeadlines([
-      { id: 'too-old', date: iso(-10) },              // dropped
-      { id: 'recent-past', date: iso(-1) },            // kept
+      { id: 'too-old', date: iso(-10) }, // dropped
+      { id: 'recent-past', date: iso(-1) }, // kept
       { id: 'future-far', date: iso(30) },
       { id: 'future-near', date: iso(2) },
     ])
@@ -205,9 +231,17 @@ describe('getDeadlines', () => {
     const result = await getDeadlines()
 
     expect(result.semester_name).toBe('Semester 1 2026')
-    expect(result.deadlines.map(d => d.id)).toEqual(['recent-past', 'future-near', 'future-far'])
-    expect(result.deadlines.find(d => d.id === 'future-near')?.days_away).toBe(2)
-    expect(result.deadlines.find(d => d.id === 'recent-past')?.days_away).toBe(-1)
+    expect(result.deadlines.map((d) => d.id)).toEqual([
+      'recent-past',
+      'future-near',
+      'future-far',
+    ])
+    expect(
+      result.deadlines.find((d) => d.id === 'future-near')?.days_away,
+    ).toBe(2)
+    expect(
+      result.deadlines.find((d) => d.id === 'recent-past')?.days_away,
+    ).toBe(-1)
   })
 
   it('returns empty deadlines + Unknown semester when file missing', async () => {

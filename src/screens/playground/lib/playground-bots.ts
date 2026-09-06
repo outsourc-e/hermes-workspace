@@ -15,16 +15,28 @@ export type BotProfile = {
   avatar: string
   color: string
   spawn: [number, number, number]
-  lines: string[]
+  lines: Array<string>
 }
 
 const COMMUNITY_NAMES = [
-  'GrokKnight', 'NousPilgrim', 'KimiArtisan', 'OpusBard', 'CodexSmith',
-  'ClaudeWanderer', 'GeminiLore', 'MixtralOracle', 'LlamaScribe', 'HermesFan',
-  'BuilderAva', 'GroveSpirit', 'ForgeBaron', 'OracleNote', 'ArenaRook',
+  'GrokKnight',
+  'NousPilgrim',
+  'KimiArtisan',
+  'OpusBard',
+  'CodexSmith',
+  'ClaudeWanderer',
+  'GeminiLore',
+  'MixtralOracle',
+  'LlamaScribe',
+  'HermesFan',
+  'BuilderAva',
+  'GroveSpirit',
+  'ForgeBaron',
+  'OracleNote',
+  'ArenaRook',
 ]
 
-export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
+export const BOT_PROFILES: Record<PlaygroundWorldId, Array<BotProfile>> = {
   training: [
     {
       id: 'bot-training-1',
@@ -32,7 +44,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'athena',
       color: '#5eead4',
       spawn: [-9, 0, 10],
-      lines: ['first run through Training Grounds', 'equipping the blade now', 'forge gate is almost open'],
+      lines: [
+        'first run through Training Grounds',
+        'equipping the blade now',
+        'forge gate is almost open',
+      ],
     },
     {
       id: 'bot-training-2',
@@ -40,7 +56,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'pan',
       color: '#34d399',
       spawn: [10, 0, -7],
-      lines: ['small scopes ship', 'archive podium has the docs loop', 'the wisp is easy with Bolt'],
+      lines: [
+        'small scopes ship',
+        'archive podium has the docs loop',
+        'the wisp is easy with Bolt',
+      ],
     },
   ],
   agora: [
@@ -50,7 +70,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'iris',
       color: '#22d3ee',
       spawn: [-7, 0, 7],
-      lines: ['anyone tried the new Forge generator?', 'gm builders', 'lvl 3 already, sheesh'],
+      lines: [
+        'anyone tried the new Forge generator?',
+        'gm builders',
+        'lvl 3 already, sheesh',
+      ],
     },
     {
       id: 'bot-agora-2',
@@ -58,7 +82,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'eros',
       color: '#f472b6',
       spawn: [7, 0, 7],
-      lines: ['promptcraft is wildly fun', 'who else is on Hermes Workspace?', 'see u in the Grove'],
+      lines: [
+        'promptcraft is wildly fun',
+        'who else is on Hermes Workspace?',
+        'see u in the Grove',
+      ],
     },
     {
       id: 'bot-agora-3',
@@ -66,7 +94,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'apollo',
       color: '#f59e0b',
       spawn: [-7, 0, -7],
-      lines: ['composing the agora theme', 'kimi sounds like an oracle', 'let me know if u finish chapter 2'],
+      lines: [
+        'composing the agora theme',
+        'kimi sounds like an oracle',
+        'let me know if u finish chapter 2',
+      ],
     },
   ],
   forge: [
@@ -76,7 +108,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'pan',
       color: '#34d399',
       spawn: [-6, 0, 5],
-      lines: ['shipped a new prompt scroll', 'forge feels like a real workshop tonight', 'wanna co-build a quest?'],
+      lines: [
+        'shipped a new prompt scroll',
+        'forge feels like a real workshop tonight',
+        'wanna co-build a quest?',
+      ],
     },
     {
       id: 'bot-forge-2',
@@ -84,7 +120,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'chronos',
       color: '#facc15',
       spawn: [6, 0, -5],
-      lines: ['archiving runs from last hour', 'mission terminal is online', 'who broke the medallion'],
+      lines: [
+        'archiving runs from last hour',
+        'mission terminal is online',
+        'who broke the medallion',
+      ],
     },
   ],
   grove: [
@@ -94,7 +134,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'apollo',
       color: '#f59e0b',
       spawn: [-5, 0, 4],
-      lines: ['the grove sounds different at night', 'two song fragments down', 'apollo here keeps writing in my head'],
+      lines: [
+        'the grove sounds different at night',
+        'two song fragments down',
+        'apollo here keeps writing in my head',
+      ],
     },
     {
       id: 'bot-grove-2',
@@ -112,7 +156,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'athena',
       color: '#a78bfa',
       spawn: [-4, 0, 4],
-      lines: ['the riddle is recursive', 'memory crystals are heavy tonight', 'sage mode'],
+      lines: [
+        'the riddle is recursive',
+        'memory crystals are heavy tonight',
+        'sage mode',
+      ],
     },
     {
       id: 'bot-oracle-2',
@@ -120,7 +168,11 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'eros',
       color: '#f472b6',
       spawn: [4, 0, -4],
-      lines: ['ask softly', 'the oracle hears prompts as poems', 'this place is gorgeous'],
+      lines: [
+        'ask softly',
+        'the oracle hears prompts as poems',
+        'this place is gorgeous',
+      ],
     },
   ],
   arena: [
@@ -138,11 +190,15 @@ export const BOT_PROFILES: Record<PlaygroundWorldId, BotProfile[]> = {
       avatar: 'hermes',
       color: '#2dd4bf',
       spawn: [5, 0, 0],
-      lines: ['no judges, just judges', 'duel me', 'the model wars are heating up'],
+      lines: [
+        'no judges, just judges',
+        'duel me',
+        'the model wars are heating up',
+      ],
     },
   ],
 }
 
-export function botsFor(worldId: PlaygroundWorldId): BotProfile[] {
-  return BOT_PROFILES[worldId] ?? []
+export function botsFor(worldId: PlaygroundWorldId): Array<BotProfile> {
+  return BOT_PROFILES[worldId]
 }

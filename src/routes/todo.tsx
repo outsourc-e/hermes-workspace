@@ -19,8 +19,7 @@ function TodoRoute() {
         </h1>
       </div>
       <p className="text-sm text-[var(--theme-muted)]">
-        Personal to-do list. Quick items that don't need a full task or
-        project.
+        Personal to-do list. Quick items that don't need a full task or project.
       </p>
     </div>
   )

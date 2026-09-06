@@ -13,7 +13,11 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
-const execFileAsync = promisify(execFile)
+const execFileAsync = promisify(execFile) as (
+  file: string,
+  args: ReadonlyArray<string>,
+  options: { input?: string; timeout?: number; maxBuffer?: number },
+) => Promise<{ stdout: string; stderr: string }>
 
 export type WorktreeHealth = {
   name: string
@@ -52,9 +56,9 @@ export type ProjectHealthOptions = {
 const DEFAULTS: Required<Omit<ProjectHealthOptions, 'timeoutMs'>> & {
   timeoutMs: number
 } = {
-  host: '100.64.45.20',
+  host: '100.92.120.31',
   user: 'nick-weiland-oc381816',
-  identityFile: '/root/.ssh/home_pc_ed25519',
+  identityFile: '/root/.ssh/home_pc_key',
   rootPath: '/home/nick-weiland-oc381816/Projects/Praxentis/active/CliniTrack',
   projectName: 'CliniTrack-Suite',
   timeoutMs: 12_000,
@@ -166,8 +170,7 @@ export async function readProjectHealth(
     stdout = typeof e.stdout === 'string' ? e.stdout : ''
     const stderr = typeof e.stderr === 'string' ? e.stderr.trim() : ''
     error =
-      stderr ||
-      (typeof e.message === 'string' ? e.message : 'ssh exec failed')
+      stderr || (typeof e.message === 'string' ? e.message : 'ssh exec failed')
   }
 
   if (stdout.includes('JSON__ROOT_MISSING')) {

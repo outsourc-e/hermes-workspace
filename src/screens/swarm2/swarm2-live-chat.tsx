@@ -8,9 +8,10 @@ import {
   SentIcon,
 } from '@hugeicons/core-free-icons'
 import { useQueryClient } from '@tanstack/react-query'
+import type { SwarmChatMessage } from '@/hooks/use-swarm-chat'
 import { ChatComposer } from '@/screens/chat/components/chat-composer'
 import { cn } from '@/lib/utils'
-import { useSwarmChat, type SwarmChatMessage } from '@/hooks/use-swarm-chat'
+import { useSwarmChat } from '@/hooks/use-swarm-chat'
 
 type Swarm2LiveChatProps = {
   workerId: string
@@ -38,10 +39,16 @@ function formatMessageTime(ts: number | null | undefined): string {
   return `${shortDate} ${time}`
 }
 
-function parseTodoSummary(content: string): { total: number; pending: number; inProgress: number; completed: number; cancelled: number } | null {
+function parseTodoSummary(content: string): {
+  total: number
+  pending: number
+  inProgress: number
+  completed: number
+  cancelled: number
+} | null {
   try {
     const parsed = JSON.parse(content) as {
-      todos?: unknown[]
+      todos?: Array<unknown>
       summary?: {
         total?: number
         pending?: number
@@ -50,7 +57,7 @@ function parseTodoSummary(content: string): { total: number; pending: number; in
         cancelled?: number
       }
     }
-    if (!parsed || typeof parsed !== 'object' || !parsed.summary) return null
+    if (typeof parsed !== 'object' || !parsed.summary) return null
     return {
       total: parsed.summary.total ?? 0,
       pending: parsed.summary.pending ?? 0,
@@ -115,41 +122,57 @@ function MessageBubble({
           message.pending && 'opacity-80',
         )}
       >
-      <div className={cn(
-        'mb-0.5 flex items-center justify-between gap-2 text-[9px] text-[var(--theme-muted)]',
-        nativeStyle ? 'font-medium tracking-normal' : 'font-semibold uppercase tracking-[0.16em]',
-      )}>
-        {nativeStyle ? (
-          <span className="inline-flex items-center gap-1">
-            {isError ? (
-              <HugeiconsIcon icon={AlertCircleIcon} size={9} />
-            ) : null}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1">
-            {isError ? (
-              <HugeiconsIcon icon={AlertCircleIcon} size={9} />
-            ) : null}
-            {renderAsToolCard ? 'tool' : label}
-          </span>
-        )}
-        {message.timestamp && !message.pending ? (
-          <span className="inline-flex items-center gap-1 text-[9px] text-[var(--theme-muted)]/80">
-            <HugeiconsIcon icon={Clock01Icon} size={9} />
-            {formatMessageTime(message.timestamp)}
-          </span>
-        ) : null}
-      </div>
+        <div
+          className={cn(
+            'mb-0.5 flex items-center justify-between gap-2 text-[9px] text-[var(--theme-muted)]',
+            nativeStyle
+              ? 'font-medium tracking-normal'
+              : 'font-semibold uppercase tracking-[0.16em]',
+          )}
+        >
+          {nativeStyle ? (
+            <span className="inline-flex items-center gap-1">
+              {isError ? (
+                <HugeiconsIcon icon={AlertCircleIcon} size={9} />
+              ) : null}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              {isError ? (
+                <HugeiconsIcon icon={AlertCircleIcon} size={9} />
+              ) : null}
+              {renderAsToolCard ? 'tool' : label}
+            </span>
+          )}
+          {message.timestamp && !message.pending ? (
+            <span className="inline-flex items-center gap-1 text-[9px] text-[var(--theme-muted)]/80">
+              <HugeiconsIcon icon={Clock01Icon} size={9} />
+              {formatMessageTime(message.timestamp)}
+            </span>
+          ) : null}
+        </div>
         {todoSummary ? (
           <div className="space-y-2">
-            <div className="text-[11px] font-medium text-[var(--theme-text)]">Task snapshot</div>
+            <div className="text-[11px] font-medium text-[var(--theme-text)]">
+              Task snapshot
+            </div>
             <div className="flex flex-wrap gap-1.5 text-[10px] text-[var(--theme-muted-2)]">
-              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">{todoSummary.total} total</span>
-              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">{todoSummary.pending} pending</span>
-              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">{todoSummary.inProgress} in progress</span>
-              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">{todoSummary.completed} completed</span>
+              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">
+                {todoSummary.total} total
+              </span>
+              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">
+                {todoSummary.pending} pending
+              </span>
+              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">
+                {todoSummary.inProgress} in progress
+              </span>
+              <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">
+                {todoSummary.completed} completed
+              </span>
               {todoSummary.cancelled > 0 ? (
-                <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">{todoSummary.cancelled} cancelled</span>
+                <span className="rounded-full border border-[var(--theme-border)] px-1.5 py-0.5">
+                  {todoSummary.cancelled} cancelled
+                </span>
               ) : null}
             </div>
           </div>
@@ -165,10 +188,12 @@ function MessageBubble({
             ) : null}
           </div>
         ) : (
-          <pre className={cn(
-            'whitespace-pre-wrap break-words font-sans text-[12px] leading-snug',
-            message.pending && isAssistant && 'animate-pulse',
-          )}>
+          <pre
+            className={cn(
+              'whitespace-pre-wrap break-words font-sans text-[12px] leading-snug',
+              message.pending && isAssistant && 'animate-pulse',
+            )}
+          >
             {message.content || '(empty)'}
           </pre>
         )}
@@ -213,7 +238,10 @@ export function Swarm2LiveChat({
     const queryKey = ['swarm', 'chat', workerId, 30] as const
     async function poll() {
       try {
-        const res = await fetch(`/api/swarm-chat?workerId=${encodeURIComponent(workerId)}&limit=30`, { cache: 'no-store' })
+        const res = await fetch(
+          `/api/swarm-chat?workerId=${encodeURIComponent(workerId)}&limit=30`,
+          { cache: 'no-store' },
+        )
         if (!res.ok) return
         const data = await res.json()
         if (cancelled) return
@@ -253,14 +281,15 @@ export function Swarm2LiveChat({
     const baselineIndex = baselineId
       ? messages.findIndex((m) => m.id === baselineId)
       : -1
-    const newSlice = baselineIndex >= 0 ? messages.slice(baselineIndex + 1) : messages
+    const newSlice =
+      baselineIndex >= 0 ? messages.slice(baselineIndex + 1) : messages
     const prompt = localPending.prompt.trim()
-    const hasUserEcho = newSlice.some((m) =>
-      m.role === 'user' && (
-        m.content.trim() === prompt ||
-        m.content.includes(prompt) ||
-        prompt.includes(m.content.trim())
-      ),
+    const hasUserEcho = newSlice.some(
+      (m) =>
+        m.role === 'user' &&
+        (m.content.trim() === prompt ||
+          m.content.includes(prompt) ||
+          prompt.includes(m.content.trim())),
     )
     const hasAssistantReply = newSlice.some((m) => m.role === 'assistant')
     return { hasUserEcho, hasAssistantReply }
@@ -297,7 +326,9 @@ export function Swarm2LiveChat({
     if (pendingState.hasAssistantReply) setLocalPending(null)
   }, [pendingState, localPending])
 
-  const previewMessages = preview ? renderedMessages.slice(-previewLimit) : renderedMessages
+  const previewMessages = preview
+    ? renderedMessages.slice(-previewLimit)
+    : renderedMessages
   const allErrors = sendError || error
 
   useEffect(() => {
@@ -309,7 +340,9 @@ export function Swarm2LiveChat({
     const text = draft.trim()
     if (!text || isSending) return
     const sentAt = Date.now()
-    const baselineLastId = messages.length ? messages[messages.length - 1].id : null
+    const baselineLastId = messages.length
+      ? messages[messages.length - 1].id
+      : null
     setLocalPending({ prompt: text, sentAt, baselineLastId })
     setDraft('')
     try {
@@ -330,7 +363,9 @@ export function Swarm2LiveChat({
       {!nativeStyle ? (
         <header className="flex items-center justify-between gap-2 border-b border-[var(--theme-border)]/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]/85">
           <span>Chat</span>
-          <span className="text-[9px] normal-case tracking-normal">{source === 'state.db' ? 'live' : 'no session'}</span>
+          <span className="text-[9px] normal-case tracking-normal">
+            {source === 'state.db' ? 'live' : 'no session'}
+          </span>
         </header>
       ) : null}
 
@@ -338,7 +373,11 @@ export function Swarm2LiveChat({
         ref={scrollRef}
         className={cn(
           'flex-1 space-y-1.5 overflow-y-auto px-3 py-2',
-          preview ? 'max-h-[260px] min-h-[140px]' : nativeStyle ? 'max-h-[300px] min-h-[170px]' : 'max-h-[250px] min-h-[120px]',
+          preview
+            ? 'max-h-[260px] min-h-[140px]'
+            : nativeStyle
+              ? 'max-h-[300px] min-h-[170px]'
+              : 'max-h-[250px] min-h-[120px]',
         )}
       >
         {isLoading ? (
@@ -351,7 +390,12 @@ export function Swarm2LiveChat({
           </p>
         ) : (
           previewMessages.map((m) => (
-            <MessageBubble key={m.id} workerId={workerId} message={m} nativeStyle={nativeStyle} />
+            <MessageBubble
+              key={m.id}
+              workerId={workerId}
+              message={m}
+              nativeStyle={nativeStyle}
+            />
           ))
         )}
       </div>
@@ -370,7 +414,9 @@ export function Swarm2LiveChat({
                 const text = value.trim()
                 if (!text || isSending) return
                 const sentAt = Date.now()
-                const baselineLastId = messages.length ? messages[messages.length - 1].id : null
+                const baselineLastId = messages.length
+                  ? messages[messages.length - 1].id
+                  : null
                 setLocalPending({ prompt: text, sentAt, baselineLastId })
                 helpers.reset()
                 void sendMessage(text).catch(() => {
@@ -383,7 +429,6 @@ export function Swarm2LiveChat({
               embedded
               hideModelSelector
             />
-
           </div>
         ) : (
           <div className="border-t border-[var(--theme-border)]/70 px-2.5 py-2">
@@ -393,7 +438,11 @@ export function Swarm2LiveChat({
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  if (
+                    event.key === 'Enter' &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
                     event.preventDefault()
                     void handleSend()
                   }
@@ -417,7 +466,6 @@ export function Swarm2LiveChat({
                 {isSending ? '…' : 'Send'}
               </button>
             </div>
-
           </div>
         )
       ) : null}

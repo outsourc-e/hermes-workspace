@@ -5,19 +5,30 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType } from '../../server/rate-limit'
-import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
+import {
+  dashboardFetch,
+  ensureGatewayProbed,
+} from '../../server/gateway-capabilities'
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
-import { getSwarmMission } from '../../server/swarm-missions'
-import { dispatchSwarmAssignments, readRuntimeCheckpointSnapshot, checkpointFromRuntimeSnapshot, runtimeCheckpointSignature } from './swarm-dispatch'
-import type { SwarmMission } from '../../server/swarm-missions'
-import { recordMissionCheckpoint } from '../../server/swarm-missions'
+import {
+  getSwarmMission,
+  recordMissionCheckpoint,
+} from '../../server/swarm-missions'
 import { getSwarmProfilePath } from '../../server/swarm-foundation'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { newestCheckpointFromMessages } from '../../server/swarm-checkpoints'
+import {
+  checkpointFromRuntimeSnapshot,
+  dispatchSwarmAssignments,
+  readRuntimeCheckpointSnapshot,
+  runtimeCheckpointSignature,
+} from './swarm-dispatch'
+import type { SwarmMission } from '../../server/swarm-missions'
 
 let cachedSkill: string | null = null
 
-export const NATIVE_CONDUCTOR_MODE_NOTE = 'Native-swarm is the official Workspace-native Swarm fallback when the dashboard Conductor API is unavailable.'
+export const NATIVE_CONDUCTOR_MODE_NOTE =
+  'Native-swarm is the official Workspace-native Swarm fallback when the dashboard Conductor API is unavailable.'
 
 type ConductorSpawnBody = {
   goal?: unknown
@@ -43,8 +54,17 @@ function loadDispatchSkill(): string {
   const candidates = [
     resolve(repoRoot(), 'skills/workspace-dispatch/SKILL.md'),
     resolve(process.cwd(), 'skills/workspace-dispatch/SKILL.md'),
-    ...(home ? [resolve(home, '.hermes/skills/workspace-dispatch/SKILL.md')] : []),
-    ...(home ? [resolve(home, '.openclaw/workspace/skills/workspace-dispatch/SKILL.md')] : []),
+    ...(home
+      ? [resolve(home, '.hermes/skills/workspace-dispatch/SKILL.md')]
+      : []),
+    ...(home
+      ? [
+          resolve(
+            home,
+            '.openclaw/workspace/skills/workspace-dispatch/SKILL.md',
+          ),
+        ]
+      : []),
   ]
   for (const p of candidates) {
     try {
@@ -77,23 +97,39 @@ function buildOrchestratorPrompt(
   },
 ): string {
   const outputBase = options.projectsDir || '/tmp'
-  const outputPrefix = outputBase === '/tmp' ? '/tmp/dispatch-<slug>' : `${outputBase}/dispatch-<slug>`
+  const outputPrefix =
+    outputBase === '/tmp'
+      ? '/tmp/dispatch-<slug>'
+      : `${outputBase}/dispatch-<slug>`
   return [
     'You are a mission orchestrator. Execute this mission autonomously.',
     '',
     '## Dispatch Skill Instructions',
     '',
-    skill || '(workspace-dispatch skill not found locally; proceed using create_task to spawn workers)',
+    skill ||
+      '(workspace-dispatch skill not found locally; proceed using create_task to spawn workers)',
     '',
     '## Mission',
     '',
     `Goal: ${goal}`,
-    ...(options.orchestratorModel ? ['', `Use model: ${options.orchestratorModel} for the orchestrator`] : []),
-    ...(options.workerModel ? ['', `Use model: ${options.workerModel} for all workers`] : []),
+    ...(options.orchestratorModel
+      ? ['', `Use model: ${options.orchestratorModel} for the orchestrator`]
+      : []),
+    ...(options.workerModel
+      ? ['', `Use model: ${options.workerModel} for all workers`]
+      : []),
     ...(options.maxParallel > 1
-      ? ['', `Run up to ${options.maxParallel} workers in parallel when tasks are independent`]
-      : ['', 'Spawn workers one at a time. Do NOT wait for workers to finish — the UI handles tracking.']),
-    ...(options.supervised ? ['', 'Supervised mode is enabled. Require approval before each task.'] : []),
+      ? [
+          '',
+          `Run up to ${options.maxParallel} workers in parallel when tasks are independent`,
+        ]
+      : [
+          '',
+          'Spawn workers one at a time. Do NOT wait for workers to finish — the UI handles tracking.',
+        ]),
+    ...(options.supervised
+      ? ['', 'Supervised mode is enabled. Require approval before each task.']
+      : []),
     '',
     '## Critical Rules',
     '- Use create_task / delegate_task to create worker agents for each task',
@@ -108,7 +144,10 @@ function buildOrchestratorPrompt(
   ].join('\n')
 }
 
-async function createDashboardConductorMission(payload: { name: string; prompt: string }): Promise<{
+async function createDashboardConductorMission(payload: {
+  name: string
+  prompt: string
+}): Promise<{
   id?: string
   name?: string
   sessionKey?: string
@@ -120,7 +159,13 @@ async function createDashboardConductorMission(payload: { name: string; prompt: 
     body: JSON.stringify({ name: payload.name, prompt: payload.prompt }),
   })
   const text = await res.text()
-  let data: { id?: string; name?: string; session_id?: string; error?: string; detail?: string } = {}
+  let data: {
+    id?: string
+    name?: string
+    session_id?: string
+    error?: string
+    detail?: string
+  } = {}
   try {
     data = JSON.parse(text)
   } catch {
@@ -142,19 +187,29 @@ type NativeConductorAssignment = {
 }
 
 function clipText(value: string, max = 8000): string {
-  return value.length <= max ? value : `${value.slice(0, max - 20)}\n...[truncated]`
+  return value.length <= max
+    ? value
+    : `${value.slice(0, max - 20)}\n...[truncated]`
 }
 
-export function buildNativeConductorAssignments(goal: string, options: { maxParallel: number; supervised: boolean }): Array<NativeConductorAssignment> {
+export function buildNativeConductorAssignments(
+  goal: string,
+  options: { maxParallel: number; supervised: boolean },
+): Array<NativeConductorAssignment> {
   const maxParallel = Math.min(5, Math.max(1, options.maxParallel || 1))
   const normalizedGoal = goal.toLowerCase()
-  const wantsProduction = /production|ready|harden|audit|clean|fix|bug|test|build|release|deploy|operational/.test(normalizedGoal)
+  const wantsProduction =
+    /production|ready|harden|audit|clean|fix|bug|test|build|release|deploy|operational/.test(
+      normalizedGoal,
+    )
   const wantsDocs = /doc|handoff|readme|spec|plan|summary/.test(normalizedGoal)
   const assignments: Array<NativeConductorAssignment> = []
 
   assignments.push({
     workerId: wantsProduction ? 'swarm2' : 'swarm5',
-    rationale: wantsProduction ? 'Foundation owns runtime contracts and production blockers.' : 'Builder owns the primary implementation lane.',
+    rationale: wantsProduction
+      ? 'Foundation owns runtime contracts and production blockers.'
+      : 'Builder owns the primary implementation lane.',
     reviewRequired: false,
     direct: true,
     task: [
@@ -162,14 +217,17 @@ export function buildNativeConductorAssignments(goal: string, options: { maxPara
       '',
       'Lane: Foundation / primary implementation.',
       'Find the smallest safe execution plan, make concrete progress, and produce a checkpoint. If code changes are required, keep them scoped and testable.',
-      options.supervised ? 'Supervised mode: stop before destructive writes or commits and report the exact approval needed.' : 'Do not ask for confirmation unless blocked; start immediately.',
+      options.supervised
+        ? 'Supervised mode: stop before destructive writes or commits and report the exact approval needed.'
+        : 'Do not ask for confirmation unless blocked; start immediately.',
     ].join('\n'),
   })
 
   if (maxParallel >= 2) {
     assignments.push({
       workerId: 'swarm5',
-      rationale: 'Builder executes implementation or patch work in parallel with foundation analysis.',
+      rationale:
+        'Builder executes implementation or patch work in parallel with foundation analysis.',
       reviewRequired: false,
       direct: true,
       task: [
@@ -177,7 +235,9 @@ export function buildNativeConductorAssignments(goal: string, options: { maxPara
         '',
         'Lane: Builder.',
         'Implement or prototype the concrete fix/feature path. Avoid broad refactors. Report files changed, tests run, and remaining risks.',
-        options.supervised ? 'Supervised mode: prepare patches but stop before destructive writes or commits if approval is needed.' : 'Proceed without asking unless blocked.',
+        options.supervised
+          ? 'Supervised mode: prepare patches but stop before destructive writes or commits if approval is needed.'
+          : 'Proceed without asking unless blocked.',
       ].join('\n'),
     })
   }
@@ -185,7 +245,8 @@ export function buildNativeConductorAssignments(goal: string, options: { maxPara
   if (maxParallel >= 3) {
     assignments.push({
       workerId: 'swarm6',
-      rationale: 'Reviewer independently checks correctness, regressions, and merge risk.',
+      rationale:
+        'Reviewer independently checks correctness, regressions, and merge risk.',
       reviewRequired: false,
       direct: true,
       task: [
@@ -228,7 +289,10 @@ export function buildNativeConductorAssignments(goal: string, options: { maxPara
   }
 
   const selected = assignments.slice(0, maxParallel)
-  if (wantsDocs && !selected.some((assignment) => assignment.workerId === 'swarm7')) {
+  if (
+    wantsDocs &&
+    !selected.some((assignment) => assignment.workerId === 'swarm7')
+  ) {
     selected[selected.length - 1] = {
       workerId: 'swarm7',
       rationale: 'Scribe captures handoff, docs, and operational notes.',
@@ -239,7 +303,9 @@ export function buildNativeConductorAssignments(goal: string, options: { maxPara
         '',
         'Lane: Scribe.',
         'Create a concise handoff/status note: what changed, how to operate it, verification, caveats, and next actions. Do not expose secrets.',
-        options.supervised ? 'Supervised mode: stop before destructive writes or commits and report the exact approval needed.' : 'Proceed without asking unless blocked.',
+        options.supervised
+          ? 'Supervised mode: stop before destructive writes or commits and report the exact approval needed.'
+          : 'Proceed without asking unless blocked.',
       ].join('\n'),
     }
   }
@@ -254,30 +320,53 @@ function swarmMissionStatus(mission: SwarmMission): string {
   return 'running'
 }
 
-function nativeMissionLines(mission: SwarmMission, maxLines: number): Array<string> {
+function nativeMissionLines(
+  mission: SwarmMission,
+  maxLines: number,
+): Array<string> {
   const lines = [
     `Native Workspace Swarm mission: ${mission.title}`,
     `mission_id: ${mission.id}`,
     `state: ${mission.state}`,
     ...mission.assignments.map((assignment) => {
-      const result = assignment.checkpoint?.result ? ` — ${assignment.checkpoint.result}` : ''
-      const blocker = assignment.checkpoint?.blocker ? ` — blocker: ${assignment.checkpoint.blocker}` : ''
+      const result = assignment.checkpoint?.result
+        ? ` — ${assignment.checkpoint.result}`
+        : ''
+      const blocker = assignment.checkpoint?.blocker
+        ? ` — blocker: ${assignment.checkpoint.blocker}`
+        : ''
       return `${assignment.workerId} ${assignment.state}: ${assignment.task.slice(0, 160)}${result}${blocker}`
     }),
-    ...mission.events.slice(-20).map((event) => `${new Date(event.at).toISOString()} ${event.type}: ${event.message}`),
+    ...mission.events
+      .slice(-20)
+      .map(
+        (event) =>
+          `${new Date(event.at).toISOString()} ${event.type}: ${event.message}`,
+      ),
   ]
   return lines.slice(-maxLines)
 }
 
-export function toNativeConductorMissionRecord(mission: SwarmMission, maxLines = 400) {
+export function toNativeConductorMissionRecord(
+  mission: SwarmMission,
+  maxLines = 400,
+) {
   return {
     id: mission.id,
     name: mission.title,
     status: swarmMissionStatus(mission),
-    error: mission.state === 'blocked' ? 'Native Workspace Swarm mission blocked' : null,
+    error:
+      mission.state === 'blocked'
+        ? 'Native Workspace Swarm mission blocked'
+        : null,
     session_id: null,
     lines: nativeMissionLines(mission, maxLines),
-    exit_code: mission.state === 'blocked' || mission.state === 'cancelled' ? 1 : mission.state === 'complete' ? 0 : null,
+    exit_code:
+      mission.state === 'blocked' || mission.state === 'cancelled'
+        ? 1
+        : mission.state === 'complete'
+          ? 0
+          : null,
     nativeSwarm: true,
     modeOfficialOotb: true,
     modeNote: NATIVE_CONDUCTOR_MODE_NOTE,
@@ -307,7 +396,10 @@ function createNativeConductorMission(input: {
     checkpointPollSeconds: 10,
     notifySessionKey: 'main',
   }).catch((error) => {
-    console.error('[conductor] native swarm dispatch failed:', error instanceof Error ? error.message : String(error))
+    console.error(
+      '[conductor] native swarm dispatch failed:',
+      error instanceof Error ? error.message : String(error),
+    )
   })
   return { missionId: input.missionName, missionTitle, assignments }
 }
@@ -316,12 +408,19 @@ export const Route = createFileRoute('/api/conductor-spawn')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        if (!isAuthenticated(request))
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         const url = new URL(request.url)
         const missionId = url.searchParams.get('missionId')?.trim()
         const requestedLines = Number(url.searchParams.get('lines') || '200')
-        const lines = Number.isFinite(requestedLines) ? Math.min(2000, Math.max(1, requestedLines)) : 200
-        if (!missionId) return json({ ok: false, error: 'missionId required' }, { status: 400 })
+        const lines = Number.isFinite(requestedLines)
+          ? Math.min(2000, Math.max(1, requestedLines))
+          : 200
+        if (!missionId)
+          return json(
+            { ok: false, error: 'missionId required' },
+            { status: 400 },
+          )
 
         const nativeMission = getSwarmMission(missionId)
         if (nativeMission) {
@@ -343,14 +442,25 @@ export const Route = createFileRoute('/api/conductor-spawn')({
                   if (!checkpoint || checkpoint.stateLabel === 'IN_PROGRESS') {
                     const chat = readWorkerMessages(profilePath, 50)
                     if (chat.ok) {
-                      const msgCheckpoint = newestCheckpointFromMessages(chat.messages)
-                      if (msgCheckpoint && msgCheckpoint.raw !== snapshot.checkpointRaw) {
+                      const msgCheckpoint = newestCheckpointFromMessages(
+                        chat.messages,
+                      )
+                      if (
+                        msgCheckpoint &&
+                        msgCheckpoint.raw !== snapshot.checkpointRaw
+                      ) {
                         checkpoint = msgCheckpoint
                       }
                     }
                   }
 
-                  if (checkpoint && (checkpoint.stateLabel === 'DONE' || checkpoint.stateLabel === 'BLOCKED' || checkpoint.stateLabel === 'HANDOFF' || checkpoint.stateLabel === 'NEEDS_INPUT')) {
+                  if (
+                    checkpoint &&
+                    (checkpoint.stateLabel === 'DONE' ||
+                      checkpoint.stateLabel === 'BLOCKED' ||
+                      checkpoint.stateLabel === 'HANDOFF' ||
+                      checkpoint.stateLabel === 'NEEDS_INPUT')
+                  ) {
                     recordMissionCheckpoint({
                       missionId: nativeMission.id,
                       assignmentId: assignment.id,
@@ -368,35 +478,59 @@ export const Route = createFileRoute('/api/conductor-spawn')({
           // Re-read the mission from the store so the response reflects any
           // checkpoints just synced via recordMissionCheckpoint above.
           const updatedNative = getSwarmMission(missionId) ?? nativeMission
-          return json({ ok: true, mode: 'native-swarm', mission: toNativeConductorMissionRecord(updatedNative, lines) })
+          return json({
+            ok: true,
+            mode: 'native-swarm',
+            mission: toNativeConductorMissionRecord(updatedNative, lines),
+          })
         }
 
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.dashboard.available || !capabilities.conductor) {
-          return json({ ok: false, error: 'Conductor mission not found in native swarm store and dashboard Conductor API is unavailable' }, { status: 404 })
+          return json(
+            {
+              ok: false,
+              error:
+                'Conductor mission not found in native swarm store and dashboard Conductor API is unavailable',
+            },
+            { status: 404 },
+          )
         }
 
-        const res = await dashboardFetch(`/api/conductor/missions/${encodeURIComponent(missionId)}?lines=${lines}`)
+        const res = await dashboardFetch(
+          `/api/conductor/missions/${encodeURIComponent(missionId)}?lines=${lines}`,
+        )
         const text = await res.text()
         let mission: Record<string, unknown> = {}
         try {
           mission = JSON.parse(text) as Record<string, unknown>
         } catch {
-          return json({ ok: false, error: text || `HTTP ${res.status}` }, { status: res.ok ? 502 : res.status })
+          return json(
+            { ok: false, error: text || `HTTP ${res.status}` },
+            { status: res.ok ? 502 : res.status },
+          )
         }
         if (!res.ok) {
-          const error = typeof mission.detail === 'string' ? mission.detail : typeof mission.error === 'string' ? mission.error : `HTTP ${res.status}`
+          const error =
+            typeof mission.detail === 'string'
+              ? mission.detail
+              : typeof mission.error === 'string'
+                ? mission.error
+                : `HTTP ${res.status}`
           return json({ ok: false, error }, { status: res.status })
         }
         return json({ ok: true, mission })
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        if (!isAuthenticated(request))
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
 
         try {
-          const body = (await request.json().catch(() => ({}))) as ConductorSpawnBody
+          const body = (await request
+            .json()
+            .catch(() => ({}))) as ConductorSpawnBody
           const rawGoal = readOptionalString(body.goal)
           const goalSanitization = sanitizeConductorMissionGoal(rawGoal)
           const goal = goalSanitization.goal
@@ -453,8 +587,12 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             })
           }
 
-          const result = await createDashboardConductorMission({ name: missionName, prompt })
-          if (result.error) return json({ ok: false, error: result.error }, { status: 502 })
+          const result = await createDashboardConductorMission({
+            name: missionName,
+            prompt,
+          })
+          if (result.error)
+            return json({ ok: false, error: result.error }, { status: 502 })
           const missionId = result.id ?? missionName
           return json({
             ok: true,
@@ -462,14 +600,21 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             prompt: null,
             missionId,
             sessionKey: result.sessionKey ?? null,
-            sessionKeyPrefix: (result as Record<string, unknown>).sessionKeyPrefix ?? null,
+            sessionKeyPrefix:
+              (result as Record<string, unknown>).sessionKeyPrefix ?? null,
             jobId: missionId,
             jobName: result.name ?? missionName,
             runId: null,
             warnings: goalSanitization.warnings,
           })
         } catch (error) {
-          return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 })
+          return json(
+            {
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            { status: 500 },
+          )
         }
       },
     },

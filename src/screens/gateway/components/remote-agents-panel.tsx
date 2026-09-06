@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { GatewaySession } from '@/lib/gateway-api'
 import { formatModelName } from '@/lib/format-model-name'
 import { cn } from '@/lib/utils'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
+import { fetchSessions } from '@/lib/gateway-api'
 
 export type RemoteAgentsPanelProps = {
-  localSessionKeys: string[]
+  localSessionKeys: Array<string>
 }
 
 function shouldHideSession(session: GatewaySession): boolean {
@@ -23,7 +24,10 @@ function shouldHideSession(session: GatewaySession): boolean {
     'morning brief',
     'evening wrap',
     'weekly',
-  ].some((marker) => normalizedLabel.includes(marker) || normalizedTitle.includes(marker))
+  ].some(
+    (marker) =>
+      normalizedLabel.includes(marker) || normalizedTitle.includes(marker),
+  )
 
   return hasNoiseMarker
 }
@@ -42,11 +46,19 @@ function timeAgo(ts: number | string | undefined): string {
 
 function statusColor(status: string | undefined): string {
   switch (status) {
-    case 'active': case 'running': return 'bg-emerald-500 animate-pulse'
-    case 'idle': case 'waiting': return 'bg-amber-400'
-    case 'error': return 'bg-red-500'
-    case 'completed': case 'done': return 'bg-blue-400'
-    default: return 'bg-neutral-400'
+    case 'active':
+    case 'running':
+      return 'bg-emerald-500 animate-pulse'
+    case 'idle':
+    case 'waiting':
+      return 'bg-amber-400'
+    case 'error':
+      return 'bg-red-500'
+    case 'completed':
+    case 'done':
+      return 'bg-blue-400'
+    default:
+      return 'bg-neutral-400'
   }
 }
 
@@ -62,8 +74,10 @@ function getLastMessageText(session: GatewaySession): string {
   return ''
 }
 
-export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) {
-  const [sessions, setSessions] = useState<GatewaySession[]>([])
+export function RemoteAgentsPanel({
+  localSessionKeys,
+}: RemoteAgentsPanelProps) {
+  const [sessions, setSessions] = useState<Array<GatewaySession>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const localSet = useMemo(() => new Set(localSessionKeys), [localSessionKeys])
@@ -73,7 +87,9 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
     setError(null)
     try {
       const res = await fetchSessions()
-      const remote = (res.sessions ?? []).filter((s) => s.key && !localSet.has(s.key) && !shouldHideSession(s))
+      const remote = (res.sessions ?? []).filter(
+        (s) => s.key && !localSet.has(s.key) && !shouldHideSession(s),
+      )
       setSessions(remote)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch sessions')
@@ -91,7 +107,9 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
   if (sessions.length === 0 && !loading && !error) {
     return (
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-900 p-6 text-center">
-        <p className="text-sm text-neutral-600 dark:text-neutral-300">No remote agents found</p>
+        <p className="text-sm text-neutral-600 dark:text-neutral-300">
+          No remote agents found
+        </p>
       </div>
     )
   }
@@ -130,11 +148,22 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
               className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-900 p-3 shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="flex items-center gap-2 mb-2">
-                <span className={cn('size-2 shrink-0 rounded-full', statusColor(s.status))} />
+                <span
+                  className={cn(
+                    'size-2 shrink-0 rounded-full',
+                    statusColor(s.status),
+                  )}
+                />
                 <span className="flex-1 truncate text-sm font-semibold text-neutral-900 dark:text-white">
-                  {s.label || s.title || s.derivedTitle || s.key?.slice(0, 20) || 'Unknown'}
+                  {s.label ||
+                    s.title ||
+                    s.derivedTitle ||
+                    s.key?.slice(0, 20) ||
+                    'Unknown'}
                 </span>
-                <span className="text-[10px] text-neutral-400">{timeAgo(s.updatedAt)}</span>
+                <span className="text-[10px] text-neutral-400">
+                  {timeAgo(s.updatedAt)}
+                </span>
               </div>
 
               {s.model && (
@@ -144,17 +173,27 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
               )}
 
               {s.task && (
-                <p className="text-[11px] text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-2">{s.task}</p>
+                <p className="text-[11px] text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-2">
+                  {s.task}
+                </p>
               )}
 
               {preview && (
-                <p className="text-[10px] text-neutral-400 line-clamp-1">{preview}</p>
+                <p className="text-[10px] text-neutral-400 line-clamp-1">
+                  {preview}
+                </p>
               )}
 
               <div className="mt-2 flex items-center gap-2 text-[10px] text-neutral-400">
-                {s.tokenCount != null && <span>{(s.tokenCount).toLocaleString()} tok</span>}
-                {s.cost != null && s.cost > 0 && <span>· ${s.cost.toFixed(4)}</span>}
-                {s.status && <span className="ml-auto capitalize">{s.status}</span>}
+                {s.tokenCount != null && (
+                  <span>{s.tokenCount.toLocaleString()} tok</span>
+                )}
+                {s.cost != null && s.cost > 0 && (
+                  <span>· ${s.cost.toFixed(4)}</span>
+                )}
+                {s.status && (
+                  <span className="ml-auto capitalize">{s.status}</span>
+                )}
               </div>
 
               <div className="mt-2">

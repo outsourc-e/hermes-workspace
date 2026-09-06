@@ -160,10 +160,7 @@ export function ProviderMixCard({
 
       <div className="flex items-center gap-3">
         {/* Donut */}
-        <div
-          className="relative shrink-0"
-          style={{ width: 64, height: 64 }}
-        >
+        <div className="relative shrink-0" style={{ width: 64, height: 64 }}>
           <div
             className="absolute inset-0 rounded-full"
             style={{ background: conic }}
