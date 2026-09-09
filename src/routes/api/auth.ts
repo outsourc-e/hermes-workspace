@@ -2,9 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import {
+  clearSessionCookie,
   createSessionCookie,
   generateSessionToken,
+  getSessionTokenFromCookie,
   isPasswordProtectionEnabled,
+  revokeSessionToken,
   storeSessionToken,
   verifyPassword,
 } from '../../server/auth-middleware'
@@ -86,6 +89,31 @@ export const Route = createFileRoute('/api/auth')({
             { status: 500 },
           )
         }
+      },
+      DELETE: ({ request }) => {
+        // Logout: revoke the session token and clear the cookie.
+        // Idempotent — always returns ok even if no valid token was present.
+        // CSRF: the session cookie is SameSite=Strict; additionally reject
+        // cross-site requests (defense in depth, mirrors requireJsonContentType
+        // on the login POST which has no body to check).
+        const secFetchSite = request.headers.get('sec-fetch-site')
+        if (secFetchSite && secFetchSite === 'cross-site') {
+          return json({ ok: false, error: 'Forbidden' }, { status: 403 })
+        }
+        const cookieHeader = request.headers.get('cookie')
+        const token = getSessionTokenFromCookie(cookieHeader)
+        if (token) {
+          revokeSessionToken(token)
+        }
+        return json(
+          { ok: true },
+          {
+            status: 200,
+            headers: {
+              'Set-Cookie': clearSessionCookie(),
+            },
+          },
+        )
       },
     },
   },

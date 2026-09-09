@@ -58,6 +58,47 @@ describe('createSessionCookie (#123)', () => {
   })
 })
 
+describe('clearSessionCookie (logout)', () => {
+  it('clears the cookie with Max-Age=0 and matching attributes', async () => {
+    process.env.NODE_ENV = 'production'
+    const { clearSessionCookie } = await import('./auth-middleware')
+    const cookie = clearSessionCookie()
+    expect(cookie).toMatch(/^claude-auth=;/)
+    expect(cookie).toContain('Max-Age=0')
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('SameSite=Strict')
+    expect(cookie).toContain('Path=/')
+    expect(cookie).toContain('Secure')
+  })
+
+  it('omits Secure when COOKIE_SECURE=0 in production', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.COOKIE_SECURE = '0'
+    const { clearSessionCookie } = await import('./auth-middleware')
+    const cookie = clearSessionCookie()
+    expect(cookie).toMatch(/^claude-auth=;/)
+    expect(cookie).toContain('Max-Age=0')
+    expect(cookie).not.toContain('Secure')
+  })
+})
+
+describe('revokeSessionToken (logout)', () => {
+  it('revokes a stored token so it is no longer valid', async () => {
+    const { generateSessionToken, storeSessionToken, revokeSessionToken, isValidSessionToken } =
+      await import('./auth-middleware')
+    const token = generateSessionToken()
+    storeSessionToken(token)
+    expect(isValidSessionToken(token)).toBe(true)
+    revokeSessionToken(token)
+    expect(isValidSessionToken(token)).toBe(false)
+  })
+
+  it('is a no-op for an unknown token', async () => {
+    const { revokeSessionToken } = await import('./auth-middleware')
+    expect(() => revokeSessionToken('unknown-token')).not.toThrow()
+  })
+})
+
 describe('getRequestIp (#125)', () => {
   function makeRequest(headers: Record<string, string>): Request {
     return new Request('http://localhost/', { headers })

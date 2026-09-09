@@ -123,6 +123,15 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     setConnectionVerified(true)
   }, [])
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth', { method: 'DELETE' })
+    } catch {
+      // Best-effort: even if the request fails, reload to re-check auth state.
+    }
+    window.location.reload()
+  }, [])
+
   // Fallback startup verification in the shell itself.
   // This prevents a bad loading loop if the splash component gets stuck even
   // though /api/auth-check or /api/connection-status are already healthy.
@@ -363,6 +372,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 sessionsFetching={sessionsFetching}
                 sessionsError={sessionsError}
                 onRetrySessions={refetchSessions}
+                onLogout={authState.authRequired ? handleLogout : undefined}
               />
             </div>
           )}
@@ -464,7 +474,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         ) : null}
       </div>
 
-      {!isChromeFreeSurface ? <MobileHamburgerMenu /> : null}
+      {!isChromeFreeSurface ? (
+        <MobileHamburgerMenu
+          onLogout={authState.authRequired ? handleLogout : undefined}
+        />
+      ) : null}
       {!isChromeFreeSurface ? <MobileTabBar /> : null}
       {!isChromeFreeSurface && !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
