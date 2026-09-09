@@ -8,6 +8,7 @@ import {
   CheckListIcon,
   Clock01Icon,
   CommandLineIcon,
+  Logout01Icon,
   McpServerIcon,
   Menu01Icon,
   PuzzleIcon,
@@ -143,7 +144,7 @@ export function HamburgerTrigger({ className }: { className?: string }) {
 }
 
 /** Mount once in WorkspaceShell — renders the drawer + backdrop */
-export function MobileHamburgerMenu() {
+export function MobileHamburgerMenu({ onLogout }: { onLogout?: () => void }) {
   const [open, setOpen] = useState(false)
   _setOpen = setOpen
 
@@ -369,6 +370,27 @@ export function MobileHamburgerMenu() {
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             </button>
+
+            {/* Sign out */}
+            {onLogout ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onLogout()
+                }}
+                className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
+                aria-label="Sign out"
+                title="Sign out"
+                style={{ color: 'var(--color-ink-muted, #888)' }}
+              >
+                <HugeiconsIcon
+                  icon={Logout01Icon}
+                  size={20}
+                  strokeWidth={1.5}
+                />
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

@@ -133,8 +133,9 @@ export function isValidSessionToken(token: string): boolean {
  * Remove a session token (logout).
  */
 export function revokeSessionToken(token: string): void {
-  _tokens.delete(token)
-  _persist()
+  if (_tokens.delete(token)) {
+    _persist()
+  }
 }
 
 /**
@@ -305,4 +306,18 @@ export function createSessionCookie(token: string): string {
   if (shouldSetSecureCookie()) attrs.push('Secure')
   attrs.push('SameSite=Strict', 'Path=/', `Max-Age=${30 * 24 * 60 * 60}`)
   return `claude-auth=${token}; ${attrs.join('; ')}`
+}
+
+/**
+ * Create a Set-Cookie header that clears the session cookie (logout).
+ *
+ * Same attributes as createSessionCookie but with Max-Age=0 so the browser
+ * immediately drops the cookie. HttpOnly/Secure/SameSite must match the
+ * original cookie's attributes for the deletion to take effect.
+ */
+export function clearSessionCookie(): string {
+  const attrs = ['HttpOnly']
+  if (shouldSetSecureCookie()) attrs.push('Secure')
+  attrs.push('SameSite=Strict', 'Path=/', 'Max-Age=0')
+  return `claude-auth=; ${attrs.join('; ')}`
 }

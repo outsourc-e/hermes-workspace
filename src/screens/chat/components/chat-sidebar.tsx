@@ -9,6 +9,7 @@ import {
   ComputerTerminal01Icon,
   DashboardSquare01Icon,
   File01Icon,
+  Logout01Icon,
   McpServerIcon,
   MessageMultiple01Icon,
   Moon02Icon,
@@ -134,6 +135,7 @@ type ChatSidebarProps = {
   sessionsFetching: boolean
   sessionsError: string | null
   onRetrySessions: () => void
+  onLogout?: () => void
 }
 
 // ── Reusable nav item ───────────────────────────────────────────────────
@@ -683,6 +685,7 @@ function ChatSidebarComponent({
   sessionsFetching,
   sessionsError,
   onRetrySessions,
+  onLogout,
 }: ChatSidebarProps) {
   const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
     useSidebarSettings()
@@ -1333,6 +1336,21 @@ function ChatSidebarComponent({
                   Settings
                 </span>
               </MenuItem>
+              {onLogout ? (
+                <MenuItem
+                  onClick={onLogout}
+                  className="justify-between text-red-500 dark:text-red-400"
+                >
+                  <span className="flex items-center gap-2">
+                    <HugeiconsIcon
+                      icon={Logout01Icon}
+                      size={20}
+                      strokeWidth={1.5}
+                    />
+                    Sign out
+                  </span>
+                </MenuItem>
+              ) : null}
             </MenuContent>
           </MenuRoot>
 
