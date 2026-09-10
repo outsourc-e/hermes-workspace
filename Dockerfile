@@ -31,9 +31,20 @@ FROM node:22-slim
 # added in PR #185 for issue #161; regressed by the 2026-05-01 rename commit
 # efcb7d14 and re-added here per issue #259.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl tini python3 \
+      ca-certificates curl tini python3 python3-httpx python3-yaml \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r workspace && useradd -r -g workspace -u 10010 -m workspace
+
+COPY scripts/skills-search.py /app/scripts/skills-search.py
+
+RUN curl -fL \
+      https://codeload.github.com/NousResearch/hermes-agent/tar.gz/refs/heads/main \
+      -o /tmp/hermes-agent.tar.gz \
+    && mkdir -p /hermes-agent \
+    && tar -xzf /tmp/hermes-agent.tar.gz -C /hermes-agent --strip-components=1 \
+    && rm /tmp/hermes-agent.tar.gz
+
+ENV PYTHONPATH=/hermes-agent
 
 COPY --from=gosu_source /gosu /usr/local/bin/gosu
 
@@ -50,6 +61,7 @@ COPY --from=build --chown=workspace:workspace /app/package.json ./package.json
 COPY --from=build --chown=workspace:workspace /app/server-entry.js ./server-entry.js
 COPY --from=build --chown=workspace:workspace /app/skills ./skills
 COPY --chown=workspace:workspace docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --chown=workspace:workspace assets/mcp-presets.seed.json ./assets/mcp-presets.seed.json
 
 ENV NODE_ENV=production \
     PORT=3000 \
