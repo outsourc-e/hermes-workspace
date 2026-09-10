@@ -13,7 +13,6 @@ import { requireJsonContentType, safeErrorMessage } from '../../../server/rate-l
 import { normalizeTestResult } from '../../../server/mcp-normalize'
 import { runHermesMcpTest } from '../../../server/mcp-cli-bridge'
 import { setProbe } from '../../../server/mcp-tools-cache'
-import { parseMcpServerInput } from '../../../server/mcp-input-validate'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 const TEST_TIMEOUT_MS = 30_000
@@ -89,28 +88,44 @@ export const Route = createFileRoute('/api/mcp/test')({
         }
         try {
           const raw = (await request.json()) as Record<string, unknown>
-          let body: Record<string, unknown>
-          if (typeof raw.name === 'string' && Object.keys(raw).length === 1) {
-            body = { name: raw.name }
-          } else {
-            const parsed = parseMcpServerInput(raw)
-            if (!parsed.ok) {
-              return json(
-                { ok: false, error: 'Invalid MCP test payload', errors: parsed.errors },
-                { status: 400 },
-              )
-            }
-            body = parsed.value as unknown as Record<string, unknown>
+
+          if (typeof raw.name !== 'string' || !raw.name.trim()) {
+            return json(
+              { ok: false, error: 'MCP server name is required' },
+              { status: 400 },
+            )
           }
-          const response = await mcpFetch('/api/mcp/test', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-            signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
-          })
+
+          const name = raw.name.trim()
+          const startedAt = Date.now()
+
+          const response = await mcpFetch(
+            `/api/mcp/servers/${encodeURIComponent(name)}/test`,
+            {
+              method: 'POST',
+              signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
+            },
+          )
+
+          const latencyMs = Date.now() - startedAt
+
           const payload = (await response.json().catch(() => ({}))) as unknown
-          const result = normalizeTestResult(payload)
-          return json(result, { status: response.ok ? 200 : response.status || 502 })
+          const result = {
+            ...normalizeTestResult(payload),
+            latencyMs,
+          }
+
+          setProbe(name, {
+            status: result.ok ? 'connected' : 'failed',
+            toolCount: result.discoveredTools.length,
+            toolNames: result.discoveredTools.map((tool) => tool.name),
+            latencyMs: result.latencyMs,
+            error: result.error,
+          })
+
+          return json(result, {
+            status: response.ok ? 200 : response.status || 502,
+          })
         } catch (err) {
           return json({ ok: false, status: 'failed', discoveredTools: [], error: safeErrorMessage(err) }, { status: 500 })
         }

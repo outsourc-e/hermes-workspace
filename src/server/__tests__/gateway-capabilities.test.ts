@@ -245,7 +245,7 @@ describe('gateway-capabilities', () => {
           headers: { 'content-type': 'application/json' },
         })
       }
-      if (url === 'http://dashboard.test/api/mcp') {
+      if (url === 'http://dashboard.test/api/mcp/servers') {
         return new Response('not found', { status: 404 })
       }
       if (url === 'http://dashboard.test/api/config') {
@@ -259,7 +259,7 @@ describe('gateway-capabilities', () => {
       if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') {
         return new Response('', { status: 404 })
       }
-      if (url === 'http://gateway.test/api/mcp') {
+      if (url === 'http://gateway.test/api/mcp/servers') {
         return new Response('', { status: 404 })
       }
       return new Response(JSON.stringify({ ok: true }), {
@@ -308,7 +308,7 @@ describe('gateway-capabilities', () => {
       }
       if (url === 'http://gateway.test/v1/chat/completions') return new Response('', { status: 405 })
       if (url === 'http://gateway.test/api/sessions/__probe__/chat/stream') return new Response('', { status: 404 })
-      if (url.endsWith('/api/mcp')) return new Response('', { status: 404 })
+      if (url.endsWith('/api/mcp/servers')) return new Response('', { status: 404 })
       return new Response(JSON.stringify({ ok: true }), {
         headers: { 'content-type': 'application/json' },
       })

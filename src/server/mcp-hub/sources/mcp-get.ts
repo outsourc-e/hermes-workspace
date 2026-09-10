@@ -91,12 +91,19 @@ function parseManifestEntries(data: unknown): HubMcpEntry[] {
     const trust = verified ? ('official' as const) : ('community' as const)
 
     // Build a template object from raw manifest fields
+    const smitheryUrl =
+      typeof raw.url === 'string' && raw.url.trim()
+        ? raw.url.trim()
+        : rawAny.remote === true && rawAny.isDeployed === true && qualified
+          ? `https://server.smithery.ai/${qualified}`
+          : undefined
+
     const transport =
       typeof raw.transportType === 'string'
         ? raw.transportType
         : typeof raw.transport === 'string'
           ? raw.transport
-          : typeof raw.url === 'string'
+          : smitheryUrl
             ? 'http'
             : 'stdio'
 
@@ -105,8 +112,11 @@ function parseManifestEntries(data: unknown): HubMcpEntry[] {
       transportType: transport,
       command: typeof raw.command === 'string' ? raw.command : undefined,
       args: Array.isArray(raw.args) ? raw.args : undefined,
-      env: raw.env && typeof raw.env === 'object' && !Array.isArray(raw.env) ? raw.env : undefined,
-      url: typeof raw.url === 'string' ? raw.url : undefined,
+      env:
+        raw.env && typeof raw.env === 'object' && !Array.isArray(raw.env)
+          ? raw.env
+          : undefined,
+      url: smitheryUrl,
     }
 
     const normalized = normalizeTemplate(rawTemplate, trust)
@@ -131,8 +141,13 @@ function parseManifestEntries(data: unknown): HubMcpEntry[] {
   return entries
 }
 
-export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
-  const cached = getCache(SOURCE_ID)
+export async function fetchMcpGet(
+  query = '',
+  signal?: AbortSignal,
+): Promise<McpGetResult> {
+  const queryKey = query.trim().toLowerCase()
+  const cacheKey = queryKey ? `${SOURCE_ID}:${queryKey}` : SOURCE_ID
+  const cached = getCache(cacheKey)
   const warnings: string[] = []
 
   // Build request headers with conditional-GET
@@ -145,10 +160,18 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   } else if (cached?.lastModified) {
     headers['If-Modified-Since'] = cached.lastModified
   }
+  const requestUrl = new URL(REGISTRY_URL)
 
+  requestUrl.searchParams.set('pageSize', '100')
+  requestUrl.searchParams.set('remote', 'true')
+  requestUrl.searchParams.set('isDeployed', 'true')
+
+  if (query.trim()) {
+    requestUrl.searchParams.set('q', query.trim())
+  }
   let response: Response
   try {
-    response = await fetch(REGISTRY_URL, { headers, signal })
+    response = await fetch(requestUrl, { headers, signal })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     warnings.push(`mcp-get: network error: ${msg}`)
@@ -160,7 +183,7 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
 
   // 304 Not Modified — return cached payload, bump fetchedAt
   if (response.status === 304) {
-    touchCache(SOURCE_ID)
+    touchCache(cacheKey)
     const payload = cached ? (cached.payload as HubMcpEntry[]) : []
     return { entries: payload, ...(warnings.length > 0 ? { warnings } : {}) }
   }
@@ -178,7 +201,7 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
 
     // Update cache metadata with rate-limit info but keep existing payload
     if (cached) {
-      setCache(SOURCE_ID, {
+      setCache(cacheKey, {
         ...cached,
         ...(remainingNum !== undefined ? { rateLimitRemaining: remainingNum } : {}),
         ...(resetAtNum !== undefined ? { rateLimitResetAt: resetAtNum } : {}),
@@ -215,7 +238,7 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   const newEtag = response.headers.get('ETag') ?? undefined
   const newLastModified = response.headers.get('Last-Modified') ?? undefined
 
-  setCache(SOURCE_ID, {
+  setCache(cacheKey, {
     payload: entries,
     ...(newEtag ? { etag: newEtag } : {}),
     ...(newLastModified ? { lastModified: newLastModified } : {}),

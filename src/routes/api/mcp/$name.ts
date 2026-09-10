@@ -52,7 +52,7 @@ export const Route = createFileRoute('/api/mcp/$name')({
         }
         try {
           if (capabilities.mcp) {
-            const response = await mcpFetch(`/api/mcp/${encodeURIComponent(name)}`, {
+            const response = await mcpFetch(`/api/mcp/servers/${encodeURIComponent(name)}`, {
               method: 'DELETE',
               signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
             })

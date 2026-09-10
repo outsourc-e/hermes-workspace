@@ -148,7 +148,6 @@ import { Route as ApiMcpTestRouteImport } from './routes/api/mcp/test'
 import { Route as ApiMcpPresetsRouteImport } from './routes/api/mcp/presets'
 import { Route as ApiMcpHubSourcesRouteImport } from './routes/api/mcp/hub-sources'
 import { Route as ApiMcpHubSearchRouteImport } from './routes/api/mcp/hub-search'
-import { Route as ApiMcpDiscoverRouteImport } from './routes/api/mcp/discover'
 import { Route as ApiMcpConfigureRouteImport } from './routes/api/mcp/configure'
 import { Route as ApiMcpNameRouteImport } from './routes/api/mcp/$name'
 import { Route as ApiKnowledgeSyncRouteImport } from './routes/api/knowledge/sync'
@@ -874,11 +873,6 @@ const ApiMcpHubSearchRoute = ApiMcpHubSearchRouteImport.update({
   path: '/hub-search',
   getParentRoute: () => ApiMcpRoute,
 } as any)
-const ApiMcpDiscoverRoute = ApiMcpDiscoverRouteImport.update({
-  id: '/discover',
-  path: '/discover',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
 const ApiMcpConfigureRoute = ApiMcpConfigureRouteImport.update({
   id: '/configure',
   path: '/configure',
@@ -1144,7 +1138,6 @@ export interface FileRoutesByFullPath {
   '/api/knowledge/sync': typeof ApiKnowledgeSyncRoute
   '/api/mcp/$name': typeof ApiMcpNameRouteWithChildren
   '/api/mcp/configure': typeof ApiMcpConfigureRoute
-  '/api/mcp/discover': typeof ApiMcpDiscoverRoute
   '/api/mcp/hub-search': typeof ApiMcpHubSearchRoute
   '/api/mcp/hub-sources': typeof ApiMcpHubSourcesRouteWithChildren
   '/api/mcp/presets': typeof ApiMcpPresetsRoute
@@ -1311,7 +1304,6 @@ export interface FileRoutesByTo {
   '/api/knowledge/sync': typeof ApiKnowledgeSyncRoute
   '/api/mcp/$name': typeof ApiMcpNameRouteWithChildren
   '/api/mcp/configure': typeof ApiMcpConfigureRoute
-  '/api/mcp/discover': typeof ApiMcpDiscoverRoute
   '/api/mcp/hub-search': typeof ApiMcpHubSearchRoute
   '/api/mcp/hub-sources': typeof ApiMcpHubSourcesRouteWithChildren
   '/api/mcp/presets': typeof ApiMcpPresetsRoute
@@ -1480,7 +1472,6 @@ export interface FileRoutesById {
   '/api/knowledge/sync': typeof ApiKnowledgeSyncRoute
   '/api/mcp/$name': typeof ApiMcpNameRouteWithChildren
   '/api/mcp/configure': typeof ApiMcpConfigureRoute
-  '/api/mcp/discover': typeof ApiMcpDiscoverRoute
   '/api/mcp/hub-search': typeof ApiMcpHubSearchRoute
   '/api/mcp/hub-sources': typeof ApiMcpHubSourcesRouteWithChildren
   '/api/mcp/presets': typeof ApiMcpPresetsRoute
@@ -1650,7 +1641,6 @@ export interface FileRouteTypes {
     | '/api/knowledge/sync'
     | '/api/mcp/$name'
     | '/api/mcp/configure'
-    | '/api/mcp/discover'
     | '/api/mcp/hub-search'
     | '/api/mcp/hub-sources'
     | '/api/mcp/presets'
@@ -1817,7 +1807,6 @@ export interface FileRouteTypes {
     | '/api/knowledge/sync'
     | '/api/mcp/$name'
     | '/api/mcp/configure'
-    | '/api/mcp/discover'
     | '/api/mcp/hub-search'
     | '/api/mcp/hub-sources'
     | '/api/mcp/presets'
@@ -1985,7 +1974,6 @@ export interface FileRouteTypes {
     | '/api/knowledge/sync'
     | '/api/mcp/$name'
     | '/api/mcp/configure'
-    | '/api/mcp/discover'
     | '/api/mcp/hub-search'
     | '/api/mcp/hub-sources'
     | '/api/mcp/presets'
@@ -3140,13 +3128,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMcpHubSearchRouteImport
       parentRoute: typeof ApiMcpRoute
     }
-    '/api/mcp/discover': {
-      id: '/api/mcp/discover'
-      path: '/discover'
-      fullPath: '/api/mcp/discover'
-      preLoaderRoute: typeof ApiMcpDiscoverRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
     '/api/mcp/configure': {
       id: '/api/mcp/configure'
       path: '/configure'
@@ -3461,7 +3442,6 @@ const ApiMcpHubSourcesRouteWithChildren =
 interface ApiMcpRouteChildren {
   ApiMcpNameRoute: typeof ApiMcpNameRouteWithChildren
   ApiMcpConfigureRoute: typeof ApiMcpConfigureRoute
-  ApiMcpDiscoverRoute: typeof ApiMcpDiscoverRoute
   ApiMcpHubSearchRoute: typeof ApiMcpHubSearchRoute
   ApiMcpHubSourcesRoute: typeof ApiMcpHubSourcesRouteWithChildren
   ApiMcpPresetsRoute: typeof ApiMcpPresetsRoute
@@ -3471,7 +3451,6 @@ interface ApiMcpRouteChildren {
 const ApiMcpRouteChildren: ApiMcpRouteChildren = {
   ApiMcpNameRoute: ApiMcpNameRouteWithChildren,
   ApiMcpConfigureRoute: ApiMcpConfigureRoute,
-  ApiMcpDiscoverRoute: ApiMcpDiscoverRoute,
   ApiMcpHubSearchRoute: ApiMcpHubSearchRoute,
   ApiMcpHubSourcesRoute: ApiMcpHubSourcesRouteWithChildren,
   ApiMcpPresetsRoute: ApiMcpPresetsRoute,

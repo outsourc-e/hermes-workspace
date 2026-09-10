@@ -13,7 +13,6 @@ import {
   ScrollAreaViewport,
 } from '@/components/ui/scroll-area'
 import {
-  useDiscoverMcpTools,
   useUpsertMcpServer,
 } from '../hooks/use-mcp-mutations'
 import { useMcpCapabilityMode } from '../hooks/use-mcp-capability-mode'
@@ -63,7 +62,6 @@ function isMcpServer(value: unknown): value is McpServer {
 
 export function McpServerDialog({ open, initial, onClose }: Props) {
   const upsert = useUpsertMcpServer()
-  const discover = useDiscoverMcpTools()
   const { mode: capabilityMode } = useMcpCapabilityMode()
   const [draft, setDraft] = useState<McpClientInput>(EMPTY)
   // Ephemeral, never persisted to a named exported type — secrets stay
@@ -103,9 +101,6 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
     setDraft((prev) => ({ ...prev, ...patch }))
 
   const fallbackMode = capabilityMode === 'fallback'
-  const discoverDisabledReason = fallbackMode
-    ? 'Discover requires hermes-agent /api/mcp runtime endpoint (not available in local fallback mode).'
-    : ''
 
   return (
     <DialogRoot
@@ -257,16 +252,6 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
                     /api/mcp runtime endpoint.
                   </p>
                 ) : null}
-                {discover.data ? (
-                  <p className="text-xs text-primary-500">
-                    Discovered {discover.data.tools.length} tools.
-                  </p>
-                ) : null}
-                {discover.error ? (
-                  <p className="text-xs text-red-700 dark:text-red-300">
-                    {discover.error.message}
-                  </p>
-                ) : null}
                 {upsert.error ? (
                   <p className="text-xs text-red-700 dark:text-red-300">
                     {upsert.error.message}
@@ -296,15 +281,6 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
               disabled={upsert.isPending}
             >
               Cancel
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={discover.isPending || !draft.name || fallbackMode}
-              title={discoverDisabledReason}
-              onClick={() => discover.mutate(draft)}
-            >
-              {discover.isPending ? 'Discovering…' : 'Discover'}
             </Button>
             <Button
               size="sm"

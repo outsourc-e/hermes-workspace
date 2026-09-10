@@ -77,22 +77,65 @@ export const Route = createFileRoute('/api/mcp/configure')({
             return json({ ok: false, error: 'Invalid configure payload' }, { status: 400 })
           }
           if (capabilities.mcp) {
-            const response = await mcpFetch('/api/mcp/configure', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(input),
+            if (typeof input.enabled !== 'boolean') {
+              return json(
+                { ok: false, error: 'Native MCP configure currently supports enabled toggle only' },
+                { status: 400 },
+              )
+            }
+
+            const response = await mcpFetch(
+              `/api/mcp/servers/${encodeURIComponent(input.name)}/enabled`,
+              {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: input.enabled }),
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+              },
+            )
+
+            const body = (await response.json().catch(() => ({}))) as Record<string, unknown>
+
+            if (!response.ok) {
+              const errMsg =
+                (body.error as string | undefined) ||
+                (body.detail as string | undefined) ||
+                `MCP configure failed (${response.status})`
+
+              return json(
+                { ok: false, error: errMsg },
+                { status: response.status || 502 },
+              )
+            }
+
+            const listResponse = await mcpFetch('/api/mcp/servers', {
+              method: 'GET',
               signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
             })
-            const body = (await response.json().catch(() => ({}))) as unknown
-            const server = normalizeMcpServer(
-              (body as Record<string, unknown>).server ?? body,
+
+            const listBody =
+              (await listResponse.json().catch(() => ({}))) as Record<string, unknown>
+
+            const rawServers = Array.isArray(listBody.servers)
+              ? listBody.servers
+              : []
+
+            const rawServer = rawServers.find(
+              (server) =>
+                server &&
+                typeof server === 'object' &&
+                (server as Record<string, unknown>).name === input.name,
             )
-            if (!response.ok || !server) {
-              const errMsg =
-                ((body as Record<string, unknown>).error as string | undefined) ||
-                `MCP configure failed (${response.status})`
-              return json({ ok: false, error: errMsg }, { status: response.status || 502 })
+
+            const server = normalizeMcpServer(rawServer)
+
+            if (!listResponse.ok || !server) {
+              return json(
+                { ok: false, error: `MCP server refresh failed: ${input.name}` },
+                { status: listResponse.status || 502 },
+              )
             }
+
             return json({ ok: true, server: maskSecretsInPlace(server) })
           }
           // Phase 1.5 fallback — patch the matching `config.mcp_servers[name]`

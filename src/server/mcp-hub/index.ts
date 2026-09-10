@@ -80,7 +80,10 @@ async function fetchWithTimeout<T>(
   return fn(signal)
 }
 
-async function fetchSource(source: HubSource): Promise<SourceResult> {
+async function fetchSource(
+  source: HubSource,
+  query = '',
+): Promise<SourceResult> {
   if (source === 'local') {
     const res = await fetchLocalFile()
     return {
@@ -91,7 +94,7 @@ async function fetchSource(source: HubSource): Promise<SourceResult> {
   }
   if (source === 'mcp-get') {
     const res = await fetchWithTimeout(
-      (signal) => fetchMcpGet(signal),
+      (signal) => fetchMcpGet(query, signal),
       PER_SOURCE_TIMEOUT_MS,
     )
     return {
@@ -173,7 +176,9 @@ export async function unifiedSearch(
     sources === 'all' ? ['mcp-get', 'local'] : [sources]
 
   // Fetch all sources in parallel; tolerate individual failures
-  const builtinPromises = builtinSourcesToQuery.map((s) => fetchSource(s))
+  const builtinPromises = builtinSourcesToQuery.map((s) =>
+    fetchSource(s, query),
+  )
   const userPromises =
     sources === 'all' ? userSources.map((s) => fetchUserSource(s)) : []
 

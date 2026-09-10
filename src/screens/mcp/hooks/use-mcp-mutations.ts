@@ -1,7 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
-  McpClientInput,
-  McpDiscoveredTool,
   McpServer,
   McpTestResult,
   McpToolMode,
@@ -24,13 +22,6 @@ async function postJson<T>(path: string, body: unknown, method: 'POST' | 'PUT' |
 export function useTestMcpServer() {
   return useMutation<McpTestResult, Error, { name: string } | McpClientInput>({
     mutationFn: (payload) => postJson<McpTestResult>('/api/mcp/test', payload),
-  })
-}
-
-export function useDiscoverMcpTools() {
-  return useMutation<{ ok: boolean; tools: Array<McpDiscoveredTool> }, Error, McpClientInput>({
-    mutationFn: (payload) =>
-      postJson<{ ok: boolean; tools: Array<McpDiscoveredTool> }>('/api/mcp/discover', payload),
   })
 }
 
