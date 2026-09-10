@@ -1,5 +1,6 @@
 'use client'
 
+import { useWorkspaceVoiceSettings } from '../../hooks/use-workspace-voice-settings'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowLeft01Icon,
@@ -2227,6 +2228,15 @@ function VoiceContent() {
   const sttProvider = String(stt.provider || 'local')
   const sttGroq =
     (stt.groq as Record<string, unknown> | undefined) || {}
+  const sttOpenAi =
+    (stt.openai as Record<string, unknown> | undefined) || {}
+
+  const {
+    ttsChunkSize,
+    setTtsChunkSize,
+    saveTtsChunkSize,
+    ttsChunkSizeLoading,
+  } = useWorkspaceVoiceSettings()
 
   return (
     <div className="space-y-4">
@@ -2263,28 +2273,79 @@ function VoiceContent() {
           </select>
         </Row>
         {ttsProvider === 'openai' && (
-          <Row label="Voice">
-            <select
-              value={String(
-                (tts.openai as Record<string, unknown>)?.voice || 'nova',
-              )}
-              onChange={(e) =>
-                saveTts('openai', {
-                  ...((tts.openai as Record<string, unknown>) || {}),
-                  voice: e.target.value,
-                })
-              }
-              className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+          <>
+            <Row label="Voice">
+              <input
+                value={String(
+                  (tts.openai as Record<string, unknown>)?.voice || '',
+                )}
+                onChange={(e) =>
+                  saveTts('openai', {
+                    ...((tts.openai as Record<string, unknown>) || {}),
+                    voice: e.target.value,
+                  })
+                }
+                placeholder="alloy"
+                className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+              />
+            </Row>
+
+            <Row label="Model">
+              <input
+                value={String(
+                  (tts.openai as Record<string, unknown>)?.model || '',
+                )}
+                onChange={(e) =>
+                  saveTts('openai', {
+                    ...((tts.openai as Record<string, unknown>) || {}),
+                    model: e.target.value,
+                  })
+                }
+                placeholder="tts-1"
+                className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+              />
+            </Row>
+
+            <Row label="Base URL">
+              <input
+                value={String(
+                  (tts.openai as Record<string, unknown>)?.base_url || '',
+                )}
+                onChange={(e) =>
+                  saveTts('openai', {
+                    ...((tts.openai as Record<string, unknown>) || {}),
+                    base_url: e.target.value,
+                  })
+                }
+                placeholder="https://api.openai.com/v1"
+                className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+              />
+            </Row>
+            <Row
+              label="Chunk size"
+              description="Maximum characters generated per TTS chunk."
             >
-              {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map(
-                (v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ),
-              )}
-            </select>
-          </Row>
+              <Input
+                type="number"
+                min={100}
+                max={2000}
+                step={100}
+                value={String(ttsChunkSize)}
+                disabled={ttsChunkSizeLoading}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+
+                  if (Number.isFinite(value)) {
+                    setTtsChunkSize(value)
+                  }
+                }}
+                onBlur={() => {
+                  void saveTtsChunkSize(ttsChunkSize)
+                }}
+                className="h-8 w-32"
+              />
+            </Row>
+          </>
         )}
       </div>
       <div className={SETTINGS_CARD_CLASS}>
@@ -2310,6 +2371,49 @@ function VoiceContent() {
             ))}
           </select>
         </Row>
+        {sttProvider === 'openai' && (
+          <>
+            <Row label="Model">
+              <Input
+                value={String(sttOpenAi.model || '')}
+                onChange={(e) =>
+                  saveStt('openai', {
+                    ...sttOpenAi, 
+                    model: e.target.value,
+                  })
+                }
+                placeholder="whisper-1"
+                className="h-8 w-64"
+              />
+            </Row>
+
+            <Row label="Base URL">
+              <Input
+                value={String(sttOpenAi.base_url || '')}
+                onChange={(e) =>
+                  saveStt('openai', {
+                    ...sttOpenAi,
+                    base_url: e.target.value,
+                  })
+                }
+                placeholder="https://api.openai.com/v1"
+                className="h-8 w-64"
+              />
+            </Row>
+
+            <Row
+              label="Language"
+              description="Optional BCP-47 code, e.g. en or fr."
+            >
+              <Input
+                value={String(stt.language || '')}
+                onChange={(e) => saveStt('language', e.target.value)}
+                placeholder="auto"
+                className="h-8 w-40"
+              />
+            </Row>
+          </>
+        )}
         {sttProvider === 'groq' && (
           <>
             <Row label="Groq model">

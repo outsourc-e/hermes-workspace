@@ -90,6 +90,7 @@ export function resolveTranscriptionTarget(
       language,
       apiKey,
       baseUrl:
+        readString(groq.base_url) ||
         readString(runtimeEnv.GROQ_BASE_URL) ||
         readString(hermesEnv.GROQ_BASE_URL) ||
         DEFAULT_GROQ_BASE_URL,
@@ -103,12 +104,15 @@ export function resolveTranscriptionTarget(
       readString(hermesEnv.VOICE_TOOLS_OPENAI_KEY) ||
       readString(runtimeEnv.OPENAI_API_KEY) ||
       readString(hermesEnv.OPENAI_API_KEY)
+
     if (!apiKey) {
       return {
         ok: false,
-        error: 'OpenAI STT is configured but VOICE_TOOLS_OPENAI_KEY or OPENAI_API_KEY is missing.',
+        error:
+          'OpenAI STT is configured but VOICE_TOOLS_OPENAI_KEY or OPENAI_API_KEY is missing.',
       }
     }
+
     return {
       ok: true,
       provider: 'openai',
@@ -120,6 +124,7 @@ export function resolveTranscriptionTarget(
       language,
       apiKey,
       baseUrl:
+        readString(openai.base_url) ||
         readString(runtimeEnv.STT_OPENAI_BASE_URL) ||
         readString(hermesEnv.STT_OPENAI_BASE_URL) ||
         DEFAULT_OPENAI_BASE_URL,

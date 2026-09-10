@@ -2894,6 +2894,7 @@ function MessageItemComponent({
           text={fullText}
           timestamp={timestamp}
           align={isUser ? 'end' : 'start'}
+          enableSpeech={!isUser}
           forceVisible={forceActionsVisible}
           isQueued={isUser && isQueued && !isFailed}
           isFailed={isUser && (isFailed || isStuckSending)}

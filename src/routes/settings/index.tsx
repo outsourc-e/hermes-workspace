@@ -1,3 +1,4 @@
+import { useWorkspaceVoiceSettings } from '../../hooks/use-workspace-voice-settings'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   CheckmarkCircle02Icon,
@@ -1553,7 +1554,13 @@ function ClaudeConfigSection({
   const sttProvider = (sttConfig.provider as string) || 'local'
   const sttLocal = asRecord(sttConfig.local)
   const sttGroq = asRecord(sttConfig.groq)
-
+  const sttOpenAi = asRecord(sttConfig.openai)
+  const {
+    ttsChunkSize,
+    setTtsChunkSize,
+    saveTtsChunkSize,
+    ttsChunkSizeLoading,
+  } = useWorkspaceVoiceSettings()
   const manifestBaseUrlOnly = readManifestBlockBaseUrl(data.config)
 
   const renderClaudeOverview = () => (
@@ -1745,7 +1752,6 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="API Keys"
-        description="Manage provider API keys stored in ~/.hermes/.env"
         icon={CloudIcon}
       >
         {data.providers
@@ -2588,45 +2594,103 @@ function ClaudeConfigSection({
             </SettingsRow>
           </>
         )}
-
         {ttsProvider === 'openai' && (
           <>
             <SettingsRow
               label="Voice"
-              description="alloy, echo, fable, onyx, nova, shimmer"
+              description="OpenAI-compatible TTS voice."
             >
-              <select
-                value={(ttsOpenAi.voice as string) || 'alloy'}
+              <Input
+                value={(ttsOpenAi.voice as string) || ''}
                 onChange={(e) =>
                   void saveConfig({
-                    config: { tts: { openai: { voice: e.target.value } } },
+                    config: {
+                      tts: {
+                        openai: {
+                          ...ttsOpenAi,
+                          voice: e.target.value,
+                        },
+                      },
+                    },
                   })
                 }
-                className={selectClassName}
-              >
-                {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map(
-                  (voice) => (
-                    <option key={voice} value={voice}>
-                      {voice}
-                    </option>
-                  ),
-                )}
-              </select>
+                placeholder="alloy"
+                className="md:w-64"
+              />
             </SettingsRow>
-            <SettingsRow label="Model" description="OpenAI TTS model.">
+
+            <SettingsRow
+              label="Model"
+              description="OpenAI-compatible TTS model."
+            >
               <Input
                 value={(ttsOpenAi.model as string) || ''}
                 onChange={(e) =>
                   void saveConfig({
-                    config: { tts: { openai: { model: e.target.value } } },
+                    config: {
+                      tts: {
+                        openai: {
+                          ...ttsOpenAi,
+                          model: e.target.value,
+                        },
+                      },
+                    },
                   })
                 }
                 placeholder="tts-1"
                 className="md:w-64"
               />
             </SettingsRow>
+
+            <SettingsRow
+              label="Base URL"
+              description="OpenAI-compatible TTS API base URL."
+            >
+              <Input
+                value={(ttsOpenAi.base_url as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: {
+                      tts: {
+                        openai: {
+                          ...ttsOpenAi,
+                          base_url: e.target.value,
+                        },
+                      },
+                    },
+                  })
+                }
+                placeholder="https://api.openai.com/v1"
+                className="md:w-64"
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Chunk size"
+              description="Maximum characters generated per TTS chunk."
+            >
+              <Input
+                type="number"
+                min={100}
+                max={2000}
+                step={100}
+                value={String(ttsChunkSize)}
+                disabled={ttsChunkSizeLoading}
+                onChange={(e) => {
+                  const value = Number(e.target.value)
+
+                  if (Number.isFinite(value)) {
+                    setTtsChunkSize(value)
+                  }
+                }}
+                onBlur={() => {
+                  void saveTtsChunkSize(ttsChunkSize)
+                }}
+                className="md:w-32"
+              />
+            </SettingsRow>
           </>
         )}
+
       </SettingsSection>
 
       <SettingsSection
@@ -2638,10 +2702,17 @@ function ClaudeConfigSection({
           <Switch
             checked={readBoolean(sttConfig.enabled, false)}
             onCheckedChange={(checked) =>
-              void saveConfig({ config: { stt: { enabled: checked } } })
+              void saveConfig({
+                config: {
+                  stt: {
+                    enabled: checked,
+                  },
+                },
+              })
             }
           />
         </SettingsRow>
+
         <SettingsRow
           label="STT provider"
           description="Which speech engine to use."
@@ -2649,7 +2720,13 @@ function ClaudeConfigSection({
           <select
             value={sttProvider}
             onChange={(e) =>
-              void saveConfig({ config: { stt: { provider: e.target.value } } })
+              void saveConfig({
+                config: {
+                  stt: {
+                    provider: e.target.value,
+                  },
+                },
+              })
             }
             className={selectClassName}
           >
@@ -2660,6 +2737,7 @@ function ClaudeConfigSection({
             ))}
           </select>
         </SettingsRow>
+
         {sttProvider === 'local' && (
           <SettingsRow
             label="Model size"
@@ -2669,7 +2747,14 @@ function ClaudeConfigSection({
               value={(sttLocal.model_size as string) || 'base'}
               onChange={(e) =>
                 void saveConfig({
-                  config: { stt: { local: { model_size: e.target.value } } },
+                  config: {
+                    stt: {
+                      local: {
+                        ...sttLocal,
+                        model_size: e.target.value,
+                      },
+                    },
+                  },
                 })
               }
               className={selectClassName}
@@ -2681,6 +2766,76 @@ function ClaudeConfigSection({
               ))}
             </select>
           </SettingsRow>
+        )}
+
+        {sttProvider === 'openai' && (
+          <>
+            <SettingsRow
+              label="Model"
+              description="OpenAI-compatible STT model."
+            >
+              <Input
+                value={(sttOpenAi.model as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: {
+                      stt: {
+                        openai: {
+                          ...sttOpenAi,
+                          model: e.target.value,
+                        },
+                      },
+                    },
+                  })
+                }
+                placeholder="whisper-1"
+                className="md:w-64"
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              label="Base URL"
+              description="OpenAI-compatible STT API base URL."
+            >
+              <Input
+                value={(sttOpenAi.base_url as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: {
+                      stt: {
+                        openai: {
+                          ...sttOpenAi,
+                          base_url: e.target.value,
+                        },
+                      },
+                    },
+                  })
+                }
+                placeholder="https://api.openai.com/v1"
+                className="md:w-64"
+              />
+            </SettingsRow>
+
+            <SettingsRow
+              label="Language"
+              description="Optional language code. Leave blank for auto-detect."
+            >
+              <Input
+                value={(sttConfig.language as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: {
+                      stt: {
+                        language: e.target.value,
+                      },
+                    },
+                  })
+                }
+                placeholder="auto"
+                className="md:w-64"
+              />
+            </SettingsRow>
+          </>
         )}
         {sttProvider === 'groq' && (
           <>

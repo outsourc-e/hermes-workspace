@@ -7,7 +7,10 @@ import {
   rateLimitResponse,
   safeErrorMessage,
 } from '../../server/rate-limit'
-import { getConfig } from '../../server/claude-api'
+import {
+  readHermesConfigFiles,
+  resolveHermesConfigPaths,
+} from '../../server/hermes-config-store'
 import {
   extractTranscriptionText,
   resolveTranscriptionTarget,
@@ -52,7 +55,8 @@ export const Route = createFileRoute('/api/transcribe')({
             )
           }
 
-          const config = await getConfig()
+          const paths = resolveHermesConfigPaths()
+          const { config } = readHermesConfigFiles(paths)
           const target = resolveTranscriptionTarget(config)
           if (target.ok === false) {
             return json({ ok: false, error: target.error }, { status: 400 })
