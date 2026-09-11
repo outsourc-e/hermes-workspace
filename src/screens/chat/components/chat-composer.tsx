@@ -506,27 +506,20 @@ function hasAttachableData(dt: DataTransfer | null): boolean {
 
 function collectFilesFromDataTransfer(dt: DataTransfer | null): Array<File> {
   if (!dt) return []
-  const files: Array<File> = []
-  const seen = new Set<string>()
 
-  const pushFile = (file: File | null) => {
-    if (!file) return
-    const key = `${file.name}:${file.size}:${file.lastModified}:${file.type}`
-    if (seen.has(key)) return
-    seen.add(key)
-    files.push(file)
+  // Prefer DataTransfer.files when available. Browsers may expose the same
+  // clipboard image through both files and items as distinct File objects,
+  // which would otherwise create duplicate attachments.
+  const directFiles = Array.from(dt.files)
+  if (directFiles.length > 0) {
+    return directFiles
   }
 
-  for (const item of Array.from(dt.items)) {
-    if (item.kind !== 'file') continue
-    pushFile(item.getAsFile())
-  }
-
-  for (const file of Array.from(dt.files)) {
-    pushFile(file)
-  }
-
-  return files
+  // Fallback for browsers that expose pasted files only through items.
+  return Array.from(dt.items)
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null)
 }
 
 async function readFileAsDataUrl(file: File): Promise<string | null> {
