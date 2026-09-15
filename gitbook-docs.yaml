@@ -1,0 +1,48 @@
+$schema: https://api.gitbook.com/gitbook-docs.yaml
+site:
+  title: Hermes Workspace
+  structure:
+    - type: section
+      key: section-documentation
+      title: Documentation
+      path: documentation
+      default: true
+      children:
+        - type: space
+          key: space-documentation
+          title: Hermes Workspace Documentation
+          path: workspace
+          default: true
+          content:
+            directory: ./docs
+            language: pt-br
+    - type: section
+      key: section-agents
+      title: Agents
+      path: agents
+      children:
+        - type: space
+          key: space-agent-roles
+          title: Agent Roles
+          path: roles
+          default: true
+          content:
+            directory: ./agents
+    - type: section
+      key: section-extensions
+      title: Extensions
+      path: extensions
+      children:
+        - type: space
+          key: space-multiplayer-worker
+          title: Multiplayer Worker
+          path: multiplayer-worker
+          default: true
+          content:
+            directory: ./playground-ws-worker
+        - type: space
+          key: space-workspace-dispatch
+          title: Workspace Dispatch Skill
+          path: workspace-dispatch
+          content:
+            directory: ./skills/workspace-dispatch

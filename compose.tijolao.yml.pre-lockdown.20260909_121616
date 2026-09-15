@@ -1,0 +1,101 @@
+# Hermes Workspace + Hermes Agent — stack do Tijolao
+#
+# Derivado do docker-compose.yml oficial do repo, com quatro adaptacoes
+# obrigatorias para esta maquina:
+#
+#   1. network_mode: host.  Medido em 07/09/2026: o firewall do Tijolao
+#      bloqueia bridge -> host (timeout via 172.17.0.1 E 172.18.0.1), e o
+#      Ollama escuta em 127.0.0.1:11434, inalcancavel de qualquer bridge por
+#      definicao. Como TODO backend que este Hermes consome mora em loopback
+#      do host (9Router :20128, Ollama :11434, Obsidian :27123), compartilhar
+#      o namespace de rede do host resolve os dois casos sem mexer no
+#      firewall. Consequencia: `ports:` e ignorado e os binds abaixo passam
+#      a ser os binds reais no host — por isso todos sao 127.0.0.1.
+#
+#   2. Estado em bind mount de ~/.hermes (nao volume nomeado vazio).
+#      O operador ja tem 127 MB de estado real: config.yaml apontando pro
+#      9Router, skills, memories, profiles, cron, telegram.
+#
+#   3. /home/dr/projetos/.env montado por cima de /opt/data/.env.
+#      No host esse caminho e um symlink pra fora de ~/.hermes; dentro do
+#      container o symlink apontaria pro vazio e o agent subiria sem chaves.
+#
+#   4. dashboard.basic_auth no config.yaml (ver ~/.hermes/config.yaml).
+#      O compose oficial do repo manda o dashboard bindar 0.0.0.0 sem
+#      provider de auth; o agent (hardening de junho/2026) recusa subir
+#      assim. Aqui o bind e loopback, mas a credencial fica configurada.
+#
+# Uso:  ./tijolao.sh up | logs | health | down | status
+#
+services:
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes-agent
+    restart: unless-stopped
+    command: ["gateway", "run"]
+    network_mode: host
+    environment:
+      # UID/GID do host — o bind mount de ~/.hermes pertence a dr(1000).
+      # O compose oficial usa 10010, o que deixaria arquivos root-owned
+      # e quebraria o gateway na proxima subida.
+      HERMES_UID: '1000'
+      HERMES_GID: '1000'
+      HERMES_DASHBOARD: '1'
+      # Loopback: em network_mode host isto e o bind REAL da maquina.
+      HERMES_DASHBOARD_HOST: 127.0.0.1
+      HERMES_DASHBOARD_PORT: '9119'
+      API_SERVER_ENABLED: 'true'
+      API_SERVER_HOST: 127.0.0.1
+      API_SERVER_KEY: ${API_SERVER_KEY:-}
+    volumes:
+      - /home/dr/.hermes:/opt/data
+      # O .env real vive fora de ~/.hermes; monta o alvo do symlink.
+      - /home/dr/projetos/.env:/opt/data/.env:ro
+      # Workspace de codigo do agente.
+      - /home/dr/projetos:/workspace/projetos
+      # skills.external_dirs no config.yaml aponta pra ca; montado no
+      # mesmo caminho pra config seguir valida sem edicao.
+      - /home/dr/.claude/skills:/home/dr/.claude/skills:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8642/health && curl -fsS http://127.0.0.1:9119/api/status || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
+  hermes-workspace:
+    image: ghcr.io/outsourc-e/hermes-workspace:latest
+    container_name: hermes-workspace
+    restart: unless-stopped
+    depends_on:
+      hermes-agent:
+        condition: service_healthy
+    network_mode: host
+    environment:
+      HERMES_UID: '1000'
+      HERMES_GID: '1000'
+      HERMES_HOME: /home/workspace/.hermes
+      HERMES_WORKSPACE_DIR: /workspace
+      # Em network_mode host o agent esta no mesmo namespace: loopback,
+      # nao DNS de servico.
+      HERMES_API_URL: http://127.0.0.1:8642
+      HERMES_DASHBOARD_URL: http://127.0.0.1:9119
+      HERMES_API_TOKEN: ${API_SERVER_KEY:-}
+      # Bind REAL da UI na maquina. Loopback: para expor na tailnet,
+      # troque para 0.0.0.0 conscientemente (a senha abaixo ja protege).
+      HOST: 127.0.0.1
+      PORT: '3000'
+      HERMES_PASSWORD: ${HERMES_PASSWORD:?defina HERMES_PASSWORD no .env}
+      # Publicacao e HTTP em loopback; cookie Secure quebraria o login.
+      COOKIE_SECURE: '0'
+    volumes:
+      - /home/dr/.hermes:/home/workspace/.hermes
+      - /home/dr/projetos:/workspace/projetos
+    deploy:
+      resources:
+        limits:
+          memory: 1G
