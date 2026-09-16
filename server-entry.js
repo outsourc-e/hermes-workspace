@@ -33,6 +33,12 @@ const APP_CSP_HEADERS = [
 
 const ALWAYS_HEADERS = {
   'Content-Security-Policy': APP_CSP_HEADERS,
+  // Cross-origin isolation must also hold in production, otherwise the
+  // embedded HermesWorld WebGL client loses SharedArrayBuffer and silently
+  // drops to a single thread (#597 delivered this to the dev server only,
+  // via vite.config.ts). Keep in sync with the vite dev/preview headers.
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'credentialless',
   // Tighten later if/when CSP moves to nonce-based — the dash prefix
   // makes adding/removing trivial without searching the codebase.
   'X-Content-Type-Options': 'nosniff',
