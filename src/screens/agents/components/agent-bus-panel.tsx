@@ -70,7 +70,7 @@ function formatDate(value?: string): string {
 }
 
 function firstLine(value?: string): string {
-  return String(value || '').split('\\n').find(Boolean) || 'no details'
+  return String(value || '').split('\n').find(Boolean) || 'no details'
 }
 
 function missionTitle(mission: AgentBusMission): string {
