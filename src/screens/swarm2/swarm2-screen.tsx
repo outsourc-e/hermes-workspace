@@ -1582,6 +1582,14 @@ export function Swarm2Screen() {
                   </div>
                 </div>
               ) : null}
+              <a
+                href="/chat/main"
+                className="inline-flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-sm font-medium text-[var(--theme-text)] shadow-sm hover:bg-[var(--theme-card2)]"
+                title="Open Nova’s main Hermes conversation"
+              >
+                <HugeiconsIcon icon={MessageMultiple01Icon} size={13} />
+                Talk to Nova
+              </a>
               <button
                 type="button"
                 onClick={openAddSwarm}
