@@ -458,7 +458,12 @@ export function extractPullRequestUrl(row: Swarm2ReportRow): string | null {
   return null
 }
 
-export async function postSwarmDispatch(body: { assignments: Array<{ workerId: string; task: string }> }, fetchImpl: typeof fetch = fetch): Promise<void> {
+export type SwarmDispatchReceipt = {
+  missionId?: string
+  results?: Array<{ workerId?: string; ok?: boolean; checkpointStatus?: string }>
+}
+
+export async function postSwarmDispatch(body: { assignments: Array<{ workerId: string; task: string }> }, fetchImpl: typeof fetch = fetch): Promise<SwarmDispatchReceipt> {
   const res = await fetchImpl('/api/swarm-dispatch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -468,6 +473,7 @@ export async function postSwarmDispatch(body: { assignments: Array<{ workerId: s
     const text = await res.text().catch(() => '')
     throw new Error(text || `HTTP ${res.status}`)
   }
+  return await res.json().catch(() => ({})) as SwarmDispatchReceipt
 }
 
 export async function markInboxItemReadyForEric(input: { missionId: string; assignmentId: string }, fetchImpl: typeof fetch = fetch): Promise<void> {
@@ -561,13 +567,13 @@ export function Swarm2ReportsView({
     setBusyId(`reply:${row.id}`)
     setReplyErrors((current) => ({ ...current, [row.id]: null }))
     try {
-      await postSwarmDispatch({
+      const receipt = await postSwarmDispatch({
         assignments: [{ workerId: row.workerId, task: buildBlockedGuidanceTask(row, guidance) }],
       })
       await refreshData()
       setReplyDrafts((current) => ({ ...current, [row.id]: buildReplyPrefill(row) }))
       setExpandedId(null)
-      showToast(`Sent to ${row.workerId}`)
+      showToast(receipt.missionId ? `Sent to ${row.workerId} · mission ${receipt.missionId}` : `Sent to ${row.workerId}`)
     } catch (error) {
       setReplyErrors((current) => ({
         ...current,
@@ -581,12 +587,12 @@ export function Swarm2ReportsView({
   async function routeToReviewer(row: Swarm2InboxItem) {
     setBusyId(`review:${row.id}`)
     try {
-      await postSwarmDispatch({
-        assignments: [{ workerId: 'swarm6', task: buildReviewerDispatchTask(row) }],
+      const receipt = await postSwarmDispatch({
+        assignments: [{ workerId: 'reviewer', task: buildReviewerDispatchTask(row) }],
       })
       await refreshData()
       onRouteToReviewer?.(row)
-      showToast(`Sent to swarm6 for ${row.workerId}`)
+      showToast(receipt.missionId ? `Sent to reviewer · mission ${receipt.missionId}` : `Sent to reviewer for ${row.workerId}`)
     } catch (error) {
       setReplyErrors((current) => ({
         ...current,

@@ -40,6 +40,7 @@ type DispatchResult = {
 export type DispatchResponse = {
   dispatchedAt: number
   completedAt: number
+  missionId?: string
   results: Array<DispatchResult>
 }
 
@@ -241,10 +242,11 @@ export function RouterChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           assignments: plan,
-          timeoutSeconds: 300,
-          waitForCheckpoint: false,
+          timeoutSeconds: 90,
+          waitForCheckpoint: true,
+          checkpointPollSeconds: 90,
         }),
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(210_000),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -253,13 +255,14 @@ export function RouterChat({
       const data = (await res.json()) as DispatchResponse
       setResults(data)
       onResults(data)
-      if (plan.length > 1 && data.results.some((result) => result.checkpointStatus === 'checkpointed')) {
-        const reviewer = members.find((member) => member.id === 'swarm6') ?? members.find((member) => /review|qa|critic/i.test(`${member.role} ${member.specialty ?? ''}`))
+      if (plan.length > 1 && data.missionId) {
+        const reviewer = members.find((member) => member.id === 'reviewer') ?? members.find((member) => member.id === 'swarm6') ?? members.find((member) => /review|qa|critic/i.test(`${member.role} ${member.specialty ?? ''}`))
         const follow = await fetch('/api/swarm-orchestrator-loop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             workerIds: [...new Set([...plan.map((item) => item.workerId), ...(reviewer ? [reviewer.id] : [])])],
+            missionId: data.missionId,
             staleMinutes: 3,
             autoContinue: true,
             allowExecution: false,

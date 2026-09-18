@@ -23,7 +23,7 @@ type LoopRequest = {
   allowExecution?: unknown
 }
 
-type WorkerLoopResult = {
+export type WorkerLoopResult = {
   workerId: string
   status: 'checkpointed' | 'already_processed' | 'stale' | 'waiting' | 'unavailable'
   checkpoint: ParsedSwarmCheckpoint | null
@@ -253,21 +253,33 @@ function buildReviewAssignment(results: Array<WorkerLoopResult>, reviewerId: str
   }
 }
 
-function buildNextActionAssignments(results: Array<WorkerLoopResult>, workerIds: Array<string>, allowExecution: boolean): Array<{ workerId: string; task: string; rationale: string }> {
+function isExplicitlySafeContinuation(next: string): boolean {
+  // Continue only work that is unambiguously read-only. Unknown wording must
+  // return to the owner approval flow rather than being inferred as safe.
+  return /\b(review|verify|test|gate|research|investigate|assess|inspect|analy[sz]e|options)\b/i.test(next)
+}
+
+function changesWorkspaceOrExternalState(next: string): boolean {
+  return /\b(builder|implement|patch|code|ship|execute|run|create|write|modify|change|commit|save|open|send|email|message|notify|publish|post|deploy|schedule|book|purchase|pay|charge|refund|delete|invite|upload|push|call api)\b/i.test(next)
+}
+
+export function buildNextActionAssignments(results: Array<WorkerLoopResult>, workerIds: Array<string>, _allowExecution: boolean): Array<{ workerId: string; task: string; rationale: string }> {
   const assignments: Array<{ workerId: string; task: string; rationale: string }> = []
   for (const item of results) {
     const checkpoint = item.checkpoint
-    if (item.status !== 'checkpointed' || !checkpoint || checkpoint.stateLabel !== 'DONE' || !checkpoint.nextAction) continue
+    if (
+      item.status !== 'checkpointed'
+      || !checkpoint
+      || !['DONE', 'HANDOFF'].includes(checkpoint.stateLabel)
+      || !checkpoint.nextAction
+    ) continue
     const next = checkpoint.nextAction
-    const implementationLike = /builder|implement|patch|code|ship|execute|run|real execution/i.test(next)
-    if (implementationLike && !allowExecution) continue
-    const target = implementationLike
-      ? chooseByRole(workerIds, /builder|backend|ui/i)
-      : /research|investigate|options/i.test(next)
-        ? chooseByRole(workerIds, /research/i)
-        : /review|verify|test|gate/i.test(next)
-          ? chooseReviewer(workerIds, null)
-          : null
+    if (!isExplicitlySafeContinuation(next) || changesWorkspaceOrExternalState(next)) continue
+    const target = /research|investigate|options/i.test(next)
+      ? chooseByRole(workerIds, /research/i)
+      : /review|verify|test|gate|assess|inspect|analy[sz]e/i.test(next)
+        ? chooseReviewer(workerIds, null)
+        : null
     if (!target || target === item.workerId) continue
     assignments.push({
       workerId: target,
