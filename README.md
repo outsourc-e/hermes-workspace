@@ -572,6 +572,10 @@ The image is built for `linux/amd64` and `linux/arm64`. Pair it with either
 a `nousresearch/hermes-agent:latest` container (what our `docker-compose.yml`
 does by default) or an existing gateway on another host.
 
+## ☁️ One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/Hermes%20Workspace/)
+
 ---
 
 ## 📱 Install as App (Recommended)
