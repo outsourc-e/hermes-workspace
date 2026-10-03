@@ -325,6 +325,127 @@ export async function fetchDashboardToken(options?: {
   }
 }
 
+// ── Cookie-based dashboard auth (Hermes Agent ≥0.17 login gate) ──────────
+//
+// When the dashboard is bound to a non-loopback host (e.g. 0.0.0.0), Hermes Agent
+// enables its login gate: GET / redirects to /login and the ephemeral
+// __HERMES_SESSION_TOKEN__ is NOT injected into the root HTML, so the token-scrape
+// path above yields nothing and every dashboard API call 401s with "no_cookie".
+// The dashboard also rejects Authorization: Basic / Bearer headers — it wants a
+// session cookie issued by POST /auth/password-login. When the operator sets
+// HERMES_DASHBOARD_BASIC_AUTH_USERNAME / _PASSWORD in the workspace env (same
+// names as the Agent side, so they copy straight across), we log in, cache the
+// session cookie, and replay it as a Cookie header. Deployments that do NOT set
+// these vars keep the legacy token-scrape behaviour byte-for-byte.
+
+const DASHBOARD_LOGIN_PATH = '/auth/password-login'
+const SESSION_COOKIE_NAMES = [
+  'hermes_session_at',
+  'hermes_session_rt',
+  'hermes_session_provider',
+]
+
+let dashboardCookieCache = ''
+let dashboardCookiePromise: Promise<string> | null = null
+
+function dashboardBasicAuthCredentials(): {
+  username: string
+  password: string
+} | null {
+  const username = (
+    process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME ||
+    process.env.CLAUDE_DASHBOARD_BASIC_AUTH_USERNAME ||
+    ''
+  ).trim()
+  const password = (
+    process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD ||
+    process.env.CLAUDE_DASHBOARD_BASIC_AUTH_PASSWORD ||
+    ''
+  ).trim()
+  if (!username || !password) return null
+  return { username, password }
+}
+
+/** Parse Set-Cookie header(s) into a Cookie request-header string. */
+function cookiesToHeader(setCookie: string | string[] | null): string {
+  if (!setCookie) return ''
+  const entries = Array.isArray(setCookie) ? setCookie : [setCookie]
+  const parts: string[] = []
+  for (const c of entries) {
+    // Split on ", " but not on commas inside cookie attributes (Expires=..., Date=...).
+    for (const line of c.split(/,\s*(?=[^;]+=)/)) {
+      const pair = line.split(';')[0].trim()
+      const name = pair.split('=')[0]
+      if (SESSION_COOKIE_NAMES.includes(name) && pair) parts.push(pair)
+    }
+  }
+  return parts.join('; ')
+}
+
+/**
+ * Authenticate to a login-gated dashboard via POST /auth/password-login and
+ * cache the issued session cookie. Returns a Cookie header string, or '' when
+ * no credentials are configured or login fails — callers fall back to the
+ * token-scrape path. The dashboard rejects Authorization: Basic, so credentials
+ * are exchanged for a session cookie, not sent on each request.
+ */
+export async function loginToDashboard(options?: {
+  force?: boolean
+}): Promise<string> {
+  const force = options?.force === true
+
+  if (!force && dashboardCookieCache) return dashboardCookieCache
+  if (!force && dashboardCookiePromise) return dashboardCookiePromise
+
+  const creds = dashboardBasicAuthCredentials()
+  if (!creds) return ''
+
+  dashboardCookiePromise = (async () => {
+    try {
+      const res = await fetch(`${CLAUDE_DASHBOARD_URL}${DASHBOARD_LOGIN_PATH}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'basic',
+          username: creds.username,
+          password: creds.password,
+          next: '/',
+        }),
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        redirect: 'follow',
+      })
+      if (!res.ok) {
+        console.warn(
+          `[gateway] Dashboard password-login returned ${res.status} — cookie unavailable`,
+        )
+        return ''
+      }
+      const cookie = cookiesToHeader(res.headers.get('set-cookie'))
+      if (!cookie) {
+        console.warn(
+          '[gateway] Dashboard login succeeded but no session cookie was issued',
+        )
+        return ''
+      }
+      dashboardCookieCache = cookie
+      return cookie
+    } catch (err) {
+      console.warn(
+        `[gateway] Failed to log in to dashboard: ${
+          err instanceof Error ? err.message : err
+        }`,
+      )
+      return ''
+    }
+  })()
+
+  try {
+    return await dashboardCookiePromise
+  } finally {
+    dashboardCookiePromise = null
+  }
+}
+
 export async function getDashboardToken(options?: {
   force?: boolean
 }): Promise<string> {
@@ -334,8 +455,13 @@ export async function getDashboardToken(options?: {
 export async function dashboardAuthHeaders(options?: {
   force?: boolean
 }): Promise<Record<string, string>> {
+  // Login-gated dashboard (Hermes Agent ≥0.17 non-loopback bind): prefer the
+  // session cookie we obtained via POST /auth/password-login. Fall back to the
+  // ephemeral token scrape when no basic-auth credentials are configured.
+  const cookie = await loginToDashboard(options)
+  if (cookie) return { Cookie: cookie }
   const token = await getDashboardToken(options)
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  return token ? { Authorization: 'Bearer ' + token } : {}
 }
 
 function withDashboardBase(path: string): string {
@@ -377,7 +503,10 @@ export async function dashboardFetch(
 
   let res = await doFetch(false)
   if (res.status === 401) {
+    // Token scrape went stale OR the dashboard session cookie expired. Clear
+    // both caches and retry once so a rotated/expired session re-authenticates.
     dashboardTokenCache = ''
+    dashboardCookieCache = ''
     res = await doFetch(true)
   }
   return res

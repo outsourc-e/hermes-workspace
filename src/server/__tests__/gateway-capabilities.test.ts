@@ -219,6 +219,114 @@ describe('gateway-capabilities', () => {
     })
   })
 
+  describe('cookie-based dashboard auth (login gate)', () => {
+    it('returns empty string and never logs in when no basic-auth credentials are configured', async () => {
+      delete process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+      delete process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+      const mod = await loadMod()
+      fetchMock.mockClear()
+      await expect(mod.loginToDashboard({ force: true })).resolves.toBe('')
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('POSTs credentials to /auth/password-login, caches the session cookie, and returns a Cookie header', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'admin'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 's3cret'
+      const setCookie =
+        'hermes_session_at="eyJzdWIiOiJhZG1pbiJ9"; Path=/; HttpOnly, ' +
+        'hermes_session_provider=basic; Path=/'
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: (n: string) => (n === 'set-cookie' ? setCookie : null) },
+      })
+
+      const mod = await loadMod()
+      const cookie = await mod.loginToDashboard()
+      expect(cookie).toBe(
+        'hermes_session_at="eyJzdWIiOiJhZG1pbiJ9"; hermes_session_provider=basic',
+      )
+      // Credentials are exchanged for a cookie, not sent as an Authorization header.
+      const call = fetchMock.mock.calls[0]
+      expect(call[0]).toBe('http://127.0.0.1:9119/auth/password-login')
+      expect(call[1]).toMatchObject({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const body = JSON.parse(call[1].body)
+      expect(body).toMatchObject({
+        provider: 'basic',
+        username: 'admin',
+        password: 's3cret',
+        next: '/',
+      })
+      // A forced re-login issues a fresh request; a non-forced call reuses cache.
+      fetchMock.mockClear()
+      await mod.loginToDashboard({ force: true })
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      fetchMock.mockClear()
+      await mod.loginToDashboard()
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('dashboardAuthHeaders prefers the login cookie over the token scrape', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'admin'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 's3cret'
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (n: string) =>
+            n === 'set-cookie' ? 'hermes_session_at="abc"; Path=/' : null,
+        },
+      })
+      const mod = await loadMod()
+      const headers = await mod.dashboardAuthHeaders({ force: true })
+      expect(headers.Cookie).toBe('hermes_session_at="abc"')
+      expect(headers.Authorization).toBeUndefined()
+    })
+
+    it('dashboardFetch clears the cached cookie on 401 and re-logs in', async () => {
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME = 'admin'
+      process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD = 's3cret'
+      let configCalls = 0
+      let loginCalls = 0
+      const localFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url === 'http://127.0.0.1:9119/auth/password-login') {
+          loginCalls += 1
+          return {
+            ok: true,
+            status: 200,
+            headers: {
+              get: (n: string) =>
+                n === 'set-cookie' ? 'hermes_session_at="abc"; Path=/' : null,
+            },
+          }
+        }
+        // The dashboard API 401s the first time (expired session) then succeeds
+        // after we clear the cookie cache and re-log in.
+        if (url === 'http://127.0.0.1:9119/api/config') {
+          configCalls += 1
+          return configCalls === 1
+            ? { status: 401, ok: false }
+            : { status: 200, ok: true, json: async () => ({ ok: true }) }
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      })
+      vi.stubGlobal('fetch', localFetch)
+      const mod = await loadMod()
+      // Prime the cookie cache (auto-probe + explicit login both hit the endpoint).
+      await mod.loginToDashboard({ force: true })
+      const loginsBefore = loginCalls
+      // First dashboardFetch 401s -> clears cookie, re-logs in, retries -> 200.
+      const res = await mod.dashboardFetch('/api/config')
+      expect(res.status).toBe(200)
+      expect(configCalls).toBe(2) // initial 401 + retry after re-login
+      expect(loginCalls).toBeGreaterThan(loginsBefore) // a fresh login happened
+    })
+  })
+
   it('does not mark Conductor available when dashboard returns SPA HTML fallback', async () => {
     process.env.HERMES_API_URL = 'http://gateway.test'
     process.env.CLAUDE_DASHBOARD_URL = 'http://dashboard.test'
