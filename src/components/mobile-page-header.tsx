@@ -31,7 +31,7 @@ export function MobilePageHeader({
     >
       <button
         type="button"
-        aria-label="Open navigation menu"
+        aria-label="Открыть меню навигации"
         onClick={openHamburgerMenu}
         className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation z-10"
       >

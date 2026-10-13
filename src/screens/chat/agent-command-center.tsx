@@ -262,17 +262,17 @@ export function AgentCommandCenter({
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-primary-500">
               <span className="size-2 rounded-full bg-emerald-500" />
-              Live workspace
+              Рабочее пространство
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-primary-950">
               {selectedRuntime
                 ? runtimeLabel(selectedRuntime)
-                : 'Command Center'}
+                : 'Центр управления'}
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm text-primary-600">
               {selectedRuntime
                 ? `Sessions and activity for the ${runtimeLabel(selectedRuntime)} harness.`
-                : 'See what every agent is doing, what needs you, and what just finished.'}
+                : 'Что делает каждый агент, что требует вас и что только что завершилось.'}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -294,7 +294,7 @@ export function AgentCommandCenter({
                 }
               >
                 <HugeiconsIcon icon={PlusSignIcon} size={16} />
-                New Hermes chat
+                Новый чат
               </Button>
             )}
           </div>
@@ -302,11 +302,11 @@ export function AgentCommandCenter({
 
         <section className="grid grid-cols-2 gap-2 py-5 md:grid-cols-4">
           {[
-            { label: 'Working', value: workingCount, dot: 'bg-emerald-500' },
-            { label: 'Needs you', value: waitingCount, dot: 'bg-amber-400' },
-            { label: 'Completed', value: doneTasks.length, dot: 'bg-sky-500' },
+            { label: 'В работе', value: workingCount, dot: 'bg-emerald-500' },
+            { label: 'Нужно ваше внимание', value: waitingCount, dot: 'bg-amber-400' },
+            { label: 'Выполнено', value: doneTasks.length, dot: 'bg-sky-500' },
             {
-              label: 'Harnesses online',
+              label: 'Среды агентов онлайн',
               value: `${onlineCount}/${visibleRuntimes.length}`,
               dot: 'bg-violet-500',
             },
@@ -333,10 +333,10 @@ export function AgentCommandCenter({
             <div className="flex items-center justify-between px-1 pb-2">
               <div>
                 <h2 className="text-sm font-semibold text-primary-900">
-                  Agents
+                  Агенты
                 </h2>
                 <p className="text-xs text-primary-500">
-                  Pick a harness or open the full roster.
+                  Выберите среду агента или откройте полный состав.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -354,7 +354,7 @@ export function AgentCommandCenter({
                   to="/operations"
                   className="text-xs font-medium text-accent-600 hover:text-accent-700"
                 >
-                  Manage assistants
+                  Управление ассистентами
                 </Link>
               </div>
             </div>
@@ -370,9 +370,9 @@ export function AgentCommandCenter({
                       <HugeiconsIcon icon={Chat01Icon} size={18} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium">Hermes</span>
+                      <span className="block text-sm font-medium">AWG GPT</span>
                       <span className="block truncate text-xs text-primary-500">
-                        Native workspace · {nativeSessions.length} sessions
+                        Рабочее пространство · {nativeSessions.length} sessions
                       </span>
                     </span>
                     <span className="size-2 rounded-full bg-emerald-500" />
@@ -381,8 +381,8 @@ export function AgentCommandCenter({
                     type="button"
                     onClick={() => toggleHarness('hermes-native')}
                     className="mr-2 flex size-8 items-center justify-center rounded-lg text-primary-300 opacity-0 transition-opacity hover:bg-primary-200 hover:text-primary-700 group-hover:opacity-100 focus:opacity-100"
-                    aria-label="Hide native Hermes"
-                    title="Hide harness"
+                    aria-label="Скрыть встроенный AWG GPT"
+                    title="Скрыть среду агента"
                   >
                     <HugeiconsIcon icon={EyeIcon} size={16} />
                   </button>
@@ -425,7 +425,7 @@ export function AgentCommandCenter({
                       onClick={() => toggleHarness(runtime.id)}
                       className="mr-2 flex size-8 items-center justify-center rounded-lg text-primary-300 opacity-0 transition-opacity hover:bg-primary-200 hover:text-primary-700 group-hover:opacity-100 focus:opacity-100"
                       aria-label={`Hide ${runtimeLabel(runtime)}`}
-                      title="Hide harness"
+                      title="Скрыть среду агента"
                     >
                       <HugeiconsIcon icon={EyeIcon} size={16} />
                     </button>
@@ -437,14 +437,14 @@ export function AgentCommandCenter({
               <div className="mt-3 rounded-xl border border-dashed border-primary-200 bg-primary-100/40 p-2">
                 <div className="mb-1 flex items-center justify-between px-2 py-1">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-primary-500">
-                    Hidden harnesses
+                    Скрытые среды агентов
                   </span>
                   <button
                     type="button"
                     onClick={showAllHarnesses}
                     className="text-[11px] font-medium text-accent-600 hover:text-accent-700"
                   >
-                    Show all
+                    Показать все
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -454,7 +454,7 @@ export function AgentCommandCenter({
                       onClick={() => toggleHarness('hermes-native')}
                       className="flex items-center gap-1.5 rounded-lg bg-surface px-2.5 py-1.5 text-xs text-primary-600 hover:text-primary-900"
                     >
-                      <HugeiconsIcon icon={ViewOffIcon} size={13} /> Hermes
+                      <HugeiconsIcon icon={ViewOffIcon} size={13} /> Агент
                     </button>
                   )}
                   {hiddenRuntimes.map((runtime) => (
@@ -479,12 +479,12 @@ export function AgentCommandCenter({
             title={
               selectedRuntime
                 ? `${runtimeLabel(selectedRuntime)} chats`
-                : 'Working now'
+                : 'Работают сейчас'
             }
             subtitle={
               selectedRuntime
-                ? 'Open a session or start another.'
-                : 'Active agents and tasks across the workspace.'
+                ? 'Откройте сессию или начните новую.'
+                : 'Активные агенты и задачи в рабочем пространстве.'
             }
           >
             {selectedRuntime ? (
@@ -499,7 +499,7 @@ export function AgentCommandCenter({
                   ))}
                 </div>
               ) : (
-                <EmptyRow>No sessions yet. Start the first chat.</EmptyRow>
+                <EmptyRow>Сессий пока нет. Начните первый чат.</EmptyRow>
               )
             ) : activeTasks.length || processingConversations.length ? (
               <div className="space-y-1">
@@ -533,13 +533,13 @@ export function AgentCommandCenter({
                 ))}
               </div>
             ) : (
-              <EmptyRow>Nothing is running right now.</EmptyRow>
+              <EmptyRow>Сейчас ничего не запущено.</EmptyRow>
             )}
           </SectionCard>
 
           <SectionCard
-            title="Needs you"
-            subtitle="Reviews, approvals, blockers, and setup issues."
+            title="Нужно ваше внимание"
+            subtitle="Проверки, согласования, блокеры и проблемы настройки."
           >
             {waitingCount ? (
               <div className="space-y-1">
@@ -586,15 +586,15 @@ export function AgentCommandCenter({
                 ))}
               </div>
             ) : (
-              <EmptyRow>You’re all caught up.</EmptyRow>
+              <EmptyRow>Вы всё просмотрели.</EmptyRow>
             )}
           </SectionCard>
 
           {!selectedRuntime && (
             <>
               <SectionCard
-                title="Latest updates"
-                subtitle="A compact activity trail across every agent."
+                title="Последние обновления"
+                subtitle="Краткая лента активности всех агентов."
               >
                 {latestUpdates.length ? (
                   <div className="space-y-1">
@@ -623,13 +623,13 @@ export function AgentCommandCenter({
                     ))}
                   </div>
                 ) : (
-                  <EmptyRow>No recent updates yet.</EmptyRow>
+                  <EmptyRow>Недавних обновлений пока нет.</EmptyRow>
                 )}
               </SectionCard>
 
               <SectionCard
-                title="Recently completed"
-                subtitle="Finished work, kept out of the way until you need it."
+                title="Недавно завершено"
+                subtitle="Завершённая работа, не мешающая, пока не понадобится."
               >
                 {doneTasks.length ? (
                   <div className="space-y-1">
@@ -652,7 +652,7 @@ export function AgentCommandCenter({
                     ))}
                   </div>
                 ) : (
-                  <EmptyRow>Completed work will appear here.</EmptyRow>
+                  <EmptyRow>Здесь появится завершённая работа.</EmptyRow>
                 )}
               </SectionCard>
             </>
@@ -664,11 +664,11 @@ export function AgentCommandCenter({
             {[
               {
                 to: '/operations',
-                label: 'Assistants',
+                label: 'Ассистенты',
                 icon: UserMultipleIcon,
               },
-              { to: '/tasks', label: 'Tasks', icon: CheckListIcon },
-              { to: '/swarm', label: 'Teams', icon: UserGroupIcon },
+              { to: '/tasks', label: 'Задачи', icon: CheckListIcon },
+              { to: '/swarm', label: 'Команды', icon: UserGroupIcon },
             ].map((item) => (
               <Link
                 key={item.label}

@@ -76,7 +76,7 @@ export function formatModelName(raw: string): string {
  * Formats a Unix ms timestamp as a relative time string.
  *
  * Examples:
- *   (now - 30s)   → "just now"
+ *   (now - 30s)   → "только что"
  *   (now - 2min)  → "2m ago"
  *   (now - 3h)    → "3h ago"
  *   (now - 2d)    → "2d ago"
@@ -101,10 +101,10 @@ export function formatSkillName(raw: string): string {
 }
 
 export function formatRelativeTime(timestampMs: number): string {
-  if (!timestampMs || timestampMs <= 0) return 'just now'
+  if (!timestampMs || timestampMs <= 0) return 'только что'
   const diffMs = Math.max(0, Date.now() - timestampMs)
   const seconds = Math.floor(diffMs / 1000)
-  if (seconds < 60) return 'just now'
+  if (seconds < 60) return 'только что'
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.floor(minutes / 60)

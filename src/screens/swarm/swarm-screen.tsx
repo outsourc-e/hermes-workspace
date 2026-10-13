@@ -64,7 +64,7 @@ function useUpdatedAgo(fetchedAt: number | null): string {
     function update() {
       if (!fetchedAt) return setLabel('')
       const diff = Math.floor((Date.now() - fetchedAt) / 1000)
-      if (diff < 5) setLabel('just now')
+      if (diff < 5) setLabel('только что')
       else if (diff < 60) setLabel(`${diff}s ago`)
       else setLabel(`${Math.floor(diff / 60)}m ago`)
     }
@@ -220,10 +220,10 @@ export function SwarmScreen() {
           </div>
           <div className="text-sm font-bold tracking-tight text-white">Swarm OS</div>
         </div>
-        <Chip icon={ChartLineData02Icon} label="Model" value={workspaceModel} />
-        <Chip icon={Activity01Icon} label="Provider" value={provider} />
-        <Chip icon={FlashIcon} label="Auth errors 24h" value={String(authErrors)} tone={authErrors === 0 ? 'good' : 'warn'} />
-        <Chip icon={ViewIcon} label="Online" value={`${onlineCount}/${swarmMembers.length} agents`} tone="good" />
+        <Chip icon={ChartLineData02Icon} label="Модель" value={workspaceModel} />
+        <Chip icon={Activity01Icon} label="Провайдер" value={provider} />
+        <Chip icon={FlashIcon} label="Ошибки авторизации за 24 ч" value={String(authErrors)} tone={authErrors === 0 ? 'good' : 'warn'} />
+        <Chip icon={ViewIcon} label="В сети" value={`${onlineCount}/${swarmMembers.length} agents`} tone="good" />
         {pingResult ? (
           <div className={cn('truncate rounded-full border px-3 py-1 text-[11px]', pingResult.startsWith('✓') ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-red-500/40 bg-red-500/10 text-red-200')}>
             {pingResult}
@@ -233,27 +233,27 @@ export function SwarmScreen() {
           <WorkflowHelpModal
             compact
             eyebrow="Swarm"
-            title="How Swarm works"
+            title="Как работает Swarm"
             sections={[
               {
-                title: 'What Swarm is for',
+                title: 'Для чего нужен Swarm',
                 bullets: [
-                  'Swarm is the multi-worker orchestration surface for parallel execution.',
-                  'Use it when one goal should be split across several agents with live visibility and routing.',
+                  'Swarm — слой оркестрации нескольких исполнителей для параллельной работы.',
+                  'Используйте, когда одну цель нужно разделить между несколькими агентами с наблюдением и маршрутизацией.',
                 ],
               },
               {
-                title: 'Typical flow',
+                title: 'Типовой сценарий',
                 bullets: [
-                  'Select workers, dispatch targeted tasks, and monitor progress from the hub and cards.',
-                  'Use ping, refresh, and card status to triage stuck or unhealthy workers quickly.',
+                  'Выбирайте исполнителей, отправляйте им задачи и следите за ходом в центре и карточках.',
+                  'Используйте ping, обновление и статус карточки, чтобы быстро найти зависших или неисправных исполнителей.',
                 ],
               },
               {
-                title: 'FAQ',
+                title: 'Вопросы и ответы',
                 bullets: [
-                  'If workers look empty or unhealthy, fix setup and runtime issues in Operations first.',
-                  'Swarm is best for coordination and throughput, not first-time configuration.',
+                  'Если исполнители не отображаются или работают плохо, сначала устраните проблемы настройки в «Операциях».',
+                  'Swarm подходит для координации и пропускной способности, а не для первичной настройки.',
                 ],
               },
             ]}
@@ -267,7 +267,7 @@ export function SwarmScreen() {
             className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
           >
             <HugeiconsIcon icon={RefreshIcon} size={11} className={isFetching ? 'animate-spin' : ''} />
-            Refresh
+            Обновить
           </button>
           <button
             type="button"
@@ -302,9 +302,9 @@ export function SwarmScreen() {
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/65">Agent Workspace</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/65">Рабочее пространство агента</div>
               <h2 className="text-xl font-semibold text-white">
-                {viewMode === 'cards' ? 'Active Swarm' : 'Live Agent Terminals'}
+                {viewMode === 'cards' ? 'Активный Swarm' : 'Live Agent Terminals'}
               </h2>
               <p className="mt-0.5 text-sm text-emerald-50/55">
                 {viewMode === 'cards'
@@ -358,12 +358,12 @@ export function SwarmScreen() {
                   ? `Showing live terminals for the active room: ${roomIds.join(', ')}.`
                   : selectedId
                     ? `Showing ${selectedId}. Add workers to the room to monitor several at once.`
-                    : 'Select a worker or add some to the room to open terminals here.'}
+                    : 'Выберите исполнителя или добавьте их в комнату, чтобы открыть здесь терминалы.'}
               </div>
 
               {terminalTargets.length === 0 ? (
                 <div className="rounded-[1.5rem] border border-emerald-400/12 bg-emerald-500/5 px-4 py-10 text-center text-sm text-emerald-100/55">
-                  No terminal targets yet.
+                  Целей для терминала пока нет.
                 </div>
               ) : (
                 <div className="grid gap-3 xl:grid-cols-2">
@@ -385,7 +385,7 @@ export function SwarmScreen() {
                             className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
                           >
                             <HugeiconsIcon icon={ComputerTerminal01Icon} size={11} />
-                            Focus
+                            Фокус
                           </button>
                         </div>
                         <SwarmTerminal
@@ -427,7 +427,7 @@ export function SwarmScreen() {
           onClick={() => setMissionOpen(true)}
           className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-black shadow-[0_18px_40px_rgba(34,197,94,0.35)] hover:bg-emerald-300"
         >
-          Open Agent Router Chat ↑
+          Открыть чат маршрутизатора ↑
         </button>
       ) : null}
     </div>
@@ -442,14 +442,14 @@ function ViewModeToggle({ mode, setMode }: { mode: SwarmViewMode; setMode: (mode
         onClick={() => setMode('cards')}
         className={cn('rounded-full px-3 py-1 transition-colors', mode === 'cards' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
       >
-        Cards
+        Карточки
       </button>
       <button
         type="button"
         onClick={() => setMode('terminals')}
         className={cn('rounded-full px-3 py-1 transition-colors', mode === 'terminals' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
       >
-        Terminals
+        Терминалы
       </button>
     </div>
   )

@@ -86,7 +86,7 @@ export function AttachmentPreview({
               size="icon-sm"
               onClick={() => onRemove(attachment.id)}
               className="size-5 shrink-0 rounded-full hover:bg-primary-200"
-              aria-label="Remove attachment"
+              aria-label="Удалить вложение"
               type="button"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={12} />

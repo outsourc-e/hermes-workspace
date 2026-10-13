@@ -124,11 +124,11 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
             'shadow-[0_8px_30px_rgba(0,0,0,0.15)] dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)]',
           )}
           role="dialog"
-          aria-label="Pending approvals"
+          aria-label="Ожидают согласования"
         >
           <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--theme-text)]">Approvals</span>
+              <span className="text-sm font-semibold text-[var(--theme-text)]">Согласования</span>
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                 {count} pending
               </span>
@@ -137,7 +137,7 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
               type="button"
               onClick={() => setOpen(false)}
               className="rounded-md p-0.5 text-neutral-400 transition-colors hover:text-neutral-600 dark:hover:text-neutral-200"
-              aria-label="Close"
+              aria-label="Закрыть"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                 <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -149,8 +149,8 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
             {latestThree.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <span className="mb-2 text-2xl">🛡️</span>
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">All clear</p>
-                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">No pending approvals</p>
+                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Всё в порядке</p>
+                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">Нет запросов на согласование</p>
               </div>
             ) : (
               latestThree.map((approval) => {

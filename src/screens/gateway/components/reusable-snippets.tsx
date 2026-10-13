@@ -34,14 +34,14 @@ export function ReusableSnippets({ snippets, onUseSnippet }: SnippetProps) {
     <section className="flex h-full min-h-[320px] flex-col rounded-2xl border border-primary-800 bg-primary-950 p-4">
       <div className="mb-3">
         <label className="sr-only" htmlFor="snippet-search">
-          Search snippets
+          Поиск фрагментов
         </label>
         <input
           id="snippet-search"
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search snippets by title, content, or tag..."
+          placeholder="Поиск фрагментов по названию, тексту или тегу..."
           className="h-10 w-full rounded-lg border border-primary-700 bg-primary-900 px-3 text-sm text-primary-100 placeholder:text-primary-400 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
       </div>
@@ -49,7 +49,7 @@ export function ReusableSnippets({ snippets, onUseSnippet }: SnippetProps) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {filteredSnippets.length === 0 ? (
           <div className="rounded-xl border border-dashed border-primary-800 bg-primary-900/60 px-4 py-8 text-center text-sm text-primary-300">
-            No snippets match your search.
+            Нет фрагментов, подходящих под поиск.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -91,7 +91,7 @@ export function ReusableSnippets({ snippets, onUseSnippet }: SnippetProps) {
                   onClick={() => onUseSnippet(snippet.id)}
                   className="mt-auto h-9 rounded-lg bg-accent-500 px-3 text-xs font-semibold text-primary-950 transition-colors hover:bg-accent-400"
                 >
-                  Use
+                  Использовать
                 </button>
               </article>
             ))}

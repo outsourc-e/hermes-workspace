@@ -37,7 +37,7 @@ export function OperationsAgentChat({
     <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-[0_20px_70px_color-mix(in_srgb,var(--theme-shadow)_14%,transparent)]">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--theme-text)]">Chat</h3>
+          <h3 className="text-lg font-semibold text-[var(--theme-text)]">Чат</h3>
           <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
             Persistent session with {agentName}
           </p>
@@ -53,7 +53,7 @@ export function OperationsAgentChat({
             strokeWidth={1.8}
             className={cn(isRefreshing && 'animate-spin')}
           />
-          Refresh
+          Обновить
         </Button>
       </div>
 
@@ -87,7 +87,7 @@ export function OperationsAgentChat({
           ))
         ) : (
           <p className="text-sm text-[var(--theme-muted)]">
-            No messages yet. Start the conversation with this agent.
+            Сообщений пока нет. Начните диалог с этим агентом.
           </p>
         )}
       </div>
@@ -106,7 +106,7 @@ export function OperationsAgentChat({
               void handleSend()
             }
           }}
-          placeholder="Type a message..."
+          placeholder="Введите сообщение..."
           className="min-h-[112px] flex-1 resize-y rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
         />
         <Button

@@ -274,7 +274,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
                 sessionIdRef.current = null
                 setState('closed')
               } else if (event === 'error') {
-                const message = typeof parsed.message === 'string' ? parsed.message : 'unknown error'
+                const message = typeof parsed.message === 'string' ? parsed.message : 'неизвестная ошибка'
                 terminal.writeln(`\r\n\x1b[31m[swarm] ${message}\x1b[0m`)
               }
             } catch {
@@ -332,11 +332,11 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         <div className="flex items-center justify-between text-[10px] text-[var(--theme-muted)]">
           <span>
             {state === 'connecting' && 'connecting…'}
-            {state === 'closed' && 'session closed'}
+            {state === 'closed' && 'сессия закрыта'}
             {state === 'error' && 'error'}
             {state === 'idle' && 'idle'}
           </span>
-          {error ? <span className="text-red-300">attach error</span> : null}
+          {error ? <span className="text-red-300">ошибка вложения</span> : null}
         </div>
       ) : null}
       <div

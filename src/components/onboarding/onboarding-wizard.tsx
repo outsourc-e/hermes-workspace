@@ -108,7 +108,7 @@ export function OnboardingWizard() {
             <button
               onClick={skip}
               className="absolute right-4 top-4 z-10 rounded-full p-2 text-primary-500 transition-colors hover:bg-primary-100 hover:text-primary-700"
-              aria-label="Skip onboarding"
+              aria-label="Пропустить обучение"
             >
               <HugeiconsIcon icon={Cancel01Icon} className="size-5" />
             </button>
@@ -147,7 +147,7 @@ export function OnboardingWizard() {
                         {step.id === 'welcome' ? (
                           <img
                             src="/claude-avatar.webp"
-                            alt="Hermes Agent"
+                            alt="AWG GPT"
                             className="size-16 rounded-2xl"
                           />
                         ) : (
@@ -204,7 +204,7 @@ export function OnboardingWizard() {
                   className={cn('gap-2', isFirstStep && 'invisible')}
                 >
                   <HugeiconsIcon icon={ArrowLeft01Icon} className="size-4" />
-                  Back
+                  Назад
                 </Button>
 
                 <span className="text-sm text-primary-500">

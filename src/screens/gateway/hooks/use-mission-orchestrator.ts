@@ -227,7 +227,7 @@ export function useMissionOrchestrator() {
 
     emitFeedEvent({
       type: 'mission_started',
-      message: '✓ All agents reached terminal state — mission complete',
+      message: '✓ Все агенты завершили работу — миссия выполнена',
     })
     completeMission()
     setIsDispatching(false)
@@ -759,7 +759,7 @@ export function useMissionOrchestrator() {
   const handleSetAgentPaused = useCallback(async (agentId: string, pause: boolean) => {
     const sessionKey = sessionMapRef.current[agentId]
     if (!sessionKey) {
-      throw new Error('No active session to control')
+      throw new Error('Нет активной сессии для управления')
     }
 
     const member = missionRef.current?.team.find((entry) => entry.id === agentId)
@@ -858,7 +858,7 @@ export function useMissionOrchestrator() {
   const handleSteerAgent = useCallback(async (agentId: string, message: string) => {
     const sessionKey = sessionMapRef.current[agentId]
     if (!sessionKey) {
-      throw new Error('No active session to steer')
+      throw new Error('Нет активной сессии для направления')
     }
 
     const directive = message.trim()
@@ -905,7 +905,7 @@ export function useMissionOrchestrator() {
     setIsDispatching(false)
     emitFeedEvent({
       type: 'system',
-      message: 'Mission aborted',
+      message: 'Миссия прервана',
     })
     abortMissionInStore()
   }, [abortMissionInStore, closeAllStreams])

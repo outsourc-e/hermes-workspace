@@ -142,7 +142,7 @@ export function AnalyticsHeroCard({
                 color: 'var(--theme-muted)',
               }}
             >
-              Expand →
+              Развернуть →
             </button>
           ) : null}
         </div>
@@ -242,11 +242,11 @@ export function AnalyticsHeroCard({
               <div className="mt-1 flex items-center gap-4 text-[10px]">
                 <LegendDot
                   tone="var(--theme-accent)"
-                  label="tokens (in+out)"
+                  label="токены (вход + выход)"
                 />
                 <LegendDot
                   tone="var(--theme-accent-secondary)"
-                  label="cache reads"
+                  label="чтения из кэша"
                 />
               </div>
             </div>
@@ -255,7 +255,7 @@ export function AnalyticsHeroCard({
                 className="text-[10px] font-semibold uppercase tracking-[0.15em]"
                 style={{ color: 'var(--theme-muted)' }}
               >
-                By model · top 5
+                По моделям · топ-5
               </div>
               {analytics.topModels.map((m, i) => {
                 const max = analytics.topModels[0]?.tokens || 1
@@ -393,7 +393,7 @@ function AnalyticsModal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Закрыть"
             className="rounded p-1 hover:bg-[var(--theme-card)]/80"
           >
             <HugeiconsIcon
@@ -411,7 +411,7 @@ function AnalyticsModal({
               className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              Daily token mix
+              Структура токенов по дням
             </h3>
             <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -486,7 +486,7 @@ function AnalyticsModal({
               className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              Models · ranked by tokens
+              Модели · по числу токенов
             </h3>
             <div className="space-y-2">
               {analytics.topModels.map((m, i) => (
@@ -552,7 +552,7 @@ function AnalyticsModal({
                     color: 'var(--theme-muted)',
                   }}
                 >
-                  No model data.
+                  Нет данных о моделях.
                 </div>
               ) : null}
             </div>

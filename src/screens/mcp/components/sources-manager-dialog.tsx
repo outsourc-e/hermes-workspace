@@ -102,7 +102,7 @@ function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }:
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className={LABEL}>
-        <span>Source ID <span className="text-red-500">*</span></span>
+        <span>ID источника <span className="text-red-500">*</span></span>
         <input
           className={FIELD}
           value={form.id}
@@ -112,17 +112,17 @@ function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }:
           autoFocus
         />
         {idErr ? <p className={ERROR_TEXT}>{idErr}</p> : null}
-        <p className="text-[11px] text-primary-400">Lowercase, alphanumeric + _ -. Cannot be changed after creation.</p>
+        <p className="text-[11px] text-primary-400">Строчные буквы, цифры и символы _ -. После создания изменить нельзя.</p>
       </div>
 
       <div className={LABEL}>
-        <span>Name <span className="text-red-500">*</span></span>
+        <span>Название <span className="text-red-500">*</span></span>
         <input
           className={FIELD}
           value={form.name}
           onChange={(e) => set('name', e.target.value)}
           disabled={saving}
-          placeholder="Internal Catalog"
+          placeholder="Внутренний каталог"
         />
         {nameErr ? <p className={ERROR_TEXT}>{nameErr}</p> : null}
       </div>
@@ -143,7 +143,7 @@ function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }:
 
       <div className="grid grid-cols-2 gap-3">
         <div className={LABEL}>
-          <span>Trust</span>
+          <span>Доверие</span>
           <select
             className={FIELD}
             value={form.trust}
@@ -158,7 +158,7 @@ function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }:
         </div>
 
         <div className={LABEL}>
-          <span>Format</span>
+          <span>Формат</span>
           <select
             className={FIELD}
             value={form.format}
@@ -183,7 +183,7 @@ function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }:
           className="h-4 w-4 rounded border-primary-200 text-primary accent-primary"
         />
         <label htmlFor="enabled-toggle" className="text-sm text-ink cursor-pointer">
-          Enabled
+          Включено
         </label>
       </div>
 
@@ -193,7 +193,7 @@ function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }:
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
-          Cancel
+          Отмена
         </Button>
         <Button type="submit" size="sm" disabled={saving}>
           {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Source'}
@@ -248,7 +248,7 @@ function SourceRow({ source, onEdit, onDelete, deleting }: SourceRowProps) {
             disabled={deleting}
             className="h-7 px-2 text-xs"
           >
-            Edit
+            Изменить
           </Button>
           <Button
             variant="ghost"
@@ -375,9 +375,9 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
           {mode === 'list' ? (
             <div className="flex flex-col gap-3">
               {query.isLoading ? (
-                <p className="text-sm text-primary-400">Loading sources…</p>
+                <p className="text-sm text-primary-400">Загрузка источников…</p>
               ) : query.error ? (
-                <p className="text-sm text-red-600">Failed to load sources.</p>
+                <p className="text-sm text-red-600">Не удалось загрузить источники.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {sources.map((source) => (
@@ -390,7 +390,7 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
                     />
                   ))}
                   {sources.length === 0 ? (
-                    <p className="text-sm text-primary-400">No sources found.</p>
+                    <p className="text-sm text-primary-400">Источники не найдены.</p>
                   ) : null}
                 </div>
               )}
@@ -406,10 +406,10 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
                   size="sm"
                   onClick={() => { setServerErrors([]); setMode('add') }}
                 >
-                  Add Source
+                  Добавить источник
                 </Button>
                 <Button variant="ghost" size="sm" onClick={handleClose}>
-                  Done
+                  Готово
                 </Button>
               </div>
             </div>

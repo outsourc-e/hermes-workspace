@@ -55,10 +55,10 @@ type AuthTypeMeta = {
 }
 
 const WIZARD_STEPS: Array<StepItem> = [
-  { id: 'provider', label: 'Choose Provider' },
-  { id: 'auth', label: 'Choose Auth' },
-  { id: 'instructions', label: 'Config Instructions' },
-  { id: 'verify', label: 'Verify' },
+  { id: 'provider', label: 'Выберите провайдера' },
+  { id: 'auth', label: 'Выберите способ авторизации' },
+  { id: 'instructions', label: 'Инструкции по настройке' },
+  { id: 'verify', label: 'Проверить' },
 ]
 
 const AUTH_TYPE_ORDER: Array<ProviderAuthType> = [
@@ -71,29 +71,29 @@ const AUTH_TYPE_ORDER: Array<ProviderAuthType> = [
 function getAuthTypeMeta(authType: ProviderAuthType): AuthTypeMeta {
   if (authType === 'api-key') {
     return {
-      title: 'API Key',
-      description: 'Paste your API key — saved directly to local config',
+      title: 'API-ключ',
+      description: 'Вставьте API-ключ — он сохраняется прямо в локальную конфигурацию',
     }
   }
 
   if (authType === 'cli-token') {
     return {
-      title: 'CLI Token',
+      title: 'Токен CLI',
       description:
-        'Use your existing Hermes CLI auth token (from Claude Code / claude.ai)',
+        'Использовать существующий токен авторизации CLI',
     }
   }
 
   if (authType === 'oauth') {
     return {
       title: 'OAuth',
-      description: 'Sign in via browser — launches OAuth flow automatically',
+      description: 'Вход через браузер — OAuth запускается автоматически',
     }
   }
 
   return {
-    title: 'Local',
-    description: 'No auth needed for local backends like Ollama or Atomic Chat',
+    title: 'Локально',
+    description: 'Для локальных бэкендов (Ollama, Atomic Chat) авторизация не нужна',
   }
 }
 
@@ -268,7 +268,7 @@ export function ProviderWizard({
       const data = (await res.json()) as { ok: boolean; error?: string }
 
       if (!data.ok) {
-        throw new Error(data.error || 'Failed to save config')
+        throw new Error(data.error || 'Не удалось сохранить конфигурацию')
       }
     }
 
@@ -277,7 +277,7 @@ export function ProviderWizard({
       setSaveState('saved')
       setVerifyState('checking')
       setVerificationMessage(
-        `${providerName} API key saved. Hermes Agent is restarting…`,
+        `${providerName} API key saved. AWG GPT is restarting…`,
       )
       setStep('verify')
 
@@ -301,7 +301,7 @@ export function ProviderWizard({
         } else {
           setVerifyState('warning')
           setVerificationMessage(
-            `Hermes Agent restarted, but ${providerName} models haven't appeared yet. ` +
+            `AWG GPT restarted, but ${providerName} models haven't appeared yet. ` +
               `Check your API key or wait a moment and refresh.`,
           )
         }
@@ -309,7 +309,7 @@ export function ProviderWizard({
       }
     } catch (err) {
       setSaveState('error')
-      setSaveError(err instanceof Error ? err.message : 'Network error')
+      setSaveError(err instanceof Error ? err.message : 'Ошибка сети')
     }
   }
 
@@ -352,8 +352,7 @@ export function ProviderWizard({
                     : 'Provider Setup Wizard'}
                 </DialogTitle>
                 <DialogDescription className="text-pretty">
-                  Add provider credentials safely. API keys stay local in your
-                  Hermes config file and are never sent to Studio.
+                  Безопасно добавьте учётные данные провайдера. API-ключи хранятся в локальном файле конфигурации и никуда не отправляются.
                 </DialogDescription>
               </div>
               <Button
@@ -362,7 +361,7 @@ export function ProviderWizard({
                 onClick={function onClose() {
                   handleDialogOpenChange(false)
                 }}
-                aria-label="Close provider setup wizard"
+                aria-label="Закрыть мастер настройки провайдера"
               >
                 <HugeiconsIcon
                   icon={Cancel01Icon}
@@ -416,10 +415,10 @@ export function ProviderWizard({
             {step === 'provider' ? (
               <section className="mt-5">
                 <h3 className="text-base font-medium text-primary-900 text-balance">
-                  Step 1: Choose Provider
+                  Шаг 1: выберите провайдера
                 </h3>
                 <p className="mt-1 text-sm text-primary-600 text-pretty">
-                  Select the provider you want to configure.
+                  Выберите провайдера для настройки.
                 </p>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -468,7 +467,7 @@ export function ProviderWizard({
             {step === 'auth' && selectedProvider ? (
               <section className="mt-5">
                 <h3 className="text-base font-medium text-primary-900 text-balance">
-                  Step 2: Choose Auth Type
+                  Шаг 2: выберите способ авторизации
                 </h3>
                 <p className="mt-1 text-sm text-primary-600 text-pretty">
                   {selectedProvider.name} supports{' '}
@@ -542,7 +541,7 @@ export function ProviderWizard({
                       size={20}
                       strokeWidth={1.5}
                     />
-                    Back
+                    Назад
                   </Button>
                 </div>
               </section>
@@ -551,7 +550,7 @@ export function ProviderWizard({
             {step === 'instructions' && selectedProvider && selectedAuthType ? (
               <section className="mt-5">
                 <h3 className="text-base font-medium text-primary-900 text-balance">
-                  Step 3: Add API Key
+                  Шаг 3: добавьте API-ключ
                 </h3>
 
                 {selectedAuthType === 'oauth' ? (
@@ -572,24 +571,24 @@ export function ProviderWizard({
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
                             'Run "hermes setup" in the terminal and select Google OAuth when prompted. ' +
-                              'A browser window will open for sign-in. Once complete, Hermes Agent will restart automatically.',
+                              'A browser window will open for sign-in. Once complete, AWG GPT will restart automatically.',
                           )
                           setVerifyState('warning')
                           setStep('verify')
                         }}
                       >
-                        Open Terminal
+                        Открыть терминал
                       </Button>
 
                       <div className="rounded-xl border border-primary-200 bg-primary-100/70 px-3 py-2">
                         <p className="text-xs text-primary-700 text-pretty">
-                          In the terminal, run:
+                          В терминале выполните:
                         </p>
                         <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">
                           hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
-                          Select <strong>Google Antigravity</strong> →{' '}
+                          Выбрать <strong>Google Antigravity</strong> →{' '}
                           <strong>OAuth</strong>. A browser tab will open for
                           Google sign-in.
                         </p>
@@ -604,7 +603,7 @@ export function ProviderWizard({
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Hermes Agent docs
+                            Документация AWG GPT
                           </a>{' '}
                           for setup instructions.
                         </p>
@@ -614,9 +613,7 @@ export function ProviderWizard({
                 ) : selectedAuthType === 'cli-token' ? (
                   <>
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
-                      If you have Claude Code or the Hermes CLI installed,
-                      Hermes Agent can use the same auth token. Run the configure
-                      command to detect and import it automatically.
+                      Если у вас установлен CLI, AWG GPT может использовать тот же токен авторизации. Выполните команду настройки, чтобы он был найден и импортирован автоматически.
                     </p>
 
                     <div className="mt-4 flex flex-col gap-3">
@@ -632,19 +629,19 @@ export function ProviderWizard({
                           setStep('verify')
                         }}
                       >
-                        Open Terminal
+                        Открыть терминал
                       </Button>
 
                       <div className="rounded-xl border border-primary-200 bg-primary-100/70 px-3 py-2">
                         <p className="text-xs text-primary-700 text-pretty">
-                          In the terminal, run:
+                          В терминале выполните:
                         </p>
                         <pre className="mt-1 rounded-lg bg-primary-200/60 px-2 py-1.5 text-xs font-mono text-primary-900">
                           hermes setup
                         </pre>
                         <p className="mt-1.5 text-xs text-primary-600 text-pretty">
-                          Select <strong>Anthropic</strong> →{' '}
-                          <strong>Setup Token (Hermes CLI)</strong>. It will
+                          Выбрать <strong>Anthropic</strong> →{' '}
+                          <strong>Токен настройки (CLI)</strong>. It will
                           detect your existing Claude credentials from{' '}
                           <code className="font-mono">~/.hermes/</code>.
                         </p>
@@ -654,8 +651,7 @@ export function ProviderWizard({
                         <p className="text-xs text-amber-800 text-pretty">
                           <strong>Requires:</strong> Claude Code or Hermes CLI
                           must be installed and authenticated first. Run{' '}
-                          <code className="font-mono">hermes</code> in terminal
-                          to verify.
+                          <code className="font-mono">hermes</code> в терминале для проверки.
                         </p>
                       </div>
 
@@ -668,7 +664,7 @@ export function ProviderWizard({
                             rel="noopener noreferrer"
                             className="text-primary-800 underline decoration-primary-400 hover:text-primary-900"
                           >
-                            See the Hermes Agent docs
+                            Документация AWG GPT
                           </a>{' '}
                           for CLI token setup instructions.
                         </p>
@@ -723,7 +719,7 @@ export function ProviderWizard({
                             strokeWidth={1.5}
                             className="inline mr-1"
                           />
-                          Key saved! Hermes Agent is restarting to apply changes.
+                          Ключ сохранён! AWG GPT перезапускается, чтобы применить изменения.
                         </p>
                       ) : null}
                     </div>
@@ -777,7 +773,7 @@ export function ProviderWizard({
                               size={20}
                               strokeWidth={1.5}
                             />
-                            Copy snippet
+                            Копировать фрагмент
                           </Button>
                           {copyState === 'copied' ? (
                             <span className="inline-flex items-center gap-1 text-xs text-green-600">
@@ -786,7 +782,7 @@ export function ProviderWizard({
                                 size={20}
                                 strokeWidth={1.5}
                               />
-                              Copied
+                              Скопировано
                             </span>
                           ) : null}
                         </div>
@@ -801,8 +797,7 @@ export function ProviderWizard({
                 ) : (
                   <>
                     <p className="mt-1 text-sm text-primary-600 text-pretty">
-                      No additional configuration needed. Just ensure the
-                      service is running locally.
+                      Дополнительная настройка не нужна. Убедитесь, что сервис запущен локально.
                     </p>
                   </>
                 )}
@@ -820,7 +815,7 @@ export function ProviderWizard({
                       size={20}
                       strokeWidth={1.5}
                     />
-                    Back
+                    Назад
                   </Button>
                   {selectedAuthType === 'local' ? (
                     <Button
@@ -829,7 +824,7 @@ export function ProviderWizard({
                         handleDone()
                       }}
                     >
-                      Done
+                      Готово
                     </Button>
                   ) : null}
                 </div>
@@ -839,7 +834,7 @@ export function ProviderWizard({
             {step === 'verify' ? (
               <section className="mt-5">
                 <h3 className="text-base font-medium text-primary-900 text-balance">
-                  Step 4: Verify
+                  Шаг 4: проверка
                 </h3>
                 <div
                   className={cn(
@@ -856,7 +851,7 @@ export function ProviderWizard({
                     {verifyTitle}
                   </p>
                   <p className="mt-1 text-sm text-primary-600 text-pretty">
-                    {verificationMessage || 'Waiting for Hermes Agent to respond…'}
+                    {verificationMessage || 'Ожидание ответа AWG GPT…'}
                   </p>
                 </div>
 
@@ -873,7 +868,7 @@ export function ProviderWizard({
                       size={20}
                       strokeWidth={1.5}
                     />
-                    Back
+                    Назад
                   </Button>
                   <Button
                     size="sm"
@@ -881,7 +876,7 @@ export function ProviderWizard({
                       handleDone()
                     }}
                   >
-                    Done
+                    Готово
                   </Button>
                 </div>
               </section>

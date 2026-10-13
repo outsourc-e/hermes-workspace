@@ -112,7 +112,7 @@ describe('getConnectionErrorMessage', () => {
     const clawsuite = getConnectionErrorMessage('clawsuite_auth_required')
     expect(gateway.title).not.toBe(clawsuite.title)
     expect(gateway.description).not.toBe(clawsuite.description)
-    expect(gateway.title.toLowerCase()).toContain('gateway')
+    expect(gateway.title.toLowerCase()).toContain('шлюз')
     // The action should point the user at re-pairing / token config, not
     // at entering a password.
     expect(gateway.action?.toLowerCase()).not.toContain('password')
@@ -143,7 +143,7 @@ describe('getConnectionErrorInfo', () => {
       'Hermes Agent rejected the connection token',
     )
     expect(info.kind).toBe('gateway_auth_rejected')
-    expect(info.title.toLowerCase()).toContain('gateway')
+    expect(info.title.toLowerCase()).toContain('шлюз')
     expect(info.details).toBe('Hermes Agent rejected the connection token')
   })
 

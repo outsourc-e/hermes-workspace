@@ -20,7 +20,7 @@ export async function fetchClaudeAuthStatus(
 
     throw error instanceof Error
       ? error
-      : new Error('Failed to connect to Hermes Agent')
+      : new Error('Не удалось подключиться к AWG GPT')
   } finally {
     globalThis.clearTimeout(timeout)
   }

@@ -107,13 +107,13 @@ function createDemoQueue(): Array<QueuedAgentTask> {
     {
       id: 'demo-queue-1',
       name: 'release-notes',
-      description: 'Drafting release notes and migration checklist',
+      description: 'Готовлю заметки к релизу и чек-лист миграции',
       priority: 'high',
     },
     {
       id: 'demo-queue-2',
       name: 'theme-pass',
-      description: 'Applying dark theme polish to diagnostics screens',
+      description: 'Доработка тёмной темы на экранах диагностики',
       priority: 'normal',
     },
   ]
@@ -124,7 +124,7 @@ function createDemoHistory(): Array<AgentHistoryItem> {
     {
       id: 'demo-history-1',
       name: 'api-telemetry',
-      description: 'Instrumented API telemetry dashboard',
+      description: 'Панель телеметрии API',
       model: 'gpt-5-codex',
       status: 'success',
       runtimeSeconds: 452,
@@ -134,7 +134,7 @@ function createDemoHistory(): Array<AgentHistoryItem> {
     {
       id: 'demo-history-2',
       name: 'auth-hardening',
-      description: 'Added auth guardrails for session endpoints',
+      description: 'Добавлены ограничения авторизации для эндпоинтов сессий',
       model: 'claude-3-5-sonnet',
       status: 'success',
       runtimeSeconds: 311,
@@ -620,7 +620,7 @@ export function useAgentView(): AgentViewResult {
         setIsDemoMode(false)
         setIsLiveConnected(false)
         setErrorMessage(
-          error instanceof Error ? error.message : 'Gateway unavailable',
+          error instanceof Error ? error.message : 'Шлюз недоступен',
         )
       } finally {
         if (!isDisposed) {

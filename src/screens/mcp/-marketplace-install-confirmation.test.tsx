@@ -121,7 +121,7 @@ describe('InstallConfirmationDialog — preview render', () => {
     )
     expect(container.textContent).toContain('github-mcp')
     expect(container.textContent).toContain('GitHub MCP server')
-    expect(container.textContent).toContain('Community')
+    expect(container.textContent).toContain('Сообщество')
     expect(container.textContent).toContain('stdio')
     await unmount()
   })
@@ -182,7 +182,7 @@ describe('InstallConfirmationDialog — preview render', () => {
     const { container, unmount } = await renderInto(
       React.createElement(InstallConfirmationDialog, { entry: officialEntry, onClose: vi.fn() }),
     )
-    expect(container.textContent).toContain('Official')
+    expect(container.textContent).toContain('Официальный')
     await unmount()
   })
 
@@ -191,7 +191,7 @@ describe('InstallConfirmationDialog — preview render', () => {
     const { container, unmount } = await renderInto(
       React.createElement(InstallConfirmationDialog, { entry: unverifiedEntry, onClose: vi.fn() }),
     )
-    expect(container.textContent).toContain('Unverified')
+    expect(container.textContent).toContain('Не проверено')
     await unmount()
   })
 })
@@ -315,7 +315,7 @@ describe('InstallConfirmationDialog — 2-click commit', () => {
     )
 
     const cancelBtn = Array.from(container.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Cancel',
+      (b) => b.textContent === 'Отмена',
     ) as HTMLButtonElement
     await React.act(async () => { cancelBtn.click() })
 

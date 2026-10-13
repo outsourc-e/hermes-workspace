@@ -402,7 +402,7 @@ export function FileExplorerSidebar({
             size="icon-sm"
             variant="ghost"
             onClick={refresh}
-            title="Refresh"
+            title="Обновить"
           >
             <HugeiconsIcon icon={RefreshIcon} size={18} />
           </Button>
@@ -410,7 +410,7 @@ export function FileExplorerSidebar({
             size="icon-sm"
             variant="ghost"
             onClick={() => handleUploadClick('')}
-            title="Upload"
+            title="Загрузить"
           >
             <HugeiconsIcon icon={Upload01Icon} size={18} />
           </Button>
@@ -418,7 +418,7 @@ export function FileExplorerSidebar({
             size="icon-sm"
             variant="ghost"
             onClick={() => openPrompt({ mode: 'new-file', targetPath: '' })}
-            title="New file"
+            title="Новый файл"
           >
             <HugeiconsIcon icon={PlusSignIcon} size={18} />
           </Button>
@@ -429,7 +429,7 @@ export function FileExplorerSidebar({
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search files"
+          placeholder="Поиск файлов"
           className="w-full rounded-md border border-primary-200 bg-primary-50 px-2 py-1 text-sm text-primary-900 placeholder:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-300"
         />
       </div>
@@ -450,10 +450,10 @@ export function FileExplorerSidebar({
               </div>
               <div>
                 <p className="text-sm font-medium text-primary-800">
-                  No workspace selected
+                  Рабочее пространство не выбрано
                 </p>
                 <p className="mt-1 text-xs text-primary-500 text-pretty">
-                  Select a folder to browse and edit files.
+                  Выберите папку, чтобы просматривать и редактировать файлы.
                 </p>
               </div>
               <Button
@@ -463,7 +463,7 @@ export function FileExplorerSidebar({
                 className="mt-1"
               >
                 <HugeiconsIcon icon={RefreshIcon} size={16} />
-                Retry
+                Повторить
               </Button>
             </div>
           ) : entries.length === 0 ? (
@@ -478,10 +478,10 @@ export function FileExplorerSidebar({
               </div>
               <div>
                 <p className="text-sm font-medium text-primary-800">
-                  Workspace is empty
+                  Рабочее пространство пусто
                 </p>
                 <p className="mt-1 text-xs text-primary-500 text-pretty">
-                  Create files or upload content to get started.
+                  Создайте файлы или загрузите содержимое, чтобы начать.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -493,7 +493,7 @@ export function FileExplorerSidebar({
                   }
                 >
                   <HugeiconsIcon icon={PlusSignIcon} size={16} />
-                  New file
+                  Новый файл
                 </Button>
                 <Button
                   size="sm"
@@ -501,7 +501,7 @@ export function FileExplorerSidebar({
                   onClick={() => handleUploadClick('')}
                 >
                   <HugeiconsIcon icon={Upload01Icon} size={16} />
-                  Upload
+                  Загрузить
                 </Button>
               </div>
             </div>
@@ -540,7 +540,7 @@ export function FileExplorerSidebar({
               setContextMenu(null)
             }}
           >
-            <HugeiconsIcon icon={Pen01Icon} size={16} /> Rename
+            <HugeiconsIcon icon={Pen01Icon} size={16} /> Переименовать
           </button>
           {contextMenu.entry.type === 'folder' ? (
             <>
@@ -551,7 +551,7 @@ export function FileExplorerSidebar({
                   setContextMenu(null)
                 }}
               >
-                <HugeiconsIcon icon={PlusSignIcon} size={16} /> New file
+                <HugeiconsIcon icon={PlusSignIcon} size={16} /> Новый файл
               </button>
               <button
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-primary-100"
@@ -560,7 +560,7 @@ export function FileExplorerSidebar({
                   setContextMenu(null)
                 }}
               >
-                <HugeiconsIcon icon={Folder01Icon} size={16} /> New folder
+                <HugeiconsIcon icon={Folder01Icon} size={16} /> Новая папка
               </button>
               <button
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-primary-100"
@@ -569,7 +569,7 @@ export function FileExplorerSidebar({
                   setContextMenu(null)
                 }}
               >
-                <HugeiconsIcon icon={Upload01Icon} size={16} /> Upload
+                <HugeiconsIcon icon={Upload01Icon} size={16} /> Загрузить
               </button>
             </>
           ) : (
@@ -580,7 +580,7 @@ export function FileExplorerSidebar({
                 setContextMenu(null)
               }}
             >
-              <HugeiconsIcon icon={Download01Icon} size={16} /> Download
+              <HugeiconsIcon icon={Download01Icon} size={16} /> Скачать
             </button>
           )}
           <button
@@ -590,7 +590,7 @@ export function FileExplorerSidebar({
               setContextMenu(null)
             }}
           >
-            <HugeiconsIcon icon={Delete01Icon} size={16} /> Delete
+            <HugeiconsIcon icon={Delete01Icon} size={16} /> Удалить
           </button>
         </div>
       ) : null}
@@ -613,7 +613,7 @@ export function FileExplorerSidebar({
             <DialogDescription>
               {promptState?.mode === 'rename'
                 ? 'Enter a new name.'
-                : 'Enter a name to create.'}
+                : 'Введите имя для создания.'}
             </DialogDescription>
             <input
               value={promptValue}
@@ -622,8 +622,8 @@ export function FileExplorerSidebar({
               autoFocus
             />
             <div className="flex justify-end gap-2 pt-2">
-              <DialogClose render={<Button variant="outline">Cancel</Button>} />
-              <Button onClick={handlePromptSubmit}>Save</Button>
+              <DialogClose render={<Button variant="outline">Отмена</Button>} />
+              <Button onClick={handlePromptSubmit}>Сохранить</Button>
             </div>
           </div>
         </DialogContent>
@@ -639,7 +639,7 @@ export function FileExplorerSidebar({
         type="button"
         onClick={onToggle}
         className="sr-only"
-        aria-label="Toggle file explorer"
+        aria-label="Показать или скрыть проводник файлов"
       />
     </aside>
   )

@@ -15,14 +15,14 @@ function ReserveConfirmRoute() {
     message: string
   }>({
     status: 'loading',
-    message: 'Confirming your reservation…',
+    message: 'Подтверждаю бронирование…',
   })
 
   useEffect(() => {
     if (!token) {
       setState({
         status: 'error',
-        message: 'Missing confirmation token. Re-open the link from your email.',
+        message: 'Нет токена подтверждения. Откройте ссылку из письма ещё раз.',
       })
       return
     }
@@ -54,7 +54,7 @@ function ReserveConfirmRoute() {
     <main className="flex min-h-screen items-center justify-center bg-[#03060a] px-4 text-[#f8f3e7]">
       <div className="w-full max-w-xl rounded-[2rem] border border-[#d9b35f]/24 bg-[#05080e]/88 p-8 shadow-[0_40px_140px_rgba(0,0,0,.52)] backdrop-blur-2xl sm:p-10">
         <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#d9b35f]/72">
-          Email confirmation
+          Подтверждение по эл. почте
         </div>
         <h1 className="mt-4 font-serif text-4xl font-bold leading-[0.95] tracking-[-0.05em] text-[#fff6df]">
           {state.status === 'success'
@@ -69,7 +69,7 @@ function ReserveConfirmRoute() {
             href="/reserve"
             className="inline-flex items-center justify-center rounded-xl border border-[#ffe7a3]/55 bg-[linear-gradient(180deg,#ffe7a3,#d9a63f)] px-6 py-3 text-sm font-black uppercase tracking-[0.16em] text-[#11100b] shadow-[0_30px_90px_rgba(217,179,95,.32),inset_0_1px_0_rgba(255,255,255,.32)]"
           >
-            Back to reserve
+            Назад к резерву
           </a>
           <a
             href="/hermes-world"

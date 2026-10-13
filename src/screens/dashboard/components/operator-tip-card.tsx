@@ -33,10 +33,10 @@ type Tip = {
 const TIPS: ReadonlyArray<Tip> = [
   {
     id: 'cache-low',
-    title: 'Cache hit rate is low',
-    body: "Reusable system prompts get cached on most providers. Pin shared scaffolding (skills, persona, tools) into a stable preamble so the next request hits cache instead of paying for fresh input.",
+    title: 'Низкая доля попаданий в кэш',
+    body: "Повторяющиеся системные промпты кэшируются у большинства провайдеров. Вынесите общую часть (навыки, роль, инструменты) в стабильное вступление, чтобы следующий запрос попал в кэш, а не оплачивался заново.",
     tone: 'warn',
-    cta: 'Open analytics',
+    cta: 'Открыть аналитику',
     href: '/analytics',
     score: (o) => {
       const a = o?.analytics
@@ -49,8 +49,8 @@ const TIPS: ReadonlyArray<Tip> = [
   },
   {
     id: 'cache-high',
-    title: 'Cache hit rate looks great',
-    body: "Cache reads are doing the heavy lifting. Worth checking if any *cold* sessions are skipping your shared preamble — those usually represent untapped savings.",
+    title: 'Отличная доля попаданий в кэш',
+    body: "Основную нагрузку берёт кэш. Проверьте, не пропускают ли «холодные» сессии общее вступление: это обычно упущенная экономия.",
     tone: 'positive',
     score: (o) => {
       const a = o?.analytics
@@ -63,10 +63,10 @@ const TIPS: ReadonlyArray<Tip> = [
   },
   {
     id: 'stale-cron',
-    title: 'You have stale cron jobs',
-    body: "Cron jobs that haven't run in 7+ days are usually a sign of a paused integration or a misconfigured schedule. Worth a quick triage so you don't lose silent automation.",
+    title: 'Есть устаревшие cron-задания',
+    body: "Cron-задания, не запускавшиеся больше 7 дней, обычно означают приостановленную интеграцию или неверное расписание. Стоит быстро проверить, чтобы не потерять фоновую автоматизацию.",
     tone: 'warn',
-    cta: 'Open jobs',
+    cta: 'Открыть задания',
     href: '/jobs',
     score: (o) => {
       const cron = o?.cron
@@ -82,10 +82,10 @@ const TIPS: ReadonlyArray<Tip> = [
   },
   {
     id: 'config-drift',
-    title: 'Gateway config has drift',
-    body: "There are pending diffs between your local gateway config and the latest committed version. Apply or reject them so your live behavior matches what the repo says.",
+    title: 'Конфигурация шлюза расходится с ожидаемой',
+    body: "Есть расхождения между локальной конфигурацией шлюза и последней зафиксированной версией. Примените или отклоните их, чтобы поведение совпадало с репозиторием.",
     tone: 'warn',
-    cta: 'Open settings',
+    cta: 'Открыть настройки',
     href: '/settings',
     score: (o) => {
       const s = o?.status
@@ -102,19 +102,19 @@ const TIPS: ReadonlyArray<Tip> = [
   },
   {
     id: 'restart-pending',
-    title: 'Gateway restart pending',
-    body: "Some config or plugin change wants a gateway restart to take effect. Best to do it during a quiet window — long-running sessions handle it gracefully.",
+    title: 'Ожидается перезапуск шлюза',
+    body: "Изменение конфигурации или плагина требует перезапуска шлюза. Лучше сделать это в спокойный момент: долгие сессии переживают его без проблем.",
     tone: 'warn',
-    cta: 'Open settings',
+    cta: 'Открыть настройки',
     href: '/settings',
     score: (o) => (o?.status?.restartRequested ? 75 : 0),
   },
   {
     id: 'achievements-momentum',
-    title: 'Achievement momentum',
-    body: "You unlocked something recently — keep going. The Hermes achievements track real workflows, so the next tier usually drops out of normal usage rather than grinding.",
+    title: 'Динамика достижений',
+    body: "Вы недавно получили достижение — так держать. Достижения отражают реальную работу, поэтому следующий уровень обычно приходит сам при обычном использовании.",
     tone: 'positive',
-    cta: 'View all',
+    cta: 'Показать все',
     score: (o) => {
       const ach = o?.achievements
       if (!ach || ach.recentUnlocks.length === 0) return 0
@@ -126,10 +126,10 @@ const TIPS: ReadonlyArray<Tip> = [
   },
   {
     id: 'sessions-low',
-    title: 'Things have been quiet',
-    body: "Session count is below the prior period — could be intentional, could be silent breakage. Worth scanning recent logs and reviewing your cron / heartbeat schedule.",
+    title: 'Было тихо',
+    body: "Число сессий ниже, чем в прошлом периоде: это может быть нормой, а может — тихой поломкой. Просмотрите свежие журналы и расписание cron и heartbeat.",
     tone: 'info',
-    cta: 'Open sessions',
+    cta: 'Открыть сессии',
     href: '/sessions',
     score: (o) => {
       const a = o?.analytics
@@ -146,10 +146,10 @@ const TIPS: ReadonlyArray<Tip> = [
   },
   {
     id: 'top-model-share',
-    title: 'One model is doing all the work',
-    body: "Concentration risk: if your top model is handling >70% of calls, an outage or pricing change hits hard. Worth setting up a fallback even if you never use it.",
+    title: 'Всю работу выполняет одна модель',
+    body: "Риск концентрации: если основная модель обрабатывает больше 70% вызовов, сбой или смена цен больно ударит. Настройте запасную модель, даже если не планируете её использовать.",
     tone: 'info',
-    cta: 'Open models',
+    cta: 'Открыть модели',
     href: '/models',
     score: (o) => {
       const a = o?.analytics
@@ -165,26 +165,26 @@ const TIPS: ReadonlyArray<Tip> = [
   // nothing context-specific is more relevant.
   {
     id: 'edit-mode',
-    title: 'Customize this dashboard',
-    body: "Use the pencil icon in the header to enter edit mode. You can hide widgets you don't care about and reveal extras (Provider Mix, Velocity, Cost Ledger, Live Logs) from the picker.",
+    title: 'Настроить эту панель',
+    body: "Нажмите на карандаш в шапке, чтобы перейти в режим редактирования. Ненужные виджеты можно скрыть, а дополнительные (структура провайдеров, скорость, журнал затрат, живые журналы) — добавить из списка.",
     tone: 'info',
     score: () => 5,
   },
   {
     id: 'skills-shortcut',
-    title: 'Skills are first-class',
-    body: "Hermes loads skills into context on demand. Click any row in Skills Usage to jump to that skill's page and edit its SKILL.md — every change is hot-reloaded.",
+    title: 'Навыки — полноценные участники',
+    body: "Навыки загружаются в контекст по требованию. Нажмите на строку в «Использовании навыков», чтобы открыть страницу навыка и отредактировать SKILL.md — изменения применяются сразу.",
     tone: 'info',
-    cta: 'Open skills',
+    cta: 'Открыть навыки',
     href: '/skills',
     score: () => 4,
   },
   {
     id: 'new-chat',
-    title: "Pick the right model up-front",
-    body: "Hitting New Chat without a model in mind is fine, but Hermes routes faster when you set a default in Settings → Models for your common task types.",
+    title: "Выбирайте подходящую модель заранее",
+    body: "Можно начинать новый чат без выбора модели, но маршрутизация быстрее, если задать модель по умолчанию в «Настройки → Модели» для привычных типов задач.",
     tone: 'info',
-    cta: 'New chat',
+    cta: 'Новый чат',
     href: '/chat/new',
     score: () => 3,
   },
@@ -309,8 +309,8 @@ export function OperatorTipCard({
             <button
               type="button"
               onClick={handleNext}
-              aria-label="Next tip"
-              title="Next tip"
+              aria-label="Следующая подсказка"
+              title="Следующая подсказка"
               className="inline-flex size-6 items-center justify-center rounded-full border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70"
               style={{
                 borderColor: 'var(--theme-border)',

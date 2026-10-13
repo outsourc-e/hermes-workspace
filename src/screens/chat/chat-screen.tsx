@@ -1662,7 +1662,7 @@ export function ChatScreen({
           }
         : statusQuery.data && !statusQuery.data.ok
           ? {
-              message: statusQuery.data.error || 'Hermes Agent unavailable',
+              message: statusQuery.data.error || 'AWG GPT unavailable',
               status: statusQuery.data.status,
             }
           : null
@@ -1776,7 +1776,7 @@ export function ChatScreen({
     }
     const messageText = sessionsError ?? historyError ?? statusError?.message
     if (!messageText) {
-      if (error?.startsWith('Failed to load')) {
+      if (error?.startsWith('Не удалось загрузить')) {
         setError(null)
       }
       return
@@ -1789,7 +1789,7 @@ export function ChatScreen({
       : historyError
         ? `Failed to load history. ${historyError}`
         : statusError
-          ? `Hermes Agent unavailable. ${statusError.message}`
+          ? `AWG GPT unavailable. ${statusError.message}`
           : null
     if (message) setError(message)
   }, [
@@ -2215,7 +2215,7 @@ export function ChatScreen({
 
   useEffect(() => {
     if (false) {
-      // Server connection checks removed — Hermes Agent uses direct API
+      // Server connection checks removed — AWG GPT uses direct API
       hasSeenDisconnectRef.current = true
       retriedQueuedMessageKeysRef.current.clear()
       return
@@ -2821,7 +2821,7 @@ export function ChatScreen({
                         }}
                         className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
                       >
-                        Approve
+                        Одобрить
                       </button>
                       <button
                         type="button"
@@ -2830,7 +2830,7 @@ export function ChatScreen({
                         }}
                         className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 dark:border-red-800/50 dark:bg-red-900/10 dark:text-red-400"
                       >
-                        Deny
+                        Отклонить
                       </button>
                     </div>
                   </div>

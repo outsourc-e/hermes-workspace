@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 
 type ConnectionStatus = {
   status: 'connected' | 'enhanced' | 'partial' | 'disconnected'
-  label: 'Connected' | 'Enhanced' | 'Partial' | 'Disconnected'
+  label: 'Подключено' | 'Enhanced' | 'Partial' | 'Disconnected'
   detail: string
   health: boolean
   chatReady: boolean
@@ -22,7 +22,7 @@ async function fetchConnectionStatus(): Promise<ConnectionStatus> {
   if (!response.ok) {
     return {
       status: 'disconnected',
-      label: 'Disconnected',
+      label: 'Отключено',
       detail: 'No compatible backend detected.',
       health: false,
       chatReady: false,
@@ -44,30 +44,30 @@ function statusToColors(
     return {
       dot: 'bg-yellow-400',
       pulse: 'bg-yellow-400/40',
-      label: 'Checking...',
+      label: 'Проверка...',
     }
   }
   switch (status) {
     case 'enhanced':
-      return { dot: 'bg-cyan-400', pulse: 'bg-cyan-400/40', label: 'Enhanced' }
+      return { dot: 'bg-cyan-400', pulse: 'bg-cyan-400/40', label: 'Расширенный' }
     case 'connected':
       return {
         dot: 'bg-emerald-400',
         pulse: 'bg-emerald-400/40',
-        label: 'Connected',
+        label: 'Подключено',
       }
     case 'partial':
       return {
         dot: 'bg-yellow-400',
         pulse: 'bg-yellow-400/40',
-        label: 'Partial',
+        label: 'Частично',
       }
     case 'disconnected':
     default:
       return {
         dot: 'bg-red-400',
         pulse: 'bg-red-400/40',
-        label: 'Disconnected',
+        label: 'Отключено',
       }
   }
 }
@@ -84,7 +84,7 @@ function buildTooltip(
     if (!data.modelConfigured) parts.push('No model selected')
   }
   if (data.status === 'enhanced') {
-    parts.push('Hermes Agent gateway enhancements detected')
+    parts.push('AWG GPT gateway enhancements detected')
   }
   if (data.activeModel) parts.push(`Model: ${data.activeModel}`)
   return parts.join(' · ')

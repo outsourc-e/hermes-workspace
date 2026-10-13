@@ -32,49 +32,49 @@ export type SlashCommandMenuHandle = {
 
 export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   // Session control
-  { command: '/new', description: 'Start new session' },
-  { command: '/clear', description: 'Clear screen and start fresh' },
-  { command: '/retry', description: 'Resend the last message' },
-  { command: '/undo', description: 'Remove the last exchange' },
-  { command: '/title', description: 'Name the current session' },
-  { command: '/compress', description: 'Manually compress context' },
+  { command: '/new', description: 'Начать новую сессию' },
+  { command: '/clear', description: 'Очистить экран и начать заново' },
+  { command: '/retry', description: 'Отправить последнее сообщение повторно' },
+  { command: '/undo', description: 'Удалить последний обмен сообщениями' },
+  { command: '/title', description: 'Назвать текущую сессию' },
+  { command: '/compress', description: 'Сжать контекст вручную' },
 
   // Persistent goals (Ralph loop)
-  { command: '/goal <text>', description: 'Set standing goal across turns' },
-  { command: '/goal status', description: 'Check active goal status' },
-  { command: '/goal pause', description: 'Pause active goal' },
-  { command: '/goal resume', description: 'Resume paused goal' },
-  { command: '/goal clear', description: 'Clear active goal' },
-  { command: '/subgoal <text>', description: 'Add extra success criteria to active goal' },
+  { command: '/goal <text>', description: 'Задать постоянную цель на несколько шагов' },
+  { command: '/goal status', description: 'Проверить статус активной цели' },
+  { command: '/goal pause', description: 'Приостановить активную цель' },
+  { command: '/goal resume', description: 'Возобновить приостановленную цель' },
+  { command: '/goal clear', description: 'Очистить активную цель' },
+  { command: '/subgoal <text>', description: 'Добавить критерии успеха к активной цели' },
 
   // Model & config
-  { command: '/model', description: 'Show or change the current model' },
-  { command: '/reasoning', description: 'Set reasoning level (none/minimal/low/medium/high/xhigh)' },
-  { command: '/skin', description: 'Change the display theme' },
-  { command: '/config', description: 'Show session config' },
-  { command: '/profile', description: 'Show active Hermes profile info' },
+  { command: '/model', description: 'Показать или сменить текущую модель' },
+  { command: '/reasoning', description: 'Задать уровень рассуждений (none/minimal/low/medium/high/xhigh)' },
+  { command: '/skin', description: 'Сменить тему оформления' },
+  { command: '/config', description: 'Показать конфигурацию сессии' },
+  { command: '/profile', description: 'Показать сведения об активном профиле' },
 
   // Tools & skills
-  { command: '/skills', description: 'Browse and manage skills' },
-  { command: '/skill <name>', description: 'Load a skill into session' },
-  { command: '/plugins', description: 'List installed plugins and their status' },
-  { command: '/mcp', description: 'Manage MCP servers' },
-  { command: '/cron', description: 'Manage cron jobs' },
-  { command: '/kanban', description: 'Kanban collaboration board' },
+  { command: '/skills', description: 'Просмотр и управление навыками' },
+  { command: '/skill <name>', description: 'Загрузить навык в сессию' },
+  { command: '/plugins', description: 'Список установленных плагинов и их состояние' },
+  { command: '/mcp', description: 'Управление MCP-серверами' },
+  { command: '/cron', description: 'Управление cron-заданиями' },
+  { command: '/kanban', description: 'Канбан-доска для совместной работы' },
 
   // Session management
-  { command: '/save', description: 'Save the current conversation' },
-  { command: '/history', description: 'Show conversation history' },
-  { command: '/agents', description: 'Show active agents and running tasks' },
-  { command: '/resume', description: 'Resume a named session' },
-  { command: '/branch', description: 'Branch the current session' },
-  { command: '/fork', description: 'Fork the current session' },
+  { command: '/save', description: 'Сохранить текущий диалог' },
+  { command: '/history', description: 'Показать историю диалога' },
+  { command: '/agents', description: 'Показать активных агентов и выполняемые задачи' },
+  { command: '/resume', description: 'Продолжить именованную сессию' },
+  { command: '/branch', description: 'Ответвить текущую сессию' },
+  { command: '/fork', description: 'Создать ответвление текущей сессии' },
 
   // Info
-  { command: '/help', description: 'Show all available commands' },
-  { command: '/usage', description: 'View token usage' },
-  { command: '/status', description: 'Show session info' },
-  { command: '/debug', description: 'Upload debug report' },
+  { command: '/help', description: 'Показать все доступные команды' },
+  { command: '/usage', description: 'Просмотр расхода токенов' },
+  { command: '/status', description: 'Показать сведения о сессии' },
+  { command: '/debug', description: 'Загрузить отчёт об отладке' },
 ]
 
 export function mergeSlashCommands(
@@ -175,7 +175,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenu(
         >
           {filteredCommands.length === 0 ? (
             <div className="px-3 py-2 text-sm text-primary-600">
-              No commands found
+              Команды не найдены
             </div>
           ) : (
             <CommandList className="max-h-60 min-h-0">

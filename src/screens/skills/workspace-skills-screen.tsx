@@ -239,10 +239,10 @@ export function WorkspaceSkillsScreen() {
             </div>
             <div>
               <h1 className="text-base font-semibold text-primary-900">
-                Skills
+                Навыки
               </h1>
               <p className="mt-1 text-sm text-primary-500">
-                Installed skills and workspace memory sources
+                Установленные навыки и источники памяти рабочего пространства
               </p>
             </div>
           </div>
@@ -254,7 +254,7 @@ export function WorkspaceSkillsScreen() {
               <div className="flex flex-col gap-3 border-b border-primary-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-[15px] font-semibold text-primary-900">
-                    Skills
+                    Навыки
                   </h2>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -263,14 +263,14 @@ export function WorkspaceSkillsScreen() {
                     size="sm"
                     onClick={handleComingSoon}
                   >
-                    + Install Skill
+                    + Установить навык
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={handleComingSoon}
                   >
-                    Browse Skills Hub
+                    Каталог навыков
                   </Button>
                 </div>
               </div>
@@ -278,17 +278,17 @@ export function WorkspaceSkillsScreen() {
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
                 {skillsQuery.isPending ? (
                   <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-600">
-                    Loading skills...
+                    Загрузка навыков...
                   </div>
                 ) : skillsQuery.isError ? (
                   <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">
                     {skillsQuery.error instanceof Error
                       ? skillsQuery.error.message
-                      : 'Failed to load skills'}
+                      : 'Не удалось загрузить навыки'}
                   </div>
                 ) : visibleSkills.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-500">
-                    No skills found in `~/.hermes/skills` for Hermes Agent.
+                    No skills found in `~/.hermes/skills` for AWG GPT.
                   </div>
                 ) : (
                   visibleSkills.map((skill) => {
@@ -364,8 +364,7 @@ export function WorkspaceSkillsScreen() {
                                   />
                                   <div className="space-y-1">
                                     <p>
-                                      Installed and ready to use in the
-                                      workspace.
+                                      Установлено и готово к использованию.
                                     </p>
                                     <p className="break-all text-xs text-primary-500">
                                       {skill.path}
@@ -381,7 +380,7 @@ export function WorkspaceSkillsScreen() {
                                     })
                                   }
                                 >
-                                  Enabled
+                                  Включено
                                 </Button>
                               </div>
                             </motion.div>
@@ -415,7 +414,7 @@ export function WorkspaceSkillsScreen() {
                       <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
                         {skillContentQuery.error instanceof Error
                           ? skillContentQuery.error.message
-                          : 'Failed to load skill content'}
+                          : 'Не удалось загрузить содержимое навыка'}
                       </div>
                     ) : (
                       <div className="max-h-96 overflow-y-auto rounded-lg border border-primary-200 bg-white p-4 text-sm text-primary-800 prose prose-sm prose-primary max-w-none">
@@ -437,7 +436,7 @@ export function WorkspaceSkillsScreen() {
             <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
               <div className="flex flex-col gap-3 border-b border-primary-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-[15px] font-semibold text-primary-900">
-                  Memory
+                  Память
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -445,14 +444,14 @@ export function WorkspaceSkillsScreen() {
                     size="sm"
                     onClick={handleComingSoon}
                   >
-                    Export
+                    Экспорт
                   </Button>
                   <Button
                     variant="destructive"
                     size="sm"
                     onClick={handleClearAll}
                   >
-                    Clear All
+                    Очистить всё
                   </Button>
                 </div>
               </div>
@@ -468,7 +467,7 @@ export function WorkspaceSkillsScreen() {
                   <input
                     value={memorySearch}
                     onChange={(event) => setMemorySearch(event.target.value)}
-                    placeholder="Search memory..."
+                    placeholder="Поиск по памяти..."
                     className="w-full rounded-xl border border-primary-200 bg-white px-10 py-2.5 text-sm text-primary-900 outline-none transition-colors placeholder:text-primary-500 focus:border-accent-500/50"
                   />
                 </div>
@@ -498,13 +497,13 @@ export function WorkspaceSkillsScreen() {
               <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
                 {memoryQuery.isPending ? (
                   <div className="rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-600">
-                    Loading memory files...
+                    Загрузка файлов памяти...
                   </div>
                 ) : memoryQuery.isError ? (
                   <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">
                     {memoryQuery.error instanceof Error
                       ? memoryQuery.error.message
-                      : 'Failed to load memory files'}
+                      : 'Не удалось загрузить файлы памяти'}
                   </div>
                 ) : (
                   <>
@@ -533,31 +532,31 @@ export function WorkspaceSkillsScreen() {
                 !memoryQuery.isError &&
                 filteredMemoryFiles.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/70 px-4 py-5 text-sm text-primary-500">
-                    No memory files match the current filter.
+                    Нет файлов памяти, подходящих под фильтр.
                   </div>
                 ) : null}
 
                 <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-4">
                   <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-400">
-                    Retention
+                    Хранение
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2">
-                      <span className="text-primary-600">Workspace memory</span>
+                      <span className="text-primary-600">Память рабочего пространства</span>
                       <span className="font-medium text-primary-900">
-                        Permanent
+                        Постоянно
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2">
-                      <span className="text-primary-600">Project memory</span>
+                      <span className="text-primary-600">Память проекта</span>
                       <span className="font-medium text-primary-900">
                         Per-project
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2">
-                      <span className="text-primary-600">Agent memory</span>
+                      <span className="text-primary-600">Память агента</span>
                       <span className="font-medium text-primary-900">
-                        30 day rolling
+                        Скользящие 30 дней
                       </span>
                     </div>
                   </div>

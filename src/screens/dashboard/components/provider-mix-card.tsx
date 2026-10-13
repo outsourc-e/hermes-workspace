@@ -148,7 +148,7 @@ export function ProviderMixCard({
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-text)' }}
         >
-          Provider mix
+          Структура провайдеров
         </h3>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em]"

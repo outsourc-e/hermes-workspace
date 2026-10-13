@@ -124,7 +124,7 @@ export function BackgroundRunsSection() {
               size={20}
               strokeWidth={1.5}
             />
-            Background runs
+            Фоновые запуски
           </CollapsibleTrigger>
           <span
             className={cn(
@@ -189,14 +189,14 @@ export function BackgroundRunsSection() {
                       onClick={() => handleOpen(run)}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium text-accent-600 hover:bg-accent-100 hover:text-accent-800"
                     >
-                      Open
+                      Открыть
                     </button>
                     <button
                       type="button"
                       disabled={isBusy}
                       onClick={() => handleAbandon(run)}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium text-red-500 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
-                      title="Mark this run as failed and remove it from the active list"
+                      title="Пометить запуск как неудачный и убрать из активных"
                     >
                       {isBusy ? 'Killing…' : 'Mark dead'}
                     </button>

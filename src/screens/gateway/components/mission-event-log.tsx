@@ -29,10 +29,10 @@ type EventVisual = {
 }
 
 const FILTER_OPTIONS: Array<{ key: EventFilter; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'agent', label: 'Agent Events' },
-  { key: 'task', label: 'Task Events' },
-  { key: 'errors', label: 'Errors Only' },
+  { key: 'all', label: 'Все' },
+  { key: 'agent', label: 'События агентов' },
+  { key: 'task', label: 'События задачи' },
+  { key: 'errors', label: 'Только ошибки' },
 ]
 
 function getEventVisual(eventType: MissionEvent['type']): EventVisual {
@@ -164,7 +164,7 @@ export function MissionEventLog({ events, agentNames, className }: MissionEventL
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {filteredEvents.length === 0 ? (
           <div className="rounded-xl border border-dashed border-primary-700 bg-primary-950/60 px-4 py-8 text-center">
-            <p className="text-sm text-primary-300">No mission events yet.</p>
+            <p className="text-sm text-primary-300">Событий миссии пока нет.</p>
           </div>
         ) : (
           <ol className="space-y-2">

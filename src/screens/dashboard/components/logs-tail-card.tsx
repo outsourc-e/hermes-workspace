@@ -104,7 +104,7 @@ export function LogsTailCard({
                 color: 'var(--theme-muted)',
               }}
             >
-              Tail →
+              Журнал →
             </button>
           </div>
         </div>
@@ -120,7 +120,7 @@ export function LogsTailCard({
         >
           {previewLines.length === 0 ? (
             <span style={{ color: 'var(--theme-muted)' }}>
-              no recent log lines.
+              нет свежих строк журнала.
             </span>
           ) : (
             previewLines.map((line, i) => (
@@ -253,7 +253,7 @@ function LogsModal({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label="Закрыть"
               className="rounded p-1 hover:bg-[var(--theme-card)]/80"
             >
               <HugeiconsIcon
@@ -277,7 +277,7 @@ function LogsModal({
               className="py-6 text-center text-[11px]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              No matching log lines.
+              Подходящих строк журнала нет.
             </div>
           ) : (
             filtered.map((line, i) => (

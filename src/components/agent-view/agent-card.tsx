@@ -245,7 +245,7 @@ export function AgentCard({
             triggerClassName,
           )}
           aria-label={`${node.name} controls`}
-          title="Agent controls"
+          title="Управление агентом"
         >
           <HugeiconsIcon icon={MoreVerticalIcon} size={16} strokeWidth={1.5} />
         </MenuTrigger>
@@ -258,7 +258,7 @@ export function AgentCard({
             className="data-disabled:pointer-events-none data-disabled:opacity-50"
           >
             <HugeiconsIcon icon={AiChat01Icon} size={16} strokeWidth={1.5} />
-            Steer
+            Направить
           </MenuItem>
           <MenuItem
             onClick={function onClickPauseToggle() {
@@ -287,7 +287,7 @@ export function AgentCard({
             className="text-red-700 hover:bg-red-50/80 data-highlighted:bg-red-50/80"
           >
             <HugeiconsIcon icon={Delete02Icon} size={16} strokeWidth={1.5} />
-            Kill
+            Завершить
           </MenuItem>
         </MenuContent>
       </MenuRoot>
@@ -339,7 +339,7 @@ export function AgentCard({
             onClick={() => setShowDetail(false)}
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} size={14} strokeWidth={1.5} />
-            Back
+            Назад
           </Button>
           <div className="min-w-0 flex-1">
             <h4 className="truncate text-sm font-medium text-primary-900" title={node.name}>
@@ -375,7 +375,7 @@ export function AgentCard({
 
         {/* Last output / task preview */}
         <div className="mb-3 rounded-xl border border-primary-300/30 bg-primary-200/24 p-2.5">
-          <p className="mb-1 text-[10px] font-medium text-primary-600">Last message</p>
+          <p className="mb-1 text-[10px] font-medium text-primary-600">Последнее сообщение</p>
           <p className="text-[11px] leading-relaxed text-primary-800">
             {node.task.length > 80 ? `${node.task.slice(0, 80)}…` : node.task}
           </p>
@@ -401,7 +401,7 @@ export function AgentCard({
                 onClick={() => onChat(node.id)}
               >
                 <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.5} />
-                View Output
+                Открыть результат
               </Button>
             ) : null}
             {(node.status === 'running' || node.status === 'thinking') && onKill ? (
@@ -412,7 +412,7 @@ export function AgentCard({
                 onClick={() => setKillConfirmOpen(true)}
               >
                 <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.5} />
-                Kill
+                Завершить
               </Button>
             ) : null}
             {node.status === 'queued' ? (
@@ -423,7 +423,7 @@ export function AgentCard({
                 onClick={() => onCancel?.(node.id)}
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
-                Cancel
+                Отмена
               </Button>
             ) : null}
           </div>
@@ -532,7 +532,7 @@ export function AgentCard({
                       }}
                     >
                       <HugeiconsIcon icon={AiChat01Icon} size={13} strokeWidth={1.5} />
-                      Chat
+                      Чат
                     </Button>
                   ) : null}
                   {onView || useInlineDetail ? (
@@ -543,7 +543,7 @@ export function AgentCard({
                       onClick={handleViewClick}
                     >
                       <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.5} />
-                      View
+                      Просмотр
                     </Button>
                   ) : null}
                 </div>
@@ -676,7 +676,7 @@ export function AgentCard({
                     }}
                   >
                     <HugeiconsIcon icon={AiChat01Icon} size={14} strokeWidth={1.5} />
-                    Chat
+                    Чат
                   </Button>
                 ) : null}
                 {onView || useInlineDetail ? (
@@ -687,7 +687,7 @@ export function AgentCard({
                     onClick={handleViewClick}
                   >
                     <HugeiconsIcon icon={EyeIcon} size={14} strokeWidth={1.5} />
-                    View
+                    Просмотр
                   </Button>
                 ) : null}
                 {node.status === 'queued' ? (
@@ -698,7 +698,7 @@ export function AgentCard({
                     onClick={function handleCancelClick() {
                       onCancel?.(node.id)
                     }}
-                    title="Cancel"
+                    title="Отмена"
                   >
                     <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.5} />
                   </Button>

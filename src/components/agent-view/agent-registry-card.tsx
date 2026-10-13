@@ -174,7 +174,7 @@ export function AgentRegistryCard({
               <>
                 <button
                   type="button"
-                  aria-label="Close controls"
+                  aria-label="Закрыть управление"
                   className="fixed inset-0 z-40"
                   onClick={() => setMenuOpen(false)}
                 />
@@ -187,7 +187,7 @@ export function AgentRegistryCard({
                     }}
                     className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
                   >
-                    Steer
+                    Направить
                   </button>
                   <button
                     type="button"
@@ -213,7 +213,7 @@ export function AgentRegistryCard({
                     }}
                     className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
                   >
-                    Kill
+                    Завершить
                   </button>
                 </div>
               </>
@@ -235,21 +235,21 @@ export function AgentRegistryCard({
             }}
             className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
-            Chat
+            Чат
           </button>
           <button
             type="button"
             onClick={handleSteerIntent}
             className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
-            Steer
+            Направить
           </button>
           <button
             type="button"
             onClick={() => onHistory(agent)}
             className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
-            History
+            История
           </button>
           <button
             type="button"

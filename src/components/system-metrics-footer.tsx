@@ -127,26 +127,26 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
     <footer
       className="fixed bottom-0 right-0 z-40 hidden h-7 items-center border-t border-[var(--theme-border)] bg-[var(--theme-card)] px-4 text-[11px] leading-none text-[var(--theme-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] md:flex"
       data-testid="system-metrics-footer"
-      aria-label="System metrics footer"
+      aria-label="Строка системных метрик"
       style={{ left: leftOffsetPx }}
     >
       <div className="flex max-w-full items-center justify-center gap-3 overflow-hidden opacity-85">
         {data ? (
           <>
             <MetricItem
-              label="CPU"
+              label="ЦП"
               value={`${data.cpu.loadPercent}%`}
               tone={metricTone(data.cpu.loadPercent)}
             />
             <Separator />
             <MetricItem
-              label="RAM"
+              label="ОЗУ"
               value={`${formatBytes(data.memory.usedBytes)} / ${formatBytes(data.memory.totalBytes)}`}
               tone={metricTone(data.memory.usedPercent)}
             />
             <Separator />
             <MetricItem
-              label="Disk"
+              label="Диск"
               value={`${data.disk.usedPercent}%`}
               tone={metricTone(data.disk.usedPercent)}
             />
@@ -157,7 +157,7 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
             </span>
             <Separator />
             <MetricItem
-              label="Updated"
+              label="Обновлено"
               value={formatCheckedAt(data.checkedAt)}
               tone="muted"
             />
@@ -166,7 +166,7 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
           <span className="inline-flex items-center gap-2 whitespace-nowrap text-[var(--theme-muted)]">
             <StatusDot tone={isError ? 'warn' : 'muted'} />
             <MetricItem
-              label="Metrics"
+              label="Метрики"
               value={isError ? 'unavailable' : 'loading'}
               tone={isError ? 'warn' : 'muted'}
             />

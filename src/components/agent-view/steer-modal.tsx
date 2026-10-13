@@ -45,7 +45,7 @@ export function SteerModal({
       onOpenChange(false)
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to send directive'
+        error instanceof Error ? error.message : 'Не удалось отправить указание'
       toast(message, { type: 'error' })
     } finally {
       setPending(false)
@@ -66,7 +66,7 @@ export function SteerModal({
           <textarea
             value={message}
             rows={5}
-            placeholder="Send a directive to this agent..."
+            placeholder="Отправить указание этому агенту..."
             disabled={pending}
             onChange={function onChangeMessage(event) {
               setMessage(event.target.value)
@@ -83,7 +83,7 @@ export function SteerModal({
                 onOpenChange(false)
               }}
             >
-              Cancel
+              Отмена
             </Button>
             <Button
               size="sm"

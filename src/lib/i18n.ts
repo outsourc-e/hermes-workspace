@@ -1,5 +1,5 @@
 /**
- * Lightweight i18n — UI string translations for Hermes Workspace.
+ * Lightweight i18n — UI string translations for AWG GPT.
  * Add new languages by adding a locale map below.
  */
 
@@ -325,14 +325,11 @@ export const LOCALE_LABELS: Record<LocaleId, string> = {
 const STORAGE_KEY = 'hermes-workspace-locale'
 
 export function getLocale(): LocaleId {
-  if (typeof window === 'undefined') return 'en'
+  if (typeof window === 'undefined') return 'ru'
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored && stored in LOCALES) return stored as LocaleId
-  const full = navigator.language
-  if (full in LOCALES) return full as LocaleId
-  const lang = full.split('-')[0]
-  if (lang in LOCALES) return lang as LocaleId
-  return 'en'
+  // AWG GPT: интерфейс по умолчанию русский
+  return 'ru'
 }
 
 export function setLocale(id: LocaleId): void {

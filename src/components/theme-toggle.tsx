@@ -14,9 +14,9 @@ const MODES: Array<{
   icon: typeof ComputerIcon
   label: string
 }> = [
-  { value: 'system', icon: ComputerIcon, label: 'System' },
-  { value: 'light', icon: Sun01Icon, label: 'Light' },
-  { value: 'dark', icon: Moon01Icon, label: 'Dark' },
+  { value: 'system', icon: ComputerIcon, label: 'Система' },
+  { value: 'light', icon: Sun01Icon, label: 'Светлая' },
+  { value: 'dark', icon: Moon01Icon, label: 'Тёмная' },
 ]
 
 type ThemeToggleProps = {

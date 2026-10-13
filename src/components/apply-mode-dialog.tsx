@@ -77,7 +77,7 @@ export function ApplyModeDialog({
           id="apply-mode-title"
           className="mb-2 text-lg font-semibold text-primary-900"
         >
-          Switch Model?
+          Сменить модель?
         </h2>
 
         <p className="mb-6 text-sm text-primary-600">
@@ -92,14 +92,14 @@ export function ApplyModeDialog({
             onClick={handleSkip}
             className="rounded-lg border border-primary-200 bg-surface px-4 py-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
-            Skip
+            Пропустить
           </button>
           <button
             type="button"
             onClick={handleSwitchNow}
             className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
-            Switch Now
+            Переключить сейчас
           </button>
         </div>
       </div>

@@ -22,19 +22,19 @@ export const Route = createFileRoute('/chat/$sessionKey')({
         <div className="max-w-md">
           <div className="mb-4 text-5xl">💬</div>
           <h2 className="text-xl font-semibold text-primary-900 mb-3">
-            Chat Error
+            Ошибка чата
           </h2>
           <p className="text-sm text-primary-600 mb-6">
             {error instanceof Error
               ? error.message
-              : 'Failed to load chat session'}
+              : 'Не удалось загрузить сессию чата'}
           </p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={reset}
               className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
             >
-              Try Again
+              Повторить
             </button>
             <button
               onClick={() => {
@@ -43,7 +43,7 @@ export const Route = createFileRoute('/chat/$sessionKey')({
               }}
               className="px-4 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors"
             >
-              Return to Main
+              Вернуться на главную
             </button>
           </div>
         </div>
@@ -123,7 +123,7 @@ function ChatRoute() {
   if (!mounted) {
     return (
       <div className="flex h-full items-center justify-center text-primary-400">
-        Loading chat…
+        Загрузка чата…
       </div>
     )
   }
@@ -133,7 +133,7 @@ function ChatRoute() {
       <Suspense
         fallback={
           <div className="flex h-full items-center justify-center text-primary-400">
-            Loading chat…
+            Загрузка чата…
           </div>
         }
       >

@@ -87,14 +87,14 @@ function MemoryEditor({
             className="tabular-nums"
           >
             <HugeiconsIcon icon={FloppyDiskIcon} size={20} strokeWidth={1.5} />
-            Save
+            Сохранить
           </Button>
         </div>
       </header>
       <div className="min-h-0 flex-1">
         {loading ? (
           <div className="flex h-full items-center justify-center text-sm text-primary-600 text-pretty">
-            Loading file content...
+            Загрузка содержимого файла...
           </div>
         ) : error ? (
           <div className="flex h-full items-center justify-center px-5 text-sm text-red-700 text-pretty">

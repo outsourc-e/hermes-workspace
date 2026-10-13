@@ -253,7 +253,7 @@ function ChatHeaderComponent({
             type="button"
             onClick={openHamburgerMenu}
             className="shrink-0 flex items-center justify-center w-11 h-11 -ml-1 rounded-xl active:bg-white/10 transition-colors z-10"
-            aria-label="Open navigation menu"
+            aria-label="Открыть меню навигации"
           >
             <svg
               width="20"
@@ -276,7 +276,7 @@ function ChatHeaderComponent({
             type="button"
             onClick={onOpenSessions}
             className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 dark:bg-neutral-700/80 dark:hover:bg-neutral-600/80 transition-colors"
-            aria-label="Switch session"
+            aria-label="Переключить сессию"
           >
             <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
               {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
@@ -319,7 +319,7 @@ function ChatHeaderComponent({
                     variant="ghost"
                     className="mr-2 text-primary-800 hover:bg-primary-100 dark:hover:bg-primary-800"
                     aria-label={
-                      fileExplorerCollapsed ? 'Show files' : 'Hide files'
+                      fileExplorerCollapsed ? 'Показать файлы' : 'Скрыть файлы'
                     }
                   >
                     <HugeiconsIcon
@@ -331,7 +331,7 @@ function ChatHeaderComponent({
                 }
               />
               <TooltipContent side="bottom">
-                {fileExplorerCollapsed ? 'Show files' : 'Hide files'}
+                {fileExplorerCollapsed ? 'Показать файлы' : 'Скрыть файлы'}
               </TooltipContent>
             </TooltipRoot>
           </TooltipProvider>
@@ -358,7 +358,7 @@ function ChatHeaderComponent({
                 }
               }}
               className="h-7 w-full min-w-0 border-b border-transparent bg-transparent px-0 text-sm font-medium text-balance text-ink outline-none transition-colors focus:border-primary-300"
-              aria-label="Session name"
+              aria-label="Название сессии"
             />
           ) : (
             <div
@@ -369,7 +369,7 @@ function ChatHeaderComponent({
                 type="button"
                 onClick={() => setSessionPopoverOpen((p) => !p)}
                 className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
-                title="Click to switch session"
+                title="Нажмите, чтобы переключить сессию"
               >
                 {activeTitle}
               </button>
@@ -378,7 +378,7 @@ function ChatHeaderComponent({
                   type="button"
                   onClick={startTitleEdit}
                   className="text-xs text-primary-400 opacity-0 group-hover:opacity-100 hover:text-primary-600 transition-opacity shrink-0"
-                  title="Rename session"
+                  title="Переименовать сессию"
                 >
                   ✏️
                 </button>
@@ -408,7 +408,7 @@ function ChatHeaderComponent({
                       <input
                         autoFocus
                         type="text"
-                        placeholder="Search sessions..."
+                        placeholder="Поиск сессий..."
                         value={sessionSearch}
                         onChange={(e) => setSessionSearch(e.target.value)}
                         className="flex-1 bg-transparent text-sm outline-none"
@@ -488,7 +488,7 @@ function ChatHeaderComponent({
         {renamingTitle ? (
           <span
             className="mr-1 inline-flex size-3 animate-spin rounded-full border border-primary-300 border-t-primary-700"
-            aria-label="Saving session name"
+            aria-label="Сохраняю название сессии"
           />
         ) : null}
         {showThinkingIndicator ? (
@@ -498,7 +498,7 @@ function ChatHeaderComponent({
                 render={
                   <span
                     className="mr-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    aria-label="Thinking: Adaptive"
+                    aria-label="Размышления: адаптивные"
                     role="status"
                     style={{ boxShadow: '0 0 6px 1px rgba(251,191,36,0.4)' }}
                   >
@@ -507,7 +507,7 @@ function ChatHeaderComponent({
                 }
               />
               <TooltipContent side="bottom">
-                Thinking: Adaptive — Hermes reasons before responding
+                Размышления: адаптивные — перед ответом модель рассуждает
               </TooltipContent>
             </TooltipRoot>
           </TooltipProvider>
@@ -555,13 +555,13 @@ function ChatHeaderComponent({
                     size="icon-sm"
                     variant="ghost"
                     className="text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800"
-                    aria-label="Undo last message"
+                    aria-label="Отменить последнее сообщение"
                   >
                     <span className="text-sm">↩️</span>
                   </Button>
                 }
               />
-              <TooltipContent side="bottom">Undo last message</TooltipContent>
+              <TooltipContent side="bottom">Отменить последнее сообщение</TooltipContent>
             </TooltipRoot>
           </TooltipProvider>
         )}

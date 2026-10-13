@@ -24,25 +24,25 @@ function getSetupSteps(
 ): Array<{ title: string; command: string; note?: string }> {
   return [
     {
-      title: 'Use any OpenAI-compatible backend',
-      command: 'Set HERMES_API_URL to your backend base URL',
+      title: 'Любой OpenAI-совместимый бэкенд',
+      command: 'Укажите базовый URL бэкенда в HERMES_API_URL',
       note: 'Portable chat works with any backend that exposes /v1/chat/completions (Ollama, LiteLLM, vLLM, etc.)',
     },
     {
-      title: 'Optional: install Hermes Agent locally',
+      title: 'По желанию: установить AWG GPT локально',
       command:
         'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash',
-      note: 'Vanilla hermes-agent unlocks sessions, skills, memory, jobs, and config automatically — no fork required',
+      note: 'Сессии, навыки, память, задания и конфигурация включаются автоматически — форк не нужен',
     },
     {
-      title: 'Set up your agent',
+      title: 'Настройте агента',
       command: 'hermes setup',
-      note: 'Pick your providers once; Hermes Agent stores them under ~/.hermes',
+      note: 'Pick your providers once; AWG GPT stores them under ~/.hermes',
     },
     {
-      title: 'Start the gateway',
+      title: 'Запустить шлюз',
       command: 'hermes gateway run',
-      note: 'This starts the HTTP API on :8642 for the workspace',
+      note: 'Запускает HTTP API на :8642 для рабочего пространства',
     },
   ]
 }
@@ -113,7 +113,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           setServerLog([
             String(
               data.message ||
-                'Auto-started Hermes Agent gateway — reconnecting…',
+                'Auto-started AWG GPT gateway — reconnecting…',
             ),
           ])
         }
@@ -212,33 +212,34 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-white"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-[#F3F1F6]"
       style={{
-        backgroundColor: '#0A0E1A',
+        backgroundColor: '#141316',
+        color: '#F3F1F6',
         fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >
       <div className="flex w-full max-w-lg flex-col items-center text-center">
         <img
           src="/claude-avatar.webp"
-          alt="Hermes Agent"
+          alt="AWG GPT"
           className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
         />
 
-        <h1 className="text-[2rem] font-semibold tracking-tight text-white">
-          Hermes Workspace
+        <h1 className="text-[2rem] font-semibold tracking-tight text-[#F3F1F6]">
+          AWG GPT
         </h1>
 
         {/* Connecting spinner */}
         <div
           className={[
-            'mt-4 flex items-center gap-3 text-sm text-white/72 transition-opacity duration-300',
+            'mt-4 flex items-center gap-3 text-sm text-[#F3F1F6]/72 transition-opacity duration-300',
             showFailureState ? 'opacity-0 h-0' : 'opacity-100',
           ].join(' ')}
           aria-hidden={showFailureState}
         >
           <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
-          <span>Connecting to your backend...</span>
+          <span>Подключаюсь к бэкенду...</span>
         </div>
 
         {/* Failure state — setup guide */}
@@ -251,13 +252,11 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
           ].join(' ')}
         >
           <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-            <p className="text-base font-medium text-white">
+            <p className="text-base font-medium text-[#F3F1F6]">
               Welcome! Let&apos;s connect your backend
             </p>
-            <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace works with any OpenAI-compatible backend. Hermes Agent
-              gateway APIs unlock enhanced features automatically when they are
-              available.
+            <p className="mt-2 text-sm leading-6 text-[#F3F1F6]/60">
+              AWG GPT работает с любым OpenAI-совместимым бэкендом. Расширенные функции включаются автоматически, когда API шлюза доступен.
             </p>
 
             {/* Auto-start section */}
@@ -269,8 +268,8 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                 className={[
                   'w-full rounded-xl px-5 py-3 text-sm font-semibold transition',
                   serverStarting
-                    ? 'cursor-not-allowed bg-indigo-900/70 text-indigo-200'
-                    : 'bg-indigo-500 text-white hover:bg-indigo-400',
+                    ? 'cursor-not-allowed bg-[#7657c7]/40 text-[#d0cad9]'
+                    : 'bg-[#7657c7] text-white hover:bg-[#8d73d6]',
                 ].join(' ')}
               >
                 {serverStarting ? (
@@ -279,7 +278,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                     Detecting...
                   </span>
                 ) : (
-                  'Auto-Start Hermes Agent Gateway'
+                  'Auto-Start AWG GPT Gateway'
                 )}
               </button>
 
@@ -293,7 +292,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                       : 'border-emerald-500/20 bg-emerald-950/30',
                   ].join(' ')}
                 >
-                  <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-white/70">
+                  <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-[#F3F1F6]/70">
                     {serverLog.join('\n')}
                   </pre>
                 </div>
@@ -306,7 +305,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
               <button
                 type="button"
                 onClick={() => setShowManual(!showManual)}
-                className="text-xs font-medium text-white/50 transition hover:text-white/70"
+                className="text-xs font-medium text-[#F3F1F6]/50 transition hover:text-[#F3F1F6]/70"
               >
                 {showManual ? 'Hide' : 'Show'} manual setup
               </button>
@@ -328,26 +327,26 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-300">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#b79cff]/20 text-xs font-bold text-[#b79cff]">
                           {idx + 1}
                         </span>
-                        <span className="text-sm font-medium text-white/90">
+                        <span className="text-sm font-medium text-[#F3F1F6]/90">
                           {step.title}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleCopy(step.command, idx)}
-                        className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white/80"
+                        className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-[#F3F1F6]/60 transition hover:bg-white/10 hover:text-[#F3F1F6]/80"
                       >
                         {copiedIdx === idx ? '✓ Copied' : 'Copy'}
                       </button>
                     </div>
-                    <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-3 font-mono text-xs leading-5 text-white/80">
+                    <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-3 font-mono text-xs leading-5 text-[#F3F1F6]/80">
                       <code>{step.command}</code>
                     </pre>
                     {step.note ? (
-                      <p className="mt-2 text-xs text-white/40">{step.note}</p>
+                      <p className="mt-2 text-xs text-[#F3F1F6]/40">{step.note}</p>
                     ) : null}
                   </div>
                 ))}
@@ -355,14 +354,14 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
               {/* Env var hint */}
               <div className="mt-4 rounded-xl border border-white/6 bg-white/3 p-3">
-                <p className="text-xs font-medium text-white/50">
+                <p className="text-xs font-medium text-[#F3F1F6]/50">
                   Point{' '}
-                  <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">
+                  <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[#F3F1F6]/70">
                     HERMES_API_URL
                   </code>{' '}
                   at any OpenAI-compatible backend:
                 </p>
-                <pre className="mt-2 overflow-x-auto font-mono text-xs text-white/60">
+                <pre className="mt-2 overflow-x-auto font-mono text-xs text-[#F3F1F6]/60">
                   HERMES_API_URL=http://your-server:8642 pnpm dev
                 </pre>
               </div>
@@ -371,8 +370,8 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         </div>
 
         {!showFailureState ? (
-          <p className="mt-6 text-xs text-white/45">
-            This page auto-refreshes when a compatible backend is detected
+          <p className="mt-6 text-xs text-[#F3F1F6]/45">
+            Страница обновится автоматически, когда будет найден совместимый бэкенд
           </p>
         ) : null}
       </div>

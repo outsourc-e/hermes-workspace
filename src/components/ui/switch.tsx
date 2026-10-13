@@ -41,7 +41,7 @@ function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
         aria-hidden="true"
         className="pointer-events-none absolute right-1 select-none text-[8px] font-bold uppercase tracking-wide text-primary-700 opacity-100 transition-opacity duration-150 dark:text-neutral-300 in-data-checked:opacity-0"
       >
-        OFF
+        ВЫКЛ
       </span>
       <SwitchPrimitive.Thumb
         className={cn(

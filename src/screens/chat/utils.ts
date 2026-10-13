@@ -286,7 +286,7 @@ export async function readError(res: Response): Promise<string> {
 }
 
 export const missingAuthMessage =
-  'Hermes Agent connection failed. Make sure Hermes Agent is running and HERMES_API_URL is set correctly.'
+  'Не удалось подключиться к AWG GPT. Убедитесь, что AWG GPT запущен и HERMES_API_URL указан верно.'
 
 export function isMissingAuth(message: string): boolean {
   return message.includes(missingAuthMessage)

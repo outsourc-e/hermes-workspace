@@ -27,12 +27,12 @@ import { filterResults, useSearchData } from '@/hooks/use-search-data'
 import { cn } from '@/lib/utils'
 
 const SCOPE_TABS: Array<{ value: SearchScope; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'chats', label: '💬 Chats' },
-  { value: 'files', label: '📁 Files' },
-  { value: 'agents', label: '🤖 Agents' },
-  { value: 'skills', label: '🛠️ Skills' },
-  { value: 'actions', label: '⚡ Actions' },
+  { value: 'all', label: 'Все' },
+  { value: 'chats', label: '💬 Чаты' },
+  { value: 'files', label: '📁 Файлы' },
+  { value: 'agents', label: '🤖 Агенты' },
+  { value: 'skills', label: '🛠️ Навыки' },
+  { value: 'actions', label: '⚡ Действия' },
 ]
 
 const RESULT_LIMITS = {
@@ -86,8 +86,8 @@ export function SearchModal() {
       {
         id: 'qa-new-chat',
         emoji: '💬',
-        label: 'New Chat',
-        description: 'Start a new conversation session',
+        label: 'Новый чат',
+        description: 'Начать новую сессию диалога',
         onSelect: () => {
           closeModal()
           // /chat redirects to last session — force the new sentinel. See #300.
@@ -97,8 +97,8 @@ export function SearchModal() {
       {
         id: 'qa-skills',
         emoji: '🛠️',
-        label: 'Skills',
-        description: 'Manage installed and available skills',
+        label: 'Навыки',
+        description: 'Управление установленными и доступными навыками',
         onSelect: () => {
           closeModal()
           navigate({ to: '/skills' })
@@ -108,7 +108,7 @@ export function SearchModal() {
         id: 'qa-mcp',
         emoji: '🔌',
         label: 'MCP',
-        description: 'Manage MCP servers and presets',
+        description: 'Управление MCP-серверами и пресетами',
         onSelect: () => {
           closeModal()
           navigate({ to: '/mcp' })
@@ -117,8 +117,8 @@ export function SearchModal() {
       {
         id: 'qa-memory',
         emoji: '🧠',
-        label: 'Memory',
-        description: 'Browse durable memory entries',
+        label: 'Память',
+        description: 'Просмотр записей долговременной памяти',
         onSelect: () => {
           closeModal()
           navigate({ to: '/memory' })
@@ -127,8 +127,8 @@ export function SearchModal() {
       {
         id: 'qa-files',
         emoji: '📁',
-        label: 'Files',
-        description: 'Toggle the file explorer sidebar',
+        label: 'Файлы',
+        description: 'Показать или скрыть проводник файлов',
         onSelect: () => {
           closeModal()
           emitSearchModalEvent(SEARCH_MODAL_EVENTS.TOGGLE_FILE_EXPLORER)
@@ -137,8 +137,8 @@ export function SearchModal() {
       {
         id: 'qa-settings',
         emoji: '⚙️',
-        label: 'Settings',
-        description: 'Open the settings workspace',
+        label: 'Настройки',
+        description: 'Открыть раздел настроек',
         onSelect: () => {
           closeModal()
           navigate({ to: '/settings', search: {} })
@@ -147,8 +147,8 @@ export function SearchModal() {
       {
         id: 'qa-usage',
         emoji: '📊',
-        label: 'Usage',
-        description: 'Open usage meter details',
+        label: 'Использование',
+        description: 'Открыть подробности расхода',
         onSelect: () => {
           closeModal()
           emitSearchModalEvent(SEARCH_MODAL_EVENTS.OPEN_USAGE)
@@ -487,13 +487,13 @@ export function SearchModal() {
             <div className="flex items-center justify-between border-t border-primary-200 bg-primary-50/80 px-3 py-2 text-[11px] text-primary-500">
               <div className="flex items-center gap-1.5">
                 <HugeiconsIcon icon={CommandIcon} size={20} strokeWidth={1.5} />
-                <span>Arrow keys to navigate</span>
+                <span>Стрелки для навигации</span>
               </div>
               <div className="flex items-center gap-2 tabular-nums">
-                <span>Tab scope</span>
+                <span>Область вкладки</span>
                 <span>1-9 jump</span>
                 <span>↵ open</span>
-                <span>Esc close</span>
+                <span>Esc — закрыть</span>
               </div>
             </div>
           </motion.div>

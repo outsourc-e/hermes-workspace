@@ -60,7 +60,7 @@ type HugeIcon = typeof Settings02Icon
 
 function timeAgo(ts: number): string {
   const diff = Date.now() / 1000 - ts
-  if (diff < 60) return 'just now'
+  if (diff < 60) return 'только что'
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return `${Math.floor(diff / 86400)}d ago`
@@ -169,7 +169,7 @@ function GlassCard({
   )
 }
 
-function EnhancedBadge({ label = 'Enhanced API' }: { label?: string }) {
+function EnhancedBadge({ label = 'Расширенный API' }: { label?: string }) {
   return (
     <span
       className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
@@ -287,7 +287,7 @@ function ActivityChart({
 
   return (
     <GlassCard
-      title="Activity"
+      title="Активность"
       titleRight={<span className="text-[10px] text-muted">14 days</span>}
       accentColor={palette.accent}
       className="h-full"
@@ -365,11 +365,11 @@ function ActivityChart({
       <div className="mt-2 flex items-center gap-5 text-[10px] text-muted">
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full" style={{ background: palette.accent }} />
-          Sessions
+          Сессии
         </span>
         <span className="flex items-center gap-1.5">
           <span className="size-2 rounded-full" style={{ background: palette.success }} />
-          Messages
+          Сообщения
         </span>
       </div>
     </GlassCard>
@@ -405,13 +405,13 @@ function SkillsWidget({
   if (!skillsAvailable) {
     return (
       <UnavailableWidget
-        title="Skills"
+        title="Навыки"
         description={getUnavailableReason('skills')}
       />
     )
   }
 
-  // Summary view per Hermes Agent feedback: 'don’t enumerate, summarise.'
+  // Summary view per AWG GPT feedback: 'don’t enumerate, summarise.'
   // Prefer real usage signal from /api/analytics/usage when present
   // (counts what the agent *actually used*, not just what's installed).
   const installed = skills.length
@@ -444,13 +444,13 @@ function SkillsWidget({
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          Skills
+          Навыки
         </h3>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          manage →
+          управлять →
         </span>
       </div>
       <div
@@ -464,7 +464,7 @@ function SkillsWidget({
         style={{ color: 'var(--theme-muted)' }}
       >
         {installed === 0
-          ? 'no skills installed'
+          ? 'навыки не установлены'
           : usedThisWindow !== null && usedThisWindow > 0
             ? `${enabled} enabled · ${usedThisWindow} used · top: ${topName}`
             : `${enabled} enabled · top: ${topName}`}
@@ -836,7 +836,7 @@ export function DashboardScreen() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <button
           type="button"
-          aria-label="Open navigation menu"
+          aria-label="Открыть меню навигации"
           onClick={openHamburgerMenu}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
         >
@@ -846,7 +846,7 @@ export function DashboardScreen() {
         </button>
         <button
           type="button"
-          aria-label="Toggle theme"
+          aria-label="Переключить тему"
           onClick={() => {
             const LIGHT_DARK_PAIRS: Record<string, string> = {
               'claude-nous': 'claude-nous-light',
@@ -875,7 +875,7 @@ export function DashboardScreen() {
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
       {/* ── Header: brand lockup left, action cluster right.
            Iteration 010: dropped redundant "Dashboard" eyebrow (the
-           page IS the dashboard); promoted "Hermes Workspace" to
+           page IS the dashboard); promoted "AWG GPT" to
            the primary heading at a larger weight. Logo bumped from
            36px → 44px and gets a soft accent glow + ring so the
            lockup commands the left side instead of feeling like
@@ -900,7 +900,7 @@ export function DashboardScreen() {
           >
             <img
               src="/claude-avatar.webp"
-              alt="Hermes Workspace logo"
+              alt="Логотип AWG GPT"
               className="size-8 rounded-md"
               style={{ background: 'transparent' }}
             />
@@ -920,11 +920,11 @@ export function DashboardScreen() {
                 lineHeight: 1.1,
               }}
             >
-              Hermes Workspace
+              AWG GPT
             </h1>
           </div>
         </div>
-        {/* Action row: hierarchy per Hermes Agent review.
+        {/* Action row: hierarchy per AWG GPT review.
            New Chat is primary (full button + accent), Terminal +
            Skills are secondary, Settings collapses to icon-only. */}
         <div className="flex w-full flex-wrap items-center gap-2 lg:justify-end lg:max-w-xl">
@@ -956,15 +956,15 @@ export function DashboardScreen() {
               size={16}
               strokeWidth={1.8}
             />
-            <span>New Chat</span>
+            <span>Новый чат</span>
           </button>
           <SecondaryAction
-            label="Terminal"
+            label="Терминал"
             icon={ConsoleIcon}
             onClick={() => navigate({ to: '/terminal' })}
           />
           <SecondaryAction
-            label="Skills"
+            label="Навыки"
             icon={PuzzleIcon}
             onClick={() => navigate({ to: '/skills' })}
             disabled={!skillsAvailable}
@@ -974,8 +974,8 @@ export function DashboardScreen() {
               hidden widgets. Persisted to localStorage. */}
           <button
             type="button"
-            aria-label={layout.editMode ? 'Done editing layout' : 'Edit layout'}
-            title={layout.editMode ? 'Done editing layout' : 'Edit layout'}
+            aria-label={layout.editMode ? 'Завершить редактирование' : 'Редактировать раскладку'}
+            title={layout.editMode ? 'Завершить редактирование' : 'Редактировать раскладку'}
             onClick={layout.toggleEdit}
             className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70"
             style={{
@@ -998,8 +998,8 @@ export function DashboardScreen() {
           </button>
           <button
             type="button"
-            aria-label="Settings"
-            title="Settings"
+            aria-label="Настройки"
+            title="Настройки"
             onClick={() => navigate({ to: '/settings', search: {} })}
             className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
             style={{
@@ -1144,7 +1144,7 @@ export function DashboardScreen() {
               <WidgetShell id="sessions_intelligence" layout={layout}>
                 {sessionsQuery.isError || sessionsUnavailable ? (
                   <UnavailableWidget
-                    title="Recent Sessions"
+                    title="Недавние сессии"
                     description={
                       sessionsQuery.isError
                         ? getUnavailableReason('sessions')

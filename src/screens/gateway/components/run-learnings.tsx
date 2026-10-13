@@ -22,15 +22,15 @@ type LearningCategory = RunLearningsProps['learnings'][number]['category']
 type CategoryFilter = 'all' | LearningCategory
 
 const FILTER_OPTIONS: Array<{ key: CategoryFilter; label: string; className?: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'success', label: 'Success', className: 'border-emerald-700/60 bg-emerald-900/30 text-emerald-300' },
-  { key: 'failure', label: 'Failure', className: 'border-red-700/60 bg-red-900/30 text-red-300' },
-  { key: 'optimization', label: 'Optimization', className: 'border-sky-700/60 bg-sky-900/30 text-sky-300' },
+  { key: 'all', label: 'Все' },
+  { key: 'success', label: 'Успешно', className: 'border-emerald-700/60 bg-emerald-900/30 text-emerald-300' },
+  { key: 'failure', label: 'Сбой', className: 'border-red-700/60 bg-red-900/30 text-red-300' },
+  { key: 'optimization', label: 'Оптимизация', className: 'border-sky-700/60 bg-sky-900/30 text-sky-300' },
 ]
 
 function relativeTime(ts: number, now: number): string {
   const seconds = Math.max(0, Math.floor((now - ts) / 1000))
-  if (seconds < 5) return 'just now'
+  if (seconds < 5) return 'только что'
   if (seconds < 60) return `${seconds}s ago`
   if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
@@ -112,7 +112,7 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
           onClick={onClose}
           className="rounded-lg border border-primary-700 px-2.5 py-1 text-xs font-medium text-primary-300 transition-colors hover:bg-primary-900 hover:text-primary-100"
         >
-          Close
+          Закрыть
         </button>
       </header>
 
@@ -139,7 +139,7 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {filteredLearnings.length === 0 ? (
           <div className="rounded-xl border border-dashed border-primary-800 bg-primary-900/60 px-4 py-8 text-center text-sm text-primary-300">
-            No learnings yet for this filter.
+            По этому фильтру знаний пока нет.
           </div>
         ) : (
           <ol className="space-y-2">
@@ -188,7 +188,7 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
       <form onSubmit={handleSubmit} className="border-t border-primary-800 px-4 py-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="sr-only" htmlFor="learning-category">
-            Category
+            Категория
           </label>
           <select
             id="learning-category"
@@ -196,20 +196,20 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
             onChange={(event) => setDraftCategory(event.target.value as LearningCategory)}
             className="h-10 rounded-lg border border-primary-700 bg-primary-900 px-3 text-sm text-primary-100 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
           >
-            <option value="success">Success</option>
-            <option value="failure">Failure</option>
-            <option value="optimization">Optimization</option>
+            <option value="success">Успешно</option>
+            <option value="failure">Сбой</option>
+            <option value="optimization">Оптимизация</option>
           </select>
 
           <label className="sr-only" htmlFor="learning-text">
-            Learning text
+            Текст знания
           </label>
           <input
             id="learning-text"
             type="text"
             value={draftText}
             onChange={(event) => setDraftText(event.target.value)}
-            placeholder="Add a reusable learning..."
+            placeholder="Добавьте переиспользуемое знание..."
             className="h-10 min-w-0 flex-1 rounded-lg border border-primary-700 bg-primary-900 px-3 text-sm text-primary-100 placeholder:text-primary-400 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
 
@@ -218,7 +218,7 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
             disabled={!draftText.trim()}
             className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-semibold text-primary-950 transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Add Learning
+            Добавить знание
           </button>
         </div>
       </form>

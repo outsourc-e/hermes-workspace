@@ -170,7 +170,7 @@ export function ChatPanel() {
                           size="icon-sm"
                           variant="ghost"
                           className="text-primary-600 hover:text-primary-900"
-                          aria-label="New chat"
+                          aria-label="Новый чат"
                         >
                           <HugeiconsIcon
                             icon={PencilEdit02Icon}
@@ -180,7 +180,7 @@ export function ChatPanel() {
                         </Button>
                       }
                     />
-                    <TooltipContent side="bottom">New chat</TooltipContent>
+                    <TooltipContent side="bottom">Новый чат</TooltipContent>
                   </TooltipRoot>
                   <TooltipRoot>
                     <TooltipTrigger
@@ -190,7 +190,7 @@ export function ChatPanel() {
                           size="icon-sm"
                           variant="ghost"
                           className="text-primary-600 hover:text-primary-900"
-                          aria-label="Expand to full chat"
+                          aria-label="Развернуть на весь чат"
                         >
                           <HugeiconsIcon
                             icon={ArrowExpand01Icon}
@@ -200,7 +200,7 @@ export function ChatPanel() {
                         </Button>
                       }
                     />
-                    <TooltipContent side="bottom">Full view</TooltipContent>
+                    <TooltipContent side="bottom">Полный вид</TooltipContent>
                   </TooltipRoot>
                 </TooltipProvider>
                 <Button
@@ -208,7 +208,7 @@ export function ChatPanel() {
                   variant="ghost"
                   onClick={handleClose}
                   className="text-primary-600 hover:text-primary-900"
-                  aria-label="Close chat panel"
+                  aria-label="Закрыть панель чата"
                 >
                   <HugeiconsIcon
                     icon={Cancel01Icon}

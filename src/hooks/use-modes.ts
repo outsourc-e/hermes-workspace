@@ -75,7 +75,7 @@ export function useModes() {
     ): Mode | { error: string } => {
       // Check for duplicate names
       if (modes.some((m) => m.name.toLowerCase() === name.toLowerCase())) {
-        return { error: 'A mode with this name already exists' }
+        return { error: 'Режим с таким названием уже есть' }
       }
 
       const newMode: Mode = {
@@ -103,7 +103,7 @@ export function useModes() {
           (m) => m.id !== id && m.name.toLowerCase() === newName.toLowerCase(),
         )
       ) {
-        return { error: 'A mode with this name already exists' }
+        return { error: 'Режим с таким названием уже есть' }
       }
 
       setModes((prev) =>

@@ -178,7 +178,7 @@ function ContextBarComponent({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium text-primary-900">
-              Context Window
+              Контекстное окно
             </span>
             <span
               className={cn(
@@ -211,7 +211,7 @@ function ContextBarComponent({
           </div>
           {isCritical && (
             <p className="text-[10px] text-red-600 font-medium">
-              Context almost full — consider starting a new chat
+              Контекст почти заполнен — начните новый чат
             </p>
           )}
         </div>

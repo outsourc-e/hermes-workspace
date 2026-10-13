@@ -54,27 +54,27 @@ export const MISSION_CONTROL_STATUS_META: Record<
   }
 > = {
   running: {
-    label: 'Running',
+    label: 'Выполняется',
     className:
       'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300',
   },
   paused: {
-    label: 'Paused',
+    label: 'На паузе',
     className:
       'border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300',
   },
   completed: {
-    label: 'Completed',
+    label: 'Выполнено',
     className:
       'border border-neutral-200 bg-neutral-100 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
   },
   aborted: {
-    label: 'Aborted',
+    label: 'Прервано',
     className:
       'border border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300',
   },
   stopped: {
-    label: 'Stopped',
+    label: 'Остановлено',
     className:
       'border border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
   },

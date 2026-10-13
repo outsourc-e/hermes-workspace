@@ -123,12 +123,12 @@ type WorkerReportCard = {
 }
 
 const STATE_FILTERS: Array<{ id: ReportState; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'needs_review', label: 'Needs review' },
+  { id: 'all', label: 'Все' },
+  { id: 'needs_review', label: 'Нужна проверка' },
   { id: 'ready', label: 'Ready' },
   { id: 'blocked', label: 'Blocked' },
   { id: 'artifact', label: 'Artifacts' },
-  { id: 'in_progress', label: 'In progress' },
+  { id: 'in_progress', label: 'В работе' },
 ]
 
 function clean(value: string | null | undefined, fallback = '—'): string {
@@ -184,7 +184,7 @@ function stateForRuntime(entry: RuntimeReportEntry): Exclude<ReportState, 'all'>
 function stateLabel(state: Exclude<ReportState, 'all'>): string {
   switch (state) {
     case 'needs_review':
-      return 'Needs review'
+      return 'Нужна проверка'
     case 'ready':
       return 'Ready'
     case 'blocked':
@@ -192,7 +192,7 @@ function stateLabel(state: Exclude<ReportState, 'all'>): string {
     case 'artifact':
       return 'Artifact'
     case 'in_progress':
-      return 'In progress'
+      return 'В работе'
   }
 }
 
@@ -322,7 +322,7 @@ function formatAge(value: number | null): string {
   if (!value) return 'unknown age'
   const diff = Math.max(0, Date.now() - value)
   const minutes = Math.floor(diff / 60_000)
-  if (minutes < 1) return 'just now'
+  if (minutes < 1) return 'только что'
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.floor(minutes / 60)
   if (hours < 48) return `${hours}h ago`
@@ -736,10 +736,10 @@ export function Swarm2ReportsView({
     <section className="rounded-[1.5rem] border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-[0_20px_60px_color-mix(in_srgb,var(--theme-shadow)_14%,transparent)]">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Outputs / Reports</div>
-          <h2 className="mt-1 text-lg font-semibold text-[var(--theme-text)]">Worker reports</h2>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Результаты / отчёты</div>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--theme-text)]">Отчёты исполнителей</h2>
           <p className="mt-1 max-w-3xl text-xs text-[var(--theme-muted-2)]">
-            Board for queues, Cards for worker-level scanning, List for dense detail.
+            Доска — для очередей, карточки — для обзора по исполнителям, список — для подробностей.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
@@ -766,11 +766,11 @@ export function Swarm2ReportsView({
           </button>
         ))}
         <select value={workerFilter} onChange={(event) => setWorkerFilter(event.target.value)} className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none">
-          <option value="all">All workers</option>
+          <option value="all">Все исполнители</option>
           {workers.map((worker) => <option key={worker} value={worker}>{worker}</option>)}
         </select>
         <select value={missionFilter} onChange={(event) => setMissionFilter(event.target.value)} className="max-w-xs rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none">
-          <option value="all">All missions</option>
+          <option value="all">Все миссии</option>
           {missionOptions.map((mission) => <option key={mission.id} value={mission.id}>{mission.label}</option>)}
         </select>
         <div className="ml-auto flex rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] p-1">
@@ -798,7 +798,7 @@ export function Swarm2ReportsView({
 
       {layout === 'board' ? (
         <div className="grid gap-3 xl:grid-cols-3">
-          {renderInboxLane('needs_review', 'Needs review', inboxLanes.needs_review, 'Reviewer lane is clear. Route the next completed worker output through swarm6.')}
+          {renderInboxLane('needs_review', 'Нужна проверка', inboxLanes.needs_review, 'Reviewer lane is clear. Route the next completed worker output through swarm6.')}
           {renderInboxLane('blocked', 'Blocked / needs input', inboxLanes.blocked, 'No blockers waiting on human input.')}
           {renderInboxLane('ready', 'Ready', inboxLanes.ready, 'Nothing is ready yet.')}
         </div>
@@ -907,7 +907,7 @@ export function Swarm2ReportsView({
             )
           }) : (
             <div className="col-span-full rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] p-8 text-center text-sm text-[var(--theme-muted)]">
-              No worker reports match these filters yet.
+              Отчётов, подходящих под фильтры, пока нет.
             </div>
           )}
         </div>
@@ -970,7 +970,7 @@ export function Swarm2ReportsView({
                     </dl>
                     {(row.artifacts.length > 0 || row.previews.length > 0) ? (
                       <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2">
-                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Artifacts</div>
+                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Артефакты</div>
                         <div className="flex flex-wrap gap-1.5">
                           {row.artifacts.map((artifact) => (
                             <span key={artifact.id} title={artifact.path ?? artifact.label} className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] text-[var(--theme-muted-2)]">

@@ -70,7 +70,7 @@ export const SidebarSessions = memo(function SidebarSessions({
       defaultOpen={defaultOpen}
     >
       <CollapsibleTrigger className="w-full flex items-center gap-1.5 rounded-none px-5 pt-3 pb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wider hover:bg-transparent data-panel-open:text-primary-500">
-        <span className="select-none">Sessions</span>
+        <span className="select-none">Сессии</span>
         <span className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
           <HugeiconsIcon
             icon={ArrowDown01Icon}
@@ -108,11 +108,11 @@ export const SidebarSessions = memo(function SidebarSessions({
             <div className="flex flex-col gap-px pl-3 pr-2">
               {loading ? (
                 <div className="px-2 py-2 text-xs text-primary-500">
-                  Loading sessions…
+                  Загрузка сессий…
                 </div>
               ) : error ? (
                 <div className="px-2 py-2 text-xs text-primary-500">
-                  <div className="mb-2">Failed to load sessions.</div>
+                  <div className="mb-2">Не удалось загрузить сессии.</div>
                   <div className="text-[11px] opacity-80">{error}</div>
                   <Button
                     type="button"
@@ -121,7 +121,7 @@ export const SidebarSessions = memo(function SidebarSessions({
                     className="mt-2"
                     onClick={onRetry}
                   >
-                    Retry
+                    Повторить
                   </Button>
                 </div>
               ) : unpinnedSessions.length > 0 ? (
@@ -146,7 +146,7 @@ export const SidebarSessions = memo(function SidebarSessions({
                 <div className="px-2 py-2 text-xs text-primary-500">
                   {pinnedSessions.length > 0
                     ? 'All sessions are pinned.'
-                    : 'No sessions yet. Start a conversation →'}
+                    : 'Сессий пока нет. Начните диалог →'}
                 </div>
               )}
               {fetching && !loading && !error && sessions.length > 0 ? (

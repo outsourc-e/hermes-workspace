@@ -114,13 +114,13 @@ export function TerminalPanel() {
             className="absolute inset-x-0 top-0 h-1 cursor-row-resize bg-primary-300/50 transition-colors hover:bg-[#ea580c]/80"
             onMouseDown={handleResizeStart}
             role="separator"
-            aria-label="Resize terminal panel"
+            aria-label="Изменить размер панели терминала"
           />
           <div className="h-full pt-1">
             <Suspense
               fallback={
                 <div className="flex h-full items-center justify-center text-xs text-primary-500">
-                  Loading terminal…
+                  Загрузка терминала…
                 </div>
               }
             >

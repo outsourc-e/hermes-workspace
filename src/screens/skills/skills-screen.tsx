@@ -60,7 +60,7 @@ type ProfileSkillsResponse = {
 
 function titleCaseCategory(raw: string | null | undefined): string {
   const value = (raw || '').trim()
-  if (!value) return 'Productivity'
+  if (!value) return 'Продуктивность'
   return value
     .split(/[-_/]/)
     .map((word) =>
@@ -154,19 +154,19 @@ const PAGE_LIMIT = 30
 
 const DEFAULT_CATEGORIES = [
   'All',
-  'Web & Frontend',
-  'Coding Agents',
-  'Git & GitHub',
-  'DevOps & Cloud',
-  'Browser & Automation',
-  'Image & Video',
-  'Search & Research',
-  'AI & LLMs',
-  'Productivity',
-  'Marketing & Sales',
-  'Communication',
-  'Data & Analytics',
-  'Finance & Crypto',
+  'Веб и фронтенд',
+  'Агенты для кода',
+  'Git и GitHub',
+  'DevOps и облако',
+  'Браузер и автоматизация',
+  'Изображения и видео',
+  'Поиск и исследования',
+  'ИИ и LLM',
+  'Продуктивность',
+  'Маркетинг и продажи',
+  'Коммуникации',
+  'Данные и аналитика',
+  'Финансы и крипто',
 ]
 
 function resolveSkillSearchTier(
@@ -212,7 +212,7 @@ export function SkillsScreen() {
       const response = await fetch('/api/profiles/list')
       const payload = (await response.json()) as ProfileListResponse
       if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load profiles')
+        throw new Error(payload.error || 'Не удалось загрузить профили')
       }
       return payload
     },
@@ -286,7 +286,7 @@ export function SkillsScreen() {
           error?: string
         }
         if (!response.ok) {
-          throw new Error(payload.error || 'Failed to fetch profile skills')
+          throw new Error(payload.error || 'Не удалось получить навыки профиля')
         }
         const normalized = (payload.items || []).map(normalizeProfileSkill)
         const lowered = searchInput.trim().toLowerCase()
@@ -416,7 +416,7 @@ export function SkillsScreen() {
         const category =
           skill.category ||
           (skill.extra as Record<string, unknown>)?.category ||
-          'Productivity'
+          'Продуктивность'
 
         return {
           id: skillId,
@@ -643,14 +643,13 @@ export function SkillsScreen() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
-                Hermes Workspace Marketplace
+                Каталог AWG GPT
               </p>
               <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
-                Skills Browser
+                Обзор навыков
               </h1>
               <p className="text-sm text-primary-500 text-pretty sm:text-base">
-                Discover, install, and manage skills across your local workspace
-                and Skills Hub.
+                Поиск, установка и управление навыками в рабочем пространстве и каталоге навыков.
               </p>
             </div>
           </div>
@@ -662,7 +661,7 @@ export function SkillsScreen() {
               {profiles.length > 1 ? (
                 <label className="flex h-9 items-center gap-2 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-xs text-primary-500">
                   <span className="font-medium uppercase tracking-wider text-[10px]">
-                    Profile
+                    Профиль
                   </span>
                   <select
                     value={effectiveProfile}
@@ -671,7 +670,7 @@ export function SkillsScreen() {
                       setPage(1)
                     }}
                     className="h-7 rounded-md border border-primary-200 bg-primary-50/70 px-2 text-xs text-ink outline-none"
-                    aria-label="Profile"
+                    aria-label="Профиль"
                   >
                     {profiles.map((profile) => (
                       <option key={profile.name} value={profile.name}>
@@ -690,7 +689,7 @@ export function SkillsScreen() {
                 placeholder={
                   tab === 'marketplace'
                     ? 'Search Skills Hub, GitHub, and local fallback'
-                    : 'Search by name, tags, or description'
+                    : 'Поиск по названию, тегам или описанию'
                 }
                 className="h-9 w-full min-w-0 flex-1 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
               />
@@ -717,10 +716,10 @@ export function SkillsScreen() {
                   onChange={(event) => handleOriginChange(event.target.value)}
                   className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
                 >
-                  <option value="All">All Origins</option>
-                  <option value="builtin">Built-in</option>
-                  <option value="agent-created">Agent-created</option>
-                  <option value="marketplace">Marketplace</option>
+                  <option value="All">Все источники</option>
+                  <option value="builtin">Встроенные</option>
+                  <option value="agent-created">Созданные агентом</option>
+                  <option value="marketplace">Каталог</option>
                 </select>
               ) : null}
 
@@ -734,8 +733,8 @@ export function SkillsScreen() {
                   }
                   className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
                 >
-                  <option value="name">Name A-Z</option>
-                  <option value="category">Category</option>
+                  <option value="name">Название А–Я</option>
+                  <option value="category">Категория</option>
                 </select>
               ) : null}
 
@@ -744,11 +743,11 @@ export function SkillsScreen() {
                 variant="default"
               >
                 <TabsTab value="installed" className="min-w-[110px]">
-                  Installed
+                  Установлено
                 </TabsTab>
                 {isOnActiveProfile ? (
                   <TabsTab value="marketplace" className="min-w-[120px]">
-                    Marketplace
+                    Каталог
                   </TabsTab>
                 ) : null}
               </TabsList>
@@ -792,14 +791,13 @@ export function SkillsScreen() {
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {hubQuery.error instanceof Error
                     ? hubQuery.error.message
-                    : 'Failed to load marketplace skills.'}
+                    : 'Не удалось загрузить навыки из каталога.'}
                 </div>
               ) : hubQuery.data &&
                 (hubQuery.data.source === 'installed-fallback' ||
                   hubQuery.data.source === 'error') ? (
                 <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-                  Skills Hub search unavailable — showing installed skills
-                  instead. Ensure the Hermes Agent gateway is running.
+                  Поиск по каталогу навыков недоступен — показаны установленные навыки. Убедитесь, что шлюз AWG GPT запущен.
                 </div>
               ) : null}
 
@@ -849,7 +847,7 @@ export function SkillsScreen() {
                 disabled={page <= 1 || skillsQuery.isPending}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
-                Previous
+                Назад
               </Button>
               <span className="min-w-[82px] text-center">
                 {page} / {totalPages}
@@ -862,7 +860,7 @@ export function SkillsScreen() {
                   setPage((current) => Math.min(totalPages, current + 1))
                 }
               >
-                Next
+                Далее
               </Button>
             </div>
           </footer>
@@ -927,7 +925,7 @@ export function SkillsScreen() {
                         ))
                       ) : (
                         <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
-                          No triggers listed
+                          Триггеры не указаны
                         </span>
                       )}
                     </div>
@@ -960,9 +958,9 @@ export function SkillsScreen() {
                       )}
                     >
                       {selectedSkill.origin === 'builtin'
-                        ? 'Built-in'
+                        ? 'Встроенные'
                         : selectedSkill.origin === 'agent-created'
-                          ? 'Agent-created'
+                          ? 'Созданные агентом'
                           : 'Marketplace'}
                     </span>
                   ) : null}
@@ -985,7 +983,7 @@ export function SkillsScreen() {
                         })
                       }}
                     >
-                      Uninstall
+                      Удалить
                     </Button>
                   ) : (
                     <Button
@@ -995,7 +993,7 @@ export function SkillsScreen() {
                         runSkillAction('install', { skillId: selectedSkill.id })
                       }
                     >
-                      Install
+                      Установить
                     </Button>
                   )}
                   <Button
@@ -1003,7 +1001,7 @@ export function SkillsScreen() {
                     size="sm"
                     onClick={() => setSelectedSkill(null)}
                   >
-                    Close
+                    Закрыть
                   </Button>
                 </div>
               </div>
@@ -1035,22 +1033,22 @@ const SECURITY_BADGE: Record<
   { label: string; badgeClass: string; confidence: string }
 > = {
   safe: {
-    label: 'Benign',
+    label: 'Безвредно',
     badgeClass: 'bg-green-100 text-green-700 border-green-200',
     confidence: 'HIGH CONFIDENCE',
   },
   low: {
-    label: 'Benign',
+    label: 'Безвредно',
     badgeClass: 'bg-green-100 text-green-700 border-green-200',
     confidence: 'MODERATE',
   },
   medium: {
-    label: 'Caution',
+    label: 'Осторожно',
     badgeClass: 'bg-amber-100 text-amber-700 border-amber-200',
     confidence: 'REVIEW RECOMMENDED',
   },
   high: {
-    label: 'Warning',
+    label: 'Предупреждение',
     badgeClass: 'bg-red-100 text-red-700 border-red-200',
     confidence: 'MANUAL REVIEW',
   },
@@ -1120,12 +1118,12 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
     <div className="text-xs">
       <div className="px-3 pt-3 pb-2">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-400 mb-2">
-          Security Scan
+          Проверка безопасности
         </p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="text-primary-500 font-medium w-16 shrink-0">
-              Hermes Workspace
+              AWG GPT
             </span>
             <span
               className={cn(
@@ -1156,7 +1154,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
             }}
             className="flex w-full items-center justify-between px-3 py-2 text-accent-500 hover:text-accent-600 transition-colors"
           >
-            <span className="text-[11px] font-medium">Details</span>
+            <span className="text-[11px] font-medium">Подробности</span>
             <span className="text-[10px]">{showDetails ? '▲' : '▼'}</span>
           </button>
           {showDetails && (
@@ -1176,8 +1174,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
       )}
       <div className="border-t border-primary-100 px-3 py-2">
         <p className="text-[10px] text-primary-400 italic">
-          Like a lobster shell, security has layers — review code before you run
-          it.
+          Безопасность многослойна, как панцирь: проверяйте код перед запуском.
         </p>
       </div>
     </div>
@@ -1203,11 +1200,11 @@ function SkillsGrid({
     return (
       <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
         <p className="text-sm font-medium text-primary-700">
-          {emptyState?.title || 'No skills found'}
+          {emptyState?.title || 'Навыки не найдены'}
         </p>
         <p className="mt-1 text-xs text-primary-500 text-pretty max-w-sm mx-auto">
           {emptyState?.description ||
-            'Try adjusting your filters or search term'}
+            'Измените фильтры или поисковый запрос'}
         </p>
       </div>
     )
@@ -1255,9 +1252,9 @@ function SkillsGrid({
                       )}
                     >
                       {skill.origin === 'builtin'
-                        ? 'Built-in'
+                        ? 'Встроенные'
                         : skill.origin === 'agent-created'
-                          ? 'Agent-created'
+                          ? 'Созданные агентом'
                           : 'Marketplace'}
                     </span>
                   ) : null}
@@ -1299,7 +1296,7 @@ function SkillsGrid({
                   size="sm"
                   onClick={() => onOpenDetails(skill)}
                 >
-                  Details
+                  Подробности
                 </Button>
 
                 {tab === 'installed' ? (
@@ -1321,7 +1318,7 @@ function SkillsGrid({
                       disabled={isActing}
                       onClick={() => onUninstall(skill.id)}
                     >
-                      Uninstall
+                      Удалить
                     </Button>
                   </div>
                 ) : skill.installed ? (
@@ -1331,7 +1328,7 @@ function SkillsGrid({
                     disabled={isActing}
                     onClick={() => onUninstall(skill.id)}
                   >
-                    Uninstall
+                    Удалить
                   </Button>
                 ) : (
                   <Button
@@ -1339,7 +1336,7 @@ function SkillsGrid({
                     disabled={isActing}
                     onClick={() => onInstall(skill.id)}
                   >
-                    Install
+                    Установить
                   </Button>
                 )}
               </div>
@@ -1375,7 +1372,7 @@ function FeaturedGrid({
   if (skills.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-10 text-center text-sm text-primary-500 text-pretty">
-        Featured picks are currently unavailable.
+        Рекомендуемые варианты сейчас недоступны.
       </div>
     )
   }
@@ -1422,7 +1419,7 @@ function FeaturedGrid({
                 size="sm"
                 onClick={() => onOpenDetails(skill)}
               >
-                Details
+                Подробности
               </Button>
               {skill.installed ? (
                 <Button
@@ -1431,7 +1428,7 @@ function FeaturedGrid({
                   disabled={isActing}
                   onClick={() => onUninstall(skill.id)}
                 >
-                  Uninstall
+                  Удалить
                 </Button>
               ) : (
                 <Button
@@ -1439,7 +1436,7 @@ function FeaturedGrid({
                   disabled={isActing}
                   onClick={() => onInstall(skill.id)}
                 >
-                  Install
+                  Установить
                 </Button>
               )}
             </div>

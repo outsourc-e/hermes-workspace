@@ -196,7 +196,7 @@ export function RouterChat({
       setUnassigned(data.unassigned ?? [])
       return nextAssignments
     } catch (err) {
-      setDecomposeError(err instanceof Error ? err.message : 'decompose failed')
+      setDecomposeError(err instanceof Error ? err.message : 'не удалось разбить на части')
       return null
     } finally {
       setDecomposing(false)
@@ -270,7 +270,7 @@ export function RouterChat({
         if (followData) setFollowUp(followData)
       }
     } catch (err) {
-      setDispatchError(err instanceof Error ? err.message : 'dispatch failed')
+      setDispatchError(err instanceof Error ? err.message : 'не удалось отправить')
     } finally {
       setDispatching(false)
     }
@@ -300,10 +300,10 @@ export function RouterChat({
               <>
                 <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--theme-muted)]">
                   <HugeiconsIcon icon={FlashIcon} size={11} />
-                  Agent Router Chat
+                  Чат маршрутизатора агентов
                 </div>
                 <div className="mt-1 text-sm text-[var(--theme-muted-2)]">
-                  Type a mission, choose routing, dispatch. Keep workers selected in cards.
+                  Введите миссию, выберите маршрут и отправьте. Исполнители выбираются в карточках.
                 </div>
               </>
             ) : null}
@@ -316,7 +316,7 @@ export function RouterChat({
                 onClick={onClose}
                 className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
               >
-                Close
+                Закрыть
               </button>
             ) : null}
           </div>
@@ -336,9 +336,9 @@ export function RouterChat({
               disabled={decomposing || dispatching}
               placeholder={
                 mode === 'auto'
-                  ? "Describe the mission, e.g. 'Sweep open PRs, then summarise BenchLoop runs from PC1, draft a launch tweet.'"
+                  ? "Опишите миссию, например: «Разберите открытые PR, затем подведите итоги запусков и подготовьте анонс»."
                   : mode === 'manual'
-                    ? `Message ${selectedId ?? 'select a worker first'}…`
+                    ? `Сообщение для ${selectedId ?? 'сначала выберите исполнителя'}…`
                     : "Broadcast to the room (or all workers if no room): 'Status check.'"
               }
               className="min-h-[8rem] resize-y rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)] focus:outline-none"
@@ -385,7 +385,7 @@ export function RouterChat({
                     onClick={reset}
                     className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
                   >
-                    Reset
+                    Сбросить
                   </button>
                 ) : null}
                 <button
@@ -416,7 +416,7 @@ export function RouterChat({
                       ? `Send to ${selectedId ?? '—'}`
                       : mode === 'broadcast'
                         ? `Broadcast to ${roomIds.length || members.length}`
-                        : 'Route mission'}
+                        : 'Направить миссию'}
                 </button>
               </div>
             </div>
@@ -435,7 +435,7 @@ export function RouterChat({
           {!embedded ? (
           <div className="flex min-h-[180px] flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
             <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-              Routing plan
+              План маршрутизации
             </div>
             {assignments.length === 0 ? (
               <div className="text-[12px] text-[var(--theme-muted-2)]">
@@ -492,7 +492,7 @@ export function RouterChat({
             {unassigned.length > 0 ? (
               <div className="rounded-md border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[11px] text-[var(--theme-text)]">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-                  Unrouted notes
+                  Заметки без маршрута
                 </div>
                 <ul className="list-disc pl-4">
                   {unassigned.map((u, i) => (
@@ -508,7 +508,7 @@ export function RouterChat({
         {!embedded && results ? (
           <div className="max-h-64 overflow-y-auto border-t border-[var(--theme-border)] px-5 py-3">
             <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-              <span>Dispatch results</span>
+              <span>Результаты отправки</span>
               <span className="inline-flex items-center gap-1 text-[var(--theme-muted)]">
                 <HugeiconsIcon icon={Clock01Icon} size={11} />
                 {((results.completedAt - results.dispatchedAt) / 1000).toFixed(
@@ -564,7 +564,7 @@ export function RouterChat({
                     </div>
                   ) : r.checkpointStatus === 'timeout' ? (
                     <div className="mt-2 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] p-2 text-[11px] text-[var(--theme-text)]">
-                      Delivered, waiting for checkpoint. Orchestrator loop can follow up.
+                      Доставлено, ожидает контрольной точки. Оркестратор может продолжить.
                     </div>
                   ) : null}
                   {r.output ? (
@@ -583,7 +583,7 @@ export function RouterChat({
         {!embedded && followUp ? (
           <div className="border-t border-[var(--theme-border)] px-5 py-3 text-[11px] text-[var(--theme-text)]">
             <div className="font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-              Orchestrator follow-up
+              Продолжение от оркестратора
             </div>
             <div className="mt-1 text-[var(--theme-muted-2)]">
               Parsed {followUp.summary?.checkpointed ?? 0} checkpoints · stale {followUp.summary?.stale ?? 0} · continuation {followUp.continuation ? 'sent' : 'not needed'}
@@ -615,7 +615,7 @@ function RouterClosedDock({
         <HugeiconsIcon icon={FlashIcon} size={14} className="text-[var(--theme-accent)]" />
         <span className="min-w-0">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--theme-muted)]">
-            Router
+            Маршрутизатор
           </span>
           <span className="block truncate text-sm text-[var(--theme-text)]">
             {mode} · {targetLabel}
@@ -623,7 +623,7 @@ function RouterClosedDock({
         </span>
       </span>
       <span className="shrink-0 rounded-full bg-[var(--theme-accent)] px-3 py-1 text-xs font-semibold text-primary-950">
-        Open
+        Открыть
       </span>
     </button>
   )

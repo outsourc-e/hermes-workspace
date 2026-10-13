@@ -39,7 +39,7 @@ type FilesListResponse = {
 
 export const FILE_BROWSER_MODE_LABEL = 'Server workspace'
 export const FILE_BROWSER_REMOTE_HELP =
-  'Files are loaded from the Workspace server via /api/files, so remote deployments show files created by the agent.'
+  'Файлы загружаются с сервера через /api/files, поэтому в удалённых развёртываниях видны файлы, созданные агентом.'
 
 type FileReadResponse = {
   type: 'text' | 'image'
@@ -442,10 +442,10 @@ function DiffModal({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button variant="outline" size="sm" onClick={onCancel}>
-                Cancel
+                Отмена
               </Button>
               <Button size="sm" onClick={onSave}>
-                Save anyway
+                Всё равно сохранить
               </Button>
             </div>
           </div>
@@ -455,7 +455,7 @@ function DiffModal({
             {/* Left — original */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
               <div className="shrink-0 px-3 py-1.5 text-[11px] font-semibold text-primary-500 dark:text-neutral-400 bg-primary-100/60 dark:bg-neutral-900/60 border-b border-primary-200 dark:border-neutral-800 uppercase tracking-wide">
-                Original
+                Оригинал
               </div>
               <div className="flex-1 overflow-auto">
                 <div className="font-mono text-[11px] leading-relaxed">
@@ -501,7 +501,7 @@ function DiffModal({
             {/* Right — new */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
               <div className="shrink-0 px-3 py-1.5 text-[11px] font-semibold text-primary-500 dark:text-neutral-400 bg-primary-100/60 dark:bg-neutral-900/60 border-b border-primary-200 dark:border-neutral-800 uppercase tracking-wide">
-                New
+                Новое
               </div>
               <div className="flex-1 overflow-auto">
                 <div className="font-mono text-[11px] leading-relaxed">
@@ -794,7 +794,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
         <div className="flex h-full items-center justify-center text-center text-primary-400 dark:text-neutral-600">
           <div>
             <div className="text-5xl mb-3 opacity-40">📂</div>
-            <p className="text-sm">Select a file to preview or edit</p>
+            <p className="text-sm">Выберите файл для просмотра или редактирования</p>
           </div>
         </div>
       </>
@@ -810,7 +810,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
             <div className="text-5xl mb-3 opacity-40">📁</div>
             <p className="text-sm font-medium">{selectedEntry.name}</p>
             <p className="text-xs mt-1 opacity-70">
-              Select a file inside to preview
+              Выберите файл внутри для предпросмотра
             </p>
           </div>
         </div>
@@ -861,7 +861,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
         <span>Modified {formatDate(selectedEntry.modifiedAt)}</span>
       )}
       {dirty && (
-        <span className="text-accent-500 font-medium">Unsaved changes</span>
+        <span className="text-accent-500 font-medium">Несохранённые изменения</span>
       )}
     </div>
   )
@@ -1065,7 +1065,7 @@ export function FilesScreen() {
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         setTreeError(
-          'Could not load files — request timed out. Check that HERMES_WORKSPACE_DIR is set.',
+          'Не удалось загрузить файлы — время запроса истекло. Проверьте, что задан HERMES_WORKSPACE_DIR.',
         )
       } else {
         setTreeError(err instanceof Error ? err.message : String(err))
@@ -1216,7 +1216,7 @@ export function FilesScreen() {
             <button
               type="button"
               onClick={openNewFolderPrompt}
-              title="New folder"
+              title="Новая папка"
               className="rounded p-1 text-sm text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors leading-none"
             >
               📁+
@@ -1224,7 +1224,7 @@ export function FilesScreen() {
             <button
               type="button"
               onClick={() => void loadTree()}
-              title="Refresh"
+              title="Обновить"
               className="rounded p-1 text-lg text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors leading-none"
             >
               ↺
@@ -1243,7 +1243,7 @@ export function FilesScreen() {
             </div>
             {treeLoading ? (
               <div className="px-3 py-2 text-xs text-primary-400 dark:text-neutral-500">
-                Loading server workspace…
+                Загрузка рабочего пространства сервера…
               </div>
             ) : treeError ? (
               <div className="space-y-1 px-3 py-2 text-xs text-red-500">
@@ -1254,7 +1254,7 @@ export function FilesScreen() {
               </div>
             ) : entries.length === 0 ? (
               <div className="px-3 py-2 text-xs text-primary-400 dark:text-neutral-500">
-                Server workspace is empty. Agent-created files will appear here after they are written to the configured workspace path.
+                Рабочее пространство сервера пусто. Файлы, созданные агентом, появятся здесь после записи в настроенную папку.
               </div>
             ) : (
               entries
@@ -1320,7 +1320,7 @@ export function FilesScreen() {
                 setContextMenu(null)
               }}
             >
-              📁 New folder inside
+              📁 Новая папка внутри
             </button>
           ) : (
             <button
@@ -1360,7 +1360,7 @@ export function FilesScreen() {
             <DialogDescription>
               {promptState?.mode === 'rename'
                 ? 'Enter a new name.'
-                : 'Enter a folder name to create.'}
+                : 'Введите имя создаваемой папки.'}
             </DialogDescription>
             <input
               value={promptValue}
@@ -1372,8 +1372,8 @@ export function FilesScreen() {
               autoFocus
             />
             <div className="flex justify-end gap-2 pt-2">
-              <DialogClose render={<Button variant="outline">Cancel</Button>} />
-              <Button onClick={() => void handlePromptSubmit()}>Save</Button>
+              <DialogClose render={<Button variant="outline">Отмена</Button>} />
+              <Button onClick={() => void handlePromptSubmit()}>Сохранить</Button>
             </div>
           </div>
         </DialogContent>
@@ -1399,12 +1399,12 @@ export function FilesScreen() {
               This action cannot be undone.
             </DialogDescription>
             <div className="flex justify-end gap-2 pt-2">
-              <DialogClose render={<Button variant="outline">Cancel</Button>} />
+              <DialogClose render={<Button variant="outline">Отмена</Button>} />
               <Button
                 variant="destructive"
                 onClick={() => void handleDeleteConfirmed()}
               >
-                Delete
+                Удалить
               </Button>
             </div>
           </div>

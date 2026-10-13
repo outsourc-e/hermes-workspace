@@ -15,7 +15,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {
     id: 'anthropic',
     name: 'Anthropic',
-    description: 'Claude models — Haiku, Sonnet, and Opus.',
+    description: 'Модели Claude — Haiku, Sonnet и Opus.',
     authTypes: ['api-key', 'cli-token'],
     docsUrl: 'https://console.anthropic.com/settings/keys',
     configExample: JSON.stringify(
@@ -36,7 +36,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {
     id: 'openai',
     name: 'OpenAI',
-    description: 'GPT and reasoning models for chat and tools.',
+    description: 'GPT и модели рассуждений для чата и инструментов.',
     authTypes: ['api-key'],
     docsUrl: 'https://platform.openai.com/api-keys',
     configExample: JSON.stringify(
@@ -57,7 +57,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {
     id: 'google',
     name: 'Google',
-    description: 'Gemini models with API key or OAuth.',
+    description: 'Модели Gemini с API-ключом или OAuth.',
     authTypes: ['api-key', 'oauth'],
     docsUrl: 'https://aistudio.google.com/app/apikey',
     configExample: JSON.stringify(
@@ -78,7 +78,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {
     id: 'openrouter',
     name: 'OpenRouter',
-    description: 'Unified access to many providers through one API.',
+    description: 'Единый доступ ко многим провайдерам через один API.',
     authTypes: ['api-key'],
     docsUrl: 'https://openrouter.ai/keys',
     configExample: JSON.stringify(
@@ -99,7 +99,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {
     id: 'minimax',
     name: 'MiniMax',
-    description: 'MiniMax foundation models and multimodal APIs.',
+    description: 'Базовые модели MiniMax и мультимодальные API.',
     authTypes: ['api-key'],
     docsUrl: 'https://www.minimax.io/platform',
     configExample: JSON.stringify(
@@ -120,7 +120,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {
     id: 'ollama',
     name: 'Ollama',
-    description: 'Local models running on your machine via Ollama.',
+    description: 'Локальные модели, запущенные на вашем компьютере через Ollama.',
     authTypes: ['local'],
     docsUrl: 'https://ollama.com/download',
     configExample: JSON.stringify(
@@ -140,7 +140,7 @@ export const PROVIDER_CATALOG: Array<ProviderInfo> = [
   {
     id: 'atomic-chat',
     name: 'Atomic Chat',
-    description: 'Local LLMs via Atomic Chat — run Llama, Gemma, Qwen and more on your machine.',
+    description: 'Локальные LLM через Atomic Chat — запускайте Llama, Gemma, Qwen и другие на своём компьютере.',
     authTypes: ['local'],
     docsUrl: 'https://atomic.chat',
     configExample: JSON.stringify(

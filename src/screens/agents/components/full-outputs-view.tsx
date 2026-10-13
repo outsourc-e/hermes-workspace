@@ -164,7 +164,7 @@ function OutputCard({ output }: { output: AgentOutput }) {
       await runCronJob(output.jobId)
       toast('Cron job started', { type: 'success' })
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to retry cron job', {
+      toast(error instanceof Error ? error.message : 'Не удалось повторить cron-задание', {
         type: 'error',
       })
     } finally {
@@ -204,7 +204,7 @@ function OutputCard({ output }: { output: AgentOutput }) {
       <div className="mt-4 space-y-3 text-sm text-[var(--theme-text)]">
         <div className="rounded-[1.1rem] border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--theme-muted)]">
-            Summary
+            Сводка
           </p>
           <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--theme-text)]">{output.summary}</p>
           {output.model || output.sessionKey || output.chatSessionKey ? (
@@ -260,7 +260,7 @@ function OutputCard({ output }: { output: AgentOutput }) {
           onClick={() => void copyText(output.fullOutput, 'Output')}
         >
           <HugeiconsIcon icon={Copy01Icon} size={16} strokeWidth={1.8} />
-          Copy
+          Копировать
         </Button>
 
         {output.agentId === 'sage' && sageTweet ? (
@@ -269,7 +269,7 @@ function OutputCard({ output }: { output: AgentOutput }) {
             className="border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
             onClick={() => void copyText(sageTweet, 'Tweet')}
           >
-            Copy Tweet
+            Копировать твит
           </Button>
         ) : null}
 
@@ -279,7 +279,7 @@ function OutputCard({ output }: { output: AgentOutput }) {
             className="border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
             onClick={() => void copyText(sagePrompt, 'Image prompt')}
           >
-            Copy Image Prompt
+            Копировать промпт изображения
           </Button>
         ) : null}
 
@@ -290,7 +290,7 @@ function OutputCard({ output }: { output: AgentOutput }) {
             onClick={() => window.open(sourceUrl, '_blank', 'noopener,noreferrer')}
           >
             <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={1.8} />
-            Link
+            Ссылка
           </Button>
         ) : null}
 
@@ -300,7 +300,7 @@ function OutputCard({ output }: { output: AgentOutput }) {
             className="border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
             onClick={() => toast('Signals view coming soon', { type: 'info' })}
           >
-            View Signals
+            Открыть сигналы
           </Button>
         ) : null}
 
@@ -339,7 +339,7 @@ export function FullOutputsView() {
   if (loading) {
     return (
       <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-6 py-14 text-center text-sm text-[var(--theme-muted)] shadow-[0_24px_80px_var(--theme-shadow)]">
-        Loading outputs…
+        Загрузка результатов…
       </section>
     )
   }
@@ -379,14 +379,14 @@ export function FullOutputsView() {
             onClick={() => void refresh()}
           >
             <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.8} />
-            Refresh
+            Обновить
           </Button>
         </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between px-1">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--theme-text)]">Outputs</h2>
+          <h2 className="text-lg font-semibold text-[var(--theme-text)]">Результаты</h2>
           <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
             {outputs.length} recent {outputs.length === 1 ? 'run' : 'runs'} across the team
           </p>
@@ -396,7 +396,7 @@ export function FullOutputsView() {
       <div className="mt-4">
         {outputs.length === 0 ? (
           <div className="rounded-[1.5rem] border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-12 text-center text-sm text-[var(--theme-muted)]">
-            No agent outputs yet. Configure cron jobs in agent settings to get started.
+            Результатов агентов пока нет. Настройте cron-задания в параметрах агента.
           </div>
         ) : (
           <AnimatePresence mode="popLayout">

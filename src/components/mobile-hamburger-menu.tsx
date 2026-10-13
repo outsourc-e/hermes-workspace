@@ -29,28 +29,28 @@ import { useSettingsStore } from '@/hooks/use-settings'
 export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
     id: 'chat',
-    label: 'Chat',
+    label: 'Чат',
     icon: Chat01Icon,
     to: '/chat',
     match: (p: string) => p.startsWith('/chat') || p === '/new' || p === '/',
   },
   {
     id: 'operations',
-    label: 'Assistants',
+    label: 'Ассистенты',
     icon: UserMultipleIcon,
     to: '/operations',
     match: (p: string) => p.startsWith('/operations'),
   },
   {
     id: 'tasks',
-    label: 'Tasks',
+    label: 'Задачи',
     icon: CheckListIcon,
     to: '/tasks',
     match: (p: string) => p.startsWith('/tasks'),
   },
   {
     id: 'swarm',
-    label: 'Teams',
+    label: 'Команды',
     icon: UserGroupIcon,
     to: '/swarm',
     match: (p: string) => p === '/swarm' || p.startsWith('/swarm2'),
@@ -64,14 +64,14 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
   },
   {
     id: 'terminal',
-    label: 'Terminal',
+    label: 'Терминал',
     icon: CommandLineIcon,
     to: '/terminal',
     match: (p: string) => p.startsWith('/terminal'),
   },
   {
     id: 'jobs',
-    label: 'Jobs',
+    label: 'Задания',
     icon: Clock01Icon,
     to: '/jobs',
     match: (p: string) => p.startsWith('/jobs'),
@@ -86,14 +86,14 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
 
   {
     id: 'memory',
-    label: 'Memory',
+    label: 'Память',
     icon: BrainIcon,
     to: '/memory',
     match: (p: string) => p.startsWith('/memory'),
   },
   {
     id: 'skills',
-    label: 'Skills',
+    label: 'Навыки',
     icon: PuzzleIcon,
     to: '/skills',
     match: (p: string) => p.startsWith('/skills'),
@@ -107,7 +107,7 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
   },
   {
     id: 'profiles',
-    label: 'Profiles',
+    label: 'Профили',
     icon: UserGroupIcon,
     to: '/profiles',
     match: (p: string) => p.startsWith('/profiles'),
@@ -128,7 +128,7 @@ export function HamburgerTrigger({ className }: { className?: string }) {
   return (
     <button
       type="button"
-      aria-label="Open navigation menu"
+      aria-label="Открыть меню навигации"
       onClick={openHamburgerMenu}
       className={cn(
         'flex items-center justify-center size-9 rounded-xl',
@@ -220,7 +220,7 @@ export function MobileHamburgerMenu() {
           <div className="flex items-center gap-2.5">
             <img
               src="/claude-avatar.webp"
-              alt="Hermes Agent"
+              alt="AWG GPT"
               className="size-8 rounded-xl shrink-0"
             />
             <div className="flex flex-col leading-tight">
@@ -228,19 +228,19 @@ export function MobileHamburgerMenu() {
                 className="font-bold text-[15px] tracking-tight"
                 style={{ color: 'var(--color-ink, #111)' }}
               >
-                Hermes Agent
+                AWG GPT
               </span>
               <span
                 className="text-[11px]"
                 style={{ color: 'var(--color-muted, #888)' }}
               >
-                Workspace
+                Рабочее пространство
               </span>
             </div>
           </div>
           <button
             type="button"
-            aria-label="Close menu"
+            aria-label="Закрыть меню"
             onClick={() => setOpen(false)}
             className="flex items-center justify-center size-8 rounded-full active:scale-90 transition-all"
             style={{ color: 'var(--color-muted, #888)' }}
@@ -333,7 +333,7 @@ export function MobileHamburgerMenu() {
               type="button"
               onClick={() => handleNav('/settings')}
               className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
-              aria-label="Settings"
+              aria-label="Настройки"
               style={{ color: 'var(--color-ink-muted, #888)' }}
             >
               <HugeiconsIcon
@@ -353,7 +353,7 @@ export function MobileHamburgerMenu() {
                 setTheme(next)
               }}
               className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
-              aria-label="Toggle theme"
+              aria-label="Переключить тему"
               style={{ color: 'var(--color-ink-muted, #888)' }}
             >
               <svg

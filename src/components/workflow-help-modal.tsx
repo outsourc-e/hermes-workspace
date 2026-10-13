@@ -12,7 +12,7 @@ export function WorkflowHelpModal({
   title,
   eyebrow,
   sections,
-  triggerLabel = 'How it works',
+  triggerLabel = 'Как это работает',
   compact = false,
 }: {
   title: string

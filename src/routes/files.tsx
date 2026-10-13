@@ -92,18 +92,18 @@ export const Route = createFileRoute('/files')({
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
         <h2 className="text-xl font-semibold text-primary-900 mb-3">
-          Failed to Load Files
+          Не удалось загрузить файлы
         </h2>
         <p className="text-sm text-primary-600 mb-4 max-w-md">
           {error instanceof Error
             ? error.message
-            : 'An unexpected error occurred'}
+            : 'Произошла непредвиденная ошибка'}
         </p>
         <button
           onClick={() => window.location.reload()}
           className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
         >
-          Reload Page
+          Перезагрузить страницу
         </button>
       </div>
     )
@@ -113,7 +113,7 @@ export const Route = createFileRoute('/files')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent mb-3" />
-          <p className="text-sm text-primary-500">Loading file explorer...</p>
+          <p className="text-sm text-primary-500">Загрузка проводника файлов...</p>
         </div>
       </div>
     )
@@ -265,8 +265,8 @@ function FilesRoute() {
               type="button"
               onClick={() => setFileExplorerCollapsed((prev) => !prev)}
               className="rounded-lg p-1.5 text-primary-600 hover:bg-primary-100 transition-colors"
-              aria-label={fileExplorerCollapsed ? 'Show files' : 'Hide files'}
-              title={fileExplorerCollapsed ? 'Show files' : 'Hide files'}
+              aria-label={fileExplorerCollapsed ? 'Показать файлы' : 'Скрыть файлы'}
+              title={fileExplorerCollapsed ? 'Показать файлы' : 'Скрыть файлы'}
             >
               <HugeiconsIcon icon={Folder01Icon} size={20} strokeWidth={1.5} />
             </button>
@@ -293,9 +293,9 @@ function FilesRoute() {
                 </>
               ) : (
                 <>
-                  <h1 className="hidden text-base font-medium md:block md:text-lg">Files</h1>
+                  <h1 className="hidden text-base font-medium md:block md:text-lg">Файлы</h1>
                   <p className="hidden text-sm text-primary-600 sm:block">
-                    Click a file in the sidebar to load it into the editor.
+                    Выберите файл в боковой панели, чтобы открыть его в редакторе.
                   </p>
                 </>
               )}
@@ -325,27 +325,27 @@ function FilesRoute() {
                   type="button"
                   onClick={handleOpenInTab}
                   className="inline-flex items-center gap-1 rounded-md border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
-                  title="Open this file in a new browser tab"
+                  title="Открыть файл в новой вкладке браузера"
                 >
                   <HugeiconsIcon
                     icon={ExternalLink}
                     size={14}
                     strokeWidth={1.6}
                   />
-                  Open
+                  Открыть
                 </button>
                 <button
                   type="button"
                   onClick={handleDownload}
                   className="inline-flex items-center gap-1 rounded-md border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
-                  title="Download this file to your computer"
+                  title="Скачать файл на компьютер"
                 >
                   <HugeiconsIcon
                     icon={Download01Icon}
                     size={14}
                     strokeWidth={1.6}
                   />
-                  Download
+                  Скачать
                 </button>
               </div>
             ) : null}

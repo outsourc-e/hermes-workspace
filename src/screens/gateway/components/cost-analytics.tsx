@@ -165,20 +165,20 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
   )
   const summaryCards = compact
     ? [
-        { label: 'Tot. Mis', value: String(stats.missionCount) },
-        { label: 'Tot. Tok', value: stats.totalTokens.toLocaleString() },
-        { label: 'Tot. Cost', value: `$${stats.totalCost.toFixed(4)}` },
-        { label: 'Avg/Mis', value: `$${stats.avgCost.toFixed(4)}` },
-        { label: 'Today', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
+        { label: 'Всего, мисс.', value: String(stats.missionCount) },
+        { label: 'Всего, ток.', value: stats.totalTokens.toLocaleString() },
+        { label: 'Всего, стоим.', value: `$${stats.totalCost.toFixed(4)}` },
+        { label: 'Ср./мисс.', value: `$${stats.avgCost.toFixed(4)}` },
+        { label: 'Сегодня', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
         { label: '7d', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
       ]
     : [
-        { label: 'Total Missions', value: String(stats.missionCount) },
-        { label: 'Total Tokens', value: stats.totalTokens.toLocaleString() },
-        { label: 'Total Cost', value: `$${stats.totalCost.toFixed(4)}` },
-        { label: 'Avg / Mission', value: `$${stats.avgCost.toFixed(4)}` },
-        { label: 'Today', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
-        { label: 'This Week', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
+        { label: 'Всего миссий', value: String(stats.missionCount) },
+        { label: 'Всего токенов', value: stats.totalTokens.toLocaleString() },
+        { label: 'Общая стоимость', value: `$${stats.totalCost.toFixed(4)}` },
+        { label: 'В среднем за миссию', value: `$${stats.avgCost.toFixed(4)}` },
+        { label: 'Сегодня', value: `$${stats.todayCost.toFixed(4)}`, detail: `${stats.todayTokens.toLocaleString()} tok` },
+        { label: 'За неделю', value: `$${stats.weekCost.toFixed(4)}`, detail: `${stats.weekTokens.toLocaleString()} tok` },
       ]
   const chartTitleClass = compact ? 'mb-2 text-xs font-semibold text-neutral-900 dark:text-white' : 'mb-3 text-sm font-semibold text-neutral-900 dark:text-white'
 
@@ -199,26 +199,26 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* By Agent */}
         <div className={CARD}>
-          <h3 className={chartTitleClass}>Cost by Agent</h3>
+          <h3 className={chartTitleClass}>Стоимость по агентам</h3>
           <CSSBarChart entries={stats.agentBars} unit="$" color="bg-violet-500" />
         </div>
 
         {/* By Model */}
         <div className={CARD}>
-          <h3 className={chartTitleClass}>Cost by Model</h3>
+          <h3 className={chartTitleClass}>Стоимость по моделям</h3>
           <CSSBarChart entries={stats.modelBars} unit="$" color="bg-sky-500" />
         </div>
 
         {/* Daily Timeline */}
         <div className={CARD}>
-          <h3 className={chartTitleClass}>Daily Cost (7d)</h3>
+          <h3 className={chartTitleClass}>Стоимость за день (7 дн.)</h3>
           <CSSBarChart entries={stats.dayBars} unit="$" color="bg-emerald-500" />
         </div>
       </div>
 
       {stats.missionCount === 0 && (
         <div className="flex items-center justify-center py-12 text-sm text-neutral-400">
-          No mission data yet. Complete some missions to see analytics.
+          Данных о миссиях пока нет. Выполните несколько миссий, чтобы увидеть аналитику.
         </div>
       )}
     </div>

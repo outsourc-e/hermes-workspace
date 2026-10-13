@@ -138,17 +138,17 @@ export function ModeSelector({
           aria-haspopup="menu"
           aria-expanded={!disabled && isMenuOpen}
           aria-disabled={disabled}
-          aria-label="Mode selector"
+          aria-label="Выбор режима"
           disabled={disabled}
         >
           <span className="max-w-[8rem] truncate">{buttonLabel}</span>
           {showDrift && (
-            <span className="text-yellow-600" title="Settings changed">
+            <span className="text-yellow-600" title="Настройки изменены">
               ⚠️
             </span>
           )}
           {modelUnavailable && (
-            <span className="text-red-600" title="Model unavailable">
+            <span className="text-red-600" title="Модель недоступна">
               ⚠️
             </span>
           )}
@@ -160,7 +160,7 @@ export function ModeSelector({
             <div className="max-h-[20rem] overflow-y-auto p-1">
               {modes.length === 0 ? (
                 <div className="p-4 text-center text-sm text-primary-500">
-                  No modes saved
+                  Сохранённых режимов нет
                 </div>
               ) : (
                 <>
@@ -190,7 +190,7 @@ export function ModeSelector({
                         {drift && (
                           <span
                             className="text-yellow-600 text-xs"
-                            title="Settings changed"
+                            title="Настройки изменены"
                           >
                             ⚠️
                           </span>
@@ -198,7 +198,7 @@ export function ModeSelector({
                         {unavailable && (
                           <span
                             className="text-red-600 text-xs"
-                            title="Model unavailable"
+                            title="Модель недоступна"
                           >
                             ⚠️
                           </span>
@@ -206,7 +206,7 @@ export function ModeSelector({
                         {isApplied && !drift && (
                           <span
                             className="text-primary-900"
-                            aria-label="Currently active"
+                            aria-label="Сейчас активно"
                           >
                             ✓
                           </span>
@@ -228,9 +228,9 @@ export function ModeSelector({
                 }}
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary-700 transition-colors hover:bg-primary-100"
                 role="menuitem"
-                aria-label="Save current settings as new mode"
+                aria-label="Сохранить текущие настройки как новый режим"
               >
-                Save Current as New Mode...
+                Сохранить текущие настройки как режим...
               </button>
 
               {modes.length > 0 && (
@@ -243,9 +243,9 @@ export function ModeSelector({
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary-700 transition-colors hover:bg-primary-100"
                   role="menuitem"
-                  aria-label="Manage modes"
+                  aria-label="Управление режимами"
                 >
-                  Manage Modes...
+                  Управление режимами...
                 </button>
               )}
             </div>

@@ -183,7 +183,7 @@ type ModelSwitchNotice = {
 
 // Models are fetched through the workspace API proxy (/api/models, /api/claude-proxy)
 // to support Docker and reverse-proxy deployments where the browser cannot reach
-// the Hermes Agent gateway directly.
+// the AWG GPT gateway directly.
 
 function readModelText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -1071,7 +1071,7 @@ function ChatComposerComponent({
     },
     onError: (error) => {
       toast(
-        error instanceof Error ? error.message : 'Failed to activate profile',
+        error instanceof Error ? error.message : 'Не удалось активировать профиль',
       )
     },
   })
@@ -1095,7 +1095,7 @@ function ChatComposerComponent({
     },
     onError: (error) => {
       toast(
-        error instanceof Error ? error.message : 'Failed to switch workspace',
+        error instanceof Error ? error.message : 'Не удалось переключить рабочее пространство',
       )
     },
   })
@@ -1191,7 +1191,7 @@ function ChatComposerComponent({
 
   const currentModel = currentModelQuery.data ?? ''
 
-  // Auto-switch to hermes-agent model on mount (Hermes Workspace uses Hermes Agent)
+  // Auto-switch to hermes-agent model on mount (AWG GPT uses AWG GPT)
   // Removed: auto-switch to hermes-agent. The workspace respects the
   // model/provider configured in ~/.hermes/config.yaml. Users switch
   // via the model selector or Settings page.
@@ -1226,7 +1226,7 @@ function ChatComposerComponent({
   // Derive the label directly from the store so navigation between sessions
   // updates without a render-window flash from a stale React-state mirror.
   const modelButtonLabel =
-    persistedSessionModel || currentModel || configuredModel || '⚕ Hermes Agent'
+    persistedSessionModel || currentModel || configuredModel || 'AWG GPT'
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1546,7 +1546,7 @@ function ChatComposerComponent({
       if (skippedCount > 0) {
         toast(
           skippedCount === 1
-            ? '1 file could not be attached.'
+            ? 'Не удалось прикрепить 1 файл.'
             : `${skippedCount} files could not be attached.`,
           { type: 'warning' },
         )
@@ -1708,7 +1708,7 @@ function ChatComposerComponent({
   const hasDraft = value.trim().length > 0 || attachments.length > 0
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
-    : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
+    : 'Спросите что угодно… (↵ — отправить · ⇧↵ — новая строка · ⌘⇧M — сменить модель)'
   const [serverCommands, setServerCommands] = useState<Array<SlashCommandDefinition>>([])
 
   useEffect(() => {
@@ -1846,7 +1846,7 @@ function ChatComposerComponent({
                 toast(
                   error instanceof Error
                     ? error.message
-                    : 'Voice note transcription failed',
+                    : 'Не удалось расшифровать голосовую заметку',
                   { type: 'error' },
                 )
               })
@@ -2192,7 +2192,7 @@ function ChatComposerComponent({
 
         {isDraggingOver ? (
           <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center rounded-[18px] border-2 border-dashed border-primary-400 bg-primary-50/90 text-sm font-medium text-primary-700">
-            Drop files to attach
+            Перетащите файлы, чтобы прикрепить
           </div>
         ) : null}
 
@@ -2238,7 +2238,7 @@ function ChatComposerComponent({
                     )}
                     <button
                       type="button"
-                      aria-label="Remove attachment"
+                      aria-label="Удалить вложение"
                       onClick={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
@@ -2272,7 +2272,7 @@ function ChatComposerComponent({
               {/* + button — opens bottom sheet actions menu */}
               <button
                 type="button"
-                aria-label="Actions"
+                aria-label="Действия"
                 disabled={disabled}
                 onClick={(event) => {
                   event.stopPropagation()
@@ -2313,7 +2313,7 @@ function ChatComposerComponent({
                   <button
                     type="button"
                     onClick={handleAbort}
-                    aria-label="Stop generation"
+                    aria-label="Остановить генерацию"
                     className="size-9 rounded-full bg-red-500 flex items-center justify-center text-white transition-all duration-150"
                   >
                     <HugeiconsIcon icon={StopIcon} size={18} strokeWidth={2} />
@@ -2325,7 +2325,7 @@ function ChatComposerComponent({
                     type="button"
                     onClick={handleSubmit}
                     disabled={submitDisabled}
-                    aria-label="Send message"
+                    aria-label="Отправить сообщение"
                     className="size-9 rounded-full bg-accent-500 flex items-center justify-center text-white transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                   >
                     <HugeiconsIcon
@@ -2354,7 +2354,7 @@ function ChatComposerComponent({
                         ? 'Recording voice note'
                         : voiceInput.isListening
                           ? 'Stop listening'
-                          : 'Voice input'
+                          : 'Голосовой ввод'
                     }
                     disabled={disabled}
                     className={cn(
@@ -2383,7 +2383,7 @@ function ChatComposerComponent({
                     type="button"
                     onClick={handleSubmit}
                     disabled={submitDisabled}
-                    aria-label="Send message"
+                    aria-label="Отправить сообщение"
                     className="size-9 rounded-full bg-accent-500 flex items-center justify-center text-white transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     <HugeiconsIcon
@@ -2401,7 +2401,7 @@ function ChatComposerComponent({
                   <>
                     <button
                       type="button"
-                      aria-label="Close actions"
+                      aria-label="Закрыть действия"
                       className="fixed inset-0 z-[199] bg-black/30"
                       onClick={() => {
                         setIsMobileActionsMenuOpen(false)
@@ -2411,12 +2411,12 @@ function ChatComposerComponent({
                     <div
                       className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
                       role="dialog"
-                      aria-label="Actions"
+                      aria-label="Действия"
                       onClick={(event) => event.stopPropagation()}
                     >
                       <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-600" />
                       <div className="px-4 pb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-                        Actions
+                        Действия
                       </div>
                       <div className="grid grid-cols-2 gap-2 px-4 pb-4">
                         {/* Attach File — keep sheet open so iOS picker can layer on top */}
@@ -2437,7 +2437,7 @@ function ChatComposerComponent({
                             />
                           </span>
                           <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                            Attach File
+                            Прикрепить файл
                           </span>
                         </button>
 
@@ -2454,7 +2454,7 @@ function ChatComposerComponent({
                           }}
                           className="rounded-xl border border-neutral-100 bg-neutral-50 dark:bg-neutral-800 dark:border-neutral-700 p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="rounded-lg bg-indigo-100 dark:bg-indigo-900/30 p-1.5 text-indigo-600 dark:text-indigo-400">
+                          <span className="rounded-lg bg-[#e9e4f5] dark:bg-[#2f2352]/30 p-1.5 text-[#6847b8] dark:text-[#a98bf5]">
                             <HugeiconsIcon
                               icon={ArrowDown01Icon}
                               size={24}
@@ -2483,7 +2483,7 @@ function ChatComposerComponent({
                               />
                             </span>
                             <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                              Clear Draft
+                              Очистить черновик
                             </span>
                           </button>
                         ) : null}
@@ -2505,7 +2505,7 @@ function ChatComposerComponent({
                               />
                             </span>
                             <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                              New Session
+                              Новая сессия
                             </span>
                           </button>
                         ) : null}
@@ -2522,19 +2522,19 @@ function ChatComposerComponent({
                   <>
                     <button
                       type="button"
-                      aria-label="Close model picker"
+                      aria-label="Закрыть выбор модели"
                       className="fixed inset-0 z-[209] bg-black/30"
                       onClick={() => setIsModelMenuOpen(false)}
                     />
                     <div
                       className="fixed bottom-0 left-0 right-0 z-[210] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
                       role="dialog"
-                      aria-label="Select model"
+                      aria-label="Выбрать модель"
                       onClick={(event) => event.stopPropagation()}
                     >
                       <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300 dark:bg-neutral-600" />
                       <div className="px-4 pb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-                        Model
+                        Модель
                       </div>
                       <div className="pb-4 max-h-[60dvh] overflow-y-auto overflow-x-hidden">
                         {(() => {
@@ -2545,10 +2545,10 @@ function ChatComposerComponent({
                             return (
                               <div className="p-4 text-center text-sm text-neutral-500">
                                 <p className="font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                                  No models available
+                                  Нет доступных моделей
                                 </p>
                                 <p className="text-xs">
-                                  Check your Hermes provider configuration.
+                                  Проверьте настройки провайдера.
                                 </p>
                               </div>
                             )
@@ -2692,7 +2692,7 @@ function ChatComposerComponent({
                                     >
                                       <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
                                     </svg>
-                                    <span>Pinned</span>
+                                    <span>Закреплено</span>
                                   </div>
                                   {pinnedEntries.map(renderEntry)}
                                 </div>
@@ -2744,12 +2744,12 @@ function ChatComposerComponent({
             />
             <PromptInputActions className="justify-between px-1.5 md:px-3 gap-0.5 md:gap-2">
               <div className="flex min-w-0 flex-1 items-center gap-0 md:gap-1">
-                <PromptInputAction tooltip="Add attachment">
+                <PromptInputAction tooltip="Добавить вложение">
                   <Button
                     size="icon-sm"
                     variant="ghost"
                     className="rounded-lg text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-500"
-                    aria-label="Add attachment"
+                    aria-label="Добавить вложение"
                     disabled={disabled}
                     onClick={handleOpenAttachmentPicker}
                   >
@@ -2761,12 +2761,12 @@ function ChatComposerComponent({
                   </Button>
                 </PromptInputAction>
                 {hasDraft && !isLoading && (
-                  <PromptInputAction tooltip="Clear draft">
+                  <PromptInputAction tooltip="Очистить черновик">
                     <Button
                       size="icon-sm"
                       variant="ghost"
                       className="rounded-lg text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-red-600"
-                      aria-label="Clear draft"
+                      aria-label="Очистить черновик"
                       onClick={handleClearDraft}
                     >
                       <HugeiconsIcon
@@ -2825,7 +2825,7 @@ function ChatComposerComponent({
                     {isControlsMenuOpen ? (
                       <div className="absolute bottom-full left-0 z-[190] mb-2 w-[min(32rem,calc(100vw-2rem))] min-w-[18rem] overflow-visible rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
                         <div className="mb-2 px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
-                          Chat controls
+                          Управление чатом
                         </div>
                         <div className="flex flex-wrap items-start gap-2">
                           <div
@@ -2857,7 +2857,7 @@ function ChatComposerComponent({
                             {isProfileMenuOpen && (
                               <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
                                 <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
-                                  Agent profile
+                                  Профиль агента
                                 </div>
                                 {(profilesQuery.data?.profiles ?? []).map((profile) => {
                                   const selected = profile.name === activeProfileName
@@ -2881,13 +2881,13 @@ function ChatComposerComponent({
                                     >
                                       <span className="flex items-center gap-2">
                                         <span className="truncate font-medium">{profile.name}</span>
-                                        {selected ? <span className="text-[10px] text-accent-500">active</span> : null}
+                                        {selected ? <span className="text-[10px] text-accent-500">активен</span> : null}
                                       </span>
                                       {profileMeta(profile) ? <span className="mt-0.5 max-w-[12rem] truncate text-[11px] text-neutral-500">{profileMeta(profile)}</span> : null}
                                     </button>
                                   )
                                 })}
-                                {profilesQuery.isError ? <div className="px-3 py-2 text-xs text-red-500">Failed to load profiles</div> : null}
+                                {profilesQuery.isError ? <div className="px-3 py-2 text-xs text-red-500">Не удалось загрузить профили</div> : null}
                               </div>
                             )}
                           </div>
@@ -2969,7 +2969,7 @@ function ChatComposerComponent({
                                       const allModels = modelsQuery.data?.models ?? []
                                       const defaultProvider = modelsQuery.data?.currentProvider ?? ''
                                       if (allModels.length === 0) {
-                                        return <div className="p-4 text-center text-sm text-neutral-500">No models available</div>
+                                        return <div className="p-4 text-center text-sm text-neutral-500">Нет доступных моделей</div>
                                       }
                                       const parsed = allModels.map((m) => {
                                         const mId = String(typeof m === 'string' ? m : m.id || m.model || m.name || 'unknown')
@@ -3038,7 +3038,7 @@ function ChatComposerComponent({
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="text-accent-500">
                                                   <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" />
                                                 </svg>
-                                                <span>Pinned</span>
+                                                <span>Закреплено</span>
                                               </div>
                                               {pinnedEntries.map(renderEntry)}
                                             </div>
@@ -3103,7 +3103,7 @@ function ChatComposerComponent({
                           ? 'Recording voice note'
                           : voiceInput.isListening
                             ? 'Stop listening'
-                            : 'Voice input'
+                            : 'Голосовой ввод'
                       }
                       disabled={disabled}
                     >
@@ -3122,13 +3122,13 @@ function ChatComposerComponent({
                   </PromptInputAction>
                 ) : null}
                 {isLoading ? (
-                  <PromptInputAction tooltip="Stop generation">
+                  <PromptInputAction tooltip="Остановить генерацию">
                     <Button
                       onClick={handleAbort}
                       size="icon-sm"
                       variant="destructive"
                       className="rounded-md"
-                      aria-label="Stop generation"
+                      aria-label="Остановить генерацию"
                     >
                       <HugeiconsIcon
                         icon={StopIcon}
@@ -3139,14 +3139,14 @@ function ChatComposerComponent({
                   </PromptInputAction>
                 ) : (
                   <>
-                    <PromptInputAction tooltip="Send message">
+                    <PromptInputAction tooltip="Отправить сообщение">
                       <Button
                         type="button"
                         onClick={handleSubmit}
                         disabled={submitDisabled}
                         size="icon-sm"
                         className="rounded-full"
-                        aria-label="Send message"
+                        aria-label="Отправить сообщение"
                       >
                         <HugeiconsIcon
                           icon={ArrowUp02Icon}
@@ -3170,7 +3170,7 @@ function ChatComposerComponent({
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setPreviewImage(null)}
             role="dialog"
-            aria-label="Image preview"
+            aria-label="Предпросмотр изображения"
           >
             <button
               type="button"
@@ -3179,7 +3179,7 @@ function ChatComposerComponent({
                 e.stopPropagation()
                 setPreviewImage(null)
               }}
-              aria-label="Close preview"
+              aria-label="Закрыть предпросмотр"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={24} strokeWidth={2} />
             </button>

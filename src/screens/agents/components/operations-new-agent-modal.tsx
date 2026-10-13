@@ -208,10 +208,10 @@ export function OperationsNewAgentModal({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-[var(--theme-text)]">
-                New Agent
+                Новый агент
               </h2>
               <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
-                Add a persistent Operations agent to the roster.
+                Добавьте в состав постоянного агента для операций.
               </p>
             </div>
           </div>
@@ -226,7 +226,7 @@ export function OperationsNewAgentModal({
 
         <div className="mt-6 space-y-2">
           <span className="text-sm font-medium text-[var(--theme-text)]">
-            Start from a template
+            Начать с шаблона
           </span>
           <div className="flex flex-wrap gap-2">
             {PRESET_OPTIONS.map((preset) => (
@@ -247,14 +247,13 @@ export function OperationsNewAgentModal({
             ))}
           </div>
           <p className="text-xs text-[var(--theme-muted)]">
-            Templates fill in emoji, description, and system prompt. You can edit
-            everything before creating.
+            Шаблоны заполняют эмодзи, описание и системный промпт. Всё можно изменить до создания.
           </p>
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_0.6fr]">
           <label className="space-y-2">
-            <span className="text-sm font-medium text-[var(--theme-text)]">Name</span>
+            <span className="text-sm font-medium text-[var(--theme-text)]">Название</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -264,7 +263,7 @@ export function OperationsNewAgentModal({
           </label>
 
           <label className="space-y-2">
-            <span className="text-sm font-medium text-[var(--theme-text)]">Emoji</span>
+            <span className="text-sm font-medium text-[var(--theme-text)]">Эмодзи</span>
             <input
               value={emoji}
               onChange={(event) => setEmoji(event.target.value)}
@@ -275,28 +274,28 @@ export function OperationsNewAgentModal({
         </div>
 
         <label className="mt-4 block space-y-2">
-          <span className="text-sm font-medium text-[var(--theme-text)]">Model</span>
+          <span className="text-sm font-medium text-[var(--theme-text)]">Модель</span>
           <ModelSelector value={model} onChange={setModel} models={models} />
         </label>
 
         <label className="mt-4 block space-y-2">
-          <span className="text-sm font-medium text-[var(--theme-text)]">Description</span>
+          <span className="text-sm font-medium text-[var(--theme-text)]">Описание</span>
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="X/Twitter growth agent"
+            placeholder="Агент роста в X/Twitter"
             className="w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
           />
         </label>
 
         <label className="mt-4 block space-y-2">
           <span className="text-sm font-medium text-[var(--theme-text)]">
-            System Prompt
+            Системный промпт
           </span>
           <textarea
             value={systemPrompt}
             onChange={(event) => setSystemPrompt(event.target.value)}
-            placeholder="You are Sage, an expert..."
+            placeholder="Ты — Sage, эксперт..."
             className="min-h-[180px] w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
           />
         </label>
@@ -307,7 +306,7 @@ export function OperationsNewAgentModal({
             className="border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
             onClick={onClose}
           >
-            Cancel
+            Отмена
           </Button>
           <Button
             className="bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"

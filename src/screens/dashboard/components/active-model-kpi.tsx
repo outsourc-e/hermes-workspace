@@ -30,7 +30,7 @@ export function ActiveModelKpi({
   const provider = modelInfo?.provider ?? '—'
 
   // Routing share (proxy): % of calls in the analytics window that hit
-  // the active model. Hermes Agent confirmed this is the closest
+  // the active model. AWG GPT confirmed this is the closest
   // available metric without a dedicated routing-decisions endpoint.
   const share = ((): number | null => {
     if (!modelInfo || !analytics) return null
@@ -75,7 +75,7 @@ export function ActiveModelKpi({
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          Active Model
+          Активная модель
         </span>
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold"
@@ -87,7 +87,7 @@ export function ActiveModelKpi({
           }}
         >
           <span className="size-1.5 rounded-full" style={{ background: tone }} />
-          {connected ? 'Online' : 'Offline'}
+          {connected ? 'В сети' : 'Не в сети'}
         </span>
       </div>
 
@@ -106,7 +106,7 @@ export function ActiveModelKpi({
               background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
               color: 'var(--theme-accent)',
             }}
-            title="Share of API calls in the analytics window."
+            title="Доля вызовов API за период аналитики."
           >
             {share}% calls
           </span>

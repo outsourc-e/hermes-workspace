@@ -72,7 +72,7 @@ export function TopologyBand({
           </div>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-200/45">
-              Compact topology
+              Компактная топология
             </div>
             <div className="truncate text-sm font-semibold text-white">
               {selected
@@ -85,12 +85,12 @@ export function TopologyBand({
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
           <div className="flex shrink-0 items-center gap-2 rounded-full border border-emerald-400/18 bg-emerald-500/8 px-3 py-1.5 text-xs text-emerald-100/75">
             <HugeiconsIcon icon={CpuIcon} size={13} />
-            Agent
+            Агент
             <span className="text-emerald-200/45">→</span>
           </div>
           {members.length === 0 ? (
             <div className="rounded-full border border-dashed border-emerald-400/20 px-3 py-1.5 text-xs text-emerald-100/45">
-              No swarm workers discovered from crew status.
+              Исполнители Swarm по состоянию команды не найдены.
             </div>
           ) : (
             members.map((member) => {

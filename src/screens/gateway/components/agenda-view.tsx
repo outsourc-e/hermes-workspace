@@ -116,7 +116,7 @@ function formatDuration(ms: number): string {
 
 function formatTimeAgo(timestamp: number, nowTs: number): string {
   const diff = nowTs - timestamp
-  if (diff < 45_000) return 'just now'
+  if (diff < 45_000) return 'только что'
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
   return `${Math.floor(diff / 86_400_000)}d ago`
@@ -284,14 +284,14 @@ export function AgendaView({
   return (
     <div className="space-y-3">
       <header className="rounded-xl border border-primary-800 bg-primary-900 p-4">
-        <p className="text-xs uppercase tracking-wide text-primary-400">Today overview</p>
+        <p className="text-xs uppercase tracking-wide text-primary-400">Обзор за сегодня</p>
         <h2 className="mt-1 text-lg font-semibold text-primary-100">{greeting}</h2>
-        <p className="text-xs text-primary-300">Here is your daily briefing.</p>
+        <p className="text-xs text-primary-300">Ваша ежедневная сводка.</p>
       </header>
 
       <SectionCard
         id="attention"
-        title="🔴 Needs Attention"
+        title="🔴 Требует внимания"
         count={needsAttention.length}
         open={openSections.attention}
         onToggle={toggleSection}
@@ -314,7 +314,7 @@ export function AgendaView({
 
       <SectionCard
         id="active"
-        title="🟢 Active Now"
+        title="🟢 Сейчас активны"
         count={activeNow.length}
         open={openSections.active}
         onToggle={toggleSection}
@@ -336,7 +336,7 @@ export function AgendaView({
 
       <SectionCard
         id="tasks"
-        title="📋 Tasks Due Today"
+        title="📋 Задачи на сегодня"
         count={tasksDueToday.length}
         open={openSections.tasks}
         onToggle={toggleSection}
@@ -363,7 +363,7 @@ export function AgendaView({
         count={upcoming24h.length}
         open={openSections.upcoming}
         onToggle={toggleSection}
-        emptyText="No cron runs scheduled in the next 24 hours."
+        emptyText="В ближайшие 24 часа запусков cron не запланировано."
       >
         <ul className="space-y-2">
           {upcoming24h.map((cron) => (
@@ -381,11 +381,11 @@ export function AgendaView({
 
       <SectionCard
         id="completed"
-        title="✅ Recently Completed"
+        title="✅ Недавно завершено"
         count={recentlyCompleted.length}
         open={openSections.completed}
         onToggle={toggleSection}
-        emptyText="No recent completions yet."
+        emptyText="Недавних завершений пока нет."
       >
         <ul className="space-y-2">
           {recentlyCompleted.map((completion) => (
@@ -411,7 +411,7 @@ export function AgendaView({
 
       <SectionCard
         id="agents"
-        title="🤖 Agent Status"
+        title="🤖 Состояние агентов"
         count={agentStatuses.length}
         open={openSections.agents}
         onToggle={toggleSection}

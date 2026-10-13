@@ -275,7 +275,7 @@ export function VtCapitalScreen() {
   if (loading)
     return (
       <div className="flex h-full items-center justify-center text-muted">
-        Carico VT Capital…
+        Загрузка VT Capital…
       </div>
     )
   if (error)
@@ -285,7 +285,7 @@ export function VtCapitalScreen() {
           className="text-xl font-semibold"
           style={{ color: 'var(--theme-danger)' }}
         >
-          VT Capital non caricato
+          VT Capital не загружен
         </h1>
         <p className="max-w-xl text-sm text-muted">{error}</p>
         <button
@@ -297,7 +297,7 @@ export function VtCapitalScreen() {
             color: 'var(--theme-on-accent, white)',
           }}
         >
-          Riprova
+          Повторить
         </button>
       </div>
     )
@@ -343,14 +343,13 @@ export function VtCapitalScreen() {
               </span>
               <div>
                 <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-                  Plugin VT Capital
+                  Плагин VT Capital
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  VT Capital Cockpit
+                  Панель VT Capital
                 </h1>
                 <p className="mt-1 max-w-2xl text-sm text-muted">
-                  Bias crypto, council/precheck, worker Swarm e note vault in
-                  una superficie isolata dal resto della dashboard.
+                  Крипто-смещение, совет/предпроверка, исполнители Swarm и хранилище заметок на отдельной поверхности, изолированной от остальной панели.
                 </p>
               </div>
             </div>
@@ -390,7 +389,7 @@ export function VtCapitalScreen() {
                   background: 'var(--theme-card2)',
                 }}
               >
-                Scope: solo plugin
+                Область: отдельный плагин
               </span>
               <span
                 className="rounded-full border px-3 py-1 text-muted"
@@ -407,12 +406,12 @@ export function VtCapitalScreen() {
 
         <div className="grid gap-4 md:grid-cols-4">
           <Metric
-            label="Market bias file"
+            label="Файл рыночного смещения"
             value={data.marketBias.fileExists ? 'online' : 'missing'}
             tone={data.marketBias.fileExists ? 'good' : 'warn'}
           />
           <Metric
-            label="Council precheck"
+            label="Предпроверка совета"
             value={
               data.council.fileExists
                 ? `${data.council.recent.length} record`
@@ -421,11 +420,11 @@ export function VtCapitalScreen() {
             tone={data.council.fileExists ? 'good' : 'warn'}
           />
           <Metric
-            label="Worker runtime"
+            label="Среда исполнителя"
             value={`${activeWorkers}/${data.workers.length}`}
             tone={activeWorkers > 0 ? 'good' : 'warn'}
           />
-          <Metric label="Ultimo refresh" value={formatTime(data.checkedAt)} />
+          <Metric label="Последнее обновление" value={formatTime(data.checkedAt)} />
         </div>
 
         {data.guardian ? (
@@ -442,33 +441,33 @@ export function VtCapitalScreen() {
           >
             <div className="grid gap-3 lg:grid-cols-4">
               <Metric
-                label="Modalità executor"
+                label="Режим исполнителя"
                 value={data.guardian.executionMode.replaceAll('_', ' ')}
                 tone={data.guardian.executionEnabled ? 'warn' : 'good'}
               />
               <Metric
-                label="Live trading"
+                label="Живая торговля"
                 value={data.guardian.liveBlocked ? 'bloccato' : 'aperto'}
                 tone={data.guardian.liveBlocked ? 'good' : 'warn'}
               />
               <Metric
-                label="Ordini aperti demo"
+                label="Открытые демо-ордера"
                 value={data.guardian.demoState.openOrders}
                 tone={data.guardian.demoState.openOrders > 0 ? 'warn' : 'good'}
               />
               <Metric
-                label="Ordini tracciati"
+                label="Отслеживаемые ордера"
                 value={data.guardian.demoState.trackedOrders}
               />
             </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              <MiniEvent label="Ultimo risk.check" event={data.guardian.lastRiskCheck} />
+              <MiniEvent label="Последний risk.check" event={data.guardian.lastRiskCheck} />
               <MiniEvent
-                label="Ultimo order.proposed"
+                label="Последний order.proposed"
                 event={data.guardian.lastOrderProposed}
               />
               <MiniEvent
-                label="Ultimo order.executed"
+                label="Последний order.executed"
                 event={data.guardian.lastOrderExecuted}
               />
             </div>
@@ -480,7 +479,7 @@ export function VtCapitalScreen() {
                 }}
               >
                 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
-                  Blocchi recenti
+                  Недавние блоки
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   {data.guardian.recentBlocks.map((block, index) => (
@@ -507,7 +506,7 @@ export function VtCapitalScreen() {
 
         <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
           <Card
-            title="Market Bias BTC/ETH/SOL"
+            title="Рыночное смещение BTC/ETH/SOL"
             right={
               <span className="text-xs text-muted">
                 aggiornato {formatTime(data.marketBias.updatedAt)}
@@ -585,7 +584,7 @@ export function VtCapitalScreen() {
           </Card>
 
           <Card
-            title="Risk / Council Journal"
+            title="Журнал рисков и совета"
             right={
               <span className="text-xs text-muted">
                 {data.council.recent.length} ultimi
@@ -596,7 +595,7 @@ export function VtCapitalScreen() {
             <div className="flex max-h-[420px] flex-col gap-2 overflow-auto pr-1">
               {data.council.recent.length === 0 ? (
                 <p className="text-sm text-muted">
-                  Nessun precheck council trovato.
+                  Предпроверки совета не найдены.
                 </p>
               ) : (
                 data.council.recent
@@ -667,13 +666,13 @@ export function VtCapitalScreen() {
           </Card>
 
           <Card
-            title="Vault / Report recenti"
+            title="Недавние хранилища и отчёты"
             accent="var(--theme-accent-secondary)"
           >
             <div className="flex flex-col gap-2">
               {data.notes.length === 0 ? (
                 <p className="text-sm text-muted">
-                  Nessuna nota VT Capital/crypto trovata.
+                  Заметки VT Capital и крипто не найдены.
                 </p>
               ) : (
                 data.notes.map((note) => (

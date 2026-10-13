@@ -87,7 +87,7 @@ const PROVIDERS: Array<Provider> = [
     id: 'anthropic',
     name: 'Anthropic (Claude)',
     description:
-      'Best for complex reasoning, long-form writing and precise instructions',
+      'Лучший выбор для сложных рассуждений, больших текстов и точных инструкций',
     badge: 'Recommended',
     logo: <AnthropicLogo className="size-8" />,
     placeholder: 'sk-ant-...',
@@ -98,7 +98,7 @@ const PROVIDERS: Array<Provider> = [
     id: 'openrouter',
     name: 'OpenRouter',
     description:
-      'One Hermes Agent connection to 200+ AI models. Ideal for flexibility and experimentation',
+      'Одно подключение к 200+ моделям ИИ. Подходит для гибкости и экспериментов',
     badge: 'Popular',
     logo: <OpenRouterLogo className="size-8" />,
     placeholder: 'sk-or-v1-...',
@@ -108,7 +108,7 @@ const PROVIDERS: Array<Provider> = [
   {
     id: 'google',
     name: 'Google (Gemini)',
-    description: 'Strong with images, documents and large amounts of context',
+    description: 'Хорошо работает с изображениями, документами и большим контекстом',
     logo: <GoogleLogo className="size-8" />,
     placeholder: 'AI...',
     helpUrl: 'https://aistudio.google.com/apikey',
@@ -117,7 +117,7 @@ const PROVIDERS: Array<Provider> = [
   {
     id: 'openai',
     name: 'OpenAI (GPT)',
-    description: 'An all-rounder for chat, coding, and everyday tasks',
+    description: 'Универсальная модель для чата, кода и повседневных задач',
     logo: <OpenAILogo className="size-8" />,
     placeholder: 'sk-...',
     helpUrl: 'https://platform.openai.com/api-keys',
@@ -167,7 +167,7 @@ export function ProviderSelectStep({
       }
     } catch {
       setValidated(false)
-      setError('Validation failed — check your connection')
+      setError('Проверка не пройдена — проверьте подключение')
     } finally {
       setValidating(false)
     }
@@ -197,11 +197,10 @@ export function ProviderSelectStep({
       {/* Header */}
       <div className="mb-6 text-center">
         <h2 className="mb-2 text-2xl font-semibold text-primary-900">
-          Choose AI Provider
+          Выберите ИИ-провайдера
         </h2>
         <p className="text-sm text-primary-600">
-          Pick the AI provider you want to start with. You can switch or add
-          more providers later.
+          Выберите ИИ-провайдера для начала. Позже можно сменить или добавить других.
         </p>
       </div>
 
@@ -318,7 +317,7 @@ export function ProviderSelectStep({
                   type="button"
                   onClick={handlePaste}
                   className="inline-flex size-8 items-center justify-center rounded-md text-primary-400 hover:text-primary-600"
-                  title="Paste from clipboard"
+                  title="Вставить из буфера обмена"
                 >
                   <HugeiconsIcon
                     icon={Copy01Icon}
@@ -347,7 +346,7 @@ export function ProviderSelectStep({
                 size={14}
                 strokeWidth={2}
               />
-              <span>API key is valid!</span>
+              <span>API-ключ действителен!</span>
             </div>
           )}
           {error && (
@@ -363,7 +362,7 @@ export function ProviderSelectStep({
       <div className="flex gap-3">
         {onSkip && (
           <Button variant="secondary" onClick={onSkip} className="flex-1">
-            Skip for Now
+            Пропустить пока
           </Button>
         )}
         <Button

@@ -15,15 +15,14 @@ export type SettingsNavId =
 type NavItem = { id: SettingsNavId; label: string }
 
 export const SETTINGS_NAV_ITEMS: Array<NavItem> = [
-  { id: 'connection', label: 'Connection' },
-  { id: 'claude', label: 'Model & Provider' },
-  { id: 'agent', label: 'Agent Behavior' },
-  { id: 'voice', label: 'Voice' },
-  { id: 'display', label: 'Display' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'chat', label: 'Chat' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'language', label: 'Language' },
+  { id: 'connection', label: 'Подключение' },
+  { id: 'agent', label: 'Поведение агента' },
+  { id: 'voice', label: 'Голос' },
+  { id: 'display', label: 'Отображение' },
+  { id: 'appearance', label: 'Внешний вид' },
+  { id: 'chat', label: 'Чат' },
+  { id: 'notifications', label: 'Уведомления' },
+  { id: 'language', label: 'Язык' },
 ]
 
 type ItemRendererArgs = {
@@ -79,7 +78,7 @@ export function SettingsSidebar({ activeId }: { activeId: SettingsNavId }) {
     <nav className="hidden w-48 shrink-0 md:block">
       <div className="sticky top-8">
         <h1 className="mb-4 px-3 text-lg font-semibold text-primary-900">
-          Settings
+          Настройки
         </h1>
         <div className="flex flex-col gap-0.5">
           {SETTINGS_NAV_ITEMS.map((item) =>

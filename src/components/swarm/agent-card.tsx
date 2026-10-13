@@ -230,7 +230,7 @@ export function AgentCard({
       <div className="rounded-2xl border border-white/8 bg-black/22 px-3 py-2 text-xs">
         <div className="flex items-center justify-between gap-2">
           <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-200/50">
-            Now
+            Сейчас
           </div>
           {member.assignedTaskCount > 0 || member.cronJobCount > 0 ? (
             <div className="text-[10px] text-emerald-100/45">
@@ -251,7 +251,7 @@ export function AgentCard({
       {compactSignalOnly ? (
         <div className="min-h-[12rem] flex-1 rounded-2xl border border-emerald-400/10 bg-black/18 p-3 text-[11px] text-emerald-100/55">
           <div className="mb-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.18em] text-emerald-200/45">
-            <span>Signal</span>
+            <span>Сигнал</span>
             <span>{selected ? 'focused' : 'click card to focus'}</span>
           </div>
           {recentLines.length > 0 ? (
@@ -264,7 +264,7 @@ export function AgentCard({
             </div>
           ) : (
             <div className="text-emerald-100/40">
-              No runtime tail yet. Use Router for orchestration or Terminal for live tmux.
+              Журнала выполнения пока нет. Используйте маршрутизатор для оркестрации или терминал для tmux.
             </div>
           )}
         </div>
@@ -307,7 +307,7 @@ export function AgentCard({
             className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 bg-transparent px-2.5 py-1 text-emerald-200/70 hover:text-white"
           >
             <HugeiconsIcon icon={CheckListIcon} size={11} />
-            Tasks
+            Задачи
           </button>
           <button
             type="button"
@@ -315,7 +315,7 @@ export function AgentCard({
             className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 bg-transparent px-2.5 py-1 text-emerald-200/70 hover:text-white"
           >
             <HugeiconsIcon icon={ComputerTerminal01Icon} size={11} />
-            Terminal
+            Терминал
           </button>
         </div>
       </div>

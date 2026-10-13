@@ -215,7 +215,7 @@ export function ProfilesScreen() {
       await refreshProfiles()
     } catch (error) {
       toast(
-        error instanceof Error ? error.message : 'Failed to create profile',
+        error instanceof Error ? error.message : 'Не удалось создать профиль',
         { type: 'error' },
       )
     } finally {
@@ -231,7 +231,7 @@ export function ProfilesScreen() {
       await refreshProfiles()
     } catch (error) {
       toast(
-        error instanceof Error ? error.message : 'Failed to activate profile',
+        error instanceof Error ? error.message : 'Не удалось активировать профиль',
         { type: 'error' },
       )
     } finally {
@@ -252,7 +252,7 @@ export function ProfilesScreen() {
       await refreshProfiles()
     } catch (error) {
       toast(
-        error instanceof Error ? error.message : 'Failed to delete profile',
+        error instanceof Error ? error.message : 'Не удалось удалить профиль',
         { type: 'error' },
       )
     } finally {
@@ -276,7 +276,7 @@ export function ProfilesScreen() {
       await refreshProfiles()
     } catch (error) {
       toast(
-        error instanceof Error ? error.message : 'Failed to rename profile',
+        error instanceof Error ? error.message : 'Не удалось переименовать профиль',
         { type: 'error' },
       )
     } finally {
@@ -300,7 +300,7 @@ export function ProfilesScreen() {
       await detailQuery.refetch()
     } catch (error) {
       toast(
-        error instanceof Error ? error.message : 'Failed to save description',
+        error instanceof Error ? error.message : 'Не удалось сохранить описание',
         { type: 'error' },
       )
     } finally {
@@ -314,7 +314,7 @@ export function ProfilesScreen() {
         <div>
           <div className="flex items-center gap-2">
             <HugeiconsIcon icon={UserGroupIcon} size={22} strokeWidth={1.7} />
-            <h1 className="text-lg font-semibold text-primary-900">Profiles</h1>
+            <h1 className="text-lg font-semibold text-primary-900">Профили</h1>
           </div>
           <p className="mt-1 text-sm text-primary-600">
             Browse and manage Hermes profiles stored under{' '}
@@ -323,7 +323,7 @@ export function ProfilesScreen() {
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">
           <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
-          Create profile
+          Создать профиль
         </Button>
       </div>
 
@@ -376,7 +376,7 @@ export function ProfilesScreen() {
                         className="text-white"
                       />
                       <span className="text-[9px] font-bold uppercase tracking-wider text-white">
-                        Active
+                        Активно
                       </span>
                     </div>
                   )}
@@ -390,21 +390,21 @@ export function ProfilesScreen() {
                   {profile.provider || 'no provider'}
                 </span>
                 <p className="mt-3 line-clamp-2 min-h-[2.5rem] px-6 text-center text-xs text-primary-500 dark:text-neutral-400">
-                  {profile.description?.trim() || 'No description yet'}
+                  {profile.description?.trim() || 'Описания пока нет'}
                 </p>
               </div>
 
               {/* Stats ring */}
               <div className="mx-4 mt-4 grid grid-cols-4 divide-x divide-primary-200 rounded-xl border border-primary-200 bg-primary-100/50 dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900/50">
-                <ProfileStat label="Skills" value={profile.skillCount} />
-                <ProfileStat label="Sessions" value={profile.sessionCount} />
+                <ProfileStat label="Навыки" value={profile.skillCount} />
+                <ProfileStat label="Сессии" value={profile.sessionCount} />
                 <ProfileStat
-                  label="Model"
+                  label="Модель"
                   value={profile.model || '\u2014'}
                   truncate
                 />
                 <ProfileStat
-                  label="Env"
+                  label="Окружение"
                   value={profile.hasEnv ? '\u2713' : '\u2014'}
                 />
               </div>
@@ -509,7 +509,7 @@ export function ProfilesScreen() {
               </div>
               <div>
                 <DialogTitle className="text-base font-semibold">
-                  Create profile
+                  Создать профиль
                 </DialogTitle>
                 <p className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">
                   {wizardStep === 1
@@ -566,12 +566,12 @@ export function ProfilesScreen() {
               <div className="space-y-5">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
-                    Profile name
+                    Название профиля
                   </label>
                   <Input
                     value={newProfileName}
                     onChange={(e) => setNewProfileName(e.target.value)}
-                    placeholder="e.g. builder, researcher, ops"
+                    placeholder="Например: разработчик, исследователь, ops"
                     className="h-11 text-sm"
                     autoFocus
                   />
@@ -581,10 +581,10 @@ export function ProfilesScreen() {
                       &quot;default&quot;.
                     </p>
                   ) : newProfileName.trim() && nameValid ? (
-                    <p className="text-xs text-emerald-600">✓ Valid name</p>
+                    <p className="text-xs text-emerald-600">✓ Имя допустимо</p>
                   ) : (
                     <p className="text-xs text-primary-400 dark:text-neutral-500">
-                      Choose a short, memorable identifier
+                      Выберите короткий запоминающийся идентификатор
                     </p>
                   )}
                 </div>
@@ -597,7 +597,7 @@ export function ProfilesScreen() {
                         size={13}
                         strokeWidth={1.8}
                       />
-                      Clone from existing
+                      Скопировать из существующего
                     </span>
                   </label>
                   <select
@@ -605,7 +605,7 @@ export function ProfilesScreen() {
                     onChange={(e) => setCloneFrom(e.target.value)}
                     className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
                   >
-                    <option value="">Start fresh — empty config</option>
+                    <option value="">С нуля — пустая конфигурация</option>
                     {profiles.map((p) => (
                       <option key={p.name} value={p.name}>
                         {p.name} {p.model ? `(${p.model})` : ''}{' '}
@@ -614,8 +614,7 @@ export function ProfilesScreen() {
                     ))}
                   </select>
                   <p className="text-xs text-primary-400 dark:text-neutral-500">
-                    Copies config, skills path, and env from the selected
-                    profile
+                    Копирует конфигурацию, путь к навыкам и переменные окружения из выбранного профиля
                   </p>
                 </div>
 
@@ -635,16 +634,15 @@ export function ProfilesScreen() {
               <div className="space-y-5">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
-                    Default model
+                    Модель по умолчанию
                   </label>
                   {loadingModels ? (
                     <div className="flex h-11 items-center rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500">
-                      Loading configured models…
+                      Загрузка настроенных моделей…
                     </div>
                   ) : allModels.length === 0 ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                      No models found. Make sure Hermes Agent is running and
-                      has models configured.
+                      Модели не найдены. Убедитесь, что AWG GPT запущен и модели настроены.
                     </div>
                   ) : (
                     <select
@@ -657,7 +655,7 @@ export function ProfilesScreen() {
                       }}
                       className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
                     >
-                      <option value="">Skip — configure later</option>
+                      <option value="">Пропустить — настроить позже</option>
                       {allModels.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name || m.id}
@@ -677,8 +675,7 @@ export function ProfilesScreen() {
                 {!wizardModel && !loadingModels && allModels.length > 0 && (
                   <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
                     <p className="text-xs text-primary-500 dark:text-neutral-400">
-                      Select a model or skip to configure later from profile
-                      details or config.yaml.
+                      Выберите модель или пропустите и настройте позже в профиле или в config.yaml.
                     </p>
                   </div>
                 )}
@@ -689,20 +686,20 @@ export function ProfilesScreen() {
               <div className="space-y-4">
                 <div className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
                   <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
-                    Profile summary
+                    Сводка по профилю
                   </h3>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <SummaryField label="Name" value={newProfileName.trim()} />
+                    <SummaryField label="Название" value={newProfileName.trim()} />
                     <SummaryField
-                      label="Template"
+                      label="Шаблон"
                       value={cloneFrom || 'Fresh start'}
                     />
                     <SummaryField
-                      label="Model"
+                      label="Модель"
                       value={
                         wizardModel
                           ? `${wizardModel}${wizardProvider ? ` (${wizardProvider})` : ''}`
-                          : 'Not set'
+                          : 'Не задано'
                       }
                       muted={!wizardModel}
                     />
@@ -733,7 +730,7 @@ export function ProfilesScreen() {
                   size="sm"
                   onClick={() => setWizardStep((s) => (s - 1) as 1 | 2 | 3)}
                 >
-                  Back
+                  Назад
                 </Button>
               )}
             </div>
@@ -746,7 +743,7 @@ export function ProfilesScreen() {
                   resetWizard()
                 }}
               >
-                Cancel
+                Отмена
               </Button>
               {wizardStep < 3 ? (
                 <Button
@@ -755,7 +752,7 @@ export function ProfilesScreen() {
                   disabled={wizardStep === 1 && !nameValid}
                   className="gap-1.5"
                 >
-                  Next
+                  Далее
                   <HugeiconsIcon
                     icon={ArrowRight01Icon}
                     size={14}
@@ -774,7 +771,7 @@ export function ProfilesScreen() {
                     size={14}
                     strokeWidth={1.8}
                   />
-                  Create Profile
+                  Создать профиль
                 </Button>
               )}
             </div>
@@ -799,7 +796,7 @@ export function ProfilesScreen() {
               </div>
               <div>
                 <DialogTitle className="text-base font-semibold">
-                  Rename profile
+                  Переименовать профиль
                 </DialogTitle>
                 <p className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">
                   Renaming{' '}
@@ -813,7 +810,7 @@ export function ProfilesScreen() {
           <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
-                New name
+                Новое имя
               </label>
               <Input
                 value={renameValue}
@@ -825,7 +822,7 @@ export function ProfilesScreen() {
               {renameValue.trim() &&
                 !/^[A-Za-z0-9_-]+$/.test(renameValue.trim()) && (
                   <p className="text-xs text-red-500">
-                    Use letters, numbers, underscores, or hyphens.
+                    Допустимы буквы, цифры, подчёркивания и дефисы.
                   </p>
                 )}
             </div>
@@ -839,7 +836,7 @@ export function ProfilesScreen() {
                 setRenameValue('')
               }}
             >
-              Cancel
+              Отмена
             </Button>
             <Button
               size="sm"
@@ -850,7 +847,7 @@ export function ProfilesScreen() {
                 !/^[A-Za-z0-9_-]+$/.test(renameValue.trim())
               }
             >
-              Rename
+              Переименовать
             </Button>
           </div>
         </DialogContent>
@@ -896,36 +893,36 @@ export function ProfilesScreen() {
               <div className="space-y-4 text-sm">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <DetailField
-                    label="Name"
+                    label="Название"
                     value={detailQuery.data.profile.name}
                   />
                   <DetailField
-                    label="Active"
+                    label="Активно"
                     value={detailQuery.data.profile.active ? 'Yes' : 'No'}
                     accent={detailQuery.data.profile.active}
                   />
                 </div>
                 <DetailField
-                  label="Path"
+                  label="Путь"
                   value={detailQuery.data.profile.path}
                   mono
                 />
                 <div className="grid gap-3 sm:grid-cols-3">
                   <DetailField
-                    label="Env file"
-                    value={detailQuery.data.profile.envPath || 'Not set'}
+                    label="Файл окружения"
+                    value={detailQuery.data.profile.envPath || 'Не задано'}
                     mono
                     muted={!detailQuery.data.profile.envPath}
                   />
                   <DetailField
-                    label="Sessions"
-                    value={detailQuery.data.profile.sessionsDir || 'Not set'}
+                    label="Сессии"
+                    value={detailQuery.data.profile.sessionsDir || 'Не задано'}
                     mono
                     muted={!detailQuery.data.profile.sessionsDir}
                   />
                   <DetailField
-                    label="Skills"
-                    value={detailQuery.data.profile.skillsDir || 'Not set'}
+                    label="Навыки"
+                    value={detailQuery.data.profile.skillsDir || 'Не задано'}
                     mono
                     muted={!detailQuery.data.profile.skillsDir}
                   />
@@ -933,7 +930,7 @@ export function ProfilesScreen() {
                 <div className="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
-                      Description
+                      Описание
                     </div>
                     <Button
                       size="sm"
@@ -946,11 +943,11 @@ export function ProfilesScreen() {
                   <textarea
                     value={descriptionDraft}
                     onChange={(event) => setDescriptionDraft(event.target.value)}
-                    placeholder="What this profile is for, how it should behave, or what makes it different"
+                    placeholder="Для чего этот профиль, как он должен вести себя и чем отличается"
                     className="min-h-[96px] w-full rounded-lg border border-primary-200 bg-primary-100/70 p-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
                   />
                   <p className="mt-2 text-xs text-primary-400 dark:text-neutral-500">
-                    Saved into the profile config, so manual file edits show up here after refresh.
+                    Сохраняется в конфигурацию профиля, поэтому ручные правки файла появятся здесь после обновления.
                   </p>
                 </div>
                 <div className="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
@@ -973,7 +970,7 @@ export function ProfilesScreen() {
               </div>
             ) : (
               <div className="flex min-h-[120px] items-center justify-center text-sm text-red-500">
-                Failed to load profile.
+                Не удалось загрузить профиль.
               </div>
             )}
           </div>
@@ -985,7 +982,7 @@ export function ProfilesScreen() {
               size="sm"
               onClick={() => setDetailsName(null)}
             >
-              Close
+              Закрыть
             </Button>
           </div>
         </DialogContent>

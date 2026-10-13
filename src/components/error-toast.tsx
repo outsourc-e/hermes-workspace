@@ -18,7 +18,7 @@ function classifyError(raw: string): string {
     lower.includes('rate limit') ||
     lower.includes('too many')
   ) {
-    return 'Rate limited — try again in a moment'
+    return 'Превышен лимит запросов — повторите чуть позже'
   }
   if (
     lower.includes('401') ||
@@ -27,14 +27,14 @@ function classifyError(raw: string): string {
     lower.includes('invalid api key') ||
     lower.includes('api key')
   ) {
-    return 'Authentication error — check your API key in Settings'
+    return 'Ошибка аутентификации — проверьте API-ключ в настройках'
   }
   if (
     lower.includes('500') ||
     lower.includes('server error') ||
     lower.includes('model error')
   ) {
-    return 'Model error — the provider is having issues'
+    return 'Ошибка модели — у провайдера проблемы'
   }
   if (
     lower.includes('network') ||
@@ -45,7 +45,7 @@ function classifyError(raw: string): string {
     return 'Connection lost — retrying…'
   }
   if (lower.includes('tool_use') && lower.includes('tool_result')) {
-    return 'Tool call context error — conversation history got out of sync. Start a new session to continue.'
+    return 'Ошибка контекста вызова инструмента — история диалога рассинхронизировалась. Начните новую сессию.'
   }
   // Return original message if no pattern matched
   return raw
@@ -91,7 +91,7 @@ function ToastItem({ entry, onDismiss }: ToastItemProps) {
         type="button"
         onClick={() => onDismiss(entry.id)}
         className="shrink-0 text-primary-400 hover:text-primary-600 transition-colors text-lg leading-none"
-        aria-label="Dismiss"
+        aria-label="Скрыть"
       >
         ×
       </button>

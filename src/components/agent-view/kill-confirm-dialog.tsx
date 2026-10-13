@@ -38,7 +38,7 @@ export function KillConfirmDialog({
       onKilled?.()
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to terminate agent'
+        error instanceof Error ? error.message : 'Не удалось остановить агента'
       toast(message, { type: 'error' })
     } finally {
       setPending(false)
@@ -58,7 +58,7 @@ export function KillConfirmDialog({
           <div className="space-y-1">
             <DialogTitle className="text-base">Kill {agentName}?</DialogTitle>
             <DialogDescription>
-              This will terminate the agent session immediately.
+              Сессия агента будет немедленно завершена.
             </DialogDescription>
           </div>
 
@@ -71,7 +71,7 @@ export function KillConfirmDialog({
                 onOpenChange(false)
               }}
             >
-              Cancel
+              Отмена
             </Button>
             <Button
               variant="destructive"

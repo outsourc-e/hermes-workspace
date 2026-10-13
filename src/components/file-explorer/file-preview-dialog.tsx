@@ -67,7 +67,7 @@ export default function FilePreviewDialog({
       const res = await fetch(
         `/api/files?action=read&path=${encodeURIComponent(path)}`,
       )
-      if (!res.ok) throw new Error('Failed to read file')
+      if (!res.ok) throw new Error('Не удалось прочитать файл')
       const data = (await res.json()) as {
         type: 'text' | 'image'
         content: string
@@ -121,10 +121,10 @@ export default function FilePreviewDialog({
           <div className="flex gap-2">
             {isTextFile(path || '') ? (
               <Button onClick={handleSave} disabled={!dirty || loading}>
-                Save
+                Сохранить
               </Button>
             ) : null}
-            <DialogClose render={<Button variant="outline">Close</Button>} />
+            <DialogClose render={<Button variant="outline">Закрыть</Button>} />
           </div>
         </div>
 
@@ -146,7 +146,7 @@ export default function FilePreviewDialog({
           ) : (
             <div className="h-[60vh]">
               <textarea
-                className="h-full w-full resize-none rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 font-mono text-xs leading-relaxed text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                className="h-full w-full resize-none rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 font-mono text-xs leading-relaxed text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#7657c7]/30"
                 value={content}
                 onChange={(e) => {
                   setContent(e.target.value)

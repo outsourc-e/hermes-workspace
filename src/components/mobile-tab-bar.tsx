@@ -40,28 +40,28 @@ type TabItem = {
 export const MOBILE_NAV_TABS: Array<TabItem> = [
   {
     id: 'chat',
-    label: 'Chat',
+    label: 'Чат',
     icon: Chat01Icon,
     to: '/chat',
     match: (p) => p.startsWith('/chat') || p === '/new',
   },
   {
     id: 'operations',
-    label: 'Assistants',
+    label: 'Ассистенты',
     icon: UserMultipleIcon,
     to: '/operations',
     match: (p) => p.startsWith('/operations'),
   },
   {
     id: 'tasks',
-    label: 'Tasks',
+    label: 'Задачи',
     icon: CheckListIcon,
     to: '/tasks',
     match: (p) => p.startsWith('/tasks'),
   },
   {
     id: 'teams',
-    label: 'Teams',
+    label: 'Команды',
     icon: UserGroupIcon,
     to: '/swarm',
     match: (p) => p === '/swarm' || p.startsWith('/swarm2'),
@@ -205,7 +205,7 @@ export function MobileTabBar() {
             : 'translate-y-0 opacity-100',
           isDragging ? 'cursor-grabbing' : '',
         )}
-        aria-label="Mobile navigation"
+        aria-label="Мобильная навигация"
         onTouchStart={handlePillTouchStart}
         onTouchMove={handlePillTouchMove}
         onTouchEnd={handlePillTouchEnd}

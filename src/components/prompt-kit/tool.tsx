@@ -83,7 +83,7 @@ function Tool({ toolPart, defaultOpen = false }: ToolProps) {
             {input && Object.keys(input).length > 0 && (
               <div className="border border-primary-200 bg-primary-50 p-3">
                 <h4 className="text-primary-600 mb-2 text-xs font-medium">
-                  Input
+                  Вход
                 </h4>
                 <div className="max-h-40 overflow-auto space-y-2 font-mono text-xs text-primary-800">
                   {Object.entries(input).map(([key, value]) => (
@@ -101,7 +101,7 @@ function Tool({ toolPart, defaultOpen = false }: ToolProps) {
             {output && (
               <div className="border border-primary-200 bg-primary-50 p-3">
                 <h4 className="text-primary-600 mb-2 text-xs font-medium">
-                  Output
+                  Вывод
                 </h4>
                 <div className="max-h-40 overflow-auto font-mono text-xs text-primary-800">
                   {renderValue(output)}
@@ -111,7 +111,7 @@ function Tool({ toolPart, defaultOpen = false }: ToolProps) {
 
             {state === 'output-error' && toolPart.errorText && (
               <div className="rounded-md bg-red-50 p-2">
-                <h4 className="mb-1 text-xs font-medium text-red-600">Error</h4>
+                <h4 className="mb-1 text-xs font-medium text-red-600">Ошибка</h4>
                 <div className="text-xs text-red-700">{toolPart.errorText}</div>
               </div>
             )}

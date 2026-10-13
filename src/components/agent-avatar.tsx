@@ -127,7 +127,7 @@ function AgentAvatar({
             getContainerSizeClassName(size),
             className,
           )}
-          aria-label="Toggle agent avatar"
+          aria-label="Показать или скрыть аватар агента"
           onClick={function handleToggleAvatar(event) {
             event.stopPropagation()
             toggleAgentAvatarPreference(preference as AgentAvatarPreference)
@@ -143,7 +143,7 @@ function AgentAvatar({
           ) : (
             <img
               src="/claude-avatar.webp"
-              alt="Hermes Agent"
+              alt="AWG GPT"
               className={cn(
                 getLogoSizeClassName(size),
                 iconClassName,
@@ -152,7 +152,7 @@ function AgentAvatar({
             />
           )}
         </TooltipTrigger>
-        <TooltipContent side="top">Click to switch avatar</TooltipContent>
+        <TooltipContent side="top">Нажмите, чтобы сменить аватар</TooltipContent>
       </TooltipRoot>
     </TooltipProvider>
   )

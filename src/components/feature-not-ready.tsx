@@ -52,7 +52,7 @@ export function FeatureNotReady({
           <HugeiconsIcon icon={Alert02Icon} size={26} strokeWidth={1.6} />
         </div>
         <div className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-300/80">
-          Upstream not ready
+          Источник не готов
         </div>
         <div className="mb-3 text-2xl font-extrabold">{feature}</div>
         <p className="mb-4 text-sm leading-relaxed text-white/75">{reason}</p>

@@ -42,7 +42,7 @@ function buildSyntheticActiveSession(
   if (!activeFriendlyId || activeFriendlyId === 'new') return null
 
   const derivedTitle =
-    stored?.title ?? (activeFriendlyId === 'main' ? 'Hermes' : 'New Session')
+    stored?.title ?? (activeFriendlyId === 'main' ? 'AWG GPT' : 'New Session')
 
   return {
     key: forcedSessionKey || activeFriendlyId,
@@ -127,7 +127,7 @@ export function useChatSessions({
       if (activeSession.titleStatus === 'error') return 'New Session'
       return 'New Session'
     }
-    return activeFriendlyId === 'main' ? 'Hermes' : activeFriendlyId
+    return activeFriendlyId === 'main' ? 'AWG GPT' : activeFriendlyId
   }, [activeFriendlyId, activeSession])
 
   const sessionsError =

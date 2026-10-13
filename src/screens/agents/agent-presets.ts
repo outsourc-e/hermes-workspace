@@ -13,7 +13,7 @@ export type AgentPreset = {
 export const AGENT_PRESETS: Record<string, AgentPreset> = {
   sage: {
     emoji: '🐦',
-    description: 'X/Twitter growth & social media strategist',
+    description: 'Стратег роста в X/Twitter и соцсетях',
     systemPrompt: `You are Sage, an expert X/Twitter growth strategist and social media manager.
 
 Your role:
@@ -32,7 +32,7 @@ Output format: Always provide ready-to-post copy. Include suggested posting time
   },
   builder: {
     emoji: '🔨',
-    description: 'Software engineer & coding agent',
+    description: 'Инженер-программист и агент для кода',
     systemPrompt: `You are Builder, a senior full-stack software engineer.
 
 Your role:
@@ -51,7 +51,7 @@ Output format: Code first, explanation second. Show diffs when modifying existin
   },
   scribe: {
     emoji: '✍️',
-    description: 'Content writer & documentation specialist',
+    description: 'Автор контента и специалист по документации',
     systemPrompt: `You are Scribe, a technical content writer and documentation specialist.
 
 Your role:
@@ -68,7 +68,7 @@ Output format: Markdown formatted. Include frontmatter suggestions for blog post
   },
   ops: {
     emoji: '📊',
-    description: 'Business operations & strategy analyst',
+    description: 'Аналитик бизнес-операций и стратегии',
     systemPrompt: `You are Ops, a business operations and strategy analyst.
 
 Your role:
@@ -85,7 +85,7 @@ Output format: Structured reports with sections: Summary, Metrics, Insights, Ris
   },
   trader: {
     emoji: '🎰',
-    description: 'Prediction market signals & trading analyst',
+    description: 'Аналитик сигналов и торговли на рынках прогнозов',
     systemPrompt: `You are Trader, a prediction market analyst focused on Polymarket.
 
 Your role:
@@ -104,19 +104,19 @@ Output format: Signal cards with: Market, Direction (YES/NO), Materiality (0-1),
   },
   'pc1-coder': {
     emoji: '💻',
-    description: 'Local coding model (Qwen3-Coder 30B)',
+    description: 'Локальная модель для кода (Qwen3-Coder 30B)',
     systemPrompt: 'You are a coding assistant running on local hardware. Focus on code generation, refactoring, and debugging. Be concise.',
     color: '#06b6d4',
   },
   'pc1-planner': {
     emoji: '📋',
-    description: 'Local planning model (Qwen3-30B Sonnet distill)',
+    description: 'Локальная модель-планировщик (Qwen3-30B Sonnet distill)',
     systemPrompt: 'You are a planning assistant. Break down complex tasks into actionable steps. Create clear task lists with dependencies and priorities.',
     color: '#14b8a6',
   },
   'pc1-critic': {
     emoji: '🔍',
-    description: 'Local critic model (Qwen3-14B Opus distill)',
+    description: 'Локальная модель-критик (Qwen3-14B Opus distill)',
     systemPrompt: 'You are a code and content reviewer. Find bugs, logical errors, and improvements. Be thorough but constructive.',
     color: '#f97316',
   },

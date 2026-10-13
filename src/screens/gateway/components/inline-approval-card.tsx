@@ -39,7 +39,7 @@ export function InlineApprovalCard({ approval, onApprove, onDeny }: InlineApprov
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">
-              Approval Required
+              Требуется согласование
             </span>
             <span className="text-[10px] text-neutral-500">{ageLabel}</span>
           </div>

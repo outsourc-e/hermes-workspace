@@ -79,7 +79,7 @@ function StatusIndicator({ status }: { status: AgentCardStatus }) {
           size={14}
           strokeWidth={1.8}
         />
-        <span className="text-[11px] font-medium text-emerald-300">Done</span>
+        <span className="text-[11px] font-medium text-emerald-300">Готово</span>
       </span>
     )
   }
@@ -88,7 +88,7 @@ function StatusIndicator({ status }: { status: AgentCardStatus }) {
     return (
       <span className="inline-flex items-center gap-1 text-red-300">
         <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.8} />
-        <span className="text-[11px] font-medium text-red-300">Failed</span>
+        <span className="text-[11px] font-medium text-red-300">Ошибка</span>
       </span>
     )
   }
@@ -99,7 +99,7 @@ function StatusIndicator({ status }: { status: AgentCardStatus }) {
         <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/60" />
         <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
       </span>
-      <span className="text-[11px] font-medium text-emerald-300">Running</span>
+      <span className="text-[11px] font-medium text-emerald-300">Выполняется</span>
     </span>
   )
 }

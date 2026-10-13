@@ -199,25 +199,25 @@ function getDefaultVerificationMap(): WorkspaceCheckpointVerificationMap {
   return {
     tsc: {
       status: 'missing',
-      label: 'Not run yet',
+      label: 'Ещё не запускалось',
       output: null,
       checked_at: null,
     },
     tests: {
       status: 'not_configured',
-      label: 'Not configured',
+      label: 'Не настроено',
       output: null,
       checked_at: null,
     },
     lint: {
       status: 'not_configured',
-      label: 'Not configured',
+      label: 'Не настроено',
       output: null,
       checked_at: null,
     },
     e2e: {
       status: 'not_configured',
-      label: 'Not configured',
+      label: 'Не настроено',
       output: null,
       checked_at: null,
     },

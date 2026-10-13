@@ -133,7 +133,7 @@ export function useVoiceRecorder(
       }, maxDurationMs)
     } catch (err) {
       const msg =
-        err instanceof Error ? err.message : 'Microphone access denied'
+        err instanceof Error ? err.message : 'Доступ к микрофону запрещён'
       callbacksRef.current.onError?.(msg)
       setState('idle')
     }

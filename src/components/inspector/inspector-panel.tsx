@@ -36,13 +36,13 @@ const TABS: Array<{
   label: string
   feature?: 'memory' | 'skills'
 }> = [
-  { id: 'activity', label: 'Activity' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'files', label: 'Files' },
-  { id: 'memory', label: 'Memory', feature: 'memory' },
-  { id: 'skills', label: 'Skills', feature: 'skills' },
+  { id: 'activity', label: 'Активность' },
+  { id: 'artifacts', label: 'Артефакты' },
+  { id: 'files', label: 'Файлы' },
+  { id: 'memory', label: 'Память', feature: 'memory' },
+  { id: 'skills', label: 'Навыки', feature: 'skills' },
   { id: 'mcp', label: 'MCP' },
-  { id: 'logs', label: 'Logs' },
+  { id: 'logs', label: 'Журналы' },
 ]
 
 // ── Shared loading / error ────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ function ArtifactsTab() {
   const artifacts = events.filter((e) => e.type === 'artifact')
 
   if (artifacts.length === 0) {
-    return <EmptyState text="No agent-authored artifacts yet" />
+    return <EmptyState text="Артефактов от агентов пока нет" />
   }
 
   return (
@@ -128,7 +128,7 @@ function ActivityTab() {
   }, [events.length])
 
   if (events.length === 0) {
-    return <EmptyState text="No activity yet — start a conversation" />
+    return <EmptyState text="Пока нет активности — начните диалог" />
   }
 
   return (
@@ -182,7 +182,7 @@ function FilesTab() {
 
   if (files.length === 0) {
     return (
-      <EmptyState text="No files touched yet — activity will appear during chat" />
+      <EmptyState text="Файлы пока не затронуты — активность появится во время чата" />
     )
   }
 
@@ -247,10 +247,10 @@ function MemoryTab() {
     }
   }, [])
 
-  if (loading) return <LoadingState text="Loading memory…" />
+  if (loading) return <LoadingState text="Загрузка памяти…" />
   if (error) return <ErrorState text={`Memory: ${error}`} />
   if (!files || files.length === 0)
-    return <EmptyState text="No memory files available" />
+    return <EmptyState text="Файлов памяти нет" />
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
@@ -317,9 +317,9 @@ function SkillsTab() {
     }
   }, [])
 
-  if (loading) return <LoadingState text="Loading skills…" />
+  if (loading) return <LoadingState text="Загрузка навыков…" />
   if (error) return <ErrorState text={`Skills: ${error}`} />
-  if (skills.length === 0) return <EmptyState text="No skills found" />
+  if (skills.length === 0) return <EmptyState text="Навыки не найдены" />
 
   // Group by category
   const grouped: Record<string, Array<SkillItem>> = {}
@@ -428,10 +428,10 @@ function McpTab() {
     }
   }, [])
 
-  if (loading) return <LoadingState text="Loading MCP servers…" />
+  if (loading) return <LoadingState text="Загрузка MCP-серверов…" />
   if (error) return <ErrorState text={`MCP: ${error}`} />
   if (!servers || servers.length === 0)
-    return <EmptyState text="No MCP servers configured" />
+    return <EmptyState text="MCP-серверы не настроены" />
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
@@ -480,7 +480,7 @@ function LogsTab() {
     return (
       <div className="p-3">
         <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
-          Raw event stream — waiting for activity…
+          Поток событий — ожидание активности…
         </p>
       </div>
     )
@@ -553,14 +553,14 @@ export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}
               className="text-sm font-semibold"
               style={{ color: 'var(--theme-text)' }}
             >
-              Inspector
+              Инспектор
             </span>
             <button
               type="button"
               onClick={() => useInspectorStore.getState().setOpen(false)}
               className="rounded p-1 text-xs hover:opacity-70 transition-opacity"
               style={{ color: 'var(--theme-muted)' }}
-              aria-label="Close inspector"
+              aria-label="Закрыть инспектор"
             >
               ✕
             </button>
@@ -658,7 +658,7 @@ export function InspectorToggleButton({ className }: { className?: string }) {
         color: 'var(--theme-text)',
         border: '1px solid var(--theme-border)',
       }}
-      aria-label="Toggle inspector panel"
+      aria-label="Показать или скрыть панель инспектора"
     >
       <span className="font-mono text-[11px]">{'{ }'}</span>
     </button>

@@ -21,7 +21,7 @@ const REACT_DOM_RECOVERY_TTL_MS = 30_000
 function isReactDomReconciliationError(error: Error): boolean {
   const message = `${error.name}: ${error.message}`
   return (
-    message.includes('Failed to execute') &&
+    message.includes('Не удалось выполнить') &&
     (message.includes('insertBefore') || message.includes('removeChild')) &&
     message.includes('not a child of this node')
   )
@@ -91,9 +91,9 @@ export class ErrorBoundary extends Component<
 
     const title = this.props.title ?? 'Something went wrong'
     const description = this.state.recovering
-      ? 'Recovering from a stale DOM/runtime mismatch. The page will reload automatically.'
+      ? 'Восстановление после рассинхронизации интерфейса. Страница перезагрузится автоматически.'
       : (this.props.description ??
-        'The chat encountered an unexpected issue. Reload to try again.')
+        'В чате произошла непредвиденная ошибка. Перезагрузите страницу.')
 
     return (
       <div
@@ -115,7 +115,7 @@ export class ErrorBoundary extends Component<
             {error.stack?.split('\n').slice(0, 5).join('\n')}
           </pre>
           <div className="mt-5 flex justify-center">
-            <Button onClick={() => this.reloadPage()}>Reload</Button>
+            <Button onClick={() => this.reloadPage()}>Перезагрузить</Button>
           </div>
         </div>
       </div>

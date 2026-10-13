@@ -257,11 +257,10 @@ export function ExternalMemoryBrowserScreen() {
             className="mx-auto mb-3 size-8 text-primary-500"
           />
           <h2 className="text-lg font-semibold text-primary-900 dark:text-neutral-100">
-            No external memory providers
+            Нет внешних провайдеров памяти
           </h2>
           <p className="mt-2 text-sm text-primary-600 dark:text-neutral-400">
-            Register providers in $HERMES_HOME/external_memory_providers.json to
-            inspect external memory review queues here.
+            Зарегистрируйте провайдеров в $HERMES_HOME/external_memory_providers.json, чтобы просматривать здесь очереди проверки внешней памяти.
           </p>
         </div>
       </div>
@@ -274,10 +273,10 @@ export function ExternalMemoryBrowserScreen() {
         <div className="space-y-3 border-b border-primary-200 p-4 dark:border-neutral-800">
           <div>
             <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-              External memory
+              Внешняя память
             </h2>
             <p className="text-xs text-primary-500 dark:text-neutral-400">
-              Review queues backed by custom providers.
+              Очереди проверки на основе своих провайдеров.
             </p>
           </div>
 
@@ -301,7 +300,7 @@ export function ExternalMemoryBrowserScreen() {
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search text, metadata, source..."
+              placeholder="Поиск по тексту, метаданным, источнику..."
               className="w-full rounded-xl border border-primary-200 bg-white py-2 pr-3 pl-9 text-sm text-primary-900 outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100"
             />
           </div>
@@ -329,7 +328,7 @@ export function ExternalMemoryBrowserScreen() {
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {isLoading ? (
             <p className="p-3 text-sm text-primary-500 dark:text-neutral-400">
-              Loading...
+              Загрузка...
             </p>
           ) : null}
           {error ? (
@@ -339,7 +338,7 @@ export function ExternalMemoryBrowserScreen() {
           ) : null}
           {!isLoading && candidates.length === 0 ? (
             <p className="p-3 text-sm text-primary-500 dark:text-neutral-400">
-              No memory rows found.
+              Записи памяти не найдены.
             </p>
           ) : null}
           <div className="space-y-2">
@@ -428,7 +427,7 @@ export function ExternalMemoryBrowserScreen() {
             <dl className="grid gap-3 text-sm md:grid-cols-2">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                  Source
+                  Источник
                 </dt>
                 <dd className="mt-1 text-primary-900 dark:text-neutral-100">
                   {selected.source}
@@ -436,7 +435,7 @@ export function ExternalMemoryBrowserScreen() {
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                  Updated
+                  Обновлено
                 </dt>
                 <dd className="mt-1 text-primary-900 dark:text-neutral-100">
                   {formatTimestamp(selected.updatedAt)}
@@ -444,7 +443,7 @@ export function ExternalMemoryBrowserScreen() {
               </div>
               <div className="md:col-span-2">
                 <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                  Metadata
+                  Метаданные
                 </dt>
                 <dd className="mt-1 text-primary-900 dark:text-neutral-100">
                   {metadataPreview(selected.metadata)}
@@ -462,7 +461,7 @@ export function ExternalMemoryBrowserScreen() {
           </article>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-primary-500 dark:text-neutral-400">
-            Select a memory row.
+            Выберите запись памяти.
           </div>
         )}
       </main>

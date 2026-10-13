@@ -436,7 +436,7 @@ export function KnowledgeBrowserScreen() {
               <input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search knowledge"
+                placeholder="Поиск по знаниям"
                 className="w-full rounded-xl py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent-500"
                 style={{
                   border: '1px solid var(--theme-border)',
@@ -458,7 +458,7 @@ export function KnowledgeBrowserScreen() {
             }}
           >
             <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={1.7} />
-            Graph view
+            Вид графа
           </button>
 
           <DialogRoot open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -469,10 +469,10 @@ export function KnowledgeBrowserScreen() {
                 backgroundColor: 'var(--theme-card)',
                 color: 'var(--theme-text)',
               }}
-              title="Knowledge base settings"
+              title="Настройки базы знаний"
             >
               <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.7} />
-              <span className="hidden sm:inline">Settings</span>
+              <span className="hidden sm:inline">Настройки</span>
             </DialogTrigger>
             <DialogContent
               className="sm:max-w-md"
@@ -485,15 +485,15 @@ export function KnowledgeBrowserScreen() {
               <div className="space-y-4">
                 <div>
                   <DialogTitle className="text-base font-semibold">
-                    Knowledge Base Settings
+                    Настройки базы знаний
                   </DialogTitle>
                   <DialogDescription className="mt-1 text-sm" style={{ color: 'var(--theme-muted)' }}>
-                    Choose where your knowledge base is located. Changes take effect immediately.
+                    Укажите расположение базы знаний. Изменения применяются сразу.
                   </DialogDescription>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Source type</label>
+                  <label className="text-sm font-medium">Тип источника</label>
                   <div className="flex gap-3">
                     <button
                       type="button"
@@ -517,7 +517,7 @@ export function KnowledgeBrowserScreen() {
                       }}
                     >
                       <HugeiconsIcon icon={Folder01Icon} size={16} strokeWidth={1.7} />
-                      Local folder
+                      Локальная папка
                     </button>
                     <button
                       type="button"
@@ -543,7 +543,7 @@ export function KnowledgeBrowserScreen() {
                       }}
                     >
                       <HugeiconsIcon icon={CodeIcon} size={16} strokeWidth={1.7} />
-                      GitHub repo
+                      Репозиторий GitHub
                     </button>
                   </div>
                 </div>
@@ -551,7 +551,7 @@ export function KnowledgeBrowserScreen() {
                 {settingsSource?.type === 'local' && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="kb-local-path">
-                      Folder path
+                      Путь к папке
                     </label>
                     <input
                       id="kb-local-path"
@@ -579,7 +579,7 @@ export function KnowledgeBrowserScreen() {
                   <div className="space-y-3">
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium" htmlFor="kb-gh-repo">
-                        Repository
+                        Репозиторий
                       </label>
                       <input
                         id="kb-gh-repo"
@@ -604,7 +604,7 @@ export function KnowledgeBrowserScreen() {
                     <div className="flex gap-3">
                       <div className="flex-1 space-y-1.5">
                         <label className="text-sm font-medium" htmlFor="kb-gh-branch">
-                          Branch
+                          Ветка
                         </label>
                         <input
                           id="kb-gh-branch"
@@ -684,7 +684,7 @@ export function KnowledgeBrowserScreen() {
                           }
                         } catch (err) {
                           setSyncError(
-                            err instanceof Error ? err.message : 'Sync failed',
+                            err instanceof Error ? err.message : 'Синхронизация не удалась',
                           )
                         } finally {
                           setSyncing(false)
@@ -723,7 +723,7 @@ export function KnowledgeBrowserScreen() {
                     }}
                     className="inline-flex items-center gap-2 rounded-xl bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
                   >
-                    Save
+                    Сохранить
                   </button>
                 </div>
               </div>
@@ -758,13 +758,13 @@ export function KnowledgeBrowserScreen() {
           ) : searchTerm ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
               <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                Search Results
+                Результаты поиска
               </div>
               <div className="space-y-1">
                 {searchQuery.isLoading ? (
-                  <StateBox label="Searching knowledge..." />
+                  <StateBox label="Поиск по знаниям..." />
                 ) : searchResults.length === 0 ? (
-                  <StateBox label="No matches found" />
+                  <StateBox label="Ничего не найдено" />
                 ) : (
                   searchResults.map((result, index) => (
                     <button
@@ -809,11 +809,11 @@ export function KnowledgeBrowserScreen() {
               <div className="space-y-3 overflow-y-auto pr-1 md:h-full">
                 <section className="rounded-xl border border-primary-200 bg-primary-50/80 p-2 dark:border-neutral-800 dark:bg-neutral-900/60">
                   <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
-                    Tags
+                    Теги
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     <TagPill
-                      label="All"
+                      label="Все"
                       count={pages.length}
                       active={selectedTag == null}
                       onClick={() => setSelectedTag(null)}
@@ -832,7 +832,7 @@ export function KnowledgeBrowserScreen() {
 
                 <section className="rounded-xl border border-primary-200 bg-primary-50/80 p-1 dark:border-neutral-800 dark:bg-neutral-900/60">
                   {listQuery.isLoading ? (
-                    <StateBox label="Loading knowledge pages..." />
+                    <StateBox label="Загрузка страниц знаний..." />
                   ) : listQuery.error instanceof Error ? (
                     <StateBox label={listQuery.error.message} error />
                   ) : filteredPages.length === 0 ? (
@@ -879,26 +879,26 @@ export function KnowledgeBrowserScreen() {
                   size={14}
                   strokeWidth={1.7}
                 />
-                Ask agent about this
+                Спросить агента об этом
               </a>
             ) : null}
           </div>
 
           <div className="h-full overflow-auto p-2 md:p-3">
             {listQuery.isLoading ? (
-              <StateBox label="Loading knowledge base..." />
+              <StateBox label="Загрузка базы знаний..." />
             ) : listQuery.error instanceof Error ? (
               <StateBox label={listQuery.error.message} error />
             ) : !knowledgeExists ? (
               <EmptyKnowledgeState knowledgeRoot={knowledgeRoot} />
             ) : !selectedPath ? (
-              <StateBox label="Select a page to start browsing" />
+              <StateBox label="Выберите страницу, чтобы начать просмотр" />
             ) : readQuery.isLoading ? (
-              <StateBox label="Loading page..." />
+              <StateBox label="Загрузка страницы..." />
             ) : readQuery.error instanceof Error ? (
               <StateBox label={readQuery.error.message} error />
             ) : !page ? (
-              <StateBox label="Page not found" error />
+              <StateBox label="Страница не найдена" error />
             ) : (
               <div
                 className="rounded-xl"
@@ -976,11 +976,11 @@ export function KnowledgeBrowserScreen() {
                           size={16}
                           strokeWidth={1.7}
                         />
-                        Backlinks
+                        Обратные ссылки
                       </div>
                       {backlinks.length === 0 ? (
                         <div className="text-sm text-primary-500 dark:text-neutral-400">
-                          No pages link here yet.
+                          На эту страницу пока никто не ссылается.
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
@@ -1004,21 +1004,21 @@ export function KnowledgeBrowserScreen() {
                   </div>
 
                   <aside className="space-y-3">
-                    <MetadataCard label="Type" value={page.type} />
-                    <MetadataCard label="Domain" value={page.domain} />
-                    <MetadataCard label="Status" value={page.status} />
+                    <MetadataCard label="Тип" value={page.type} />
+                    <MetadataCard label="Домен" value={page.domain} />
+                    <MetadataCard label="Статус" value={page.status} />
                     <MetadataCard
-                      label="Created"
+                      label="Создано"
                       value={formatDate(page.created)}
                     />
                     <MetadataCard
-                      label="Updated"
+                      label="Обновлено"
                       value={formatDate(page.updated || page.modified)}
                     />
-                    <MetadataCard label="Size" value={formatBytes(page.size)} />
+                    <MetadataCard label="Размер" value={formatBytes(page.size)} />
                     <div className="rounded-xl border border-primary-200 bg-primary-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/60">
                       <div className="text-xs font-semibold uppercase tracking-wide text-primary-500 dark:text-neutral-400">
-                        Tags
+                        Теги
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {page.tags.length === 0 ? (
@@ -1046,11 +1046,11 @@ export function KnowledgeBrowserScreen() {
                           size={14}
                           strokeWidth={1.7}
                         />
-                        Wikilinks
+                        Wiki-ссылки
                       </div>
                       {page.wikilinks.length === 0 ? (
                         <div className="text-sm text-primary-500 dark:text-neutral-400">
-                          No outbound links
+                          Исходящих ссылок нет
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
@@ -1081,19 +1081,18 @@ export function KnowledgeBrowserScreen() {
       <DialogRoot open={graphOpen} onOpenChange={setGraphOpen}>
         <DialogContent className="w-[min(980px,94vw)] max-w-none p-0">
           <div className="border-b border-primary-200 px-5 py-4 dark:border-neutral-800">
-            <DialogTitle>Knowledge graph</DialogTitle>
+            <DialogTitle>Граф знаний</DialogTitle>
             <DialogDescription>
-              Page relationships from wiki links. Click any node to open that
-              page.
+              Связи страниц по wiki-ссылкам. Нажмите на узел, чтобы открыть страницу.
             </DialogDescription>
           </div>
           <div className="p-5">
             {graphQuery.isLoading ? (
-              <StateBox label="Loading graph..." />
+              <StateBox label="Загрузка графа..." />
             ) : graphQuery.error instanceof Error ? (
               <StateBox label={graphQuery.error.message} error />
             ) : (graphQuery.data?.nodes?.length ?? 0) === 0 ? (
-              <StateBox label="No graph data yet" />
+              <StateBox label="Данных для графа пока нет" />
             ) : (
               <GraphCanvas
                 nodes={graphQuery.data?.nodes ?? []}
@@ -1240,10 +1239,10 @@ function EmptyKnowledgeState({ knowledgeRoot }: { knowledgeRoot: string }) {
   return (
     <div className="flex min-h-32 flex-col justify-center rounded-xl border border-primary-200 bg-primary-50 px-4 py-5 text-sm text-primary-600 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300">
       <div className="text-base font-semibold text-primary-900 dark:text-neutral-100">
-        No knowledge base found
+        База знаний не найдена
       </div>
       <p className="mt-2 text-pretty">
-        Create markdown files in <code>{knowledgeRoot}</code> to get started.
+        Создайте markdown-файлы в <code>{knowledgeRoot}</code> чтобы начать.
       </p>
       <a
         href="https://karpathy.ai/"
@@ -1252,7 +1251,7 @@ function EmptyKnowledgeState({ knowledgeRoot }: { knowledgeRoot: string }) {
         className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary-900 underline decoration-primary-300 underline-offset-4 hover:decoration-primary-500 dark:text-neutral-100"
       >
         <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={1.7} />
-        See the Karpathy LLM wiki pattern
+        Паттерн LLM-вики Карпати
       </a>
     </div>
   )

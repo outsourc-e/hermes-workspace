@@ -73,24 +73,24 @@ function getLastRunStatus(job: ClaudeJob): {
 } {
   if (!job.last_run_at) {
     return {
-      label: 'Never run',
+      label: 'Не запускалось',
       color: 'var(--theme-muted)',
     }
   }
   if (job.last_run_success === true) {
     return {
-      label: 'Last run succeeded',
+      label: 'Последний запуск успешен',
       color: 'var(--theme-success)',
     }
   }
   if (job.last_run_success === false) {
     return {
-      label: 'Last run failed',
+      label: 'Последний запуск завершился ошибкой',
       color: 'var(--theme-danger)',
     }
   }
   return {
-    label: 'Last run unknown',
+    label: 'Результат последнего запуска неизвестен',
     color: 'var(--theme-muted)',
   }
 }
@@ -188,7 +188,7 @@ function JobCard({
           <button
             onClick={() => onTrigger(job.id)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-            title="Run now"
+            title="Запустить сейчас"
           >
             <HugeiconsIcon
               icon={PlayIcon}
@@ -210,7 +210,7 @@ function JobCard({
           <button
             onClick={() => onEdit(job)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-            title="Edit"
+            title="Изменить"
           >
             <HugeiconsIcon
               icon={PencilEdit02Icon}
@@ -232,7 +232,7 @@ function JobCard({
           <button
             onClick={() => onDelete(job.id)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-            title="Delete"
+            title="Удалить"
           >
             <HugeiconsIcon
               icon={Delete01Icon}
@@ -255,19 +255,19 @@ function JobCard({
             <div className="mt-3 border-t border-[var(--theme-border)] pt-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-medium text-[var(--theme-text)]">
-                  Run history
+                  История запусков
                 </p>
                 <p className="text-[10px] text-[var(--theme-muted)]">
-                  Showing recent outputs
+                  Показаны последние результаты
                 </p>
               </div>
               {outputQuery.isLoading ? (
                 <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">
-                  Loading outputs...
+                  Загрузка результатов...
                 </div>
               ) : outputQuery.isError ? (
                 <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">
-                  Failed to load outputs.
+                  Не удалось загрузить результаты.
                 </div>
               ) : outputQuery.data && outputQuery.data.length > 0 ? (
                 <div className="space-y-2">
@@ -289,7 +289,7 @@ function JobCard({
                 </div>
               ) : (
                 <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-3 text-xs text-[var(--theme-muted)]">
-                  No run outputs yet.
+                  Результатов запусков пока нет.
                 </div>
               )}
             </div>
@@ -360,7 +360,7 @@ export function JobsScreen() {
       setShowCreate(false)
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to create job', {
+      toast(error instanceof Error ? error.message : 'Не удалось создать задание', {
         type: 'error',
       })
     },
@@ -384,7 +384,7 @@ export function JobsScreen() {
       setEditingJob(null)
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to update job', {
+      toast(error instanceof Error ? error.message : 'Не удалось обновить задание', {
         type: 'error',
       })
     },
@@ -429,7 +429,7 @@ export function JobsScreen() {
                 className="text-[var(--theme-accent)]"
               />
               <h1 className="text-base font-semibold text-[var(--theme-text)]">
-                Jobs
+                Задания
               </h1>
               {jobsQuery.data && (
                 <span className="ml-1 text-xs text-[var(--theme-muted)]">
@@ -443,7 +443,7 @@ export function JobsScreen() {
                   void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
                 }
                 className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-                title="Refresh"
+                title="Обновить"
               >
                 <HugeiconsIcon
                   icon={RefreshIcon}
@@ -457,7 +457,7 @@ export function JobsScreen() {
                 style={{ background: 'var(--theme-accent)' }}
               >
                 <HugeiconsIcon icon={Add01Icon} size={14} />
-                New Job
+                Новое задание
               </button>
             </div>
           </div>
@@ -472,7 +472,7 @@ export function JobsScreen() {
             />
             <input
               type="text"
-              placeholder="Search jobs..."
+              placeholder="Поиск заданий..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] py-1.5 pl-8 pr-3 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
@@ -483,8 +483,7 @@ export function JobsScreen() {
               className="mt-2 text-xs"
               style={{ color: 'var(--theme-warning)' }}
             >
-              Profile list failed to load. New jobs will default to the default
-              profile until profiles refresh.
+              Не удалось загрузить список профилей. Новые задания будут использовать профиль по умолчанию, пока список не обновится.
             </p>
           ) : null}
         </div>
@@ -492,7 +491,7 @@ export function JobsScreen() {
         <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
           {jobsQuery.isLoading ? (
             <div className="flex items-center justify-center py-12 text-sm text-[var(--theme-muted)]">
-              Loading jobs...
+              Загрузка заданий...
             </div>
           ) : jobsQuery.isError ? (
             <div
@@ -502,7 +501,7 @@ export function JobsScreen() {
               Failed to load jobs:{' '}
               {jobsQuery.error instanceof Error
                 ? jobsQuery.error.message
-                : 'Unknown error'}
+                : 'Неизвестная ошибка'}
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-[var(--theme-muted)]">
@@ -511,9 +510,9 @@ export function JobsScreen() {
                 size={32}
                 className="mb-3 opacity-40"
               />
-              <p className="text-sm font-medium">No scheduled jobs</p>
+              <p className="text-sm font-medium">Запланированных заданий нет</p>
               <p className="mt-1 text-xs">
-                No cron jobs found across Hermes profiles
+                Cron-задания не найдены ни в одном профиле
               </p>
             </div>
           ) : (

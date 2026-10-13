@@ -118,7 +118,7 @@ export function SwarmNodeChat({
             role: 'error',
             text:
               result.error ||
-              'Worker dispatch failed without an error message.',
+              'Отправка исполнителю не удалась без сообщения об ошибке.',
             ts: Date.now(),
             durationMs: result.durationMs,
           },
@@ -141,7 +141,7 @@ export function SwarmNodeChat({
         {
           id: `${id}-err`,
           role: 'error',
-          text: err instanceof Error ? err.message : 'Dispatch failed',
+          text: err instanceof Error ? err.message : 'Не удалось отправить',
           ts: Date.now(),
         },
       ])
@@ -172,7 +172,7 @@ export function SwarmNodeChat({
             onClick={clear}
             className="rounded-full border border-emerald-400/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-emerald-100/70 hover:text-white"
           >
-            Clear
+            Очистить
           </button>
           {onCollapsedChange ? (
             <button
@@ -265,7 +265,7 @@ export function SwarmNodeChat({
                 }
               }}
               disabled={busy}
-              placeholder={`Message ${workerId}…`}
+              placeholder={`Сообщение для ${workerId}…`}
               className="flex-1 resize-none rounded-xl border border-emerald-400/20 bg-black/40 px-2 py-1.5 text-xs text-emerald-50 focus:border-emerald-300/50 focus:outline-none"
             />
             <button

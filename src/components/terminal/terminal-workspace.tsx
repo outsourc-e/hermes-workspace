@@ -808,8 +808,8 @@ export function TerminalWorkspace({
             variant="ghost"
             onClick={handleAnalyzeDebug}
             disabled={debugLoading}
-            aria-label="AI Debug analysis"
-            title="AI Debug — analyze terminal output"
+            aria-label="Анализ ИИ-отладчика"
+            title="ИИ-отладка: анализ вывода терминала"
           >
             🔍
           </Button>
@@ -817,8 +817,8 @@ export function TerminalWorkspace({
             size="icon-sm"
             variant="ghost"
             onClick={handleCreateTab}
-            aria-label="New terminal tab"
-            title="New tab"
+            aria-label="Новая вкладка терминала"
+            title="Новая вкладка"
           >
             <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
           </Button>
@@ -828,7 +828,7 @@ export function TerminalWorkspace({
                 size="icon-sm"
                 variant="ghost"
                 onClick={onMinimizePanel}
-                aria-label="Minimize"
+                aria-label="Свернуть"
               >
                 <HugeiconsIcon
                   icon={SidebarLeft01Icon}
@@ -840,7 +840,7 @@ export function TerminalWorkspace({
                 size="icon-sm"
                 variant="ghost"
                 onClick={onMaximizePanel}
-                aria-label="Maximize"
+                aria-label="Развернуть"
               >
                 <HugeiconsIcon
                   icon={ArrowRight01Icon}
@@ -852,7 +852,7 @@ export function TerminalWorkspace({
                 size="icon-sm"
                 variant="ghost"
                 onClick={handleClosePanel}
-                aria-label="Close"
+                aria-label="Закрыть"
               >
                 <HugeiconsIcon
                   icon={Cancel01Icon}
@@ -931,7 +931,7 @@ export function TerminalWorkspace({
               renameTab(menuTab.id, nextName)
             }}
           >
-            Rename
+            Переименовать
           </button>
           <button
             type="button"
@@ -943,7 +943,7 @@ export function TerminalWorkspace({
               handleCloseTab(menuTab)
             }}
           >
-            Close
+            Закрыть
           </button>
         </div>
       ) : null}

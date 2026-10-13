@@ -72,25 +72,25 @@ const QUICK_ACTIONS: Array<{
 }> = [
   {
     id: 'research',
-    label: 'Research',
+    label: 'Исследование',
     icon: Search01Icon,
     prompt: 'Research the problem space, gather constraints, compare approaches, and propose the most viable plan.',
   },
   {
     id: 'build',
-    label: 'Build',
+    label: 'Сборка',
     icon: PlayIcon,
     prompt: 'Build the requested feature end-to-end, including implementation, validation, and a concise delivery summary.',
   },
   {
     id: 'review',
-    label: 'Review',
+    label: 'Ревью',
     icon: TaskDone01Icon,
     prompt: 'Review the current implementation for correctness, regressions, missing tests, and release risks.',
   },
   {
     id: 'deploy',
-    label: 'Deploy',
+    label: 'Развернуть',
     icon: Rocket01Icon,
     prompt: 'Prepare the work for deployment, verify readiness, and summarize any operational follow-ups.',
   },
@@ -143,8 +143,8 @@ function MissionCostSection({ totalTokens, workers, expanded, onToggle }: { tota
     <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
       <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex w-full items-start justify-between gap-4 text-left">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Cost</p>
-          <p className="mt-1 text-sm text-[var(--theme-muted-2)]">Approximate at $5 / 1M tokens blended from input/output pricing.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Стоимость миссии</p>
+          <p className="mt-1 text-sm text-[var(--theme-muted-2)]">Оценка по $5 за 1 млн токенов (усреднённо по входу и выходу).</p>
         </div>
         <span className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-xs font-medium text-[var(--theme-text)]">
           {expanded ? 'Hide' : 'Show'}
@@ -156,19 +156,19 @@ function MissionCostSection({ totalTokens, workers, expanded, onToggle }: { tota
         <div className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Total Tokens</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Всего токенов</p>
               <p className="mt-2 text-2xl font-semibold text-[var(--theme-text)]">{totalTokens.toLocaleString()}</p>
             </div>
             <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Estimated Cost</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Оценочная стоимость</p>
               <p className="mt-2 text-2xl font-semibold text-[var(--theme-text)]">{formatUsd(estimatedCost)}</p>
             </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)]">
             <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-              <span>Workers</span>
-              <span>Cost</span>
+              <span>Исполнители</span>
+              <span>Стоимость</span>
             </div>
             {workers.length > 0 ? (
               <div className="divide-y divide-[var(--theme-border)]">
@@ -184,7 +184,7 @@ function MissionCostSection({ totalTokens, workers, expanded, onToggle }: { tota
                 ))}
               </div>
             ) : (
-              <div className="px-4 py-3 text-sm text-[var(--theme-muted)]">Per-worker token details were not captured for this mission.</div>
+              <div className="px-4 py-3 text-sm text-[var(--theme-muted)]">Данные о токенах по исполнителям для этой миссии не сохранены.</div>
             )}
           </div>
         </div>
@@ -219,7 +219,7 @@ function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { steps: 
     return (
       <div className="flex items-center gap-3 py-3">
         <div className="flex size-3.5 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/10 text-[9px] text-amber-300">||</div>
-        <p className="text-sm text-[var(--theme-muted)]">Paused</p>
+        <p className="text-sm text-[var(--theme-muted)]">На паузе</p>
       </div>
     )
   }
@@ -294,11 +294,11 @@ function formatDurationRange(startIso: string | null | undefined, endIso: string
 }
 
 function formatRelativeTime(value: string | null | undefined, now: number): string {
-  if (!value) return 'just now'
+  if (!value) return 'только что'
   const ms = new Date(value).getTime()
-  if (!Number.isFinite(ms)) return 'just now'
+  if (!Number.isFinite(ms)) return 'только что'
   const diffSeconds = Math.max(0, Math.floor((now - ms) / 1000))
-  if (diffSeconds < 10) return 'just now'
+  if (diffSeconds < 10) return 'только что'
   if (diffSeconds < 60) return `${diffSeconds}s ago`
   const diffMinutes = Math.floor(diffSeconds / 60)
   if (diffMinutes < 60) return `${diffMinutes}m ago`
@@ -313,10 +313,10 @@ function truncateContinuationText(text: string, limit = 500): string {
 }
 
 function getWorkerDot(status: 'running' | 'complete' | 'stale' | 'idle') {
-  if (status === 'complete') return { dotClass: 'bg-emerald-400', label: 'Complete' }
-  if (status === 'running') return { dotClass: 'bg-sky-400 animate-pulse', label: 'Running' }
-  if (status === 'idle') return { dotClass: 'bg-amber-400', label: 'Idle' }
-  return { dotClass: 'bg-red-400', label: 'Stale' }
+  if (status === 'complete') return { dotClass: 'bg-emerald-400', label: 'Завершено' }
+  if (status === 'running') return { dotClass: 'bg-sky-400 animate-pulse', label: 'Выполняется' }
+  if (status === 'idle') return { dotClass: 'bg-amber-400', label: 'Простаивает' }
+  return { dotClass: 'bg-red-400', label: 'Устарело' }
 }
 
 function getWorkerBorderClass(status: 'running' | 'complete' | 'stale' | 'idle') {
@@ -363,19 +363,19 @@ function WorkerCard({
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-          <p className="text-[var(--theme-muted)]">Model</p>
+          <p className="text-[var(--theme-muted)]">Модель</p>
           <p className="mt-1 truncate text-[var(--theme-text)]">{getShortModelName(worker.model)}</p>
         </div>
         <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-          <p className="text-[var(--theme-muted)]">Tokens</p>
+          <p className="text-[var(--theme-muted)]">Токены</p>
           <p className="mt-1 text-[var(--theme-text)]">{worker.tokenUsageLabel}</p>
         </div>
         <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-          <p className="text-[var(--theme-muted)]">Elapsed</p>
+          <p className="text-[var(--theme-muted)]">Прошло</p>
           <p className="mt-1 text-[var(--theme-text)]">{formatElapsedTime(workerStartedAt, workerEndTime)}</p>
         </div>
         <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2">
-          <p className="text-[var(--theme-muted)]">Last update</p>
+          <p className="text-[var(--theme-muted)]">Последнее обновление</p>
           <p className="mt-1 text-[var(--theme-text)]">{formatRelativeTime(worker.updatedAt, now)}</p>
         </div>
       </div>
@@ -596,8 +596,8 @@ function ModelSelectorDropdown({
                 aria-selected={!value}
               >
                 <span className={cn('size-2 rounded-full', !value ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]')} />
-                <span className="min-w-0 flex-1 truncate">Default (auto)</span>
-                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">Auto</span>
+                <span className="min-w-0 flex-1 truncate">По умолчанию (авто)</span>
+                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">Авто</span>
               </button>
 
               {groupedModels.map((group) => (
@@ -771,7 +771,7 @@ export function Conductor() {
       } catch (error) {
         if (cancelled) return
         setDirectoryBrowserEntries([])
-        setDirectoryBrowserError(error instanceof Error ? error.message : 'Failed to load directory')
+        setDirectoryBrowserError(error instanceof Error ? error.message : 'Не удалось загрузить папку')
       } finally {
         if (!cancelled) {
           setDirectoryBrowserLoading(false)
@@ -1139,7 +1139,7 @@ export function Conductor() {
                 onClick={() => conductor.setSelectedHistoryEntry(null)}
                 className="inline-flex items-center gap-2 self-start rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border2)] hover:text-[var(--theme-text)]"
               >
-                <span aria-hidden="true">←</span> Back
+                <span aria-hidden="true">←</span> Назад
               </button>
 
               <div className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -1163,7 +1163,7 @@ export function Conductor() {
                       }}
                       className="rounded-xl bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]"
                     >
-                      New Mission
+                      Новая миссия
                     </Button>
                   </div>
                 </div>
@@ -1173,7 +1173,7 @@ export function Conductor() {
                 <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Предпросмотр результата</p>
                       <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{selectedHistoryOutputLabel}</p>
                     </div>
                     <a
@@ -1182,30 +1182,30 @@ export function Conductor() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
                     >
-                      Open in new tab ↗
+                      Открыть в новой вкладке ↗
                     </a>
                   </div>
                   <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
-                    <iframe src={selectedHistoryPreviewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Mission history output preview" />
+                    <iframe src={selectedHistoryPreviewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Предпросмотр результата из истории миссий" />
                   </div>
                 </section>
               ) : selectedHistoryOutputPath && selectedHistoryPreview.loading ? (
                 <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                   <div className="flex items-center gap-3 text-sm text-[var(--theme-muted)]">
                     <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
-                    Loading output preview…
+                    Загрузка предпросмотра результата…
                   </div>
                 </section>
               ) : selectedHistoryOutputPath && selectedHistoryPreview.unavailable ? (
                 showHistoryOutputFallback ? null : (
-                  <p className="px-1 text-sm text-[var(--theme-muted)]">No preview available.</p>
+                  <p className="px-1 text-sm text-[var(--theme-muted)]">Предпросмотр недоступен.</p>
                 )
               ) : null}
 
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Сводка по агенту</p>
                   </div>
                   <span className={cn('rounded-full px-3 py-1 text-xs font-medium', historyStatusClasses)}>{historyStatusLabel}</span>
                 </div>
@@ -1213,7 +1213,7 @@ export function Conductor() {
                   {historySummary ? (
                     <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{historySummary}</Markdown>
                   ) : (
-                    <p className="text-sm text-[var(--theme-muted)]">No summary captured.</p>
+                    <p className="text-sm text-[var(--theme-muted)]">Сводка не сохранена.</p>
                   )}
                 </div>
                 {historyWorkerDetails.length > 0 && (
@@ -1244,7 +1244,7 @@ export function Conductor() {
                 )}
                 {selectedHistoryEntry.streamText && selectedHistoryEntry.completeSummary && (
                   <details className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
-                    <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">Raw Agent Output</summary>
+                    <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">Необработанный вывод агента</summary>
                     <div className="mt-4 border-t border-[var(--theme-border)] pt-4">
                       <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{selectedHistoryEntry.streamText}</Markdown>
                     </div>
@@ -1256,7 +1256,7 @@ export function Conductor() {
                 <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Вывод</p>
                       <p className="mt-1 text-xs text-[var(--theme-muted-2)]">
                         Preview unavailable
                         {selectedHistoryOutputPath ? ` for ${selectedHistoryOutputLabel}` : ''}.
@@ -1269,7 +1269,7 @@ export function Conductor() {
                 </section>
               ) : historyOutputText ? (
                 <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Worker Output</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Результат исполнителя</p>
                   <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                     <Markdown className="max-h-[600px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{historyOutputText}</Markdown>
                   </div>
@@ -1279,9 +1279,9 @@ export function Conductor() {
               {!historySummary && historyWorkerDetails.length === 0 && !selectedHistoryOutputPath && !selectedHistoryEntry.workerSummary?.length && !historyOutputText && (
                 <section className="overflow-hidden rounded-3xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
                   <p className="text-center text-sm text-[var(--theme-muted)]">
-                    No detailed output was captured for this mission.
+                    Подробный вывод этой миссии не сохранён.
                     <br />
-                    <span className="text-xs text-[var(--theme-muted-2)]">Missions run after this update will save full agent summaries and output previews.</span>
+                    <span className="text-xs text-[var(--theme-muted-2)]">Миссии, запущенные после этого обновления, сохранят полные сводки агентов и предпросмотры результатов.</span>
                   </p>
                 </section>
               )}
@@ -1299,31 +1299,31 @@ export function Conductor() {
               <div className="flex items-center gap-2">
                 <div className="hidden md:block flex-1" />
                 <div className="hidden md:inline-flex shrink-0 items-center gap-2.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
-                  <span>Conductor</span>
+                  <span>Дирижёр</span>
                   <span className="size-2.5 shrink-0 rounded-full bg-emerald-400" />
                 </div>
                 <div className="flex md:flex-1 items-center justify-end gap-2 ml-auto md:ml-0">
                   <WorkflowHelpModal
                     compact
                     eyebrow="Conductor"
-                    title="How Conductor works"
+                    title="Как работает Conductor"
                     sections={[
                       {
-                        title: 'What Conductor is for',
+                        title: 'Для чего нужен Conductor',
                         bullets: [
                           'Conductor is the mission-level orchestration surface for coordinated agent execution.',
                           'Use it when one goal should be planned, assigned, and tracked end to end.',
                         ],
                       },
                       {
-                        title: 'Typical flow',
+                        title: 'Типовой сценарий',
                         bullets: [
                           'Start a mission, watch worker progress, and intervene only when something is blocked or clearly off-course.',
                           'Use the mission views to understand what happened before retrying or launching the next mission.',
                         ],
                       },
                       {
-                        title: 'FAQ',
+                        title: 'Вопросы и ответы',
                         bullets: [
                           'If Conductor says upstream is unavailable, the underlying runtime capability is not ready yet.',
                           'Conductor is for orchestration, not first-time setup. Fix setup issues in Operations first.',
@@ -1335,7 +1335,7 @@ export function Conductor() {
                     type="button"
                     onClick={() => setMissionModalOpen(true)}
                     className="inline-flex items-center justify-center rounded-xl bg-[var(--theme-accent)] p-2 text-white shadow-sm transition-colors hover:bg-[var(--theme-accent-strong)]"
-                    aria-label="New Mission"
+                    aria-label="Новая миссия"
                   >
                     <HugeiconsIcon icon={Rocket01Icon} size={18} strokeWidth={1.7} />
                   </button>
@@ -1343,13 +1343,13 @@ export function Conductor() {
                     type="button"
                     onClick={() => setSettingsOpen(true)}
                     className="inline-flex items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2 text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                    aria-label="Open conductor settings"
+                    aria-label="Открыть настройки Conductor"
                   >
                     <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={1.7} />
                   </button>
                 </div>
               </div>
-              <p className="text-sm text-[var(--theme-muted-2)]">Launch a mission and watch your agent team build it live.</p>
+              <p className="text-sm text-[var(--theme-muted-2)]">Запустите миссию и наблюдайте, как команда агентов выполняет её в реальном времени.</p>
             </div>
 
             <section className="h-[280px] overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-[0_24px_80px_var(--theme-shadow)] md:h-[520px]">
@@ -1367,7 +1367,7 @@ export function Conductor() {
             {hasMissionHistory || conductor.recentSessions.length > 0 ? (
               <section className="mt-6 w-full space-y-3">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Recent Missions</h2>
+                  <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Недавние миссии</h2>
                   {activityTotalPages > 1 && (
                     <div className="ml-auto flex items-center gap-1.5">
                       <span className="text-[10px] text-[var(--theme-muted-2)]">
@@ -1488,8 +1488,8 @@ export function Conductor() {
             ) : (
               <section className="mt-6 w-full">
                 <div className="rounded-xl border border-dashed border-[var(--theme-border)] px-4 py-8 text-center">
-                  <p className="text-sm text-[var(--theme-muted)]">No missions yet.</p>
-                  <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Launch your first mission and it will appear here.</p>
+                  <p className="text-sm text-[var(--theme-muted)]">Миссий пока нет.</p>
+                  <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Запустите первую миссию, и она появится здесь.</p>
                 </div>
               </section>
             )}
@@ -1506,14 +1506,14 @@ export function Conductor() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold tracking-tight text-[var(--theme-text)]">New Mission</h2>
-                    <p className="mt-1 text-sm text-[var(--theme-muted-2)]">Describe the mission, constraints, and desired outcome.</p>
+                    <h2 className="text-lg font-semibold tracking-tight text-[var(--theme-text)]">Новая миссия</h2>
+                    <p className="mt-1 text-sm text-[var(--theme-muted-2)]">Опишите миссию, ограничения и желаемый результат.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setMissionModalOpen(false)}
                     className="inline-flex size-9 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] text-lg text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                    aria-label="Close new mission dialog"
+                    aria-label="Закрыть окно новой миссии"
                   >
                     ×
                   </button>
@@ -1576,15 +1576,15 @@ export function Conductor() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Defaults</p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--theme-text)]">Conductor settings</h2>
-                    <p className="mt-2 text-sm text-[var(--theme-muted-2)]">Set the models and defaults every new mission should inherit.</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Параметры миссии по умолчанию</p>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--theme-text)]">Настройки Conductor</h2>
+                    <p className="mt-2 text-sm text-[var(--theme-muted-2)]">Задайте модели и параметры по умолчанию для каждой новой миссии.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSettingsOpen(false)}
                     className="inline-flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] text-lg text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                    aria-label="Close settings"
+                    aria-label="Закрыть настройки"
                   >
                     ×
                   </button>
@@ -1592,21 +1592,21 @@ export function Conductor() {
 
                 <div className="mt-6 space-y-4">
                   <ModelSelectorDropdown
-                    label="Orchestrator Model"
+                    label="Модель оркестратора"
                     value={conductor.conductorSettings.orchestratorModel}
                     onChange={(nextValue) => updateSettings({ orchestratorModel: nextValue })}
                     models={availableModels}
                   />
 
                   <ModelSelectorDropdown
-                    label="Worker Model"
+                    label="Модель исполнителя"
                     value={conductor.conductorSettings.workerModel}
                     onChange={(nextValue) => updateSettings({ workerModel: nextValue })}
                     models={availableModels}
                   />
 
                   <div className="space-y-2">
-                    <span className="text-sm font-medium text-[var(--theme-text)]">Project Directory</span>
+                    <span className="text-sm font-medium text-[var(--theme-text)]">Папка проекта</span>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1620,14 +1620,14 @@ export function Conductor() {
                         onClick={openDirectoryBrowser}
                         className="shrink-0 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 py-3 text-sm font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
                       >
-                        Browse
+                        Обзор
                       </button>
                     </div>
-                    <p className="text-xs text-[var(--theme-muted-2)]">Type a path directly or choose a directory from the browser.</p>
+                    <p className="text-xs text-[var(--theme-muted-2)]">Введите путь вручную или выберите папку в обзоре.</p>
                   </div>
 
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium text-[var(--theme-text)]">Max Parallel Workers</span>
+                    <span className="text-sm font-medium text-[var(--theme-text)]">Макс. параллельных исполнителей</span>
                     <input
                       type="number"
                       min={1}
@@ -1650,16 +1650,16 @@ export function Conductor() {
                       className="mt-1 size-4 rounded border-[var(--theme-border2)] accent-[var(--theme-accent)]"
                     />
                     <span className="min-w-0">
-                      <span className="block text-sm font-medium text-[var(--theme-text)]">Supervised Mode</span>
-                      <span className="mt-1 block text-sm text-[var(--theme-muted-2)]">Require approval before each task</span>
+                      <span className="block text-sm font-medium text-[var(--theme-text)]">Режим с контролем</span>
+                      <span className="mt-1 block text-sm text-[var(--theme-muted-2)]">Требовать согласования перед каждой задачей</span>
                     </span>
                   </label>
 
                   {canResetSavedState ? (
                     <div className="flex items-center justify-between rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium text-[var(--theme-text)]">Reset saved state</p>
-                        <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Clear mission history and any persisted Conductor mission state.</p>
+                        <p className="text-sm font-medium text-[var(--theme-text)]">Сбросить сохранённое состояние</p>
+                        <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Очистить историю миссий и сохранённое состояние Conductor.</p>
                       </div>
                       <button
                         type="button"
@@ -1672,7 +1672,7 @@ export function Conductor() {
                         }}
                         className="text-xs text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-accent)]"
                       >
-                        Reset
+                        Сбросить
                       </button>
                     </div>
                   ) : null}
@@ -1689,15 +1689,15 @@ export function Conductor() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Directory Browser</p>
-                    <h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--theme-text)]">Choose project directory</h3>
-                    <p className="mt-2 text-sm text-[var(--theme-muted-2)]">Select the folder where Conductor should create project output.</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Обзор папок</p>
+                    <h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--theme-text)]">Выберите папку проекта</h3>
+                    <p className="mt-2 text-sm text-[var(--theme-muted-2)]">Выберите папку, в которой Conductor будет создавать результаты проекта.</p>
                   </div>
                   <button
                     type="button"
                     onClick={closeDirectoryBrowser}
                     className="inline-flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] text-lg text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                    aria-label="Close directory browser"
+                    aria-label="Закрыть обзор папок"
                   >
                     ×
                   </button>
@@ -1741,7 +1741,7 @@ export function Conductor() {
 
                   <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Current path</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Текущий путь</span>
                       <span className="truncate text-sm text-[var(--theme-text)]">{directoryBrowserPath}</span>
                     </div>
                   </div>
@@ -1752,7 +1752,7 @@ export function Conductor() {
 
                   <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)]">
                     <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Folders</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Папки</span>
                       {directoryBrowserLoading ? (
                         <span className="text-xs text-[var(--theme-muted-2)]">Loading…</span>
                       ) : (
@@ -1763,7 +1763,7 @@ export function Conductor() {
                       {directoryBrowserLoading ? (
                         <div className="flex items-center justify-center gap-3 px-4 py-10 text-sm text-[var(--theme-muted)]">
                           <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
-                          <span>Loading folders…</span>
+                          <span>Загрузка папок…</span>
                         </div>
                       ) : directoryBrowserEntries.length > 0 ? (
                         <div className="space-y-1">
@@ -1776,18 +1776,18 @@ export function Conductor() {
                             >
                               <span className="inline-flex size-2 rounded-full bg-[var(--theme-accent)]" />
                               <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                              <span className="text-xs text-[var(--theme-muted)]">Open</span>
+                              <span className="text-xs text-[var(--theme-muted)]">Открыть</span>
                             </button>
                           ))}
                         </div>
                       ) : (
-                        <div className="px-4 py-10 text-center text-sm text-[var(--theme-muted)]">No folders found in this location.</div>
+                        <div className="px-4 py-10 text-center text-sm text-[var(--theme-muted)]">В этом месте нет папок.</div>
                       )}
                     </div>
                   </div>
 
                   <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Quick paths</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Быстрые пути</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {getDirectorySuggestions().map((pathOption) => (
                         <button
@@ -1808,7 +1808,7 @@ export function Conductor() {
                       onClick={closeDirectoryBrowser}
                       className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
                     >
-                      Cancel
+                      Отмена
                     </button>
                     <button
                       type="button"
@@ -1818,7 +1818,7 @@ export function Conductor() {
                       }}
                       className="rounded-xl bg-[var(--theme-accent)] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--theme-accent-strong)]"
                     >
-                      Select This Directory
+                      Выбрать эту папку
                     </button>
                   </div>
                 </div>
@@ -1836,18 +1836,18 @@ export function Conductor() {
         <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
           <div className="space-y-6">
             <div className="text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Decomposition</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Декомпозиция миссии</p>
               <h1 className="text-2xl font-semibold tracking-tight">{conductor.goal}</h1>
-              <p className="text-sm text-[var(--theme-muted-2)]">The agent is breaking the mission into workers. Once they spawn, this view flips into the active board.</p>
+              <p className="text-sm text-[var(--theme-muted-2)]">Агент разбивает миссию между исполнителями. Когда они запустятся, здесь появится активная доска.</p>
             </div>
 
             <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex items-center justify-between gap-3 border-b border-[var(--theme-border)] pb-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Mission Planning</p>
-                  <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Analyzing your request and preparing agents</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Планирование миссии</p>
+                  <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Анализирую запрос и готовлю агентов</p>
                 </div>
-                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300 animate-pulse">Working</span>
+                <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300 animate-pulse">В работе</span>
               </div>
               <div className="mt-4 min-h-[200px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
                 {conductor.planText ? (
@@ -1862,13 +1862,13 @@ export function Conductor() {
               {conductor.streamError && <div className="mt-4 rounded-2xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-600">{conductor.streamError}</div>}
               {conductor.timeoutWarning && (
                 <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-5 py-3">
-                  <p className="text-sm text-amber-700">⚠️ Planning is taking longer than expected...</p>
+                  <p className="text-sm text-amber-700">⚠️ Планирование занимает больше времени, чем ожидалось...</p>
                   <Button
                     type="button"
                     onClick={handleNewMission}
                     className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                   >
-                    Cancel
+                    Отмена
                   </Button>
                 </div>
               )}
@@ -1897,7 +1897,7 @@ export function Conductor() {
           <div className="space-y-6">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
-                Conductor
+                Дирижёр
                 <span className="size-2 rounded-full bg-emerald-400" />
               </div>
             </div>
@@ -1907,7 +1907,7 @@ export function Conductor() {
                   <div className="flex items-start gap-3">
                     <span className="pt-0.5 text-[var(--theme-danger)]">❌</span>
                     <div>
-                      <p className="text-sm font-semibold text-[var(--theme-danger)]">Mission failed</p>
+                      <p className="text-sm font-semibold text-[var(--theme-danger)]">Миссия не выполнена</p>
                       <p className="mt-1 text-sm text-[var(--theme-danger)]/90">{conductor.streamError}</p>
                     </div>
                   </div>
@@ -1915,27 +1915,27 @@ export function Conductor() {
                     <WorkflowHelpModal
                       compact
                       eyebrow="Conductor"
-                      title="How Conductor works"
+                      title="Как работает Conductor"
                       sections={[
                         {
-                          title: 'What Conductor is for',
+                          title: 'Для чего нужен Conductor',
                           bullets: [
-                            'Conductor is the mission-level orchestration surface for coordinated agent execution.',
-                            'Use it when one goal should be planned, assigned, and tracked end to end.',
+                            'Conductor — уровень оркестрации миссий для согласованной работы агентов.',
+                            'Используйте, когда одну цель нужно спланировать, распределить и довести до конца.',
                           ],
                         },
                         {
-                          title: 'Typical flow',
+                          title: 'Типовой сценарий',
                           bullets: [
-                            'Start a mission, watch worker progress, and intervene only when something is blocked or clearly off-course.',
-                            'Use the mission views to understand what happened before retrying or launching the next mission.',
+                            'Запустите миссию, следите за исполнителями и вмешивайтесь, только если что-то заблокировано или идёт не так.',
+                            'Перед повтором или новой миссией посмотрите, что произошло, в обзорах миссий.',
                           ],
                         },
                         {
-                          title: 'FAQ',
+                          title: 'Вопросы и ответы',
                           bullets: [
-                            'If Conductor says upstream is unavailable, the underlying runtime capability is not ready yet.',
-                            'Conductor is for orchestration, not first-time setup. Fix setup issues in Operations first.',
+                            'Если Conductor сообщает, что источник недоступен, нужная возможность среды выполнения ещё не готова.',
+                            'Conductor нужен для оркестрации, а не для первичной настройки. Сначала решите проблемы настройки в «Операциях».',
                           ],
                         },
                       ]}
@@ -1945,10 +1945,10 @@ export function Conductor() {
                       onClick={() => void conductor.retryMission()}
                       className="rounded-xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-4 text-[var(--theme-danger)] hover:bg-[var(--theme-danger-soft-strong)]"
                     >
-                      Retry Mission
+                      Повторить миссию
                     </Button>
                     <Button type="button" onClick={handleNewMission} className="rounded-xl bg-[var(--theme-accent)] px-4 text-white hover:bg-[var(--theme-accent-strong)]">
-                      New Mission
+                      Новая миссия
                     </Button>
                   </div>
                 </div>
@@ -1973,11 +1973,11 @@ export function Conductor() {
                       onClick={() => setContinueModalOpen(true)}
                       className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
                     >
-                      Continue
+                      Продолжить
                     </Button>
                   ) : null}
                   <Button type="button" onClick={handleNewMission} className="rounded-xl bg-[var(--theme-accent)] px-5 text-white hover:bg-[var(--theme-accent-strong)]">
-                    New Mission
+                    Новая миссия
                   </Button>
                 </div>
               </div>
@@ -1987,7 +1987,7 @@ export function Conductor() {
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output Preview</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Предпросмотр результата</p>
                     <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{completePhaseProjectPath.split('/').pop() || 'index.html'}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1997,26 +1997,26 @@ export function Conductor() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
                     >
-                      Open in new tab ↗
+                      Открыть в новой вкладке ↗
                     </a>
                     <button
                       type="button"
                       onClick={() => setContinueModalOpen(true)}
                       className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
                     >
-                      Continue
+                      Продолжить
                     </button>
                   </div>
                 </div>
                 <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
-                  <iframe src={previewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Mission output preview" />
+                  <iframe src={previewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Предпросмотр результата миссии" />
                 </div>
               </section>
             ) : completePhaseProjectPath && previewState.loading && !conductor.streamError ? (
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center gap-3 text-sm text-[var(--theme-muted)]">
                   <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
-                  Loading output preview…
+                  Загрузка предпросмотра результата…
                 </div>
               </section>
             ) : null}
@@ -2047,7 +2047,7 @@ export function Conductor() {
                   <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Output</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Вывод</p>
                         <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{completePhaseProjectPath ? `Preview unavailable for ${completePhaseOutputLabel}` : 'Agent work output'}</p>
                       </div>
                     </div>
@@ -2062,8 +2062,8 @@ export function Conductor() {
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Task Outputs</p>
-                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Per-task output snapshots from completed workers.</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Результаты задач</p>
+                    <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Снимки результатов по задачам от завершивших работу исполнителей.</p>
                   </div>
                 </div>
                 <div className="mt-4 space-y-3">
@@ -2083,7 +2083,7 @@ export function Conductor() {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]"
                           >
-                            Preview
+                            Предпросмотр
                           </a>
                         )}
                       </div>
@@ -2100,7 +2100,7 @@ export function Conductor() {
             <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Agent Summary</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Сводка по агенту</p>
                 </div>
                 <span
                   className={cn(
@@ -2117,7 +2117,7 @@ export function Conductor() {
                 ) : conductor.streamText ? (
                   <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
                 ) : (
-                  <p className="text-sm text-[var(--theme-muted)]">No summary captured.</p>
+                  <p className="text-sm text-[var(--theme-muted)]">Сводка не сохранена.</p>
                 )}
               </div>
               {conductor.workers.length > 0 && (
@@ -2147,7 +2147,7 @@ export function Conductor() {
               )}
               {conductor.streamText && completeSummary && (
                 <details className="mt-4 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-5 py-4">
-                  <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">Raw Agent Output</summary>
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">Необработанный вывод агента</summary>
                   <div className="mt-4 border-t border-[var(--theme-border)] pt-4">
                     <Markdown className="max-h-[400px] max-w-none overflow-auto text-sm text-[var(--theme-text)]">{conductor.streamText}</Markdown>
                   </div>
@@ -2167,13 +2167,13 @@ export function Conductor() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold tracking-tight text-[var(--theme-text)]">Continue Mission</h2>
+                    <h2 className="text-lg font-semibold tracking-tight text-[var(--theme-text)]">Продолжить миссию</h2>
                   </div>
                   <button
                     type="button"
                     onClick={() => setContinueModalOpen(false)}
                     className="inline-flex size-9 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] text-lg text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)]"
-                    aria-label="Close continue mission dialog"
+                    aria-label="Закрыть окно продолжения миссии"
                   >
                     ×
                   </button>
@@ -2181,7 +2181,7 @@ export function Conductor() {
 
                 {continuationModalPreview ? (
                   <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--theme-muted)]">Previous output summary</p>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--theme-muted)]">Сводка предыдущего результата</p>
                     <p className="mt-2 text-sm text-[var(--theme-text)]">{continuationModalPreview}</p>
                   </div>
                 ) : null}
@@ -2197,7 +2197,7 @@ export function Conductor() {
                     type="text"
                     value={continueDraft}
                     onChange={(event) => setContinueDraft(event.target.value)}
-                    placeholder="Continue with additional instructions..."
+                    placeholder="Продолжить с дополнительными инструкциями..."
                     disabled={conductor.isSending}
                     className="w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted-2)] focus:border-[var(--theme-accent)] disabled:cursor-not-allowed disabled:opacity-60"
                   />
@@ -2231,7 +2231,7 @@ export function Conductor() {
         <div className="flex w-full flex-col gap-6">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
-              Conductor
+              Дирижёр
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
             </div>
           </div>
@@ -2250,7 +2250,7 @@ export function Conductor() {
               {conductor.isPaused ? (
                 <div className="mt-3 flex justify-center">
                   <span className="rounded-full border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--theme-accent-strong)] animate-pulse">
-                    Paused
+                    На паузе
                   </span>
                 </div>
               ) : null}
@@ -2264,7 +2264,7 @@ export function Conductor() {
                 onClick={() => void conductor.stopMission()}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--theme-danger-border, color-mix(in srgb, var(--theme-danger) 35%, white))] bg-[var(--theme-danger-soft, color-mix(in srgb, var(--theme-danger) 12%, transparent))] px-3 py-1.5 text-xs font-medium text-[var(--theme-danger)] transition-colors hover:bg-[var(--theme-danger-soft-strong, color-mix(in srgb, var(--theme-danger) 18%, transparent))]"
               >
-                <span>■</span> Stop Mission
+                <span>■</span> Остановить миссию
               </button>
               <button
                 type="button"
@@ -2295,7 +2295,7 @@ export function Conductor() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-[var(--theme-warning)]">⏳ Mission appears stalled — no activity for 60 seconds</p>
-                  <p className="mt-1 text-xs text-[var(--theme-muted)]">Sometimes the workers are still alive, but the stream went quiet. Your call.</p>
+                  <p className="mt-1 text-xs text-[var(--theme-muted)]">Иногда исполнители ещё работают, но поток затих. Решать вам.</p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
@@ -2303,14 +2303,14 @@ export function Conductor() {
                     onClick={conductor.dismissTimeoutWarning}
                     className="rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-card)] px-4 text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                   >
-                    Keep Waiting
+                    Продолжить ожидание
                   </Button>
                   <Button
                     type="button"
                     onClick={() => void conductor.stopMission()}
                     className="rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-4 text-[var(--theme-warning)] hover:bg-[var(--theme-warning-soft-strong)]"
                   >
-                    Stop Mission
+                    Остановить миссию
                   </Button>
                 </div>
               </div>
@@ -2351,7 +2351,7 @@ export function Conductor() {
               <div className="space-y-3">
                 {selectedTaskId ? (
                   <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Task Output</h2>
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Результат задачи</h2>
                   </div>
                 ) : null}
                 {(() => {
@@ -2367,7 +2367,7 @@ export function Conductor() {
                           <div className="flex flex-col items-center gap-2">
                             <div className="flex items-center justify-center gap-3">
                               <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
-                              <span>Spawning workers...</span>
+                              <span>Запускаю исполнителей...</span>
                             </div>
                             {conductor.planText ? <p className="max-w-xl text-xs text-[var(--theme-muted-2)]">{conductor.planText}</p> : null}
                           </div>
@@ -2389,7 +2389,7 @@ export function Conductor() {
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex items-center justify-center gap-3">
                         <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
-                        <span>Spawning workers...</span>
+                        <span>Запускаю исполнителей...</span>
                       </div>
                       {conductor.planText ? <p className="max-w-xl text-xs text-[var(--theme-muted-2)]">{conductor.planText}</p> : null}
                     </div>

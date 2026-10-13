@@ -77,7 +77,7 @@ export function CacheEfficiencyCard({
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-text)' }}
         >
-          Cache efficiency
+          Эффективность кэша
         </h3>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em]"
@@ -97,9 +97,9 @@ export function CacheEfficiencyCard({
         <span
           className="font-mono text-[10px] uppercase tracking-[0.1em]"
           style={{ color: 'var(--theme-muted)' }}
-          title="Cache reads divided by (cache reads + first-pass input)."
+          title="Чтения из кэша, делённые на (чтения из кэша + входные токены первого прохода)."
         >
-          hit rate
+          доля попаданий
         </span>
       </div>
 
@@ -119,7 +119,7 @@ export function CacheEfficiencyCard({
           <br />
           <span
             className="font-mono"
-            title="How many cache tokens per fresh input token."
+            title="Сколько токенов кэша приходится на один новый входной токен."
           >
             {ratio.toFixed(1)}× ratio
           </span>

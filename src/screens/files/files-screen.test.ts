@@ -9,8 +9,8 @@ describe('FilesScreen remote workspace mode', () => {
     const source = fs.readFileSync(filesScreenPath, 'utf8')
 
     expect(source).toContain('Server workspace')
-    expect(source).toContain('Files are loaded from the Workspace server via /api/files')
-    expect(source).toContain('Agent-created files will appear here')
+    expect(source).toContain('Файлы загружаются с сервера через /api/files')
+    expect(source).toContain('Файлы, созданные агентом, появятся здесь')
     expect(source).not.toContain('showDirectoryPicker')
     expect(source).not.toContain('No workspace selected')
   })

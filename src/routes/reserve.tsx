@@ -40,7 +40,7 @@ function ReserveRoute() {
     fetch('/api/hermesworld/reservations', { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json()
-        if (!response.ok) throw new Error(payload.error || 'Failed to load counter')
+        if (!response.ok) throw new Error(payload.error || 'Не удалось загрузить счётчик')
         if (!cancelled) {
           setCounter({ loading: false, count: payload.count || 0, error: null })
         }
@@ -109,29 +109,29 @@ function ReserveRoute() {
             ← Back to HermesWorld
           </a>
           <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#d9b35f]/30 bg-[#d9b35f]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#f8e4ac]">
-            Name reservation live
+            Бронирование имён открыто
           </div>
           <h1 className="mt-5 font-serif text-4xl font-bold leading-[0.92] tracking-[-0.05em] text-[#fff6df] sm:text-6xl">
             Reserve your HermesWorld name before accounts launch.
           </h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-[#d7d0bd]/68 sm:text-lg">
-            Lock your desired handle now. We validate duplicates, profanity, and admin/system names server-side, then email you a confirmation link so the reservation can auto-bind when the account system goes live.
+            Займите желаемое имя сейчас. Мы проверим дубликаты, нецензурные и системные имена на сервере, а затем пришлём ссылку для подтверждения.
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <StatCard
-              label="Reservations"
+              label="Бронирования"
               value={counter.loading ? '...' : String(counter.count)}
               tone="gold"
               subcopy={counter.error ? 'Counter temporarily unavailable' : 'Public live counter'}
             />
-            <StatCard label="Name rules" value="3–20" tone="cyan" subcopy="Letters, numbers, underscores" />
-            <StatCard label="Confirmation" value="Email" tone="violet" subcopy="One-click verification" />
+            <StatCard label="Правила для имён" value="3–20" tone="cyan" subcopy="Letters, numbers, underscores" />
+            <StatCard label="Подтверждение" value="Email" tone="violet" subcopy="One-click verification" />
           </div>
 
           <div className="mt-8 rounded-2xl border border-white/10 bg-black/24 p-5">
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#d9b35f]/72">
-              Reservation notes
+              Заметки о бронировании
             </div>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-[#d7d0bd]/64">
               <li>• Desired names must use letters, numbers, or underscores only.</li>
@@ -159,7 +159,7 @@ function ReserveRoute() {
 
           <form className="mt-8 space-y-5" onSubmit={onSubmit}>
             <Field
-              label="Desired name"
+              label="Желаемое имя"
               hint="3-20 chars • alnum + underscore"
               value={desiredName}
               onChange={setDesiredName}
@@ -168,7 +168,7 @@ function ReserveRoute() {
               required
             />
             <Field
-              label="Email"
+              label="Эл. почта"
               hint="We send the confirmation link here"
               value={email}
               onChange={setEmail}
@@ -178,11 +178,11 @@ function ReserveRoute() {
               type="email"
             />
             <Field
-              label="Wallet"
+              label="Кошелёк"
               hint="Optional today — useful for launch binding"
               value={wallet}
               onChange={setWallet}
-              placeholder="0x... or wallet alias"
+              placeholder="0x... или псевдоним кошелька"
               disabled={isDisabled}
             />
 

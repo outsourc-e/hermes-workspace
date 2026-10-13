@@ -32,7 +32,7 @@ type ActivityRow = {
 }
 
 function relativeTime(ts: number | null | undefined): string {
-  if (!ts) return 'just now'
+  if (!ts) return 'только что'
   const diff = Date.now() - ts
   if (diff < 60_000) return `${Math.max(1, Math.floor(diff / 1000))}s ago`
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
@@ -115,7 +115,7 @@ export function Swarm2ActivityFeed({
       <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-[0_18px_60px_color-mix(in_srgb,var(--theme-shadow)_12%,transparent)]">
         <div className="flex items-center gap-2 text-sm font-semibold text-[var(--theme-text)]">
           <HugeiconsIcon icon={Activity01Icon} size={14} />
-          Recent swarm activity
+          Недавняя активность Swarm
         </div>
         <p className="mt-3 text-sm text-[var(--theme-muted)]">
           No worker output captured yet. Once swarm TUIs emit logs they will show
@@ -134,10 +134,10 @@ export function Swarm2ActivityFeed({
           </span>
           <div>
             <h2 className="text-sm font-semibold text-[var(--theme-text)]">
-              Recent swarm activity
+              Недавняя активность Swarm
             </h2>
             <p className="text-[11px] text-[var(--theme-muted-2)]">
-              Latest signals across all wired workers
+              Последние сигналы от всех подключённых исполнителей
             </p>
           </div>
         </div>

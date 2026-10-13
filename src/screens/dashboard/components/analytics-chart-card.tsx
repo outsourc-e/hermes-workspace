@@ -156,7 +156,7 @@ export function AnalyticsChartCard({
                   color: 'var(--theme-muted)',
                 }}
               >
-                Expand →
+                Развернуть →
               </button>
             ) : null}
           </div>
@@ -299,10 +299,10 @@ export function AnalyticsChartCard({
 
         {hasData ? (
           <div className="flex items-center gap-4 text-[10px]">
-            <Legend tone="var(--theme-accent)" label="tokens (in+out)" />
+            <Legend tone="var(--theme-accent)" label="токены (вход + выход)" />
             <Legend
               tone="var(--theme-accent-secondary)"
-              label="cache reads"
+              label="чтения из кэша"
             />
           </div>
         ) : null}
@@ -332,7 +332,7 @@ function PeriodSwitch({
       className="inline-flex items-center overflow-hidden rounded border"
       style={{ borderColor: 'var(--theme-border)' }}
       role="tablist"
-      aria-label="Analytics period"
+      aria-label="Период аналитики"
     >
       {PERIODS.map((p) => {
         const active = p === value
@@ -426,7 +426,7 @@ function AnalyticsModal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Закрыть"
             className="rounded p-1 hover:bg-[var(--theme-card)]/80"
           >
             <HugeiconsIcon
@@ -444,7 +444,7 @@ function AnalyticsModal({
               className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              Daily token mix
+              Структура токенов по дням
             </h3>
             <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -519,7 +519,7 @@ function AnalyticsModal({
               className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              Models · ranked by tokens
+              Модели · по числу токенов
             </h3>
             <div className="space-y-2">
               {analytics.topModels.map((m, i) => (

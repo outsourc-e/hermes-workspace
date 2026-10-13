@@ -24,7 +24,7 @@ function getStatusStyles(status: OperationsAgent['status']) {
     return {
       dot: 'bg-red-500',
       ring: 'text-red-500',
-      label: 'Error',
+      label: 'Ошибка',
     }
   }
 
@@ -32,14 +32,14 @@ function getStatusStyles(status: OperationsAgent['status']) {
     return {
       dot: 'bg-emerald-500',
       ring: 'text-emerald-500',
-      label: 'Active',
+      label: 'Активно',
     }
   }
 
   return {
     dot: 'bg-primary-300',
     ring: 'text-primary-300',
-    label: 'Idle',
+    label: 'Простаивает',
   }
 }
 
@@ -130,7 +130,7 @@ export function OperationsInlineChat({
           </div>
         ) : (
           <p className="text-center text-xs text-[var(--theme-muted)]">
-            Send a message...
+            Отправить сообщение...
           </p>
         )}
       </div>
@@ -148,7 +148,7 @@ export function OperationsInlineChat({
                 void handleSend()
               }
             }}
-            placeholder={`Message ${stripEmojiPrefix(agentName)}...`}
+            placeholder={`Сообщение для ${stripEmojiPrefix(agentName)}...`}
             className="h-8 flex-1 bg-transparent px-1.5 text-xs text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]"
           />
           <Button
@@ -156,7 +156,7 @@ export function OperationsInlineChat({
             className="rounded-lg bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
             onClick={() => void handleSend()}
             disabled={!draft.trim() || isSending}
-            aria-label={isSending ? 'Sending message' : 'Send message'}
+            aria-label={isSending ? 'Sending message' : 'Отправить сообщение'}
           >
             <HugeiconsIcon icon={ArrowRight01Icon} size={15} strokeWidth={1.8} />
           </Button>
@@ -192,7 +192,7 @@ export function OperationsAgentCard({
       toast(
         mutationError instanceof Error
           ? mutationError.message
-          : 'Failed to update cron job',
+          : 'Не удалось обновить cron-задание',
         { type: 'error' },
       )
     },
@@ -206,7 +206,7 @@ export function OperationsAgentCard({
     },
     onError: (mutationError) => {
       toast(
-        mutationError instanceof Error ? mutationError.message : 'Failed to run cron job',
+        mutationError instanceof Error ? mutationError.message : 'Не удалось запустить cron-задание',
         { type: 'error' },
       )
     },
@@ -231,7 +231,7 @@ export function OperationsAgentCard({
             aria-label={
               cronJobCount > 0
                 ? `${cronJobCount} cron jobs for ${displayName}`
-                : `No cron jobs for ${displayName}`
+                : `Нет задач cron для ${displayName}`
             }
             onClick={() => setShowCronPanel((value) => !value)}
             className={cn(
@@ -270,7 +270,7 @@ export function OperationsAgentCard({
             type="button"
             aria-label={
               agent.needsSetup
-                ? `Configure ${displayName} before running`
+                ? `Настройте ${displayName} перед запуском`
                 : isActive ? `Pause ${displayName}` : `Run ${displayName} now`
             }
             onClick={() => {
@@ -283,7 +283,7 @@ export function OperationsAgentCard({
             disabled={(isSending && !isActive)}
             title={
               agent.needsSetup
-                ? 'No model configured — open settings to set one up'
+                ? 'Модель не настроена — откройте настройки'
                 : undefined
             }
             className={cn(
@@ -302,7 +302,7 @@ export function OperationsAgentCard({
 
           <button
             type="button"
-            aria-label={`Open settings for ${displayName}`}
+            aria-label={`Открыть настройки ${displayName}`}
             onClick={() => onOpenSettings(agent.id)}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
           >
@@ -337,20 +337,20 @@ export function OperationsAgentCard({
         </div>
 
         <p className="w-full truncate text-[11px] text-[var(--theme-muted)]">
-          {agent.meta.description || 'No description'}
+          {agent.meta.description || 'Нет описания'}
         </p>
         <p className="w-full truncate text-[10px] text-[var(--theme-muted)]/80">
-          {agent.jobs.length > 0 ? `${agent.jobs.length} scheduled job${agent.jobs.length === 1 ? '' : 's'}` : 'Manual only'}
+          {agent.jobs.length > 0 ? `${agent.jobs.length} scheduled job${agent.jobs.length === 1 ? '' : 's'}` : 'Только вручную'}
         </p>
         {agent.needsSetup ? (
           <button
             type="button"
             onClick={() => onOpenSettings(agent.id)}
             className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-300/40 bg-amber-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200 transition-colors hover:bg-amber-300/20"
-            title="This agent has no model configured. Click to set one up."
+            title="У этого агента не настроена модель. Нажмите, чтобы настроить."
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300" />
-            Needs setup — click to configure
+            Требуется настройка — нажмите, чтобы настроить
           </button>
         ) : null}
       </div>
@@ -416,21 +416,21 @@ export function OperationsAgentCard({
                       variant="secondary"
                       className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                     >
-                      + Add Job
+                      + Добавить задание
                     </Button>
                   </div>
                 </>
               ) : (
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs text-[var(--theme-muted)]">
-                    No scheduled jobs
+                    Запланированных заданий нет
                   </p>
                   <Button
                     render={<a href="/jobs" />}
                     variant="secondary"
                     className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                   >
-                    + Add Job
+                    + Добавить задание
                   </Button>
                 </div>
               )}

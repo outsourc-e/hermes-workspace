@@ -103,12 +103,12 @@ export function CostLedgerCard({
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-text)' }}
         >
-          Cost ledger
+          Журнал затрат
         </h3>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em]"
           style={{ color: 'var(--theme-muted)' }}
-          title="Total billed across non-subscription rows."
+          title="Итого к оплате по строкам без подписки."
         >
           {formatCostUsd(paidTotal)} paid
         </span>

@@ -38,7 +38,7 @@ describe('Swarm2 reports view model', () => {
       kind: 'checkpoint',
       workerId: 'swarm5',
       state: 'needs_review',
-      stateLabel: 'Needs review',
+      stateLabel: 'Нужна проверка',
       summary: 'Page is implemented.',
     })
     expect(rows[0].artifacts[0].path).toBe('src/screens/swarm2/swarm2-reports-view.tsx')
@@ -90,7 +90,7 @@ describe('Swarm2 reports view model', () => {
     expect(rows[0]).toMatchObject({
       workerId: 'swarm4',
       state: 'needs_review',
-      stateLabel: 'Needs review',
+      stateLabel: 'Нужна проверка',
       summary: 'Reviewer inbox is ready for Eric handoff',
     })
     expect(rows[0].details.find((detail) => detail.label === 'Result')?.value).toBe('Reviewer inbox is ready for Eric handoff')

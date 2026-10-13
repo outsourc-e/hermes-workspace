@@ -122,13 +122,13 @@ export function WidgetRail({
       items.push({ tone: 'warn', text: `${offlineCount} workers not online` })
     }
     if (roomIds.length === 0) {
-      items.push({ tone: 'neutral', text: 'No active room selected' })
+      items.push({ tone: 'neutral', text: 'Комната не выбрана' })
     }
     if (runtimeQuery.isError) {
-      items.push({ tone: 'warn', text: 'Runtime API unavailable' })
+      items.push({ tone: 'warn', text: 'API среды выполнения недоступен' })
     }
     if (items.length === 0) {
-      items.push({ tone: 'good', text: 'No attention items' })
+      items.push({ tone: 'good', text: 'Нет пунктов, требующих внимания' })
     }
     return items
   }, [authErrors, offlineCount, roomIds.length, runtimeQuery.isError])
@@ -170,14 +170,13 @@ export function WidgetRail({
             onClick={onOpenMission}
             className="rounded-full bg-emerald-400 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-black hover:bg-emerald-300"
           >
-            Dispatch
+            Отправить
           </button>
         }
       >
         {roomIds.length === 0 ? (
           <div className="rounded-xl border border-dashed border-emerald-400/18 px-3 py-3 text-xs text-emerald-100/45">
-            Add workers from the topology strip or cards. Room state controls
-            router chat and multi-terminal view.
+            Добавляйте исполнителей из ленты топологии или карточек. Состояние комнаты управляет чатом маршрутизатора и мультитерминалом.
           </div>
         ) : (
           <div className="flex flex-wrap gap-1.5">
@@ -220,7 +219,7 @@ export function WidgetRail({
         {selectedId ? (
           <div className="space-y-1.5">
             <Stat
-              label="Mode"
+              label="Режим"
               value={
                 selectedRuntime?.tmuxAttachable
                   ? 'tmux attachable'
@@ -228,7 +227,7 @@ export function WidgetRail({
               }
             />
             <Stat
-              label="Output"
+              label="Вывод"
               value={relative(selectedRuntime?.lastOutputAt ?? null)}
             />
             <Stat
@@ -241,8 +240,7 @@ export function WidgetRail({
           </div>
         ) : (
           <div className="text-xs text-emerald-100/45">
-            Select a card for runtime metadata. Open Runtime only when you need
-            a live shell.
+            Выберите карточку, чтобы увидеть метаданные среды. Открывайте «Среду выполнения», только если нужна живая оболочка.
           </div>
         )}
       </RailPanel>
@@ -250,17 +248,17 @@ export function WidgetRail({
       <div className="grid grid-cols-3 gap-2">
         <MiniStat
           icon={Activity01Icon}
-          label="Online"
+          label="В сети"
           value={`${onlineCount}/${members.length}`}
         />
         <MiniStat
           icon={CheckListIcon}
-          label="Tasks"
+          label="Задачи"
           value={String(taskTotal)}
         />
         <MiniStat
           icon={CpuIcon}
-          label="Runtime"
+          label="Среда выполнения"
           value={String(runtimeEntries.length)}
         />
       </div>

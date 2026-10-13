@@ -83,7 +83,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
         return
       }
       const diff = Math.floor((Date.now() - data.checkedAt) / 1000)
-      if (diff < 5) setTickLabel('just now')
+      if (diff < 5) setTickLabel('только что')
       else if (diff < 60) setTickLabel(`${diff}s ago`)
       else setTickLabel(`${Math.floor(diff / 60)}m ago`)
     }
@@ -114,7 +114,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
       const first = data.results && data.results[0] ? data.results[0] : null
       setPingResult(first)
     } catch (err) {
-      setPingError(err instanceof Error ? err.message : 'Ping failed')
+      setPingError(err instanceof Error ? err.message : 'Ping не прошёл')
     } finally {
       setPinging(false)
     }
@@ -137,7 +137,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={degraded ? AlertCircleIcon : CheckmarkCircle02Icon} size={14} className={degraded ? 'text-amber-300' : 'text-emerald-300'} />
-          <span className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/80">Swarm health</span>
+          <span className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/80">Состояние Swarm</span>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-emerald-100/55">
           <span>{tickLabel ? `Checked ${tickLabel}` : isLoading ? 'Checking…' : ''}</span>
@@ -148,24 +148,24 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
             className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-emerald-100/70 hover:text-white"
           >
             <HugeiconsIcon icon={RefreshIcon} size={11} className={isFetching ? 'animate-spin' : ''} />
-            Refresh
+            Обновить
           </button>
         </div>
       </div>
 
       {isError ? (
         <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-          Failed to load health. Try refresh.
+          Не удалось загрузить состояние. Попробуйте обновить.
         </div>
       ) : null}
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <HealthTile icon={CpuIcon} label="Workspace model" value={workspaceModel} />
-        <HealthTile icon={FlashIcon} label="Provider" value={provider} />
-        <HealthTile icon={FlashIcon} label="Wrappers" value={`${wrappersConfigured}/${totalWorkers}`} />
+        <HealthTile icon={CpuIcon} label="Модель рабочего пространства" value={workspaceModel} />
+        <HealthTile icon={FlashIcon} label="Провайдер" value={provider} />
+        <HealthTile icon={FlashIcon} label="Обёртки" value={`${wrappersConfigured}/${totalWorkers}`} />
         <HealthTile
           icon={totalFallbacks === 0 ? CheckmarkCircle02Icon : AlertCircleIcon}
-          label="Fallbacks 24h"
+          label="Переключения на запасные за 24 ч"
           value={String(totalFallbacks)}
           tone={totalFallbacks === 0 ? 'good' : 'warn'}
         />
@@ -173,7 +173,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
 
       {degraded ? (
         <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-          <div className="font-semibold">Primary model readiness degraded.</div>
+          <div className="font-semibold">Готовность основной модели снижена.</div>
           <div className="mt-1 text-amber-100/80">
             Auth errors: {totalAuthErrors}. Fallbacks: {totalFallbacks}. Reply smoke tests can pass on fallback; fix primary auth before production swarm work.
           </div>
@@ -184,7 +184,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-emerald-100/55">
         <span>Gateway: <span className="text-emerald-50">{apiUrl}</span></span>
         {distinctModels.length > 0 ? (
-          <span>Worker models: <span className="text-emerald-50">{distinctModels.join(', ')}</span></span>
+          <span>Модели исполнителей: <span className="text-emerald-50">{distinctModels.join(', ')}</span></span>
         ) : null}
       </div>
 

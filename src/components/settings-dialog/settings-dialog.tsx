@@ -74,14 +74,13 @@ type SectionId =
   | 'language'
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
-  { id: 'claude', label: 'Model & Provider', icon: CloudIcon },
-  { id: 'agent', label: 'Agent', icon: Settings02Icon },
-  { id: 'voice', label: 'Voice', icon: VolumeHighIcon },
-  { id: 'display', label: 'Display', icon: PaintBoardIcon },
-  { id: 'appearance', label: 'Theme', icon: PaintBoardIcon },
-  { id: 'chat', label: 'Chat', icon: MessageMultiple01Icon },
-  { id: 'notifications', label: 'Alerts', icon: Notification03Icon },
-  { id: 'language', label: 'Language', icon: MessageMultiple01Icon },
+  { id: 'agent', label: 'Агент', icon: Settings02Icon },
+  { id: 'voice', label: 'Голос', icon: VolumeHighIcon },
+  { id: 'display', label: 'Отображение', icon: PaintBoardIcon },
+  { id: 'appearance', label: 'Тема', icon: PaintBoardIcon },
+  { id: 'chat', label: 'Чат', icon: MessageMultiple01Icon },
+  { id: 'notifications', label: 'Оповещения', icon: Notification03Icon },
+  { id: 'language', label: 'Язык', icon: MessageMultiple01Icon },
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
@@ -109,7 +108,7 @@ function SectionHeader({
   return (
     <div className="mb-2">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-        Settings
+        Настройки
       </p>
       <h3 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
         {title}
@@ -599,7 +598,7 @@ function HermesContent() {
       if ((error as { name?: string })?.name === 'AbortError') return
       setOauthStatus('error')
       setOauthMessage(
-        error instanceof Error ? error.message : 'OAuth authorization failed',
+        error instanceof Error ? error.message : 'Не удалась авторизация OAuth',
       )
     } finally {
       if (oauthAbortRef.current === controller) {
@@ -611,7 +610,7 @@ function HermesContent() {
   if (!configAvailable) {
     return (
       <BackendUnavailableState
-        feature="Hermes Agent Settings"
+        feature="AWG GPT Settings"
         description={getUnavailableReason('config')}
       />
     )
@@ -645,10 +644,10 @@ function HermesContent() {
           className="mb-1 text-xs font-semibold uppercase tracking-wider"
           style={mutedStyle}
         >
-          Provider
+          Провайдер
         </p>
         <p className="mb-3 text-[11px]" style={mutedStyle}>
-          Select your AI provider. OAuth providers authenticate via browser.
+          Выберите ИИ-провайдера. Провайдеры с OAuth авторизуются через браузер.
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {PROVIDER_CARDS.map((p) => {
@@ -776,7 +775,7 @@ function HermesContent() {
                       rel="noopener noreferrer"
                       className="mt-2 inline-block font-medium underline underline-offset-2"
                     >
-                      Open authorization page
+                      Открыть страницу авторизации
                     </a>
                   ) : null}
                 </div>
@@ -825,8 +824,7 @@ function HermesContent() {
                   )}
                   {disc?.needsRestart ? (
                     <div className="mt-2 text-yellow-700 dark:text-yellow-200">
-                      Gateway restart may be needed after adding this provider to
-                      config.
+                      После добавления провайдера в конфигурацию может понадобиться перезапуск шлюза.
                     </div>
                   ) : null}
                 </div>
@@ -834,7 +832,7 @@ function HermesContent() {
                 {models.length > 0 ? (
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
-                      Detected Models
+                      Обнаруженные модели
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {models.map((model) => (
@@ -894,7 +892,7 @@ function HermesContent() {
             className="mb-1 text-xs font-semibold uppercase tracking-wider"
             style={mutedStyle}
           >
-            Model — pick one, then confirm below
+            Модель — выберите и подтвердите ниже
           </p>
           <div className="flex flex-wrap gap-2">
             {(() => {
@@ -950,7 +948,7 @@ function HermesContent() {
       {activeProvider === 'custom' && (
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={mutedStyle}>
-            Custom Endpoint
+            Свой эндпоинт
           </p>
           <div className="space-y-1.5">
             {(() => {
@@ -959,7 +957,7 @@ function HermesContent() {
               return (
                 <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={cardStyle}>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">Base URL</div>
+                    <div className="text-sm font-medium">Базовый URL</div>
                     <div className="text-[11px] font-mono" style={mutedStyle}>
                       {isEditing ? (
                         <input
@@ -985,8 +983,8 @@ function HermesContent() {
                     <span className={cn('size-2 rounded-full', hasValue ? 'bg-green-500' : 'bg-neutral-500')} />
                     {isEditing ? (
                       <>
-                        <button type="button" onClick={() => { save({ config: { model: { provider: 'manifest' }, providers: { manifest: { type: 'openai', base_url: customBaseUrl, key_env: 'CUSTOM_API_KEY' } } } }).then(() => setEditingKey(null)) }} className="text-xs font-medium text-green-400">Save</button>
-                        <button type="button" onClick={() => setEditingKey(null)} className="text-xs" style={mutedStyle}>Cancel</button>
+                        <button type="button" onClick={() => { save({ config: { model: { provider: 'manifest' }, providers: { manifest: { type: 'openai', base_url: customBaseUrl, key_env: 'CUSTOM_API_KEY' } } } }).then(() => setEditingKey(null)) }} className="text-xs font-medium text-green-400">Сохранить</button>
+                        <button type="button" onClick={() => setEditingKey(null)} className="text-xs" style={mutedStyle}>Отмена</button>
                       </>
                     ) : (
                       <button type="button" onClick={() => setEditingKey('custom_base_url')} className="text-xs font-medium" style={{ color: 'var(--theme-accent)' }}>
@@ -1006,7 +1004,7 @@ function HermesContent() {
                   style={cardStyle}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">Model</div>
+                    <div className="text-sm font-medium">Модель</div>
                     <div
                       className="text-[11px] font-mono"
                       style={mutedStyle}
@@ -1045,7 +1043,7 @@ function HermesContent() {
                         onClick={() => setEditingKey(null)}
                         className="text-xs font-medium text-green-400"
                       >
-                        Done
+                        Готово
                       </button>
                     ) : (
                       <button
@@ -1099,7 +1097,7 @@ function HermesContent() {
           className="mb-1 text-xs font-semibold uppercase tracking-wider"
           style={mutedStyle}
         >
-          API Keys
+          API-ключи
         </p>
         <div className="space-y-1.5">
           {PROVIDER_CARDS.filter((p) => p.envKey).map((p) => {
@@ -1168,7 +1166,7 @@ function HermesContent() {
                         }}
                         className="rounded-lg px-2 py-1 text-[11px] font-medium bg-accent-500 text-white"
                       >
-                        Save
+                        Сохранить
                       </button>
                       <button
                         type="button"
@@ -1179,7 +1177,7 @@ function HermesContent() {
                         className="rounded-lg px-2 py-1 text-[11px] font-medium"
                         style={{ color: 'var(--theme-muted)' }}
                       >
-                        Cancel
+                        Отмена
                       </button>
                     </>
                   ) : (
@@ -1210,7 +1208,7 @@ function HermesContent() {
           className="mb-1 text-xs font-semibold uppercase tracking-wider"
           style={mutedStyle}
         >
-          Memory
+          Память
         </p>
         <div className="space-y-1.5">
           <div
@@ -1218,9 +1216,9 @@ function HermesContent() {
             style={cardStyle}
           >
             <div>
-              <div className="text-sm font-medium">Memory</div>
+              <div className="text-sm font-medium">Память</div>
               <div className="text-[11px]" style={mutedStyle}>
-                Store & recall memories across sessions
+                Сохранять и вспоминать память между сессиями
               </div>
             </div>
             <Switch
@@ -1236,9 +1234,9 @@ function HermesContent() {
             style={cardStyle}
           >
             <div>
-              <div className="text-sm font-medium">User Profile</div>
+              <div className="text-sm font-medium">Профиль пользователя</div>
               <div className="text-[11px]" style={mutedStyle}>
-                Remember preferences & context
+                Запоминать предпочтения и контекст
               </div>
             </div>
             <Switch
@@ -1260,19 +1258,19 @@ function HermesContent() {
             className="text-xs font-semibold uppercase tracking-wider"
             style={mutedStyle}
           >
-            Runtime
+            Среда выполнения
           </span>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-          <span style={mutedStyle}>Model</span>
+          <span style={mutedStyle}>Модель</span>
           <span className="font-mono font-medium">{activeModel || '—'}</span>
-          <span style={mutedStyle}>Provider</span>
+          <span style={mutedStyle}>Провайдер</span>
           <span className="font-mono font-medium">
             {PROVIDER_CARDS.find((p) => p.id === activeProvider)?.name ||
               activeProvider ||
               '—'}
           </span>
-          <span style={mutedStyle}>Config</span>
+          <span style={mutedStyle}>Конфигурация</span>
           <span className="font-mono font-medium">~/.hermes/config.yaml</span>
         </div>
       </div>
@@ -1347,8 +1345,8 @@ function _ProfileContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Profile"
-        description="Your display identity in chat."
+        title="Профиль"
+        description="Как вы отображаетесь в чате."
       />
       <div className={SETTINGS_CARD_CLASS}>
         <div className="flex items-center gap-3">
@@ -1358,21 +1356,21 @@ function _ProfileContent() {
               {displayName}
             </p>
             <p className="text-xs text-primary-500 dark:text-neutral-400">
-              No email connected
+              Почта не подключена
             </p>
           </div>
         </div>
       </div>
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Display name" description="Shown in chat and sidebar">
+        <Row label="Отображаемое имя" description="Отображается в чате и боковой панели">
           <div className="w-full max-w-xs">
             <Input
               value={cs.displayName}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="User"
+              placeholder="Пользователь"
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
               maxLength={50}
-              aria-label="Display name"
+              aria-label="Отображаемое имя"
               aria-invalid={!!nameError}
               aria-describedby={nameError ? errorId : undefined}
             />
@@ -1387,7 +1385,7 @@ function _ProfileContent() {
             )}
           </div>
         </Row>
-        <Row label="Avatar">
+        <Row label="Аватар">
           <div className="flex items-center gap-2">
             <label className="block">
               <input
@@ -1395,7 +1393,7 @@ function _ProfileContent() {
                 accept="image/*"
                 onChange={handleAvatarUpload}
                 disabled={processing}
-                aria-label="Upload profile picture"
+                aria-label="Загрузить фото профиля"
                 className="block max-w-[13rem] cursor-pointer text-xs text-primary-700 dark:text-neutral-300 file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-primary-200 file:bg-primary-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-primary-900 file:transition-colors hover:file:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
@@ -1406,7 +1404,7 @@ function _ProfileContent() {
               disabled={!cs.avatarDataUrl || processing}
               className="h-8 rounded-lg border-primary-200 px-3"
             >
-              Remove
+              Удалить
             </Button>
           </div>
           {profileError && (
@@ -1449,18 +1447,18 @@ function AppearanceContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Appearance"
-        description="Theme and color accents."
+        title="Внешний вид"
+        description="Тема и акцентные цвета."
       />
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-          Theme Mode
+          Режим темы
         </p>
         <div className="inline-flex rounded-lg border border-primary-200 p-1">
           {[
-            { value: 'light', label: 'Light', icon: Sun01Icon },
-            { value: 'dark', label: 'Dark', icon: Moon01Icon },
-            { value: 'system', label: 'System', icon: ComputerIcon },
+            { value: 'light', label: 'Светлая', icon: Sun01Icon },
+            { value: 'dark', label: 'Тёмная', icon: Moon01Icon },
+            { value: 'system', label: 'Система', icon: ComputerIcon },
           ].map((option) => (
             <button
               key={option.value}
@@ -1482,21 +1480,21 @@ function AppearanceContent() {
       {/* Accent color removed — themes control accent */}
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-          Enterprise Theme
+          Корпоративная тема
         </p>
         <EnterpriseThemePicker />
       </div>
       <div className={SETTINGS_CARD_CLASS}>
         <Row
-          label="System metrics footer"
-          description="Show a persistent footer with CPU, RAM, disk, and Hermes Agent status."
+          label="Строка системных метрик"
+          description="Показывать постоянную строку с ЦП, ОЗУ, диском и состоянием AWG GPT."
         >
           <Switch
             checked={settings.showSystemMetricsFooter}
             onCheckedChange={(c) =>
               updateSettings({ showSystemMetricsFooter: c })
             }
-            aria-label="Show system metrics footer"
+            aria-label="Показывать строку системных метрик"
           />
         </Row>
 
@@ -1676,8 +1674,7 @@ function EnterpriseThemePicker() {
             {currentMode === 'dark' ? 'Dark mode' : 'Light mode'}
           </p>
           <p className="text-[11px] text-primary-500 dark:text-neutral-400">
-            Toggle the current theme family between paired light and dark
-            variants.
+            Переключать тему между парными светлым и тёмным вариантами.
           </p>
         </div>
         <button
@@ -1721,7 +1718,7 @@ function EnterpriseThemePicker() {
                 </span>
                 {isActive && (
                   <span className="ml-auto text-[9px] font-bold text-accent-600 uppercase tracking-wide">
-                    Active
+                    Активно
                   </span>
                 )}
               </div>
@@ -1739,14 +1736,14 @@ function EnterpriseThemePicker() {
 function _LoaderContent() {
   const { settings: cs, updateSettings: updateCS } = useChatSettingsStore()
   const styles: Array<{ value: LoaderStyle; label: string }> = [
-    { value: 'dots', label: 'Dots' },
+    { value: 'dots', label: 'Точки' },
     { value: 'braille-claude', label: 'Hermes' },
     { value: 'braille-orbit', label: 'Orbit' },
-    { value: 'braille-breathe', label: 'Breathe' },
+    { value: 'braille-breathe', label: 'Дыхание' },
     { value: 'braille-pulse', label: 'Pulse' },
     { value: 'braille-wave', label: 'Wave' },
-    { value: 'lobster', label: 'Lobster' },
-    { value: 'logo', label: 'Logo' },
+    { value: 'lobster', label: 'Омар' },
+    { value: 'logo', label: 'Логотип' },
   ]
   function getPreset(s: LoaderStyle): BrailleSpinnerPreset | null {
     const m: Record<string, BrailleSpinnerPreset> = {
@@ -1778,7 +1775,7 @@ function _LoaderContent() {
   return (
     <div>
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-        Loading animation
+        Анимация загрузки
       </p>
       <div className="grid grid-cols-4 gap-2">
         {styles.map((o) => (
@@ -1810,42 +1807,42 @@ function ChatContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Chat"
-        description="Message visibility and response loader style."
+        title="Чат"
+        description="Видимость сообщений и стиль индикатора ответа."
       />
       <div className={SETTINGS_CARD_CLASS}>
         <Row
-          label="Show tool messages"
-          description="Display tool call details in assistant responses."
+          label="Показывать сообщения инструментов"
+          description="Показывать подробности вызовов инструментов в ответах."
         >
           <Switch
             checked={cs.showToolMessages}
             onCheckedChange={(c) => updateCS({ showToolMessages: c })}
-            aria-label="Show tool messages"
+            aria-label="Показывать сообщения инструментов"
           />
         </Row>
         <Row
-          label="Show reasoning blocks"
-          description="Display model reasoning blocks when available."
+          label="Показывать блоки рассуждений"
+          description="Показывать блоки рассуждений модели, если они есть."
         >
           <Switch
             checked={cs.showReasoningBlocks}
             onCheckedChange={(c) => updateCS({ showReasoningBlocks: c })}
-            aria-label="Show reasoning blocks"
+            aria-label="Показывать блоки рассуждений"
           />
         </Row>
         <Row
-          label="Sound on response complete"
-          description="Play a short sound in the browser when the agent finishes replying."
+          label="Звук по завершении ответа"
+          description="Проигрывать короткий звук в браузере, когда агент закончил ответ."
         >
           <Switch
             checked={cs.soundOnChatComplete}
             onCheckedChange={(c) => updateCS({ soundOnChatComplete: c })}
-            aria-label="Sound on response complete"
+            aria-label="Звук по завершении ответа"
           />
         </Row>
         <Row
-          label="Enter key behavior"
+          label="Поведение клавиши Enter"
           description={
             cs.enterBehavior === 'newline'
               ? 'Enter inserts a newline. Use ⌘/Ctrl+Enter to send.'
@@ -1857,12 +1854,12 @@ function ChatContent() {
             onCheckedChange={(c) =>
               updateCS({ enterBehavior: c ? 'newline' : 'send' })
             }
-            aria-label="Enter inserts newline instead of sending"
+            aria-label="Enter вставляет перевод строки, а не отправляет"
           />
         </Row>
         <Row
-          label="Chat content width"
-          description="Max-width of the message column on wide screens."
+          label="Ширина содержимого чата"
+          description="Максимальная ширина колонки сообщений на широких экранах."
         >
           <select
             value={cs.chatWidth}
@@ -1872,15 +1869,15 @@ function ChatContent() {
               })
             }
             className="h-8 rounded-md border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400"
-            aria-label="Chat content width"
+            aria-label="Ширина содержимого чата"
           >
-            <option value="comfortable">Comfortable (900px)</option>
-            <option value="wide">Wide (1200px)</option>
-            <option value="full">Full width</option>
+            <option value="comfortable">Комфортная (900 px)</option>
+            <option value="wide">Широкая (1200 px)</option>
+            <option value="full">На всю ширину</option>
           </select>
         </Row>
         <Row
-          label="Expand sidebar on hover"
+          label="Раскрывать боковую панель при наведении"
           description={
             cs.sidebarHoverExpand
               ? 'Collapsed sidebar expands temporarily on hover.'
@@ -1890,7 +1887,7 @@ function ChatContent() {
           <Switch
             checked={cs.sidebarHoverExpand}
             onCheckedChange={(c) => updateCS({ sidebarHoverExpand: c })}
-            aria-label="Expand sidebar on hover"
+            aria-label="Раскрывать боковую панель при наведении"
           />
         </Row>
       </div>
@@ -1904,18 +1901,18 @@ function NotificationsContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Notifications"
-        description="Simple alerts and threshold controls."
+        title="Уведомления"
+        description="Простые оповещения и пороги."
       />
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Enable alerts">
+        <Row label="Включить оповещения">
           <Switch
             checked={settings.notificationsEnabled}
             onCheckedChange={(c) => updateSettings({ notificationsEnabled: c })}
-            aria-label="Enable alerts"
+            aria-label="Включить оповещения"
           />
         </Row>
-        <Row label="Usage threshold">
+        <Row label="Порог использования">
           <div className="flex w-full max-w-[14rem] items-center gap-2">
             <input
               type="range"
@@ -1979,13 +1976,13 @@ function _AdvancedContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Advanced"
-        description="Hermes Agent endpoint and connectivity."
+        title="Дополнительно"
+        description="Адрес и подключение AWG GPT."
       />
       <div className={SETTINGS_CARD_CLASS}>
         <Row
-          label="Hermes Agent URL"
-          description="Used for API requests from Studio"
+          label="URL AWG GPT"
+          description="Используется для API-запросов"
         >
           <div className="w-full max-w-sm">
             <Input
@@ -1994,7 +1991,7 @@ function _AdvancedContent() {
               value={settings.claudeUrl}
               onChange={(e) => validateAndUpdateUrl(e.target.value)}
               className="h-8 w-full rounded-lg border-primary-200 text-sm"
-              aria-label="Hermes Agent URL"
+              aria-label="URL AWG GPT"
               aria-invalid={!!urlError}
               aria-describedby={urlError ? urlErrorId : undefined}
             />
@@ -2009,7 +2006,7 @@ function _AdvancedContent() {
             )}
           </div>
         </Row>
-        <Row label="Connection status">
+        <Row label="Состояние подключения">
           <span
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
@@ -2043,7 +2040,7 @@ function _AdvancedContent() {
               size={16}
               strokeWidth={1.5}
             />
-            Test
+            Проверка
           </Button>
         </Row>
       </div>
@@ -2069,13 +2066,13 @@ class SettingsErrorBoundary extends Component<
         <div className="flex h-full items-center justify-center p-8 text-center">
           <div>
             <p className="mb-2 text-sm font-medium text-red-500">
-              Settings failed to load
+              Не удалось загрузить настройки
             </p>
             <button
               onClick={() => this.setState({ error: null })}
               className="text-xs text-primary-600 underline hover:text-primary-900"
             >
-              Try again
+              Повторить
             </button>
           </div>
         </div>
@@ -2119,8 +2116,8 @@ function AgentBehaviorContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Agent Behavior"
-        description="Execution limits and tool access."
+        title="Поведение агента"
+        description="Лимиты выполнения и доступ к инструментам."
       />
       {msg && (
         <div
@@ -2136,8 +2133,8 @@ function AgentBehaviorContent() {
       )}
       <div className={SETTINGS_CARD_CLASS}>
         <Row
-          label="Max turns"
-          description="Maximum agent turns per request (1-100)"
+          label="Макс. число шагов"
+          description="Максимум шагов агента на запрос (1–100)"
         >
           <input
             type="number"
@@ -2148,7 +2145,7 @@ function AgentBehaviorContent() {
             className="h-8 w-20 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-center text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
           />
         </Row>
-        <Row label="Gateway timeout" description="Seconds before timeout">
+        <Row label="Тайм-аут шлюза" description="Секунд до тайм-аута">
           <input
             type="number"
             min={10}
@@ -2158,15 +2155,15 @@ function AgentBehaviorContent() {
             className="h-8 w-20 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-center text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
           />
         </Row>
-        <Row label="Tool enforcement" description="When agent must use tools">
+        <Row label="Принудительное использование инструментов" description="Когда агент обязан использовать инструменты">
           <select
             value={String(config.tool_use_enforcement || 'auto')}
             onChange={(e) => save('tool_use_enforcement', e.target.value)}
             className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
           >
-            <option value="auto">Auto</option>
-            <option value="required">Required</option>
-            <option value="none">None</option>
+            <option value="auto">Авто</option>
+            <option value="required">Обязательно</option>
+            <option value="none">Нет</option>
           </select>
         </Row>
       </div>
@@ -2231,8 +2228,8 @@ function VoiceContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Voice"
-        description="Text-to-speech and speech-to-text."
+        title="Голос"
+        description="Озвучивание текста и распознавание речи."
       />
       {msg && (
         <div
@@ -2248,9 +2245,9 @@ function VoiceContent() {
       )}
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-          Text-to-Speech
+          Озвучивание текста
         </p>
-        <Row label="TTS Provider">
+        <Row label="Провайдер озвучивания">
           <select
             value={ttsProvider}
             onChange={(e) => saveTts('provider', e.target.value)}
@@ -2263,7 +2260,7 @@ function VoiceContent() {
           </select>
         </Row>
         {ttsProvider === 'openai' && (
-          <Row label="Voice">
+          <Row label="Голос">
             <select
               value={String(
                 (tts.openai as Record<string, unknown>)?.voice || 'nova',
@@ -2289,15 +2286,15 @@ function VoiceContent() {
       </div>
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
-          Speech-to-Text
+          Распознавание речи
         </p>
-        <Row label="Enable STT">
+        <Row label="Включить распознавание речи">
           <Switch
             checked={stt.enabled !== false}
             onCheckedChange={(c) => saveStt('enabled', c)}
           />
         </Row>
-        <Row label="STT Provider">
+        <Row label="Провайдер распознавания речи">
           <select
             value={sttProvider}
             onChange={(e) => saveStt('provider', e.target.value)}
@@ -2312,7 +2309,7 @@ function VoiceContent() {
         </Row>
         {sttProvider === 'groq' && (
           <>
-            <Row label="Groq model">
+            <Row label="Модель Groq">
               <select
                 value={String(sttGroq.model || GROQ_STT_MODELS[0])}
                 onChange={(e) =>
@@ -2330,7 +2327,7 @@ function VoiceContent() {
                 ))}
               </select>
             </Row>
-            <Row label="Language" description="Optional BCP-47 code, e.g. en or en-US.">
+            <Row label="Язык" description="Необязательный код BCP-47, например ru или ru-RU.">
               <Input
                 value={String(stt.language || '')}
                 onChange={(e) => saveStt('language', e.target.value)}
@@ -2379,8 +2376,8 @@ function DisplayContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Display"
-        description="Agent response style and output preferences."
+        title="Отображение"
+        description="Стиль ответов агента и параметры вывода."
       />
       {msg && (
         <div
@@ -2395,40 +2392,40 @@ function DisplayContent() {
         </div>
       )}
       <div className={SETTINGS_CARD_CLASS}>
-        <Row label="Personality" description="Agent response style">
+        <Row label="Характер" description="Стиль ответов агента">
           <select
             value={String(config.personality || 'default')}
             onChange={(e) => save('personality', e.target.value)}
             className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
           >
-            <option value="default">Default</option>
-            <option value="concise">Concise</option>
-            <option value="verbose">Verbose</option>
-            <option value="creative">Creative</option>
+            <option value="default">По умолчанию</option>
+            <option value="concise">Кратко</option>
+            <option value="verbose">Подробно</option>
+            <option value="creative">Креативно</option>
           </select>
         </Row>
-        <Row label="Streaming" description="Stream responses in real-time">
+        <Row label="Потоковый вывод" description="Выводить ответы в реальном времени">
           <Switch
             checked={config.streaming !== false}
             onCheckedChange={(c) => save('streaming', c)}
           />
         </Row>
         <Row
-          label="Show reasoning"
-          description="Display model thinking process"
+          label="Показывать рассуждения"
+          description="Показывать процесс размышлений модели"
         >
           <Switch
             checked={config.show_reasoning !== false}
             onCheckedChange={(c) => save('show_reasoning', c)}
           />
         </Row>
-        <Row label="Show cost" description="Display token cost per response">
+        <Row label="Показывать стоимость" description="Показывать стоимость токенов за ответ">
           <Switch
             checked={config.show_cost === true}
             onCheckedChange={(c) => save('show_cost', c)}
           />
         </Row>
-        <Row label="Compact mode" description="Reduce spacing in responses">
+        <Row label="Компактный режим" description="Уменьшить отступы в ответах">
           <Switch
             checked={config.compact === true}
             onCheckedChange={(c) => save('compact', c)}
@@ -2443,12 +2440,12 @@ function LanguageContent() {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Language"
-        description="Choose the display language for the workspace UI."
+        title="Язык"
+        description="Выберите язык интерфейса."
       />
       <Row
-        label="Interface Language"
-        description="Translates navigation, labels, and buttons."
+        label="Язык интерфейса"
+        description="Переводит навигацию, подписи и кнопки."
       >
         <select
           value={getLocale()}
@@ -2493,15 +2490,16 @@ type SettingsDialogProps = {
 export function SettingsDialog({
   open,
   onOpenChange,
-  initialSection = 'claude',
+  initialSection = 'agent',
 }: SettingsDialogProps) {
-  const [active, setActive] = useState<SectionId>(initialSection)
+  const resolveSection = (s: SectionId): SectionId => (s === 'claude' ? 'agent' : s)
+  const [active, setActive] = useState<SectionId>(resolveSection(initialSection))
   const [mobileView, setMobileView] = useState<'nav' | 'content'>('nav')
   const ActiveContent = CONTENT_MAP[active]
 
   useEffect(() => {
     if (open) {
-      setActive(initialSection)
+      setActive(resolveSection(initialSection))
       setMobileView('nav')
     }
   }, [initialSection, open])
@@ -2518,10 +2516,10 @@ export function SettingsDialog({
           <div className="flex items-center justify-between border-b border-primary-200 bg-primary-50/80 px-4 py-4 md:rounded-t-2xl md:px-5">
             <div>
               <DialogTitle className="text-base font-semibold text-primary-900 dark:text-neutral-100">
-                Settings
+                Настройки
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Configure Hermes Workspace
+                Настроить AWG GPT
               </DialogDescription>
             </div>
             <DialogClose
@@ -2530,7 +2528,7 @@ export function SettingsDialog({
                   size="icon-sm"
                   variant="ghost"
                   className="rounded-full text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-                  aria-label="Close"
+                  aria-label="Закрыть"
                 >
                   <HugeiconsIcon
                     icon={Cancel01Icon}
@@ -2591,7 +2589,7 @@ export function SettingsDialog({
                       size={16}
                       strokeWidth={1.5}
                     />
-                    Back
+                    Назад
                   </Button>
                 </div>
                 <ActiveContent />
@@ -2605,7 +2603,7 @@ export function SettingsDialog({
               href="/settings"
               className="ml-2 font-medium underline underline-offset-2 hover:text-primary-700 dark:hover:text-neutral-200"
             >
-              All settings →
+              Все настройки →
             </a>
           </div>
         </div>

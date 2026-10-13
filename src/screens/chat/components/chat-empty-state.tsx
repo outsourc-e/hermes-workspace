@@ -17,19 +17,19 @@ type SuggestionChip = {
 
 const SUGGESTIONS: Array<SuggestionChip> = [
   {
-    label: 'Analyze workspace',
+    label: 'Проанализировать рабочее пространство',
     prompt:
       'Analyze this workspace structure and give me 3 engineering risks. Use tools and keep it concise.',
     icon: CodeIcon,
   },
   {
-    label: 'Save a preference',
+    label: 'Сохранить предпочтение',
     prompt:
       'Save this to memory exactly: "For demos, respond in 3 bullets max and put risk first." Then confirm saved.',
     icon: BrainIcon,
   },
   {
-    label: 'Create a file',
+    label: 'Создать файл',
     prompt: 'Create demo-checklist.md with 5 launch checks for this app.',
     icon: PuzzleIcon,
   },
@@ -71,7 +71,7 @@ export function ChatEmptyState({
         <div className="relative mb-6">
           <img
             src="/claude-avatar.webp"
-            alt="Hermes Agent"
+            alt="AWG GPT"
             className="relative size-20 rounded-md"
             style={{
               border: '1px solid var(--theme-border)',
@@ -86,7 +86,7 @@ export function ChatEmptyState({
           className="micro-label mb-2"
           style={{ color: 'var(--theme-muted)' }}
         >
-          Hermes Workspace
+          AWG GPT
         </p>
 
         {/* Editorial display title */}
@@ -94,7 +94,7 @@ export function ChatEmptyState({
           className="editorial-display text-3xl"
           style={{ color: 'var(--theme-text)' }}
         >
-          Begin a session
+          Начать сессию
         </h2>
 
         {activeProfile && (
@@ -107,7 +107,7 @@ export function ChatEmptyState({
         {!compact && (
           <>
             <p className="mt-3 text-sm" style={{ color: 'var(--theme-muted)' }}>
-              Agent chat · live tools · memory · full observability
+              Чат с агентом · инструменты · память · полная наблюдаемость
             </p>
           </>
         )}

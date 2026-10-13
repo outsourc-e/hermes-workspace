@@ -22,7 +22,7 @@ function tierColor(tier: string | null): string {
 function relativeTime(unlockedAtSeconds: number | null): string {
   if (!unlockedAtSeconds) return ''
   const diff = Date.now() / 1000 - unlockedAtSeconds
-  if (diff < 60) return 'just now'
+  if (diff < 60) return 'только что'
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
   return `${Math.floor(diff / 86_400)}d ago`
@@ -118,7 +118,7 @@ export function AchievementsCard({
       const data = (await res.json()) as DashboardOverview
       setAllUnlocks(data.achievements?.recentUnlocks ?? [])
     } catch (err) {
-      setAllError(err instanceof Error ? err.message : 'failed to load')
+      setAllError(err instanceof Error ? err.message : 'не удалось загрузить')
     } finally {
       setLoadingAll(false)
     }
@@ -154,7 +154,7 @@ export function AchievementsCard({
               className="text-[10px] font-semibold uppercase tracking-[0.18em]"
               style={{ color: 'var(--theme-text)' }}
             >
-              Achievements
+              Достижения
             </h3>
           </div>
           <button
@@ -172,7 +172,7 @@ export function AchievementsCard({
               className="py-3 text-center text-[11px]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              No unlocks yet — keep working.
+              Открытых достижений пока нет — продолжайте работу.
             </div>
           ) : (
             // Render every unlock the aggregator returns so the card
@@ -205,12 +205,12 @@ export function AchievementsCard({
                 className="text-sm font-semibold uppercase tracking-[0.15em]"
                 style={{ color: 'var(--theme-text)' }}
               >
-                Achievement Ribbon
+                Лента достижений
               </h2>
               <button
                 type="button"
                 onClick={() => setShowAll(false)}
-                aria-label="Close"
+                aria-label="Закрыть"
                 className="rounded p-1 hover:bg-[var(--theme-card)]/80"
               >
                 <HugeiconsIcon

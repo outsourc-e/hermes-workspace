@@ -67,7 +67,7 @@ export function AttentionCard({
             className="text-[10px] font-semibold uppercase tracking-[0.18em]"
             style={{ color: 'var(--theme-text)' }}
           >
-            Attention
+            Внимание
           </h3>
         </div>
         <span
@@ -88,7 +88,7 @@ export function AttentionCard({
           className="py-1 text-[11px]"
           style={{ color: 'var(--theme-muted)' }}
         >
-          Nothing to triage. Gateway healthy, no stale jobs, logs quiet.
+          Разбирать нечего. Шлюз в порядке, зависших заданий нет, журналы спокойны.
         </p>
       ) : (
         <ul className="flex flex-col gap-1">

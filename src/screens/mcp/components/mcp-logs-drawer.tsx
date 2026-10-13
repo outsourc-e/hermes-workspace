@@ -105,7 +105,7 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
     >
       <button
         type="button"
-        aria-label="Close logs"
+        aria-label="Закрыть журналы"
         className="absolute inset-0 bg-black/30"
         onClick={onClose}
       />
@@ -133,7 +133,7 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
               className="rounded border border-primary-300 px-2 py-1 text-xs text-primary-700 hover:bg-primary-50"
               onClick={onClose}
             >
-              Close
+              Закрыть
             </button>
           </div>
         </header>
@@ -142,7 +142,7 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
           className="flex-1 overflow-y-auto bg-primary-950/95 px-3 py-2 font-mono text-xs text-primary-100"
         >
           {lines.length === 0 ? (
-            <p className="text-primary-300">Waiting for logs…</p>
+            <p className="text-primary-300">Ожидание журналов…</p>
           ) : (
             <ul className="space-y-0.5">
               {lines.map((line) => (

@@ -67,12 +67,12 @@ type LiveStreamEvent = {
 }
 
 const TAB_OPTIONS: Array<{ id: ConsoleTab; label: string }> = [
-  { id: 'stream', label: 'Stream' },
-  { id: 'timeline', label: 'Timeline' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'report', label: 'Report' },
-  { id: 'events', label: 'Events' },
-  { id: 'learnings', label: 'Learnings' },
+  { id: 'stream', label: 'Поток' },
+  { id: 'timeline', label: 'Таймлайн' },
+  { id: 'artifacts', label: 'Артефакты' },
+  { id: 'report', label: 'Отчёт' },
+  { id: 'events', label: 'События' },
+  { id: 'learnings', label: 'Знания' },
 ]
 
 const STATUS_STYLES: Record<RunConsoleProps['runStatus'], string> = {
@@ -417,7 +417,7 @@ export function RunConsole({
                 onClick={onClose}
                 className="inline-flex h-8 items-center rounded-md border border-primary-700 bg-primary-900/70 px-3 text-xs font-medium text-primary-200 transition-colors hover:border-primary-600 hover:bg-primary-800"
               >
-                Close
+                Закрыть
               </button>
             ) : null}
           </div>
@@ -487,7 +487,7 @@ export function RunConsole({
                     onClick={() => setSteerTarget(steerTarget === agent.id ? null : agent.id)}
                     className="rounded px-1.5 py-0.5 text-[10px] text-primary-400 transition-colors hover:bg-primary-800 hover:text-primary-200"
                   >
-                    Steer
+                    Направить
                   </button>
                 ) : null}
                 {onKillAgent ? (
@@ -496,7 +496,7 @@ export function RunConsole({
                     onClick={() => onKillAgent(agent.id)}
                     className="rounded px-1.5 py-0.5 text-[10px] text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
                   >
-                    Kill
+                    Завершить
                   </button>
                 ) : null}
               </div>
@@ -516,7 +516,7 @@ export function RunConsole({
                     setSteerTarget(null)
                   }
                 }}
-                placeholder="Send directive..."
+                placeholder="Отправить указание..."
                 className="flex-1 rounded-md border border-primary-700 bg-primary-950 px-2 py-1 text-xs text-primary-100 placeholder:text-primary-500 focus:border-accent-500 focus:outline-none"
               />
               <button
@@ -530,7 +530,7 @@ export function RunConsole({
                 }}
                 className="rounded-md bg-accent-500/20 px-2 py-1 text-[11px] font-medium text-accent-300 transition-colors hover:bg-accent-500/30"
               >
-                Send
+                Отправить
               </button>
               <button
                 type="button"
@@ -575,7 +575,7 @@ export function RunConsole({
                         : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
                   )}
                 >
-                  Combined
+                  Совмещённый
                 </button>
                 <button
                   type="button"
@@ -591,14 +591,14 @@ export function RunConsole({
                         : 'bg-primary-900/60 text-primary-300 hover:text-primary-100',
                   )}
                 >
-                  Lanes
+                  Дорожки
                 </button>
               </div>
             </div>
 
             {pendingApprovals && pendingApprovals.length > 0 ? (
               <section className="sticky top-0 z-10 rounded-lg border border-amber-500/40 bg-amber-500/15 p-3 shadow-lg backdrop-blur">
-                <h3 className="text-sm font-semibold text-amber-200">⚠️ Approval Required</h3>
+                <h3 className="text-sm font-semibold text-amber-200">⚠️ Требуется согласование</h3>
                 <ol className="mt-2 space-y-2">
                   {pendingApprovals.map((approval) => (
                     <li
@@ -624,7 +624,7 @@ export function RunConsole({
                             disabled={!onApprove}
                             className="rounded-md border border-amber-500/50 bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-500/30"
                           >
-                            Approve
+                            Одобрить
                           </button>
                           <button
                             type="button"
@@ -632,7 +632,7 @@ export function RunConsole({
                             disabled={!onDeny}
                             className="rounded-md border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-xs font-medium text-primary-200 transition-colors hover:bg-primary-800"
                           >
-                            Deny
+                            Отклонить
                           </button>
                         </div>
                       </div>
@@ -644,7 +644,7 @@ export function RunConsole({
 
             {runStatus === 'needs_input' && (!pendingApprovals || pendingApprovals.length === 0) ? (
               <div className="rounded-lg border border-primary-700/80 bg-primary-900/60 px-3 py-2 text-xs text-primary-300">
-                Mission is waiting for input — check the approval queue
+                Миссия ждёт ввода — проверьте очередь согласований
               </div>
             ) : null}
 
@@ -664,13 +664,13 @@ export function RunConsole({
                   <HugeiconsIcon icon={Rocket01Icon} size={22} strokeWidth={1.8} />
                 </div>
                 <p className={cn('text-base font-semibold', minimalChrome ? 'text-[var(--theme-text)]' : 'text-primary-100')}>
-                  Stream is ready
+                  Поток готов
                 </p>
                 <p className={cn(
                   'mt-2 max-w-md text-sm leading-6',
                   minimalChrome ? 'text-[var(--theme-muted)]' : 'text-primary-300',
                 )}>
-                  Agent output, approvals, and system events will appear here as work begins. Use timeline or artifacts to inspect the run once activity starts.
+                  Вывод агента, согласования и системные события появятся здесь, когда начнётся работа. Для разбора запуска используйте таймлайн или артефакты.
                 </p>
               </div>
             ) : null}
@@ -831,7 +831,7 @@ export function RunConsole({
         {activeTab === 'timeline' ? (
           <div className="rounded-xl border border-primary-800/80 bg-primary-950/50 p-4 sm:p-5">
             {timelineBuckets.length === 0 ? (
-              <p className="text-sm text-primary-300">No timeline events yet</p>
+              <p className="text-sm text-primary-300">Событий на таймлайне пока нет</p>
             ) : (
               <ol className="space-y-4">
                 {timelineBuckets.map((bucket) => (
@@ -877,7 +877,7 @@ export function RunConsole({
         {activeTab === 'artifacts' ? (
           <div className="rounded-xl border border-primary-800/80 bg-primary-950/50 p-4 sm:p-5">
             {!artifacts || artifacts.length === 0 ? (
-              <p className="text-sm text-primary-300">No artifacts collected yet</p>
+              <p className="text-sm text-primary-300">Артефакты ещё не собраны</p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {artifacts
@@ -913,7 +913,7 @@ export function RunConsole({
                               className="inline-flex items-center gap-1 rounded-md border border-primary-700 bg-primary-900/80 px-2 py-1 text-[11px] font-medium text-primary-200 transition-colors hover:bg-primary-800"
                             >
                               <HugeiconsIcon icon={ViewIcon} size={12} strokeWidth={1.8} />
-                              View
+                              Просмотр
                             </button>
                             {isExpanded ? (
                               <pre className="max-h-32 overflow-auto rounded-md border border-primary-800 bg-primary-950/80 p-2 text-[11px] text-primary-200">
@@ -947,7 +947,7 @@ export function RunConsole({
         {activeTab === 'events' ? (
           <div className="min-h-[200px]">
             {!missionEvents || missionEvents.length === 0 ? (
-              <p className="text-sm text-primary-300">No mission events recorded for this run yet.</p>
+              <p className="text-sm text-primary-300">Для этого запуска событий миссии пока нет.</p>
             ) : (
               <MissionEventLog
                 events={missionEvents}
@@ -977,16 +977,16 @@ export function RunConsole({
         {activeTab === 'report' ? (
           <div className="rounded-xl border border-primary-800/80 bg-primary-950/50 p-4 sm:p-5">
             {!report ? (
-              <p className="text-sm text-primary-300">Report will be generated when the mission completes</p>
+              <p className="text-sm text-primary-300">Отчёт будет создан после завершения миссии</p>
             ) : (
               <div className="space-y-4">
                 <section className="rounded-lg border border-primary-800/80 bg-primary-900/50 p-3">
-                  <h3 className="text-sm font-semibold text-primary-100">Summary</h3>
+                  <h3 className="text-sm font-semibold text-primary-100">Сводка</h3>
                   <p className="mt-2 text-sm leading-relaxed text-primary-300">{report.summary}</p>
                 </section>
 
                 <section className="rounded-lg border border-primary-800/80 bg-primary-900/50 p-3">
-                  <h3 className="text-sm font-semibold text-primary-100">Key Findings</h3>
+                  <h3 className="text-sm font-semibold text-primary-100">Ключевые выводы</h3>
                   {report.keyFindings.length > 0 ? (
                     <ul className="mt-2 space-y-2">
                       {report.keyFindings.map((finding, index) => (
@@ -997,33 +997,33 @@ export function RunConsole({
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2 text-sm text-primary-400">No key findings available</p>
+                    <p className="mt-2 text-sm text-primary-400">Ключевых выводов нет</p>
                   )}
                 </section>
 
                 <section className="grid gap-2 rounded-lg border border-primary-800/80 bg-primary-900/50 p-3 text-xs sm:grid-cols-3">
                   <div className="rounded-md border border-primary-800 bg-primary-950/70 px-2 py-1.5">
-                    <p className="text-primary-400">Duration</p>
+                    <p className="text-primary-400">Длительность</p>
                     <p className="mt-0.5 text-sm font-semibold text-primary-100">{report.duration}</p>
                   </div>
                   <div className="rounded-md border border-primary-800 bg-primary-950/70 px-2 py-1.5">
-                    <p className="text-primary-400">Total Tokens</p>
+                    <p className="text-primary-400">Всего токенов</p>
                     <p className="mt-0.5 text-sm font-semibold text-primary-100">{report.totalTokens.toLocaleString()}</p>
                   </div>
                   <div className="rounded-md border border-primary-800 bg-primary-950/70 px-2 py-1.5">
-                    <p className="text-primary-400">Total Cost</p>
+                    <p className="text-primary-400">Общая стоимость</p>
                     <p className="mt-0.5 text-sm font-semibold text-primary-100">${report.totalCost.toFixed(2)}</p>
                   </div>
                 </section>
 
                 <section className="overflow-hidden rounded-lg border border-primary-800/80 bg-primary-900/50">
-                  <h3 className="border-b border-primary-800/80 px-3 py-2 text-sm font-semibold text-primary-100">Agent Breakdown</h3>
+                  <h3 className="border-b border-primary-800/80 px-3 py-2 text-sm font-semibold text-primary-100">Разбивка по агентам</h3>
                   <table className="w-full text-left text-xs">
                     <thead className="bg-primary-950/70 text-primary-300">
                       <tr>
-                        <th className="px-3 py-2 font-medium">Agent</th>
-                        <th className="px-3 py-2 font-medium">Tasks Completed</th>
-                        <th className="px-3 py-2 font-medium">Tokens Used</th>
+                        <th className="px-3 py-2 font-medium">Агент</th>
+                        <th className="px-3 py-2 font-medium">Выполнено задач</th>
+                        <th className="px-3 py-2 font-medium">Использовано токенов</th>
                       </tr>
                     </thead>
                     <tbody>

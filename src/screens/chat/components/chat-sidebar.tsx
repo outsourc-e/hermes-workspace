@@ -110,7 +110,7 @@ function ThemeToggleMini() {
       }}
       className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80"
       style={{ color: 'var(--theme-muted)' }}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={isDark ? 'Включить светлую тему' : 'Включить тёмную тему'}
     >
       <HugeiconsIcon
         icon={isDark ? Sun02Icon : Moon02Icon}
@@ -515,7 +515,7 @@ function HarnessChatNav({
           kind: 'link',
           to: '/chat',
           icon: MessageMultiple01Icon,
-          label: 'Chat',
+          label: 'Чат',
           active,
         }}
         isCollapsed
@@ -546,14 +546,14 @@ function HarnessChatNav({
             strokeWidth={1.5}
             className="size-5 shrink-0"
           />
-          <span className="truncate">Chat</span>
+          <span className="truncate">Чат</span>
         </Link>
         <button
           type="button"
           onClick={onToggle}
           className="mr-1 flex size-8 items-center justify-center rounded-md hover:bg-primary-300/50"
           aria-label={
-            expanded ? 'Collapse chat harnesses' : 'Expand chat harnesses'
+            expanded ? 'Свернуть среды чата' : 'Развернуть среды чата'
           }
         >
           <HugeiconsIcon
@@ -581,7 +581,7 @@ function HarnessChatNav({
               className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-primary-600 hover:bg-primary-100 hover:text-primary-900"
             >
               <span className="size-1.5 rounded-full bg-violet-500" />
-              All agents
+              Все агенты
             </Link>
             {!hiddenSet.has('hermes-native') && (
               <Link
@@ -591,7 +591,7 @@ function HarnessChatNav({
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-primary-600 hover:bg-primary-100 hover:text-primary-900"
               >
                 <span className="size-1.5 rounded-full bg-emerald-500" />
-                Hermes
+                Агент
               </Link>
             )}
             {(runtimesQuery.data?.runtimes ?? [])
@@ -940,7 +940,7 @@ function ChatSidebarComponent({
   const searchItem: NavItemDef = {
     kind: 'button',
     icon: Search01Icon,
-    label: 'Search',
+    label: 'Поиск',
     active: isSearchModalOpen,
     onClick: openSearchModal,
   }
@@ -950,21 +950,21 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/operations',
       icon: UserMultipleIcon,
-      label: 'Assistants',
+      label: 'Ассистенты',
       active: isOperationsActive,
     },
     {
       kind: 'link',
       to: '/tasks',
       icon: CheckListIcon,
-      label: 'Tasks',
+      label: 'Задачи',
       active: isTasksActive,
     },
     {
       kind: 'link',
       to: '/swarm',
       icon: UserGroupIcon,
-      label: 'Teams',
+      label: 'Команды',
       active: isSwarmActive,
     },
     ...(echoStudioEnabled
@@ -1101,14 +1101,14 @@ function ChatSidebarComponent({
               >
                 <img
                   src="/claude-avatar.webp"
-                  alt="Hermes Agent"
+                  alt="AWG GPT"
                   className="size-6 rounded-lg"
                 />
                 <span
                   className="text-sm font-semibold tracking-tight"
                   style={{ color: 'var(--theme-text)' }}
                 >
-                  Hermes Workspace
+                  AWG GPT
                 </span>
               </Link>
             </motion.div>
@@ -1123,7 +1123,7 @@ function ChatSidebarComponent({
                   size="icon-sm"
                   variant="ghost"
                   aria-label={
-                    isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'
+                    isVisuallyCollapsed ? 'Открыть боковую панель' : 'Закрыть боковую панель'
                   }
                   className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
                   data-tour="sidebar-collapse-toggle"
@@ -1145,7 +1145,7 @@ function ChatSidebarComponent({
               }
             />
             <TooltipContent side="right">
-              {isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+              {isVisuallyCollapsed ? 'Открыть боковую панель' : 'Закрыть боковую панель'}
             </TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
@@ -1172,7 +1172,7 @@ function ChatSidebarComponent({
         {/* Navigation sections */}
         <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
           <SectionLabel
-            label="Command"
+            label="Команда"
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
@@ -1199,7 +1199,7 @@ function ChatSidebarComponent({
           />
 
           <SectionLabel
-            label="Workspace"
+            label="Рабочее пространство"
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
@@ -1216,7 +1216,7 @@ function ChatSidebarComponent({
           />
 
           <SectionLabel
-            label="Knowledge"
+            label="Знания"
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
@@ -1330,7 +1330,7 @@ function ChatSidebarComponent({
                     size={20}
                     strokeWidth={1.5}
                   />
-                  Settings
+                  Настройки
                 </span>
               </MenuItem>
             </MenuContent>
@@ -1343,7 +1343,7 @@ function ChatSidebarComponent({
                 type="button"
                 onClick={() => handleOpenSettings('claude')}
                 className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
-                aria-label="Settings"
+                aria-label="Настройки"
               >
                 <HugeiconsIcon
                   icon={Settings01Icon}

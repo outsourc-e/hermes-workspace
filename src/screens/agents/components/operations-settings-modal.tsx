@@ -89,7 +89,7 @@ function ModelSelector({
                 !value ? 'bg-[var(--theme-accent-soft)]' : 'hover:bg-[var(--theme-bg)]',
               )}
             >
-              Default (auto)
+              По умолчанию (авто)
             </button>
             {models.map((model) => (
               <button
@@ -165,10 +165,10 @@ export function OperationsSettingsModal({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-[var(--theme-text)]">
-                Operations Settings
+                Настройки операций
               </h2>
               <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
-                Defaults stored locally for the Operations screen.
+                Значения по умолчанию для экрана операций хранятся локально.
               </p>
             </div>
           </div>
@@ -184,7 +184,7 @@ export function OperationsSettingsModal({
         <div className="mt-6 space-y-4">
           <label className="space-y-2">
             <span className="text-sm font-medium text-[var(--theme-text)]">
-              Default model for new agents
+              Модель по умолчанию для новых агентов
             </span>
             <ModelSelector
               value={draft.defaultModel}
@@ -199,7 +199,7 @@ export function OperationsSettingsModal({
                 Auto-approve
               </span>
               <span className="block text-sm text-[var(--theme-muted-2)]">
-                Reserved for future workflow automation.
+                Зарезервировано для будущей автоматизации процессов.
               </span>
             </span>
             <input
@@ -217,7 +217,7 @@ export function OperationsSettingsModal({
 
           <label className="space-y-2">
             <span className="text-sm font-medium text-[var(--theme-text)]">
-              Activity feed length
+              Длина ленты активности
             </span>
             <input
               type="number"
@@ -241,7 +241,7 @@ export function OperationsSettingsModal({
             className="border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
             onClick={onClose}
           >
-            Cancel
+            Отмена
           </Button>
           <Button
             className="bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
@@ -250,7 +250,7 @@ export function OperationsSettingsModal({
               onClose()
             }}
           >
-            Save Settings
+            Сохранить настройки
           </Button>
         </div>
       </div>

@@ -113,7 +113,7 @@ function statusStyles(state: WorkerState) {
     return { dot: 'bg-red-500', ring: 'text-red-500', label: 'Error', progress: 'failed' as const, avatar: 'failed' as const }
   }
   if (state === 'offline') {
-    return { dot: 'bg-primary-300', ring: 'text-primary-300', label: 'Offline', progress: 'queued' as const, avatar: 'idle' as const }
+    return { dot: 'bg-primary-300', ring: 'text-primary-300', label: 'Не в сети', progress: 'queued' as const, avatar: 'idle' as const }
   }
   if (state === 'idle') {
     return { dot: 'bg-primary-300', ring: 'text-primary-300', label: 'Idle', progress: 'queued' as const, avatar: 'idle' as const }
@@ -292,7 +292,7 @@ export function OperationalWorkerCard({
         key: 'tasks',
         label: 'Tasks',
         meta: `${activeCount} active lanes`,
-        helper: 'Tracked work for this agent lives here.',
+        helper: 'Здесь отображается работа этого агента.',
       },
       {
         key: 'output',
@@ -409,7 +409,7 @@ export function OperationalWorkerCard({
                   title="Output within the last 90 seconds"
                 >
                   <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
-                  live
+                  онлайн
                 </span>
               ) : null}
             </span>
@@ -425,8 +425,8 @@ export function OperationalWorkerCard({
           </span>
           <button
             type="button"
-            aria-label={`Settings for ${displayName}`}
-            title={`Settings for ${displayName}`}
+            aria-label={`Настройки ${displayName}`}
+            title={`Настройки ${displayName}`}
             onClick={(event) => {
               event.stopPropagation()
               setSettingsOpen(true)
@@ -463,7 +463,7 @@ export function OperationalWorkerCard({
 
       {!member.profileFound ? (
         <div className="mb-2 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-center text-[11px] text-amber-200">
-          Roster-only agent, not provisioned yet. Configure now, bootstrap profile later.
+          Агент только в списке, ещё не развёрнут. Настройте сейчас, профиль создайте позже.
         </div>
       ) : null}
 
@@ -491,8 +491,8 @@ export function OperationalWorkerCard({
           <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
             <button
               type="button"
-              aria-label="Previous panel"
-              title="Previous panel"
+              aria-label="Предыдущая панель"
+              title="Предыдущая панель"
               onClick={() => cycleFocusPanel(-1)}
               className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
             >
@@ -508,8 +508,8 @@ export function OperationalWorkerCard({
               {focusPanel === 'tasks' ? (
                 <button
                   type="button"
-                  aria-label={taskComposerOpen ? 'Close add task' : 'Add task'}
-                  title={taskComposerOpen ? 'Close add task' : 'Add task'}
+                  aria-label={taskComposerOpen ? 'Close add task' : 'Добавить задачу'}
+                  title={taskComposerOpen ? 'Close add task' : 'Добавить задачу'}
                   onClick={() => setTaskComposerOpen((value) => !value)}
                   className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
                 >
@@ -518,8 +518,8 @@ export function OperationalWorkerCard({
               ) : null}
               <button
                 type="button"
-                aria-label="Next panel"
-                title="Next panel"
+                aria-label="Следующая панель"
+                title="Следующая панель"
                 onClick={() => cycleFocusPanel(1)}
                 className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
               >
@@ -581,11 +581,11 @@ export function OperationalWorkerCard({
         <button
           type="button"
           onClick={onOpenTasks}
-          title={`Route work to ${member.displayName || member.id}`}
+          title={`Направить задачу: ${member.displayName || member.id}`}
           className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
         >
           <HugeiconsIcon icon={CheckListIcon} size={11} />
-          Route to agent
+          Направить агенту
         </button>
         <button
           type="button"
@@ -593,7 +593,7 @@ export function OperationalWorkerCard({
           className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
         >
           <HugeiconsIcon icon={ComputerTerminal01Icon} size={11} />
-          Open terminal
+          Открыть терминал
         </button>
       </div>
       </>

@@ -54,16 +54,16 @@ export function SkillsUsageCard({
           className="text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-text)' }}
         >
-          Skills usage
+          Использование навыков
         </h3>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors group-hover:text-[var(--theme-accent)]"
           style={{ color: 'var(--theme-muted)' }}
         >
           {hasUsage
-            ? `${usage!.distinctSkills} of ${installedCount} used`
-            : `${installedCount} installed`}
-          {' · manage →'}
+            ? `использовано ${usage!.distinctSkills} из ${installedCount}`
+            : `установлено: ${installedCount}`}
+          {' · управление →'}
         </span>
       </div>
 
@@ -116,7 +116,7 @@ export function SkillsUsageCard({
           style={{ color: 'var(--theme-muted)' }}
         >
           {installedCount === 0
-            ? 'no skills installed'
+            ? 'навыки не установлены'
             : 'no usage in this window yet'}
         </div>
       )}

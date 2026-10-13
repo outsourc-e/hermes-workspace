@@ -36,9 +36,9 @@ describe('Swarm2 Kanban backend presentation', () => {
       details: 'Using local Swarm board JSON store.',
       path: '/tmp/swarm2-kanban.json',
     })).toMatchObject({
-      badgeLabel: 'Local fallback',
+      badgeLabel: 'Локальный резерв',
       badgeTone: 'local',
-      toastTitle: 'Using local Swarm Board',
+      toastTitle: 'Используется локальная доска Swarm',
       toastBody: 'Using local Swarm board JSON store.',
     })
   })

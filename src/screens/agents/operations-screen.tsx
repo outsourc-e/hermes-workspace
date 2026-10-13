@@ -94,10 +94,10 @@ export function OperationsScreen() {
             </div>
             <div>
               <h1 className="text-base font-semibold text-primary-900">
-                Assistants
+                Ассистенты
               </h1>
               <p className="mt-1 text-sm text-primary-600">
-                Configure persistent agents and their defaults
+                Настройка постоянных агентов и их параметров по умолчанию
               </p>
             </div>
           </div>
@@ -107,7 +107,7 @@ export function OperationsScreen() {
               onClick={() => setNewAgentOpen(true)}
             >
               <HugeiconsIcon icon={PlusSignIcon} size={16} strokeWidth={1.8} />
-              New Assistant
+              Новый ассистент
             </Button>
             <Button
               variant="secondary"
@@ -119,14 +119,14 @@ export function OperationsScreen() {
                 size={16}
                 strokeWidth={1.8}
               />
-              Settings
+              Настройки
             </Button>
           </div>
         </header>
 
         {isLoading ? (
           <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-6 py-12 text-center text-sm text-[var(--theme-muted)] shadow-[0_24px_80px_var(--theme-shadow)]">
-            Loading assistants…
+            Загрузка ассистентов…
           </section>
         ) : error ? (
           <section className="rounded-3xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-6 py-12 text-center text-sm text-[var(--theme-text)] shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -173,7 +173,7 @@ export function OperationsScreen() {
                   className="text-[var(--theme-muted)]"
                 />
                 <span className="mt-3 text-sm text-[var(--theme-muted)]">
-                  Add Assistant
+                  Добавить ассистента
                 </span>
               </motion.button>
             </section>

@@ -6,7 +6,7 @@ import { TASKS_BOARD_HELP_TEXT } from './tasks-screen'
 describe('tasks UX copy', () => {
   it('exposes helper copy that explains drag and assignment behavior', () => {
     expect(TASKS_BOARD_HELP_TEXT).toBe(
-      'Workspace Tasks is a lightweight task board. Drag cards to change status. Use Dashboard Kanban for native multi-board controls.',
+      'Задачи — лёгкая доска. Перетаскивайте карточки, чтобы менять статус. Для нескольких досок используйте канбан на панели.',
     )
   })
 

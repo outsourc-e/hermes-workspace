@@ -45,9 +45,9 @@ export const Route = createFileRoute('/memory')({
               variant="underline"
               className="w-full justify-start gap-1"
             >
-              <TabsTab value="memory">Memory</TabsTab>
-              <TabsTab value="knowledge">Knowledge</TabsTab>
-              <TabsTab value="external">External providers</TabsTab>
+              <TabsTab value="memory">Память</TabsTab>
+              <TabsTab value="knowledge">Знания</TabsTab>
+              <TabsTab value="external">Внешние провайдеры</TabsTab>
             </TabsList>
           </div>
 
@@ -55,7 +55,7 @@ export const Route = createFileRoute('/memory')({
             {tab === 'memory' ? (
               <Suspense
                 fallback={
-                  <RouteLoadingState label="Loading memory browser..." />
+                  <RouteLoadingState label="Загрузка обозревателя памяти..." />
                 }
               >
                 {memoryAvailable ? (
@@ -74,7 +74,7 @@ export const Route = createFileRoute('/memory')({
             {tab === 'knowledge' ? (
               <Suspense
                 fallback={
-                  <RouteLoadingState label="Loading knowledge browser..." />
+                  <RouteLoadingState label="Загрузка обозревателя знаний..." />
                 }
               >
                 <KnowledgeBrowserScreen />
@@ -86,7 +86,7 @@ export const Route = createFileRoute('/memory')({
             {tab === 'external' ? (
               <Suspense
                 fallback={
-                  <RouteLoadingState label="Loading external memory providers..." />
+                  <RouteLoadingState label="Загрузка внешних провайдеров памяти..." />
                 }
               >
                 <ExternalMemoryBrowserScreen />

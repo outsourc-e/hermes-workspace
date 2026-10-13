@@ -146,7 +146,7 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
       className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] overflow-hidden"
       style={{
         borderLeftWidth: '3px',
-        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
+        borderLeftColor: isRunning ? 'var(--theme-accent, #7657c7)' : isDone ? '#22c55e' : '#ef4444',
         boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.12)' : 'none',
       }}
     >
@@ -162,7 +162,7 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
         {isDone && <span className="text-xs text-green-500">✅</span>}
         {isError && <span className="text-xs text-red-500">❌</span>}
         {isRunning && (
-          <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />
+          <span className="size-1.5 rounded-full animate-pulse bg-[#7657c7]" />
         )}
       </div>
       {isRunning && (
@@ -359,7 +359,7 @@ function ThinkingBubble({
           {isStale ? (
             <span className="text-[11px] text-amber-500 dark:text-amber-400 animate-pulse">
               {isVeryStale
-                ? 'Still thinking… this is taking a while'
+                ? 'Всё ещё думаю… это занимает время'
                 : 'Taking longer than usual…'}
             </span>
           ) : null}
@@ -1671,7 +1671,7 @@ function ChatMessageListComponent({
                 type="text"
                 value={messageSearchValue}
                 onChange={(e) => setMessageSearchValue(e.target.value)}
-                placeholder="Search messages..."
+                placeholder="Поиск сообщений..."
                 className="min-w-0 flex-1 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none placeholder:text-primary-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
               />
               {isMessageSearchActive && (
@@ -1687,7 +1687,7 @@ function ChatMessageListComponent({
                   onClick={jumpToPreviousMatch}
                   disabled={messageSearchMatches.length === 0}
                   className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
-                  aria-label="Previous match"
+                  aria-label="Предыдущее совпадение"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path
@@ -1704,7 +1704,7 @@ function ChatMessageListComponent({
                   onClick={jumpToNextMatch}
                   disabled={messageSearchMatches.length === 0}
                   className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
-                  aria-label="Next match"
+                  aria-label="Следующее совпадение"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path
@@ -1720,7 +1720,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={closeMessageSearch}
                   className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
-                  aria-label="Close search"
+                  aria-label="Закрыть поиск"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path
@@ -1761,8 +1761,7 @@ function ChatMessageListComponent({
                         tool interactions
                       </p>
                       <p className="mt-1 text-sm text-amber-700 text-pretty">
-                        Most content is AI agent tool usage (file reads, code
-                        execution, etc.)
+                        Основная часть — вызовы инструментов ИИ-агента (чтение файлов, выполнение кода и т. д.)
                       </p>
                     </div>
                   </div>

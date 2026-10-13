@@ -106,7 +106,7 @@ export function ModelInfoCard({
             className="text-[10px] font-semibold uppercase tracking-[0.18em]"
             style={{ color: palette.muted }}
           >
-            Active Model
+            Активная модель
           </h3>
           <span
             className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold"
@@ -123,7 +123,7 @@ export function ModelInfoCard({
                 background: connected ? palette.success : palette.danger,
               }}
             />
-            {connected ? 'Online' : 'Offline'}
+            {connected ? 'В сети' : 'Не в сети'}
           </span>
         </div>
         <div className="flex flex-1 flex-col gap-2 px-4 pb-3 pt-2">
@@ -192,7 +192,7 @@ export function ModelInfoCard({
               color: palette.muted,
             }}
           >
-            Inventory →
+            Инвентарь →
           </button>
         </div>
       </div>
@@ -270,7 +270,7 @@ function ModelInventoryModal({
         )
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'failed to load')
+          setError(err instanceof Error ? err.message : 'не удалось загрузить')
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -320,7 +320,7 @@ function ModelInventoryModal({
               className="text-sm font-semibold uppercase tracking-[0.18em]"
               style={{ color: 'var(--theme-text)' }}
             >
-              Model inventory
+              Перечень моделей
             </h2>
             <p
               className="font-mono text-[10px] uppercase tracking-[0.1em]"
@@ -344,7 +344,7 @@ function ModelInventoryModal({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label="Закрыть"
               className="rounded p-1 hover:bg-[var(--theme-card)]/80"
             >
               <HugeiconsIcon
@@ -363,7 +363,7 @@ function ModelInventoryModal({
               className="py-8 text-center text-[11px]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              Loading models…
+              Загрузка моделей…
             </div>
           ) : error ? (
             <div
@@ -377,7 +377,7 @@ function ModelInventoryModal({
               className="py-8 text-center text-[11px]"
               style={{ color: 'var(--theme-muted)' }}
             >
-              No matching models.
+              Подходящих моделей нет.
             </div>
           ) : (
             grouped.map(([provider, list]) => (
@@ -421,7 +421,7 @@ function ModelInventoryModal({
                                 color: 'var(--theme-success)',
                               }}
                             >
-                              active
+                              активен
                             </span>
                           ) : null}
                         </div>

@@ -506,7 +506,7 @@ export function detectAssistantCorruptionWarning(
   if (roleMatch) {
     return {
       kind: 'role-prefix',
-      label: 'Assistant output contains raw transcript role text',
+      label: 'В ответе ассистента есть служебный текст ролей',
       detail: `Stored role is assistant, but the content begins with "${roleMatch[1]}". Treat this as generated text, not a real ${roleMatch[1]} turn.`,
     }
   }
@@ -517,9 +517,9 @@ export function detectAssistantCorruptionWarning(
     if (dividerMatches.length >= 20) {
       return {
         kind: 'divider-loop',
-        label: 'Assistant output looks corrupted',
+        label: 'Ответ ассистента выглядит повреждённым',
         detail:
-          'This very large assistant message contains repeated divider-like lines and may be a generation loop.',
+          'В этом очень большом сообщении много повторяющихся строк-разделителей — возможно, генерация зациклилась.',
       }
     }
   }
@@ -1113,7 +1113,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] max-w-full overflow-hidden"
       style={{
         borderLeftWidth: '3px',
-        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
+        borderLeftColor: isRunning ? 'var(--theme-accent, #7657c7)' : isDone ? '#22c55e' : '#ef4444',
         transition: 'border-color 0.3s',
         boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.15)' : 'none',
       }}
@@ -1145,7 +1145,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         {isDone && <span className="shrink-0 text-xs text-green-500">✅</span>}
         {isError && <span className="shrink-0 text-xs text-red-500">❌</span>}
         {isRunning && (
-          <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-indigo-500" />
+          <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-[#7657c7]" />
         )}
       </button>
       {isRunning && !expanded && (
@@ -1169,7 +1169,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
               0 && (
               <div className="px-2.5 py-1.5">
                 <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">
-                  Input
+                  Вход
                 </div>
                 <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-[200px] overflow-y-auto text-ink opacity-70">
                   {JSON.stringify(toolCall.args, null, 2)}
@@ -1183,7 +1183,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
               style={{ borderColor: 'var(--theme-border)' }}
             >
               <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">
-                Output
+                Вывод
               </div>
               <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-ink opacity-80">
                 {showMore ? result : detail}
@@ -1196,7 +1196,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
                       setShowMore(true)
                     }}
                   >
-                    Show more
+                    Показать ещё
                   </button>
                 )}
               </pre>
@@ -1206,7 +1206,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           {isError && result && (
             <div className="px-2.5 py-1.5">
               <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5">
-                Error
+                Ошибка
               </div>
               <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-red-500">
                 {result}
@@ -1365,7 +1365,7 @@ function MarkdownDocumentCard({
           <div className="truncate text-sm font-medium text-primary-900">
             {title}
           </div>
-          <div className="text-[11px] text-primary-600">Markdown document</div>
+          <div className="text-[11px] text-primary-600">Документ Markdown</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {hasContent ? (
@@ -1381,7 +1381,7 @@ function MarkdownDocumentCard({
                 )}
                 onClick={() => setViewMode('preview')}
               >
-                Preview
+                Предпросмотр
               </Button>
               <Button
                 type="button"
@@ -1394,7 +1394,7 @@ function MarkdownDocumentCard({
                 )}
                 onClick={() => setViewMode('source')}
               >
-                Source
+                Источник
               </Button>
             </div>
           ) : null}
@@ -1405,7 +1405,7 @@ function MarkdownDocumentCard({
               rel="noopener noreferrer"
               className="text-xs text-primary-700 underline decoration-primary-300 underline-offset-4 hover:decoration-primary-500"
             >
-              Open
+              Открыть
             </a>
           ) : null}
         </div>
@@ -1420,7 +1420,7 @@ function MarkdownDocumentCard({
           )
         ) : (
           <div className="text-sm text-primary-600">
-            Preview unavailable for this markdown content.
+            Предпросмотр этого markdown недоступен.
           </div>
         )}
       </div>
@@ -1456,7 +1456,7 @@ function extractStandaloneMarkdownFence(text: string): string | null {
 function MarkdownMessageCard({ content }: { content: string }) {
   return (
     <MarkdownDocumentCard
-      title="Markdown preview"
+      title="Предпросмотр Markdown"
       content={content}
       className="max-w-full"
     />
@@ -1595,7 +1595,7 @@ function InlineArtifactCard({ artifact }: { artifact: InlineArtifact }) {
             ) : null}
           </div>
           <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-            Open
+            Открыть
           </Button>
         </div>
       </div>
@@ -1606,7 +1606,7 @@ function InlineArtifactCard({ artifact }: { artifact: InlineArtifact }) {
               <DialogTitle className="truncate text-base">{artifact.title}</DialogTitle>
               <div className="text-xs uppercase tracking-wide opacity-70">{artifact.type}</div>
             </div>
-            <DialogClose>Close</DialogClose>
+            <DialogClose>Закрыть</DialogClose>
           </div>
           <div className="p-4">
             <ArtifactPreviewBody artifact={artifact} />
@@ -1846,7 +1846,7 @@ function InlineToolSectionItem({
                       color: 'var(--theme-text)',
                     }}
                   >
-                    Open ↗
+                    Открыть ↗
                   </a>
                 ) : null}
               </div>
@@ -1868,7 +1868,7 @@ function InlineToolSectionItem({
           {hasInputData && !showRawJson && !isArtifact ? (
             <div>
               <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">
-                Input
+                Вход
               </div>
               {toolSection.type === 'exec' && headerArg ? (
                 <pre
@@ -1895,7 +1895,7 @@ function InlineToolSectionItem({
             isError && toolSection.errorText ? (
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">
-                  Error
+                  Ошибка
                 </div>
                 <pre
                   className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400"
@@ -1907,7 +1907,7 @@ function InlineToolSectionItem({
             ) : toolSection.outputText ? (
               <div>
                 <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">
-                  Output
+                  Вывод
                 </div>
                 <pre
                   className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono"
@@ -1961,7 +1961,7 @@ function InlineToolSectionItem({
           {/* Fallback when no args or output available */}
           {!isArtifact && !hasInputData && !hasOutputData && !isRunning && (
             <div className="text-[10px] text-primary-400 italic">
-              No detail available for this tool call
+              Нет подробностей по этому вызову инструмента
             </div>
           )}
         </div>
@@ -2004,7 +2004,7 @@ function ToolCallGroup({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                Tool calls
+                Вызовы инструментов
               </span>
               <span className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-[var(--theme-muted)]">
                 {summary.countLabel}
@@ -2785,7 +2785,7 @@ function MessageItemComponent({
                   >
                     <img
                       src={img.src}
-                      alt="Shared image"
+                      alt="Общее изображение"
                       className="max-h-64 w-auto max-w-full object-contain"
                       loading="lazy"
                     />
@@ -2862,7 +2862,7 @@ function MessageItemComponent({
                     'color-mix(in srgb, var(--chat-user-foreground) 60%, transparent)',
                 }}
               >
-                Sent
+                Отправлено
               </span>
             )}
           </div>

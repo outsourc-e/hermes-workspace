@@ -9,7 +9,7 @@ describe('DEFAULT_SLASH_COMMANDS', () => {
     )
 
     expect(plugin).toBeTruthy()
-    expect(plugin?.description).toBe('List installed plugins and their status')
+    expect(plugin?.description).toBe('Список установленных плагинов и их состояние')
   })
 
   it('exposes the core slash commands users expect', () => {
@@ -68,6 +68,6 @@ describe('mergeSlashCommands', () => {
     expect(merged.filter((entry) => entry.command === '/skills')).toHaveLength(1)
     expect(
       merged.find((entry) => entry.command === '/skills')?.description,
-    ).toBe('Browse and manage skills')
+    ).toBe('Просмотр и управление навыками')
   })
 })

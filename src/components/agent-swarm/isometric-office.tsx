@@ -101,7 +101,7 @@ function MeetingTable() {
           )
         })}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[8px] text-slate-500/60">Meeting</span>
+          <span className="text-[8px] text-slate-500/60">Встреча</span>
         </div>
       </div>
     </div>
@@ -323,9 +323,9 @@ function EmptyOffice() {
         >
           🏢
         </motion.span>
-        <p className="mt-2 text-sm text-slate-400">Virtual office is empty</p>
+        <p className="mt-2 text-sm text-slate-400">Виртуальный офис пуст</p>
         <p className="text-xs text-slate-500">
-          Spawn agents to see them work here
+          Запустите агентов, чтобы увидеть их работу здесь
         </p>
       </div>
     </div>
@@ -478,7 +478,7 @@ export function IsometricOffice({ sessions, className }: IsometricOfficeProps) {
       {/* Office info */}
       <div className="absolute bottom-3 left-3 rounded bg-slate-900/80 px-2 py-1 backdrop-blur">
         <span className="text-[9px] font-mono text-accent-400/60">
-          🦞 ClawSuite Office
+          🦞 Офис ClawSuite
         </span>
       </div>
 

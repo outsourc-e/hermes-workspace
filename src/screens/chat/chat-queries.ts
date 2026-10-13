@@ -106,7 +106,7 @@ export function updateHistoryMessages(
   queryClient: QueryClient,
   friendlyId: string,
   sessionKey: string,
-  updater: (messages: Array<ChatMessage>) => Array<ChatMessage>,
+  updater: (messages: Array<ChatMessage>) => Массив<ChatMessage>,
 ) {
   const queryKey = chatQueryKeys.history(friendlyId, sessionKey)
   queryClient.setQueryData(queryKey, function update(data: unknown) {

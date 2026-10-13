@@ -167,7 +167,7 @@ export function ApprovalsPanel({
     setResolvingIds((current) => ({ ...current, [id]: true }))
     try {
       const result = await resolveGatewayApproval(id, action)
-      if (!result.ok) throw new Error('Failed to submit approval response')
+      if (!result.ok) throw new Error('Не удалось отправить ответ на согласование')
       await Promise.all([refreshPending(), refreshHistory()])
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -188,7 +188,7 @@ export function ApprovalsPanel({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
-            Approvals
+            Согласования
           </span>
           {pendingCount > 0 ? (
             <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -196,12 +196,12 @@ export function ApprovalsPanel({
             </span>
           ) : (
             <span className="rounded-full border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
-              All clear
+              Всё в порядке
             </span>
           )}
         </div>
         {pendingCount > 0 && (
-          <span className="text-[10px] text-amber-500 dark:text-amber-400">⚠ Review required</span>
+          <span className="text-[10px] text-amber-500 dark:text-amber-400">⚠ Требуется проверка</span>
         )}
       </div>
 
@@ -216,7 +216,7 @@ export function ApprovalsPanel({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {loading && pending.length === 0 ? (
             <div className="flex h-full items-center justify-center p-8">
-              <p className="text-sm text-neutral-500">Loading approvals...</p>
+              <p className="text-sm text-neutral-500">Загрузка согласований...</p>
             </div>
           ) : null}
 
@@ -227,10 +227,10 @@ export function ApprovalsPanel({
                 <span className="text-2xl">✅</span>
               </div>
               <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                No pending approvals
+                Нет запросов на согласование
               </p>
               <p className="mt-1 text-xs text-neutral-400">
-                Agents are running autonomously
+                Агенты работают автономно
               </p>
             </div>
           </div>
@@ -254,7 +254,7 @@ export function ApprovalsPanel({
         <div className="min-h-0 max-h-64 shrink-0 border-t border-neutral-200 bg-neutral-50/70 dark:border-neutral-800 dark:bg-neutral-900/40">
           <div className="flex items-center justify-between px-4 py-2">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-              History
+              История
             </p>
             <span className="text-[10px] text-neutral-400">
               {mergedHistory.length} recent
@@ -263,7 +263,7 @@ export function ApprovalsPanel({
           <div className="max-h-52 overflow-y-auto px-4 pb-3">
             {mergedHistory.length === 0 ? (
               <p className="py-4 text-center text-xs text-neutral-400">
-                No approval history yet
+                Истории согласований пока нет
               </p>
             ) : (
               <div className="space-y-1.5">

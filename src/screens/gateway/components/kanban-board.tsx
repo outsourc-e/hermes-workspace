@@ -14,17 +14,17 @@ type KanbanColumn = {
 }
 
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { key: 'backlog', label: 'Backlog' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'review', label: 'Review' },
-  { key: 'done', label: 'Done' },
+  { key: 'backlog', label: 'Бэклог' },
+  { key: 'in_progress', label: 'В работе' },
+  { key: 'review', label: 'Ревью' },
+  { key: 'done', label: 'Готово' },
 ]
 
 const COMPACT_COLUMNS: KanbanColumn[] = [
-  { key: 'backlog', label: 'Todo' },
+  { key: 'backlog', label: 'К выполнению' },
   { key: 'in_progress', label: 'WIP' },
-  { key: 'review', label: 'Review' },
-  { key: 'done', label: 'Done' },
+  { key: 'review', label: 'Ревью' },
+  { key: 'done', label: 'Готово' },
 ]
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -262,7 +262,7 @@ export function KanbanBoard({
                 <div className="min-h-[12rem] flex-1 space-y-2 overflow-y-auto p-2.5">
                   {columnTasks.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-[var(--theme-border)] px-3 py-6 text-center text-xs text-[var(--theme-muted)]">
-                      Drop tasks here
+                      Перетащите задачи сюда
                     </p>
                   ) : null}
 
@@ -320,7 +320,7 @@ export function KanbanBoard({
 
                         {onAssignAgent ? (
                           <div className={cn(compact ? 'mt-1.5' : 'mt-2')}>
-                            <label className={cn('mb-1 block font-medium uppercase tracking-wide text-[var(--theme-muted)]', compact ? 'text-[9px]' : 'text-[10px]')}>Assign</label>
+                            <label className={cn('mb-1 block font-medium uppercase tracking-wide text-[var(--theme-muted)]', compact ? 'text-[9px]' : 'text-[10px]')}>Назначить</label>
                             <select
                               value={task.agentId ?? ''}
                               onChange={(event) => {
@@ -338,7 +338,7 @@ export function KanbanBoard({
                                 compact ? 'py-1 text-[10px]' : 'py-1 text-[11px]',
                               )}
                             >
-                              <option value="">Unassigned</option>
+                              <option value="">Не назначено</option>
                               {agents.map((agent) => (
                                 <option key={agent.id} value={agent.id}>{agent.name}</option>
                               ))}
@@ -368,9 +368,9 @@ export function KanbanBoard({
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">Task Actions</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">Действия с задачей</p>
 
-          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Change priority</label>
+          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Изменить приоритет</label>
           <div className="mb-3 grid grid-cols-2 gap-1">
             {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((priority) => (
               <button
@@ -387,7 +387,7 @@ export function KanbanBoard({
             ))}
           </div>
 
-          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Reassign agent</label>
+          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Переназначить агента</label>
           <select
             className="mb-3 w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none"
             defaultValue=""
@@ -401,19 +401,19 @@ export function KanbanBoard({
               setMenuTaskId(null)
             }}
           >
-            <option value="">Unassigned</option>
+            <option value="">Не назначено</option>
             {agents.map((agent) => (
               <option key={agent.id} value={agent.id}>{agent.name}</option>
             ))}
           </select>
 
-          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Add note</label>
+          <label className="mb-1 block text-[11px] text-[var(--theme-muted)]">Добавить заметку</label>
           <textarea
             value={noteDraft}
             onChange={(event) => setNoteDraft(event.target.value)}
             rows={3}
             className="mb-2 w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]"
-            placeholder="Leave a note for this task"
+            placeholder="Оставьте заметку к этой задаче"
           />
           <div className="flex items-center justify-between gap-2">
             <button
@@ -424,7 +424,7 @@ export function KanbanBoard({
               }}
               className="rounded-md border border-red-400/40 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-300 hover:bg-red-500/20"
             >
-              Delete
+              Удалить
             </button>
             <button
               type="button"
@@ -440,7 +440,7 @@ export function KanbanBoard({
               }}
               className="rounded-md bg-accent-500 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Save note
+              Сохранить заметку
             </button>
           </div>
         </div>

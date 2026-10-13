@@ -63,7 +63,7 @@ const MODEL_BADGE: Record<string, string> = {
   flash:         'border border-violet-200 bg-violet-50 text-violet-700',
   'pc1-planner': 'border border-teal-200 bg-teal-50 text-teal-700',
   'pc1-coder':   'border border-purple-200 bg-purple-50 text-purple-700',
-  'pc1-critic':  'border border-indigo-200 bg-indigo-50 text-indigo-700',
+  'pc1-critic':  'border border-[#d0cad9] bg-[#f3f1f6] text-[#573a9b]',
   'pc1-fast':    'border border-slate-200 bg-slate-50 text-slate-700',
   'pc1-heavy':   'border border-cyan-200 bg-cyan-50 text-cyan-700',
   'pc1-fmt':      'border border-zinc-200 bg-zinc-50 text-zinc-700',
@@ -213,7 +213,7 @@ function AgentRow({
               type="button"
               onClick={(e) => { e.stopPropagation(); onRespawn() }}
               className="shrink-0 text-xs text-neutral-500 transition-colors hover:text-neutral-700"
-              title="Respawn agent"
+              title="Перезапустить агента"
             >
               ↻
             </button>
@@ -252,7 +252,7 @@ function AgentRow({
                         }}
                         className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
                       >
-                        Send directive
+                        Отправить указание
                       </button>
                     ) : null}
                     {canSteer && onPause ? (
@@ -273,7 +273,7 @@ function AgentRow({
                       onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onKill() }}
                       className="block w-full rounded-lg px-3 py-2 text-left text-[11px] font-medium text-red-400 transition-colors hover:bg-red-950/20"
                     >
-                      Kill session
+                      Завершить сессию
                     </button>
                   </div>
                 </>
@@ -388,7 +388,7 @@ export function AgentsWorkingPanel({
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
           <h3 className="text-[11px] font-bold uppercase tracking-wider text-neutral-500" style={{ fontVariant: 'small-caps' }}>
-            Agents Working
+            Агенты в работе
           </h3>
           {activeCount > 0 ? (
             <div className="flex items-center gap-1">

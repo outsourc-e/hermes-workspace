@@ -93,7 +93,7 @@ export function AgentChatPanel({
         setError(res.error)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load history')
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить историю')
     } finally {
       setLoading(false)
     }
@@ -196,7 +196,7 @@ export function AgentChatPanel({
       // Reload history to get agent's response
       setTimeout(() => void loadHistory(), 1500)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to send')
+      setError(e instanceof Error ? e.message : 'Не удалось отправить')
     } finally {
       setSending(false)
     }
@@ -261,19 +261,19 @@ export function AgentChatPanel({
         >
           {!sessionKey && (
             <div className="flex items-center justify-center py-12 text-sm text-neutral-500">
-              No active session for this agent. Start a mission first.
+              У этого агента нет активной сессии. Сначала запустите миссию.
             </div>
           )}
 
           {sessionKey && messages.length === 0 && !loading && (
             <div className="flex items-center justify-center py-12 text-sm text-neutral-500">
-              No messages yet. Send one to start a conversation.
+              Сообщений пока нет. Отправьте первое, чтобы начать диалог.
             </div>
           )}
 
           {loading && messages.length === 0 && (
             <div className="flex items-center justify-center py-12 text-sm text-neutral-500">
-              Loading conversation…
+              Загрузка диалога…
             </div>
           )}
 
@@ -327,7 +327,7 @@ export function AgentChatPanel({
                 !sessionKey
                   ? 'No session available…'
                   : isRunning
-                    ? 'Send a directive to the running agent…'
+                    ? 'Отправить указание работающему агенту…'
                     : 'Send a message…'
               }
               disabled={!sessionKey || sending}
@@ -354,8 +354,8 @@ export function AgentChatPanel({
           </div>
           <p className="mt-1.5 text-[10px] text-neutral-400">
             {isRunning
-              ? 'Agent is running. Messages are sent as steering directives.'
-              : 'Agent is idle. Messages start a new conversation turn.'}
+              ? 'Агент работает. Сообщения отправляются как направляющие указания.'
+              : 'Агент простаивает. Сообщение начнёт новый шаг диалога.'}
           </p>
         </div>
       </div>

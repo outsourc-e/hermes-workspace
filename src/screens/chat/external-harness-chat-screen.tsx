@@ -121,7 +121,7 @@ export function ExternalHarnessChatScreen({
               : undefined
           }
           className="flex size-9 items-center justify-center rounded-xl text-primary-600 hover:bg-primary-100"
-          aria-label="Back to command center"
+          aria-label="Назад в центр управления"
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} size={19} />
         </Link>
@@ -149,7 +149,7 @@ export function ExternalHarnessChatScreen({
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 py-6 md:px-6">
           {messagesQuery.isPending ? (
             <div className="flex flex-1 items-center justify-center text-sm text-primary-500">
-              Loading session…
+              Загрузка сессии…
             </div>
           ) : messagesQuery.error instanceof Error ? (
             <div className="m-auto max-w-md rounded-xl border border-red-300 bg-red-500/5 px-4 py-3 text-center text-sm text-red-700">
@@ -193,7 +193,7 @@ export function ExternalHarnessChatScreen({
               {processing && (
                 <div className="flex items-center gap-2 text-xs text-primary-500">
                   <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-                  Agent is working…
+                  Агент работает…
                 </div>
               )}
               <div ref={endRef} />
@@ -204,10 +204,10 @@ export function ExternalHarnessChatScreen({
                 <HugeiconsIcon icon={UserMultipleIcon} size={22} />
               </span>
               <h2 className="mt-4 text-base font-semibold">
-                Start the conversation
+                Начните диалог
               </h2>
               <p className="mt-1 text-sm text-primary-500">
-                This chat is connected directly to the selected agent harness.
+                Этот чат подключён напрямую к выбранной среде агента.
               </p>
             </div>
           )}
@@ -234,7 +234,7 @@ export function ExternalHarnessChatScreen({
             size="icon"
             onClick={submit}
             disabled={!draft.trim() || sendMutation.isPending || !canSend}
-            aria-label="Send message"
+            aria-label="Отправить сообщение"
             className="rounded-xl"
           >
             <HugeiconsIcon icon={SentIcon} size={18} />

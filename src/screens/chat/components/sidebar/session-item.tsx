@@ -117,7 +117,7 @@ function SessionItemComponent({
 
   const subtitle = useMemo(() => {
     if (isError) {
-      return session.titleError || 'Could not generate a title'
+      return session.titleError || 'Не удалось придумать название'
     }
     const parts: Array<string> = []
     const formatted = formatSessionTimestamp(updatedAt)
@@ -177,7 +177,7 @@ function SessionItemComponent({
             'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200 dark:hover:bg-primary-800',
             'aria-expanded:opacity-100 aria-expanded:bg-primary-200',
           )}
-          aria-label="Session options"
+          aria-label="Параметры сессии"
         >
           <HugeiconsIcon
             icon={MoreHorizontalIcon}

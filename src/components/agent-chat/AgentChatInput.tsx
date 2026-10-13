@@ -50,7 +50,7 @@ export function AgentChatInput({
         <textarea
           value={value}
           rows={1}
-          placeholder="Message this agent..."
+          placeholder="Написать этому агенту..."
           disabled={disabled || isSending}
           onChange={function handleChange(event) {
             setValue(event.target.value)
@@ -67,13 +67,13 @@ export function AgentChatInput({
           type="submit"
           disabled={disabled || isSending || value.trim().length === 0}
           className="rounded-xl"
-          aria-label="Send message"
+          aria-label="Отправить сообщение"
         >
           <HugeiconsIcon icon={ArrowUp01Icon} size={20} strokeWidth={1.5} />
         </Button>
       </div>
       <p className="mt-1 px-2 text-[11px] text-primary-700 text-pretty tabular-nums">
-        Enter to send · Shift+Enter for a new line
+        Enter — отправить · Shift+Enter — новая строка
       </p>
     </form>
   )

@@ -37,9 +37,9 @@ export function SessionRenameDialog({
     <DialogRoot open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <div className="p-4">
-          <DialogTitle className="mb-1">Rename</DialogTitle>
+          <DialogTitle className="mb-1">Переименовать</DialogTitle>
           <DialogDescription className="mb-4">
-            Enter a new name for this session.
+            Введите новое название сессии.
           </DialogDescription>
           <input
             type="text"
@@ -52,12 +52,12 @@ export function SessionRenameDialog({
               }
             }}
             className="w-full rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-900 outline-none focus:border-primary-400"
-            placeholder="Session name"
+            placeholder="Название сессии"
             autoFocus
           />
           <div className="mt-4 flex justify-end gap-2">
-            <DialogClose onClick={onCancel}>Cancel</DialogClose>
-            <Button onClick={() => onSave(renameValue)}>Save</Button>
+            <DialogClose onClick={onCancel}>Отмена</DialogClose>
+            <Button onClick={() => onSave(renameValue)}>Сохранить</Button>
           </div>
         </div>
       </DialogContent>

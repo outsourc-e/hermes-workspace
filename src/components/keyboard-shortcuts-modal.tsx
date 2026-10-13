@@ -11,28 +11,28 @@ const MOD = isMac ? '⌘' : 'Ctrl'
 
 const SHORTCUT_GROUPS = [
   {
-    title: 'Navigation',
+    title: 'Навигация',
     items: [
-      { keys: [`${MOD}+K`], label: 'Open Search' },
-      { keys: [`${MOD}+P`], label: 'Quick Open File' },
-      { keys: [`${MOD}+B`], label: 'Toggle Sidebar' },
-      { keys: [`${MOD}+J`], label: 'Toggle Chat Panel' },
-      { keys: [`${MOD}+Shift+L`], label: 'Activity Log' },
-      { keys: ['Ctrl+`'], label: 'Toggle Terminal' },
-      { keys: ['?'], label: 'Keyboard Shortcuts' },
+      { keys: [`${MOD}+K`], label: 'Открыть поиск' },
+      { keys: [`${MOD}+P`], label: 'Быстро открыть файл' },
+      { keys: [`${MOD}+B`], label: 'Показать или скрыть боковую панель' },
+      { keys: [`${MOD}+J`], label: 'Показать или скрыть панель чата' },
+      { keys: [`${MOD}+Shift+L`], label: 'Журнал активности' },
+      { keys: ['Ctrl+`'], label: 'Показать или скрыть терминал' },
+      { keys: ['?'], label: 'Горячие клавиши' },
     ],
   },
   {
-    title: 'Chat',
+    title: 'Чат',
     items: [
-      { keys: ['Enter'], label: 'Send Message' },
-      { keys: ['Shift+Enter'], label: 'New Line' },
-      { keys: ['Escape'], label: 'Close Modal / Cancel' },
+      { keys: ['Enter'], label: 'Отправить сообщение' },
+      { keys: ['Shift+Enter'], label: 'Новая строка' },
+      { keys: ['Escape'], label: 'Закрыть окно / Отмена' },
     ],
   },
   {
-    title: 'Editor',
-    items: [{ keys: [`${MOD}+S`], label: 'Save File' }],
+    title: 'Редактор',
+    items: [{ keys: [`${MOD}+S`], label: 'Сохранить файл' }],
   },
 ]
 
@@ -103,12 +103,12 @@ export function KeyboardShortcutsModal() {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-primary-200 px-5 py-3.5">
               <h2 className="text-sm font-semibold text-primary-900">
-                Keyboard Shortcuts
+                Горячие клавиши
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
                 className="rounded-lg p-1.5 text-primary-500 transition hover:bg-primary-100 hover:text-primary-900"
-                aria-label="Close"
+                aria-label="Закрыть"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path

@@ -127,7 +127,7 @@ function BrailleSpinnerComponent({
   color,
   speed = 100,
   className,
-  label = 'Loading',
+  label = 'Загрузка',
 }: BrailleSpinnerProps) {
   const [frame, setFrame] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)

@@ -45,10 +45,10 @@ export type AgentOutputFilterOption = {
 }
 
 const DEFAULT_FILTERS: AgentOutputFilterOption[] = [
-  { id: 'all', label: 'All', emoji: '📋' },
-  { id: 'ok', label: 'Success', emoji: '✅' },
-  { id: 'error', label: 'Errors', emoji: '❌' },
-  { id: 'running', label: 'Running', emoji: '⏳' },
+  { id: 'all', label: 'Все', emoji: '📋' },
+  { id: 'ok', label: 'Успешно', emoji: '✅' },
+  { id: 'error', label: 'Ошибки', emoji: '❌' },
+  { id: 'running', label: 'Выполняется', emoji: '⏳' },
 ]
 
 export function useAgentOutputs(_filter: AgentOutputFilter) {

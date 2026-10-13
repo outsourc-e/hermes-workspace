@@ -49,16 +49,16 @@ type EventBadge = { label: string; className: string }
 type EventSeverity = 'error' | 'spawn' | 'system' | 'default'
 
 const EVENT_BADGE: Record<FeedEventType, EventBadge> = {
-  mission_started: { label: 'MISSION', className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
-  task_created:    { label: 'TASK',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
-  task_moved:      { label: 'MOVE',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
-  task_completed:  { label: 'DONE',    className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
-  task_assigned:   { label: 'ASSIGN',  className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
-  agent_active:    { label: 'AGENT',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
-  agent_idle:      { label: 'IDLE',    className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700' },
-  agent_paused:    { label: 'PAUSE',   className: 'bg-amber-950/70 text-amber-400 border border-amber-800/50' },
-  agent_spawned:   { label: 'SPAWN',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
-  agent_killed:    { label: 'KILL',    className: 'bg-red-950/70 text-red-400 border border-red-800/50' },
+  mission_started: { label: 'МИССИЯ', className: 'bg-orange-950/70 text-orange-400 border border-orange-800/50' },
+  task_created:    { label: 'ЗАДАЧА',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
+  task_moved:      { label: 'ПЕРЕМЕСТИТЬ',    className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
+  task_completed:  { label: 'ГОТОВО',    className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
+  task_assigned:   { label: 'НАЗНАЧИТЬ',  className: 'bg-cyan-950/70 text-cyan-400 border border-cyan-800/50' },
+  agent_active:    { label: 'АГЕНТ',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
+  agent_idle:      { label: 'ОЖИДАНИЕ',    className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-800 dark:border-neutral-700' },
+  agent_paused:    { label: 'ПАУЗА',   className: 'bg-amber-950/70 text-amber-400 border border-amber-800/50' },
+  agent_spawned:   { label: 'ЗАПУСК',   className: 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' },
+  agent_killed:    { label: 'ЗАВЕРШИТЬ',    className: 'bg-red-950/70 text-red-400 border border-red-800/50' },
   gateway_health:  { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
   system:          { label: 'SYS',     className: 'bg-neutral-100 text-neutral-500 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-600 dark:border-neutral-800' },
 }
@@ -88,7 +88,7 @@ function sessionName(session: SessionRecord): string {
 
 function relativeTime(ts: number, now: number): string {
   const s = Math.max(0, Math.floor((now - ts) / 1000))
-  if (s < 5) return 'just now'
+  if (s < 5) return 'только что'
   if (s < 60) return `${s}s ago`
   if (s < 3600) return `${Math.floor(s / 60)}m ago`
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`
@@ -128,7 +128,7 @@ function severityClass(severity: EventSeverity): string {
 
 function severityBadge(event: FeedRow, severity: EventSeverity): EventBadge {
   if (severity === 'error') {
-    return { label: 'ERROR', className: 'bg-red-950/70 text-red-300 border border-red-800/60' }
+    return { label: 'ОШИБКА', className: 'bg-red-950/70 text-red-300 border border-red-800/60' }
   }
   return EVENT_BADGE[event.type] ?? EVENT_BADGE.system
 }
@@ -147,7 +147,7 @@ function severityTimestampClass(severity: EventSeverity): string {
 }
 
 function placeholderLabel(activeFilter: FilterTab): string {
-  if (activeFilter === 'Activity') return 'No events yet'
+  if (activeFilter === 'Activity') return 'Событий пока нет'
   return `No events yet in ${activeFilter}`
 }
 
@@ -229,7 +229,7 @@ export function LiveFeedPanel() {
   }, [])
 
   useEffect(() => {
-    const emit = () => emitFeedEvent({ type: 'gateway_health', message: 'Gateway health check' })
+    const emit = () => emitFeedEvent({ type: 'gateway_health', message: 'Проверка состояния шлюза' })
     emit()
     const interval = window.setInterval(emit, 30_000)
     return () => window.clearInterval(interval)
@@ -250,7 +250,7 @@ export function LiveFeedPanel() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-2.5 dark:border-neutral-800">
         <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400">
-          Live Feed
+          Прямая лента
         </h2>
         <div className="flex items-center gap-2">
           {events.length > 0 ? (
@@ -259,7 +259,7 @@ export function LiveFeedPanel() {
               onClick={() => setEvents([])}
               className="rounded px-1.5 py-0.5 text-[10px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             >
-              Clear
+              Очистить
             </button>
           ) : null}
           {/* Animated LIVE badge */}

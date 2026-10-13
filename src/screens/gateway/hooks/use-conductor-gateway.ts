@@ -1628,7 +1628,7 @@ export function useConductorGateway() {
       }
 
       if (!result.sessionKey && !result.sessionKeyPrefix && !result.missionId && !result.jobId) {
-        throw new Error(result.error ?? 'Failed to spawn orchestrator')
+        throw new Error(result.error ?? 'Не удалось запустить оркестратор')
       }
 
       const nextMissionId = result.missionId ?? null

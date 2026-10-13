@@ -51,23 +51,23 @@ export const PROVIDER_META: Record<string, {
   border: string
   description: string
 }> = {
-  anthropic:          { label: 'Anthropic',       emoji: '🟠', color: 'text-orange-600 dark:text-orange-400',   bg: 'bg-orange-50 dark:bg-orange-900/20',   border: 'border-orange-300',   description: 'Claude models' },
-  openai:             { label: 'OpenAI',           emoji: '🟢', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-300',  description: 'GPT & o-series' },
-  'openai-codex':     { label: 'OpenAI Codex',     emoji: '🟢', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-300',  description: 'Codex models' },
-  'github-copilot':   { label: 'GitHub Copilot',   emoji: '⚫', color: 'text-neutral-700 dark:text-neutral-300', bg: 'bg-neutral-100 dark:bg-neutral-800',   border: 'border-neutral-400',  description: 'Copilot via GitHub' },
-  google:             { label: 'Google',           emoji: '🔵', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-900/20',       border: 'border-blue-300',     description: 'Gemini models' },
-  'google-antigravity': { label: 'Google AG',      emoji: '🔵', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-900/20',       border: 'border-blue-300',     description: 'Gemini experimental' },
-  deepseek:           { label: 'DeepSeek',         emoji: '🐋', color: 'text-sky-600 dark:text-sky-400',         bg: 'bg-sky-50 dark:bg-sky-900/20',         border: 'border-sky-300',      description: 'DeepSeek R-series' },
-  minimax:            { label: 'MiniMax',          emoji: '🟣', color: 'text-violet-600 dark:text-violet-400',   bg: 'bg-violet-50 dark:bg-violet-900/20',   border: 'border-violet-300',   description: 'M-series models' },
-  openrouter:         { label: 'OpenRouter',       emoji: '🌐', color: 'text-indigo-600 dark:text-indigo-400',   bg: 'bg-indigo-50 dark:bg-indigo-900/20',   border: 'border-indigo-300',   description: 'Multi-provider routing' },
-  mistral:            { label: 'Mistral',          emoji: '🔴', color: 'text-rose-600 dark:text-rose-400',       bg: 'bg-rose-50 dark:bg-rose-900/20',       border: 'border-rose-300',     description: 'Mistral models' },
-  xai:                { label: 'xAI',              emoji: '⚡', color: 'text-neutral-800 dark:text-neutral-100', bg: 'bg-neutral-100 dark:bg-neutral-800',   border: 'border-neutral-400',  description: 'Grok models' },
-  groq:               { label: 'Groq',             emoji: '⚡', color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-900/20',     border: 'border-amber-300',    description: 'Ultra-fast inference' },
-  ollama:             { label: 'Ollama',           emoji: '🦙', color: 'text-teal-600 dark:text-teal-400',       bg: 'bg-teal-50 dark:bg-teal-900/20',       border: 'border-teal-300',     description: 'Local models' },
-  together:           { label: 'Together AI',      emoji: '🤝', color: 'text-pink-600 dark:text-pink-400',       bg: 'bg-pink-50 dark:bg-pink-900/20',       border: 'border-pink-300',     description: 'Together inference' },
-  fireworks:          { label: 'Fireworks',        emoji: '🎆', color: 'text-orange-600 dark:text-orange-400',   bg: 'bg-orange-50 dark:bg-orange-900/20',   border: 'border-orange-300',   description: 'Fast open models' },
-  perplexity:         { label: 'Perplexity',       emoji: '🔮', color: 'text-purple-600 dark:text-purple-400',   bg: 'bg-purple-50 dark:bg-purple-900/20',   border: 'border-purple-300',   description: 'Search-augmented AI' },
-  cohere:             { label: 'Cohere',           emoji: '🌊', color: 'text-cyan-600 dark:text-cyan-400',       bg: 'bg-cyan-50 dark:bg-cyan-900/20',       border: 'border-cyan-300',     description: 'Command R series' },
+  anthropic:          { label: 'Anthropic',       emoji: '🟠', color: 'text-orange-600 dark:text-orange-400',   bg: 'bg-orange-50 dark:bg-orange-900/20',   border: 'border-orange-300',   description: 'Модели Claude' },
+  openai:             { label: 'OpenAI',           emoji: '🟢', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-300',  description: 'GPT и серия o' },
+  'openai-codex':     { label: 'OpenAI Codex',     emoji: '🟢', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-300',  description: 'Модели Codex' },
+  'github-copilot':   { label: 'GitHub Copilot',   emoji: '⚫', color: 'text-neutral-700 dark:text-neutral-300', bg: 'bg-neutral-100 dark:bg-neutral-800',   border: 'border-neutral-400',  description: 'Copilot через GitHub' },
+  google:             { label: 'Google',           emoji: '🔵', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-900/20',       border: 'border-blue-300',     description: 'Модели Gemini' },
+  'google-antigravity': { label: 'Google AG',      emoji: '🔵', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-900/20',       border: 'border-blue-300',     description: 'Gemini (экспериментально)' },
+  deepseek:           { label: 'DeepSeek',         emoji: '🐋', color: 'text-sky-600 dark:text-sky-400',         bg: 'bg-sky-50 dark:bg-sky-900/20',         border: 'border-sky-300',      description: 'Серия DeepSeek R' },
+  minimax:            { label: 'MiniMax',          emoji: '🟣', color: 'text-violet-600 dark:text-violet-400',   bg: 'bg-violet-50 dark:bg-violet-900/20',   border: 'border-violet-300',   description: 'Модели серии M' },
+  openrouter:         { label: 'OpenRouter',       emoji: '🌐', color: 'text-[#6847b8] dark:text-[#a98bf5]',   bg: 'bg-[#f3f1f6] dark:bg-[#2f2352]/20',   border: 'border-[#b79cff]',   description: 'Маршрутизация между провайдерами' },
+  mistral:            { label: 'Mistral',          emoji: '🔴', color: 'text-rose-600 dark:text-rose-400',       bg: 'bg-rose-50 dark:bg-rose-900/20',       border: 'border-rose-300',     description: 'Модели Mistral' },
+  xai:                { label: 'xAI',              emoji: '⚡', color: 'text-neutral-800 dark:text-neutral-100', bg: 'bg-neutral-100 dark:bg-neutral-800',   border: 'border-neutral-400',  description: 'Модели Grok' },
+  groq:               { label: 'Groq',             emoji: '⚡', color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-900/20',     border: 'border-amber-300',    description: 'Сверхбыстрый вывод' },
+  ollama:             { label: 'Ollama',           emoji: '🦙', color: 'text-teal-600 dark:text-teal-400',       bg: 'bg-teal-50 dark:bg-teal-900/20',       border: 'border-teal-300',     description: 'Локальные модели' },
+  together:           { label: 'Together AI',      emoji: '🤝', color: 'text-pink-600 dark:text-pink-400',       bg: 'bg-pink-50 dark:bg-pink-900/20',       border: 'border-pink-300',     description: 'Вывод Together' },
+  fireworks:          { label: 'Fireworks',        emoji: '🎆', color: 'text-orange-600 dark:text-orange-400',   bg: 'bg-orange-50 dark:bg-orange-900/20',   border: 'border-orange-300',   description: 'Быстрые открытые модели' },
+  perplexity:         { label: 'Perplexity',       emoji: '🔮', color: 'text-purple-600 dark:text-purple-400',   bg: 'bg-purple-50 dark:bg-purple-900/20',   border: 'border-purple-300',   description: 'ИИ с поиском' },
+  cohere:             { label: 'Cohere',           emoji: '🌊', color: 'text-cyan-600 dark:text-cyan-400',       bg: 'bg-cyan-50 dark:bg-cyan-900/20',       border: 'border-cyan-300',     description: 'Серия Command R' },
 }
 
 export function getProviderMeta(provider: string) {
@@ -78,7 +78,7 @@ export function getProviderMeta(provider: string) {
     color: 'text-neutral-600 dark:text-neutral-400',
     bg: 'bg-neutral-100 dark:bg-neutral-800',
     border: 'border-neutral-300',
-    description: 'Custom provider',
+    description: 'Свой провайдер',
   }
 }
 
@@ -380,7 +380,7 @@ export function AgentWizardModal({
       <div className="px-6 py-5 space-y-4">
         {/* Row 1: NAME (full width, prominent) */}
         <div>
-          <FieldLabel>Name</FieldLabel>
+          <FieldLabel>Название</FieldLabel>
           <input
             value={member.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
@@ -392,20 +392,20 @@ export function AgentWizardModal({
         {/* Row 2: MODEL (half) + ROLE (half) */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <FieldLabel>Model</FieldLabel>
+            <FieldLabel>Модель</FieldLabel>
             <select value={member.modelId} onChange={(e) => onUpdate({ modelId: e.target.value })} className={SELECT_CLS}>
-              <optgroup label="Presets">
+              <optgroup label="Пресеты">
                 {modelPresets.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
               </optgroup>
               {gatewayModels.length > 0 ? (
-                <optgroup label="Available Models">
+                <optgroup label="Доступные модели">
                   {gatewayModels.map((m) => <option key={m.value} value={m.value}>{m.label} ({m.provider})</option>)}
                 </optgroup>
               ) : null}
             </select>
           </div>
           <div>
-            <FieldLabel>Role</FieldLabel>
+            <FieldLabel>Роль</FieldLabel>
             <input value={member.roleDescription} onChange={(e) => onUpdate({ roleDescription: e.target.value })} className={INPUT_CLS} />
           </div>
         </div>
@@ -413,17 +413,17 @@ export function AgentWizardModal({
         {/* Row 3: Memory Path + Skill Allowlist */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <FieldLabel>Memory Path <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
+            <FieldLabel>Путь к памяти <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
             <input
               value={member.memoryPath ?? ''}
               onChange={(e) => onUpdate({ memoryPath: e.target.value || undefined } as Partial<typeof member>)}
               className={INPUT_CLS}
               placeholder="e.g. ~/workspace/agent-memory"
             />
-            <p className="mt-0.5 text-[9px] text-neutral-400">Custom memory/workspace directory for this agent</p>
+            <p className="mt-0.5 text-[9px] text-neutral-400">Своя папка памяти и рабочего пространства для этого агента</p>
           </div>
           <div>
-            <FieldLabel>Skill Allowlist <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
+            <FieldLabel>Разрешённые навыки <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
             <input
               value={(member.skillAllowlist ?? []).join(', ')}
               onChange={(e) => {
@@ -440,7 +440,7 @@ export function AgentWizardModal({
         {/* System Prompt */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <FieldLabel>System Prompt</FieldLabel>
+            <FieldLabel>Системный промпт</FieldLabel>
             <div className="flex gap-1.5">
               <span className={cn('rounded-md border px-1.5 py-0.5 text-[9px] font-semibold',
                 isCustomPrompt ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
@@ -489,7 +489,7 @@ export function AgentWizardModal({
             onChange={(e) => { onUpdate({ backstory: e.target.value }) }}
             className="mt-2 w-full resize-none rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1 font-mono leading-relaxed overflow-auto"
             style={{ minHeight: 100, maxHeight: 400 }}
-            placeholder="Persona, instructions, and context for this agent..."
+            placeholder="Роль, инструкции и контекст для этого агента..."
           />
         </div>
       </div>
@@ -640,7 +640,7 @@ export function TeamWizardModal({
             type="button"
             onClick={() => setShowIconPicker((v) => !v)}
             className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-700 text-white shadow-md hover:bg-neutral-600 transition-colors"
-            title="Change icon"
+            title="Сменить значок"
           >
             <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
@@ -677,17 +677,17 @@ export function TeamWizardModal({
       <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
         {/* Team name */}
         <div>
-          <FieldLabel>Team Name</FieldLabel>
+          <FieldLabel>Название команды</FieldLabel>
           <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} />
         </div>
 
         {/* Specialty */}
         <div>
-          <FieldLabel>Specialty</FieldLabel>
+          <FieldLabel>Специализация</FieldLabel>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What is this team best at? e.g. Deep research & analysis"
+            placeholder="В чём эта команда сильнее всего? Например: глубокие исследования и анализ"
             className={INPUT_CLS}
           />
         </div>
@@ -697,7 +697,7 @@ export function TeamWizardModal({
           <FieldLabel>TEAM ({localMembers.length} agent{localMembers.length !== 1 ? 's' : ''})</FieldLabel>
           <div className="space-y-1.5">
             {localMembers.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 py-3 text-center text-xs text-neutral-400">No agents yet — add some below</p>
+              <p className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 py-3 text-center text-xs text-neutral-400">Агентов пока нет — добавьте ниже</p>
             ) : localMembers.map((member) => (
               <div key={member.id} className="flex items-center gap-2.5 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2.5">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30 text-[11px] font-bold text-accent-600 dark:text-accent-400">
@@ -705,7 +705,7 @@ export function TeamWizardModal({
                 </div>
                 <p className="min-w-0 flex-1 text-xs font-semibold text-neutral-900 dark:text-white truncate">{member.name}</p>
                 <button type="button" onClick={() => removeAgent(member.id)}
-                  className="flex size-6 items-center justify-center rounded-full text-neutral-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors" title="Remove from team">
+                  className="flex size-6 items-center justify-center rounded-full text-neutral-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors" title="Убрать из команды">
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                 </button>
               </div>
@@ -721,7 +721,7 @@ export function TeamWizardModal({
           <div>
             <div className="flex items-center gap-2 my-1">
               <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">Add Agents</span>
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">Добавить агентов</span>
               <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
             </div>
             <div className="space-y-1.5">
@@ -735,7 +735,7 @@ export function TeamWizardModal({
                     {agent.role ? <p className="text-[10px] text-neutral-400 truncate">{agent.role}</p> : null}
                   </div>
                   <button type="button" onClick={() => addAgent(agent.id)}
-                    className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors" title="Add to team">
+                    className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors" title="Добавить в команду">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                   </button>
                 </div>
@@ -752,7 +752,7 @@ export function TeamWizardModal({
           className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-800/50 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M5 3V2h2v1M4 3v7h4V3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          Delete Team
+          Удалить команду
         </button>
         <button
           type="button"
@@ -864,7 +864,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
           {teamIcon}
         </div>
         <div className="flex-1">
-          <p className="text-base font-bold text-neutral-900 dark:text-white">New Team</p>
+          <p className="text-base font-bold text-neutral-900 dark:text-white">Новая команда</p>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">{stepLabel}</p>
         </div>
         {/* Step dots */}
@@ -883,16 +883,16 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
       {step === 1 ? (
         <>
           <div className="px-6 py-8">
-            <p className="mb-5 text-xl font-bold text-neutral-900 dark:text-white">Name your team</p>
+            <p className="mb-5 text-xl font-bold text-neutral-900 dark:text-white">Назовите команду</p>
             <input
               ref={nameInputRef}
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && teamName.trim() && !e.nativeEvent.isComposing) setStep(2) }}
-              placeholder="e.g. Research Squad, Dev Team..."
+              placeholder="Например: Группа исследований, Команда разработки..."
               className="h-11 w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-2 transition-colors"
             />
-            <p className="mt-2 text-xs text-neutral-400 dark:text-neutral-500">You can change this later</p>
+            <p className="mt-2 text-xs text-neutral-400 dark:text-neutral-500">Это можно изменить позже</p>
           </div>
           <div className="flex justify-end border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
             <button
@@ -901,7 +901,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               disabled={!teamName.trim()}
               className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 disabled:opacity-40 transition-colors"
             >
-              Next →
+              Далее →
             </button>
           </div>
         </>
@@ -911,7 +911,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
       {step === 2 ? (
         <>
           <div className="px-6 py-6">
-            <p className="mb-4 text-xl font-bold text-neutral-900 dark:text-white">Choose a picture</p>
+            <p className="mb-4 text-xl font-bold text-neutral-900 dark:text-white">Выберите изображение</p>
             <div className="grid grid-cols-6 gap-2">
               {INLINE_TEAM_ICONS.map((ic) => (
                 <button
@@ -943,7 +943,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               onClick={() => setStep(3)}
               className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
             >
-              Next →
+              Далее →
             </button>
           </div>
         </>
@@ -955,7 +955,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
           <div className="px-6 py-5 max-h-[65vh] overflow-y-auto space-y-4">
             {/* Templates section */}
             <div>
-              <p className="mb-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Start from a template</p>
+              <p className="mb-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Начать с шаблона</p>
               <div className="grid grid-cols-2 gap-2">
                 {quickStartTemplates.map((tpl) => (
                   <button
@@ -995,14 +995,14 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
             {/* Agent checklist */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <FieldLabel>Agents to Include</FieldLabel>
+                <FieldLabel>Включить агентов</FieldLabel>
                 <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
                   {selectedAgents.size} of {currentTeam.length} selected
                 </span>
               </div>
               <div className="space-y-1.5">
                 {currentTeam.length === 0 ? (
-                  <p className="text-center text-xs text-neutral-400 py-3">No agents configured yet</p>
+                  <p className="text-center text-xs text-neutral-400 py-3">Агенты ещё не настроены</p>
                 ) : currentTeam.map((m) => {
                   const checked = selectedAgents.has(m.id)
                   const modelParts = m.modelId.split('/')
@@ -1036,7 +1036,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                   )
                 })}
                 {selectedAgents.size === 0 ? (
-                  <p className="text-[10px] text-red-500 text-center pt-1">Select at least one agent</p>
+                  <p className="text-[10px] text-red-500 text-center pt-1">Выберите хотя бы одного агента</p>
                 ) : null}
               </div>
             </div>
@@ -1056,7 +1056,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               disabled={!canCreate}
               className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 disabled:opacity-50 transition-colors"
             >
-              Create Team
+              Создать команду
             </button>
           </div>
         </>
@@ -1110,7 +1110,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
         {/* Current models list */}
         {currentModels.length > 0 ? (
           <div>
-            <FieldLabel>Available Models</FieldLabel>
+            <FieldLabel>Доступные модели</FieldLabel>
             <div className="rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 p-2 max-h-36 overflow-y-auto">
               {currentModels.map((m) => (
                 <div key={m.value} className="flex items-center gap-2 px-1 py-1">
@@ -1137,7 +1137,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
                 ) : null}
               </FieldLabel>
               <select value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} className={SELECT_CLS}>
-                <option value="">Use gateway default</option>
+                <option value="">Использовать значение шлюза</option>
                 {combined.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
@@ -1154,7 +1154,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="New API key…"
+            placeholder="Новый API-ключ…"
             className={cn(INPUT_CLS, 'font-mono')}
           />
         </div>
@@ -1168,21 +1168,21 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
               onClick={() => void onDelete()}
               className="rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 transition-colors"
             >
-              Remove Provider
+              Удалить провайдера
             </button>
           ) : null}
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={onClose}
             className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
-            Cancel
+            Отмена
           </button>
           <button
             type="button"
             onClick={() => { onSave(apiKey, defaultModel); onClose() }}
             className="rounded-lg bg-accent-500 px-5 py-2 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
           >
-            Update Provider
+            Обновить провайдера
           </button>
         </div>
       </div>

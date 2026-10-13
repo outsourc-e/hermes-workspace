@@ -323,7 +323,7 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
             type="button"
             onClick={() => stepCursor(-1)}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-primary-800 text-primary-200 transition-colors hover:bg-primary-900"
-            aria-label="Previous"
+            aria-label="Назад"
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.7} />
           </button>
@@ -332,7 +332,7 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
             type="button"
             onClick={() => stepCursor(1)}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-primary-800 text-primary-200 transition-colors hover:bg-primary-900"
-            aria-label="Next"
+            aria-label="Далее"
           >
             <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.7} />
           </button>
@@ -430,7 +430,7 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
           >
             <div className="min-w-[760px] rounded-lg border border-primary-800">
               <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-primary-800 bg-primary-900/50">
-                <div className="border-r border-primary-800 p-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400">Time</div>
+                <div className="border-r border-primary-800 p-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400">Время</div>
                 {weekRange.days.map((day) => (
                   <div key={getDayKey(day)} className={cn('border-r border-primary-800 p-2 text-center text-xs font-semibold last:border-r-0', isSameDay(day, today) ? 'text-accent-300' : 'text-primary-200')}>
                     {WEEKDAY_LABELS[day.getDay()]} {day.getDate()}

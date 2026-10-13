@@ -15,13 +15,13 @@ const DEMO_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'tpl-code-review',
     name: 'Code Review',
-    description: 'Review codebase for bugs, performance issues, and code quality',
+    description: 'Проверить код на ошибки, проблемы производительности и качество',
     icon: '🔍',
     goal: 'Review the codebase for bugs, performance issues, and code quality',
     tasks: [
-      { title: 'Analyze architecture and key code paths' },
-      { title: 'Identify defects and performance bottlenecks' },
-      { title: 'Summarize prioritized findings' },
+      { title: 'Проанализировать архитектуру и ключевые участки кода' },
+      { title: 'Найти дефекты и узкие места производительности' },
+      { title: 'Подвести итоги по приоритетам' },
     ],
     createdAt: 0,
     updatedAt: 0,
@@ -30,13 +30,13 @@ const DEMO_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'tpl-feature-build',
     name: 'Feature Build',
-    description: 'Plan and implement a new feature end-to-end',
+    description: 'Спланировать и реализовать новую функцию целиком',
     icon: '🏗️',
     goal: 'Plan, implement, test, and document the new feature',
     tasks: [
-      { title: 'Break the feature into implementation steps' },
-      { title: 'Build and integrate the feature' },
-      { title: 'Validate behavior and document changes' },
+      { title: 'Разбить функцию на шаги реализации' },
+      { title: 'Реализовать и встроить функцию' },
+      { title: 'Проверить поведение и задокументировать изменения' },
     ],
     createdAt: 0,
     updatedAt: 0,
@@ -45,13 +45,13 @@ const DEMO_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'tpl-audit',
     name: 'Security Audit',
-    description: 'Audit codebase for security risks and mitigations',
+    description: 'Аудит кода: риски безопасности и меры защиты',
     icon: '🛡️',
     goal: 'Perform a security audit: check dependencies, secrets exposure, input validation',
     tasks: [
-      { title: 'Audit dependencies and known vulnerabilities' },
-      { title: 'Scan for exposed secrets and credentials' },
-      { title: 'Review input validation and sanitization paths' },
+      { title: 'Аудит зависимостей и известных уязвимостей' },
+      { title: 'Найти открытые секреты и учётные данные' },
+      { title: 'Проверить пути валидации и очистки входных данных' },
     ],
     createdAt: 0,
     updatedAt: 0,
@@ -90,7 +90,7 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
       <div className="w-full max-w-lg rounded-2xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4 dark:border-neutral-700">
           <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
-            Mission Templates
+            Шаблоны миссий
           </h2>
           <button
             type="button"
@@ -106,7 +106,7 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search templates..."
+            placeholder="Поиск шаблонов..."
             className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
             autoFocus
           />
@@ -116,7 +116,7 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
           {builtIn.length > 0 && (
             <>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-                Built-in
+                Встроенные
               </p>
               <div className="grid gap-2">
                 {builtIn.map((template) => (
@@ -133,7 +133,7 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
           {custom.length > 0 && (
             <>
               <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-                Custom
+                Своё
               </p>
               <div className="grid gap-2">
                 {custom.map((template) => (
@@ -153,7 +153,7 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
 
           {filtered.length === 0 && (
             <p className="py-8 text-center text-sm text-neutral-400">
-              No templates found
+              Шаблоны не найдены
             </p>
           )}
         </div>

@@ -170,7 +170,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       {
         id: 'screen-chat',
         group: 'Screens',
-        label: 'Chat',
+        label: 'Чат',
         keywords: 'conversation new session home',
         shortcut: 'Go',
         icon: Chat01Icon,
@@ -179,7 +179,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       {
         id: 'screen-files',
         group: 'Screens',
-        label: 'Files',
+        label: 'Файлы',
         keywords: 'workspace editor browser',
         shortcut: 'Go',
         icon: File01Icon,
@@ -188,7 +188,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       {
         id: 'screen-terminal',
         group: 'Screens',
-        label: 'Terminal',
+        label: 'Терминал',
         keywords: 'console shell command line',
         shortcut: 'Go',
         icon: CommandLineIcon,
@@ -197,7 +197,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       {
         id: 'screen-memory',
         group: 'Screens',
-        label: 'Memory',
+        label: 'Память',
         keywords: 'knowledge durable memory notes',
         shortcut: 'Go',
         icon: BrainIcon,
@@ -206,7 +206,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       {
         id: 'screen-skills',
         group: 'Screens',
-        label: 'Skills',
+        label: 'Навыки',
         keywords: 'install tools capabilities',
         shortcut: 'Go',
         icon: PuzzleIcon,
@@ -224,7 +224,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
       {
         id: 'screen-settings',
         group: 'Screens',
-        label: 'Settings',
+        label: 'Настройки',
         keywords: 'preferences configuration',
         shortcut: 'Go',
         icon: Settings01Icon,
@@ -449,7 +449,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
           onValueChange={setQuery}
           mode="none"
         >
-          <CommandInput placeholder="Search screens, sessions, and commands" />
+          <CommandInput placeholder="Поиск экранов, сессий и команд" />
           <CommandPanel className="flex min-h-0 flex-1 flex-col">
             {groupedActions.length === 0 ? (
               <div className="flex h-72 items-center justify-center text-sm text-primary-600">
@@ -522,20 +522,20 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
                     strokeWidth={1.5}
                   />
                 </span>
-                <span>Navigate</span>
+                <span>Навигация</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-md border border-primary-200 bg-surface px-2 py-1 text-[11px] font-medium text-primary-700">
-                  Enter
+                  Ввод
                 </span>
-                <span>Select</span>
+                <span>Выбрать</span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-primary-700">
               <span className="rounded-md border border-primary-200 bg-surface px-2 py-1 text-[11px] font-medium text-primary-700">
                 {isMacPlatform ? '⌘K' : 'Ctrl K'}
               </span>
-              <span>Toggle</span>
+              <span>Переключить</span>
             </div>
           </CommandFooter>
         </Command>

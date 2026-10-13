@@ -733,7 +733,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Out
+                Выход
               </span>
               <span>{formatTokens(usage.outputTokens)}</span>
             </div>
@@ -745,7 +745,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Cost
+                Стоимость
               </span>
               <span>{formatCurrency(usage.dailyCost)}</span>
             </div>
@@ -806,7 +806,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
           )
         }
         return (
-          <span className="text-[10px] text-primary-500">No provider data</span>
+          <span className="text-[10px] text-primary-500">Нет данных о провайдерах</span>
         )
       }
 
@@ -839,7 +839,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         return (
           <div className="flex items-center gap-1">
             <span className="text-[10px] uppercase tracking-wide text-primary-600">
-              Total
+              Итого
             </span>
             <span>{formatCurrency(usage.dailyCost)}</span>
           </div>
@@ -851,19 +851,19 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
           <>
             <div className="flex items-center gap-1">
               <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Active
+                Активно
               </span>
               <span>{agentActivity.activeAgents}</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Spawned
+                Запущено
               </span>
               <span>{agentActivity.totalSpawned}</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[10px] uppercase tracking-wide text-primary-600">
-                Cost
+                Стоимость
               </span>
               <span>{formatCurrency(agentActivity.totalAgentCost)}</span>
             </div>
@@ -908,7 +908,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
               </MenuItem>
             ))}
             <div className="my-1 h-px bg-primary-100" />
-            <MenuItem onClick={() => setOpen(true)}>View Details…</MenuItem>
+            <MenuItem onClick={() => setOpen(true)}>Подробнее…</MenuItem>
           </MenuContent>
         </MenuRoot>
       ) : null}

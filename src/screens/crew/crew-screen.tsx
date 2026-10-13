@@ -52,7 +52,7 @@ function formatRelativeTime(unixSeconds: number | null): string {
 function formatUpdatedAgo(fetchedAt: number | null): string {
   if (!fetchedAt) return ''
   const diffSec = Math.floor((Date.now() - fetchedAt) / 1000)
-  if (diffSec < 5) return 'just now'
+  if (diffSec < 5) return 'только что'
   if (diffSec < 60) return `${diffSec}s ago`
   return `${Math.floor(diffSec / 60)}m ago`
 }
@@ -176,7 +176,7 @@ function AgentCard({ member }: { member: CrewMember }) {
         {/* Last active */}
         <div>
           <p className="text-[11px] text-[var(--theme-muted)]">
-            Last active: <span className="text-[var(--theme-text)]">{formatRelativeTime(member.lastSessionAt)}</span>
+            Последняя активность: <span className="text-[var(--theme-text)]">{formatRelativeTime(member.lastSessionAt)}</span>
           </p>
           {member.lastSessionTitle && (
             <p className="text-[11px] text-[var(--theme-muted)] italic truncate mt-0.5">
@@ -188,9 +188,9 @@ function AgentCard({ member }: { member: CrewMember }) {
         {/* Stats grid */}
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: 'Sessions', value: formatNumber(member.sessionCount) },
-            { label: 'Messages', value: formatNumber(member.messageCount) },
-            { label: 'Tools',    value: formatNumber(member.toolCallCount) },
+            { label: 'Сессии', value: formatNumber(member.sessionCount) },
+            { label: 'Сообщения', value: formatNumber(member.messageCount) },
+            { label: 'Инструменты',    value: formatNumber(member.toolCallCount) },
           ].map(({ label, value }) => (
             <div
               key={label}
@@ -233,7 +233,7 @@ function AgentCard({ member }: { member: CrewMember }) {
             className="flex items-center gap-1 text-[11px] text-[var(--theme-muted)] hover:text-[#B87333] hover:bg-[var(--theme-hover)] px-2 py-1 rounded transition-colors -ml-2"
           >
             <HugeiconsIcon icon={CheckListIcon} size={12} />
-            Tasks
+            Задачи
           </button>
           <button
             type="button"
@@ -241,7 +241,7 @@ function AgentCard({ member }: { member: CrewMember }) {
             className="flex items-center gap-1 text-[11px] text-[var(--theme-muted)] hover:text-[#B87333] hover:bg-[var(--theme-hover)] px-2 py-1 rounded transition-colors -mr-2"
           >
             <HugeiconsIcon icon={Clock01Icon} size={12} />
-            Cron Jobs
+            Cron-задания
           </button>
         </div>
       </div>
@@ -303,10 +303,10 @@ export function CrewScreen() {
                 className="text-2xl font-bold tracking-[0.18em] uppercase"
                 style={{ color: '#f59e0b' }}
               >
-                Crew Status
+                Состояние команды
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-muted)]">
-                Live agent health across profiles, recent session activity, assigned tasks, and cron coverage.
+                Состояние агентов по профилям, недавняя активность сессий, назначенные задачи и покрытие cron.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.18em]">
@@ -344,7 +344,7 @@ export function CrewScreen() {
               size={13}
               className={isLoading ? 'animate-spin' : ''}
             />
-            Refresh manifest
+            Обновить манифест
           </button>
         </div>
         <div className="h-px" style={{ background: 'linear-gradient(to right, #B87333, transparent)' }} />
@@ -359,7 +359,7 @@ export function CrewScreen() {
             onClick={handleRefresh}
             className="underline hover:text-red-300"
           >
-            Retry
+            Повторить
           </button>
         </div>
       )}

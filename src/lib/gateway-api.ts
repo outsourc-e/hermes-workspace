@@ -510,7 +510,7 @@ export async function toggleAgentPause(
       const message =
         typeof payload.error === 'string' && payload.error.trim().length > 0
           ? payload.error
-          : response.statusText || 'Failed to update pause state'
+          : response.statusText || 'Не удалось изменить состояние паузы'
       throw new Error(message)
     }
 

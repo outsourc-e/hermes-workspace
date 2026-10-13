@@ -333,7 +333,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 className="text-[13px] font-medium select-none"
                 style={{ color: 'var(--theme-accent, #B98A44)' }}
               >
-                Hermes
+                Агент
               </span>
             </div>
             {/* Right spacer to balance */}
@@ -404,7 +404,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               }}
             >
               {isMobile && isOnTerminalRoute && (
-                <MobilePageHeader title="Terminal" />
+                <MobilePageHeader title="Терминал" />
               )}
               <div className="flex-1 min-h-0 overflow-hidden">
                 <Suspense fallback={null}>
@@ -453,7 +453,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         {showDesktopSidebarBackdrop ? (
           <button
             type="button"
-            aria-label="Collapse navigation sidebar"
+            aria-label="Свернуть боковую навигацию"
             onClick={() => setSidebarCollapsed(true)}
             className={DESKTOP_SIDEBAR_BACKDROP_CLASS}
           />

@@ -1,5 +1,5 @@
 export const MODEL_SWITCH_BLOCKED_TOAST =
-  'Model switching requires the enhanced runtime. Set a default via `claude config set model <id>` — the displayed model reflects your config.'
+  'Для смены модели нужна расширенная среда выполнения. Задайте модель по умолчанию в конфигурации — отображается модель из неё.'
 
 export type ZeroForkModelInfoFlags = {
   vanillaAgent: boolean

@@ -20,14 +20,14 @@ export const THEMES: Array<{
 }> = [
   {
     id: 'claude-nous',
-    label: 'Nous',
-    description: 'Deep teal background, cream accent — matches Nous Research chrome',
+    label: 'AWG',
+    description: 'Тёмная тема AWG GPT — графит и фиолетовый акцент',
     icon: '◱',
   },
   {
     id: 'claude-nous-light',
-    label: 'Nous Light',
-    description: 'Cold paper white with restrained cobalt framing',
+    label: 'AWG Light',
+    description: 'Светлая тема AWG GPT — светлый фон и фиолетовый акцент',
     icon: '◲',
   },
   {
@@ -44,15 +44,15 @@ export const THEMES: Array<{
   },
   {
     id: 'claude-official',
-    label: 'Hermes',
-    description: 'Navy and indigo flagship theme',
-    icon: '⚕',
+    label: 'Navy',
+    description: 'Navy and indigo theme',
+    icon: '◆',
   },
   {
     id: 'claude-official-light',
-    label: 'Hermes Light',
+    label: 'Navy Light',
     description: 'Editorial paper white with muted cobalt accents',
-    icon: '⚕',
+    icon: '◆',
   },
   {
     id: 'claude-classic',

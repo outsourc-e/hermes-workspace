@@ -74,7 +74,7 @@ export function useAddHubSource() {
       })
       const body = await res.json() as { ok: boolean; sources?: HubSourceEntry[]; errors?: MutationError[] }
       if (!body.ok) {
-        throw { errors: body.errors ?? [{ path: '', message: 'Unknown error' }] }
+        throw { errors: body.errors ?? [{ path: '', message: 'Неизвестная ошибка' }] }
       }
       return { ok: true, sources: body.sources ?? [] }
     },
@@ -100,7 +100,7 @@ export function useUpdateHubSource() {
       })
       const body = await res.json() as { ok: boolean; sources?: HubSourceEntry[]; errors?: MutationError[] }
       if (!body.ok) {
-        throw { errors: body.errors ?? [{ path: '', message: 'Unknown error' }] }
+        throw { errors: body.errors ?? [{ path: '', message: 'Неизвестная ошибка' }] }
       }
       return { ok: true, sources: body.sources ?? [] }
     },
@@ -124,7 +124,7 @@ export function useDeleteHubSource() {
       })
       const body = await res.json() as { ok: boolean; sources?: HubSourceEntry[]; errors?: MutationError[] }
       if (!body.ok) {
-        throw { errors: body.errors ?? [{ path: '', message: 'Unknown error' }] }
+        throw { errors: body.errors ?? [{ path: '', message: 'Неизвестная ошибка' }] }
       }
       return { ok: true, sources: body.sources ?? [] }
     },

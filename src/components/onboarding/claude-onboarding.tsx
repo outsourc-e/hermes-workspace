@@ -118,11 +118,11 @@ function getEnhancedFeatureNames(
 ): Array<string> {
   if (!capabilities) return []
   const features: Array<{ enabled?: boolean; label: string }> = [
-    { enabled: capabilities.sessions, label: 'Sessions' },
-    { enabled: capabilities.skills, label: 'Skills' },
-    { enabled: capabilities.memory, label: 'Memory' },
-    { enabled: capabilities.config, label: 'In-app config' },
-    { enabled: capabilities.jobs, label: 'Jobs' },
+    { enabled: capabilities.sessions, label: 'Сессии' },
+    { enabled: capabilities.skills, label: 'Навыки' },
+    { enabled: capabilities.memory, label: 'Память' },
+    { enabled: capabilities.config, label: 'Настройки в приложении' },
+    { enabled: capabilities.jobs, label: 'Задания' },
   ]
 
   return features
@@ -240,7 +240,7 @@ export function ClaudeOnboarding() {
         setBackendStatus('ready')
         setBackendMessage(
           data.capabilities.sessions
-            ? 'Backend connected. Core chat works, and Hermes Agent gateway enhancements are available.'
+            ? 'Backend connected. Core chat works, and AWG GPT gateway enhancements are available.'
             : 'Backend connected. Core chat is ready.',
         )
         return
@@ -260,7 +260,7 @@ export function ClaudeOnboarding() {
       setBackendInfo(null)
       setBackendStatus('error')
       setBackendMessage(
-        err instanceof Error ? err.message : 'Connection check failed',
+        err instanceof Error ? err.message : 'Проверка подключения не пройдена',
       )
     }
   }, [])
@@ -298,7 +298,7 @@ export function ClaudeOnboarding() {
       await loadModels()
       return true
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save')
+      setSaveError(err instanceof Error ? err.message : 'Не удалось сохранить')
       return false
     } finally {
       setSaving(false)
@@ -333,7 +333,7 @@ export function ClaudeOnboarding() {
       if (!res.ok) throw new Error(`Save failed: ${res.status}`)
       return true
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save model')
+      setSaveError(err instanceof Error ? err.message : 'Не удалось сохранить модель')
       return false
     }
   }, [canEditConfig, configuredModel, selectedModel, selectedProvider])
@@ -350,7 +350,7 @@ export function ClaudeOnboarding() {
           sessionKey: 'new',
           friendlyId: 'new',
           message:
-            'Reply with one short sentence confirming the backend connection works.',
+            'Ответь одним коротким предложением, подтверждающим, что подключение к бэкенду работает.',
         }),
       })
 
@@ -377,7 +377,7 @@ export function ClaudeOnboarding() {
       setTestStatus('success')
       void checkBackend()
     } catch (err) {
-      setTestMessage(err instanceof Error ? err.message : 'Connection failed')
+      setTestMessage(err instanceof Error ? err.message : 'Не удалось подключиться')
       setTestStatus('error')
     }
   }, [checkBackend])
@@ -401,7 +401,7 @@ export function ClaudeOnboarding() {
       }
 
       if (!res.ok || data.error) {
-        setOauthError(data.error || 'Failed to start OAuth')
+        setOauthError(data.error || 'Не удалось начать OAuth')
         setOauthStep('error')
         return
       }
@@ -447,7 +447,7 @@ export function ClaudeOnboarding() {
       }, intervalMs)
     } catch (err) {
       setOauthError(
-        err instanceof Error ? err.message : 'Failed to start OAuth',
+        err instanceof Error ? err.message : 'Не удалось начать OAuth',
       )
       setOauthStep('error')
     }
@@ -522,16 +522,15 @@ export function ClaudeOnboarding() {
             <div className="space-y-4 text-center">
               <img
                 src="/claude-avatar.webp"
-                alt="Hermes Agent"
+                alt="AWG GPT"
                 className="mx-auto size-20 rounded-2xl"
                 style={{
                   filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.3))',
                 }}
               />
-              <h2 className="text-xl font-bold">Welcome to Hermes Workspace</h2>
+              <h2 className="text-xl font-bold">Добро пожаловать в AWG GPT</h2>
               <p className="text-sm" style={mutedStyle}>
-                Works with any OpenAI-compatible backend. Hermes Agent gateway APIs
-                unlock sessions, memory, skills, and other extras automatically.
+                Работает с любым OpenAI-совместимым бэкендом. API шлюза AWG GPT автоматически открывает сессии, память, навыки и другие возможности.
               </p>
               <button
                 onClick={() => {
@@ -540,10 +539,10 @@ export function ClaudeOnboarding() {
                 }}
                 className="w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
               >
-                Connect Backend
+                Подключить бэкенд
               </button>
               <button onClick={complete} className="text-xs" style={mutedStyle}>
-                Skip setup
+                Пропустить настройку
               </button>
             </div>
           )}
@@ -551,10 +550,9 @@ export function ClaudeOnboarding() {
           {step === 'connect' && (
             <div className="space-y-4 text-center">
               <div className="text-4xl">🔌</div>
-              <h2 className="text-lg font-bold">Connect Your Backend</h2>
+              <h2 className="text-lg font-bold">Подключите бэкенд</h2>
               <p className="text-sm" style={mutedStyle}>
-                Start by verifying that Hermes Workspace can reach your
-                OpenAI-compatible backend.
+                Для начала проверьте, что AWG GPT может подключиться к вашему OpenAI-совместимому бэкенду.
               </p>
 
               {backendStatus === 'checking' && (
@@ -563,7 +561,7 @@ export function ClaudeOnboarding() {
                   style={mutedStyle}
                 >
                   <span className="size-2 animate-pulse rounded-full bg-accent-500" />
-                  Checking backend capabilities...
+                  Проверяю возможности бэкенда...
                 </div>
               )}
 
@@ -577,7 +575,7 @@ export function ClaudeOnboarding() {
                     className="rounded-xl p-3 text-left text-xs"
                     style={cardStyle}
                   >
-                    <p style={mutedStyle}>Backend URL</p>
+                    <p style={mutedStyle}>URL бэкенда</p>
                     <p className="mt-1 font-mono">
                       {backendInfo?.claudeUrl || 'Configured automatically'}
                     </p>
@@ -596,12 +594,12 @@ export function ClaudeOnboarding() {
                     style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}
                   >
                     <p className="font-medium text-white">
-                      Compatible backends
+                      Совместимые бэкенды
                     </p>
                     <p className="mt-2" style={mutedStyle}>
                       Use any backend that exposes{' '}
-                      <code>/v1/chat/completions</code>. If you point Hermes Agent
-                      Workspace at a Hermes Agent gateway, enhanced features unlock
+                      <code>/v1/chat/completions</code>. If you point AWG GPT
+                      Workspace at a AWG GPT gateway, enhanced features unlock
                       automatically.
                     </p>
                     <div
@@ -626,7 +624,7 @@ export function ClaudeOnboarding() {
                   className="flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors"
                   style={{ borderColor: 'var(--theme-border)' }}
                 >
-                  Retry
+                  Повторить
                 </button>
                 <button
                   onClick={() => {
@@ -636,7 +634,7 @@ export function ClaudeOnboarding() {
                   disabled={backendStatus !== 'ready'}
                   className="flex-1 rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
                 >
-                  Continue
+                  Продолжить
                 </button>
               </div>
             </div>
@@ -645,19 +643,19 @@ export function ClaudeOnboarding() {
           {step === 'provider' && (
             <div className="space-y-4">
               <h2 className="text-center text-lg font-bold">
-                Choose Provider and Model
+                Выберите провайдера и модель
               </h2>
               <p className="text-center text-xs" style={mutedStyle}>
                 {canEditConfig
                   ? 'Save provider settings here, then choose a model before testing chat.'
-                  : 'This backend manages provider settings outside Hermes Workspace. Confirm the model you expect to use, then test chat.'}
+                  : 'Этот бэкенд управляет настройками провайдера отдельно от AWG GPT. Проверьте нужную модель и протестируйте чат.'}
               </p>
 
               <div className="rounded-xl p-3 text-xs" style={cardStyle}>
-                <p style={mutedStyle}>Backend mode</p>
+                <p style={mutedStyle}>Режим бэкенда</p>
                 <p className="mt-1">
                   {backendInfo?.capabilities?.sessions
-                    ? 'Hermes Agent gateway detected'
+                    ? 'AWG GPT gateway detected'
                     : 'Portable OpenAI-compatible backend'}
                 </p>
                 {configuredModel ? (
@@ -732,7 +730,7 @@ export function ClaudeOnboarding() {
                         onClick={startNousOAuth}
                         className="w-full rounded-lg bg-accent-500 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
                       >
-                        Connect with Nous Portal
+                        Подключиться через Nous Portal
                       </button>
                     )}
                     {oauthStep === 'loading' && (
@@ -741,7 +739,7 @@ export function ClaudeOnboarding() {
                         style={mutedStyle}
                       >
                         <span className="size-2 animate-pulse rounded-full bg-accent-500" />
-                        Starting OAuth flow...
+                        Запускаю OAuth...
                       </div>
                     )}
                     {oauthStep === 'waiting' && (
@@ -751,12 +749,12 @@ export function ClaudeOnboarding() {
                           style={mutedStyle}
                         >
                           <span className="size-2 animate-pulse rounded-full bg-yellow-400" />
-                          Waiting for approval...
+                          Ожидание согласования...
                         </div>
                         {oauthUserCode ? (
                           <div className="space-y-1 text-center">
                             <p className="text-xs" style={mutedStyle}>
-                              Your code
+                              Ваш код
                             </p>
                             <p className="text-2xl font-mono font-bold tracking-widest">
                               {oauthUserCode}
@@ -771,7 +769,7 @@ export function ClaudeOnboarding() {
                             className="w-full rounded-lg border py-2 text-xs font-medium"
                             style={{ borderColor: 'var(--theme-border)' }}
                           >
-                            Open Nous Portal ↗
+                            Открыть Nous Portal ↗
                           </button>
                         ) : null}
                       </div>
@@ -779,7 +777,7 @@ export function ClaudeOnboarding() {
                     {oauthStep === 'success' && (
                       <div className="flex items-center gap-2 text-sm text-green-500">
                         <span>✓</span>
-                        <span>Authenticated successfully.</span>
+                        <span>Аутентификация выполнена.</span>
                       </div>
                     )}
                     {oauthStep === 'error' && (
@@ -791,7 +789,7 @@ export function ClaudeOnboarding() {
                           onClick={startNousOAuth}
                           className="w-full rounded-lg bg-accent-500 py-2 text-xs font-medium text-white"
                         >
-                          Retry
+                          Повторить
                         </button>
                       </div>
                     )}
@@ -806,7 +804,7 @@ export function ClaudeOnboarding() {
                     className="space-y-2 rounded-xl p-4 text-left"
                     style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}
                   >
-                    <p className="text-sm font-medium">Run in your terminal</p>
+                    <p className="text-sm font-medium">Выполните в терминале</p>
                     <div
                       className="rounded-lg px-3 py-2 font-mono text-xs"
                       style={{ background: 'rgba(0,0,0,0.2)' }}
@@ -814,8 +812,7 @@ export function ClaudeOnboarding() {
                       claude auth login openai-codex
                     </div>
                     <p className="text-xs" style={mutedStyle}>
-                      After the login flow completes, click below to refresh
-                      provider settings.
+                      После входа нажмите ниже, чтобы обновить настройки провайдера.
                     </p>
                     <button
                       onClick={async () => {
@@ -865,7 +862,7 @@ export function ClaudeOnboarding() {
                         className="mb-1 block text-xs font-medium"
                         style={mutedStyle}
                       >
-                        API Key
+                        API-ключ
                       </label>
                       <input
                         type="password"
@@ -885,7 +882,7 @@ export function ClaudeOnboarding() {
                   className="mb-1 block text-xs font-medium"
                   style={mutedStyle}
                 >
-                  Model
+                  Модель
                 </label>
                 {availableModels.length > 0 ? (
                   <select
@@ -914,16 +911,14 @@ export function ClaudeOnboarding() {
                 )}
                 <p className="mt-2 text-xs" style={mutedStyle}>
                   {canFetchModels
-                    ? 'Models were fetched from the backend when available.'
-                    : 'If your backend does not expose /v1/models, enter the model name manually.'}
+                    ? 'Модели получены с бэкенда, если он их предоставляет.'
+                    : 'Если бэкенд не отдаёт /v1/models, введите название модели вручную.'}
                 </p>
               </div>
 
               {!canEditConfig ? (
                 <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-200">
-                  In-app provider editing is unavailable on this backend. That
-                  is optional. If the backend is already configured, continue to
-                  the chat test.
+                  Редактирование провайдера из приложения на этом бэкенде недоступно. Это необязательно. Если бэкенд уже настроен, переходите к проверке чата.
                 </div>
               ) : null}
 
@@ -940,7 +935,7 @@ export function ClaudeOnboarding() {
                     disabled={
                       saving || (needsApiKey && !apiKey && !needsBaseUrl)
                     }
-                    className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                    className="flex-1 rounded-xl bg-[#6847b8] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#573a9b] disabled:opacity-50"
                   >
                     {saving ? 'Saving...' : 'Save Settings'}
                   </button>
@@ -967,7 +962,7 @@ export function ClaudeOnboarding() {
                   disabled={!backendSupportsChat}
                   className="flex-1 rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
                 >
-                  Continue →
+                  Продолжить →
                 </button>
               </div>
             </div>
@@ -976,17 +971,16 @@ export function ClaudeOnboarding() {
           {step === 'test' && (
             <div className="space-y-4 text-center">
               <div className="text-4xl">🧪</div>
-              <h2 className="text-lg font-bold">Test Chat</h2>
+              <h2 className="text-lg font-bold">Тест чата</h2>
               <p className="text-sm" style={mutedStyle}>
-                Verify that core chat works first. Enhanced Hermes Agent features are
-                optional and appear automatically when supported.
+                Сначала проверьте, что базовый чат работает. Расширенные функции AWG GPT необязательны и появятся сами, если поддерживаются.
               </p>
 
               <div
                 className="rounded-xl p-3 text-left text-xs"
                 style={cardStyle}
               >
-                <p style={mutedStyle}>Backend</p>
+                <p style={mutedStyle}>Бэкенд</p>
                 <p className="mt-1 font-mono">
                   {backendInfo?.claudeUrl || 'Configured automatically'}
                 </p>
@@ -1005,7 +999,7 @@ export function ClaudeOnboarding() {
                   onClick={testConnection}
                   className="w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
                 >
-                  Send Test Message
+                  Отправить тестовое сообщение
                 </button>
               ) : null}
 
@@ -1015,7 +1009,7 @@ export function ClaudeOnboarding() {
                   style={mutedStyle}
                 >
                   <span className="size-2 animate-pulse rounded-full bg-accent-500" />
-                  Waiting for the backend response...
+                  Ожидание ответа бэкенда...
                 </div>
               ) : null}
 
@@ -1034,7 +1028,7 @@ export function ClaudeOnboarding() {
                     onClick={() => setStep('done')}
                     className="w-full rounded-xl bg-green-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-700"
                   >
-                    Continue
+                    Продолжить
                   </button>
                 </div>
               ) : null}
@@ -1043,7 +1037,7 @@ export function ClaudeOnboarding() {
                 <div className="space-y-3">
                   <div className="rounded-xl border border-red-500/30 bg-red-900/20 p-3 text-left text-sm">
                     <p className="mb-1 font-medium text-red-400">
-                      Chat test failed
+                      Тест чата не пройден
                     </p>
                     <p className="text-xs" style={mutedStyle}>
                       {testMessage}
@@ -1051,16 +1045,15 @@ export function ClaudeOnboarding() {
                     {testMessage.includes('401') ||
                     testMessage.toLowerCase().includes('key') ? (
                       <p className="mt-2 text-xs text-yellow-400">
-                        Check your provider credentials and account access.
+                        Проверьте учётные данные провайдера и доступ к аккаунту.
                       </p>
                     ) : testMessage.toLowerCase().includes('model') ? (
                       <p className="mt-2 text-xs text-yellow-400">
-                        Confirm the selected model exists on this backend.
+                        Убедитесь, что выбранная модель есть на этом бэкенде.
                       </p>
                     ) : (
                       <p className="mt-2 text-xs text-yellow-400">
-                        Confirm the backend is running and still reachable from
-                        Hermes Workspace.
+                        Убедитесь, что бэкенд запущен и доступен из AWG GPT.
                       </p>
                     )}
                   </div>
@@ -1069,7 +1062,7 @@ export function ClaudeOnboarding() {
                       onClick={testConnection}
                       className="flex-1 rounded-lg bg-accent-500 py-2 text-xs font-medium text-white"
                     >
-                      Retry
+                      Повторить
                     </button>
                     <button
                       onClick={() => setStep('provider')}
@@ -1084,7 +1077,7 @@ export function ClaudeOnboarding() {
                     className="mx-auto block text-xs"
                     style={mutedStyle}
                   >
-                    Skip for now
+                    Пропустить пока
                   </button>
                 </div>
               ) : null}
@@ -1094,12 +1087,12 @@ export function ClaudeOnboarding() {
           {step === 'done' && (
             <div className="space-y-4 text-center">
               <div className="text-5xl">🎉</div>
-              <h2 className="text-xl font-bold">Workspace Ready</h2>
+              <h2 className="text-xl font-bold">Рабочее пространство готово</h2>
               <p className="text-sm" style={mutedStyle}>
                 Core chat is set up.{' '}
                 {enhancedFeatures.length > 0
-                  ? 'This backend also exposes Hermes Agent gateway enhancements.'
-                  : 'If you later connect a Hermes Agent gateway, enhanced features unlock automatically.'}
+                  ? 'This backend also exposes AWG GPT gateway enhancements.'
+                  : 'Если позже подключите шлюз AWG GPT, расширенные функции включатся автоматически.'}
               </p>
               <div
                 className="grid grid-cols-3 gap-2 text-xs"
@@ -1107,7 +1100,7 @@ export function ClaudeOnboarding() {
               >
                 <div className="rounded-xl p-2" style={cardStyle}>
                   <div className="mb-1 text-lg">💬</div>
-                  <div>Chat Ready</div>
+                  <div>Чат готов</div>
                 </div>
                 <div className="rounded-xl p-2" style={cardStyle}>
                   <div className="mb-1 text-lg">🔗</div>
@@ -1134,7 +1127,7 @@ export function ClaudeOnboarding() {
                 onClick={complete}
                 className="w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
               >
-                Open Workspace
+                Открыть рабочее пространство
               </button>
             </div>
           )}

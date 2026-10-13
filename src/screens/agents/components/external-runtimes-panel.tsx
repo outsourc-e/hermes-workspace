@@ -119,7 +119,7 @@ export function ExternalRuntimesPanel() {
       })
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Runtime test failed', {
+      toast(error instanceof Error ? error.message : 'Тест среды выполнения не пройден', {
         type: 'error',
       })
     },
@@ -137,7 +137,7 @@ export function ExternalRuntimesPanel() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-[var(--theme-text)]">
-              Harness Hub
+              Центр сред агентов
             </h2>
             <span
               className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
@@ -172,7 +172,7 @@ export function ExternalRuntimesPanel() {
 
       {runtimesQuery.isLoading ? (
         <div className="mt-4 rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-6 text-sm text-[var(--theme-muted)]">
-          Discovering local agent runtimes…
+          Ищу локальные среды агентов…
         </div>
       ) : runtimesQuery.isError || !companion?.online ? (
         <div className="mt-4 rounded-2xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-4 py-4 text-sm text-[var(--theme-text)]">
@@ -218,7 +218,7 @@ export function ExternalRuntimesPanel() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {runtime.teamCapable ? (
                     <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 text-[10px] text-[var(--theme-muted)]">
-                      Team capable
+                      Поддерживает команды
                     </span>
                   ) : null}
                   <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 text-[10px] text-[var(--theme-muted)]">
@@ -258,9 +258,7 @@ export function ExternalRuntimesPanel() {
       )}
 
       <div className="mt-4 rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-accent-soft)] px-4 py-3 text-xs text-[var(--theme-muted)]">
-        Runtime discovery and app-managed startup are live. Unified ACP
-        conversations, approvals, and remote Tailscale hosts are the next
-        integration layer.
+        Обнаружение сред выполнения и запуск из приложения работают. Единые ACP-диалоги и согласования — следующий этап интеграции.
       </div>
     </section>
   )

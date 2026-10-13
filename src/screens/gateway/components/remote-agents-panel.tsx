@@ -33,8 +33,8 @@ function timeAgo(ts: number | string | undefined): string {
   const rawTime = typeof ts === 'string' ? new Date(ts).getTime() : ts
   if (!Number.isFinite(rawTime)) return ''
   const diff = Date.now() - rawTime
-  if (diff < 0) return 'just now'
-  if (diff < 60000) return 'just now'
+  if (diff < 0) return 'только что'
+  if (diff < 60000) return 'только что'
   if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
   return `${Math.floor(diff / 86400000)}d ago`
@@ -76,7 +76,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
       const remote = (res.sessions ?? []).filter((s) => s.key && !localSet.has(s.key) && !shouldHideSession(s))
       setSessions(remote)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch sessions')
+      setError(e instanceof Error ? e.message : 'Не удалось получить сессии')
     } finally {
       setLoading(false)
     }
@@ -91,7 +91,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
   if (sessions.length === 0 && !loading && !error) {
     return (
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-slate-900 p-6 text-center">
-        <p className="text-sm text-neutral-600 dark:text-neutral-300">No remote agents found</p>
+        <p className="text-sm text-neutral-600 dark:text-neutral-300">Удалённые агенты не найдены</p>
       </div>
     )
   }
@@ -100,7 +100,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-white">
-          Remote Agents
+          Удалённые агенты
           <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
             {sessions.length}
           </span>
@@ -170,7 +170,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
                     'dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800',
                   )}
                 >
-                  Open Session
+                  Открыть сессию
                 </button>
               </div>
             </div>

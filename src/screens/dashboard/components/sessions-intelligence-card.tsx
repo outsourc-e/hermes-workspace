@@ -54,7 +54,7 @@ function sessionGlyph(
 function relativeTime(ms: number | null): string {
   if (!ms) return '—'
   const diff = Date.now() - ms
-  if (diff < 0) return 'just now'
+  if (diff < 0) return 'только что'
   if (diff < 60_000) return '<1m ago'
   if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`
   if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`
@@ -93,7 +93,7 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
     badges.push({
       label: 'hot',
       tone: 'var(--theme-success)',
-      title: 'Active in last 5 minutes',
+      title: 'Активны за последние 5 минут',
     })
   }
   if (s.toolCallCount >= 20) {
@@ -114,7 +114,7 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
     badges.push({
       label: 'error',
       tone: 'var(--theme-danger)',
-      title: 'Session ended in an error state',
+      title: 'Сессия завершилась с ошибкой',
     })
   }
   if (
@@ -125,7 +125,7 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
     badges.push({
       label: 'stale',
       tone: 'var(--theme-muted)',
-      title: 'No activity in over 7 days',
+      title: 'Нет активности более 7 дней',
     })
   }
   return badges
@@ -192,14 +192,14 @@ export function SessionsIntelligenceCard({
           className="text-[11px] font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--theme-text)' }}
         >
-          Sessions intelligence
+          Аналитика сессий
         </h3>
         <div className="flex items-center gap-2">
           <span
             className="font-mono text-[10px] uppercase tracking-[0.15em]"
             style={{ color: 'var(--theme-muted)' }}
           >
-            {sessions.length} recent
+            {sessions.length} недавних
           </span>
           <button
             type="button"
@@ -215,7 +215,7 @@ export function SessionsIntelligenceCard({
               color: 'var(--theme-muted)',
             }}
           >
-            Open chat →
+            Открыть чат →
           </button>
         </div>
       </div>
@@ -228,7 +228,7 @@ export function SessionsIntelligenceCard({
             color: 'var(--theme-muted)',
           }}
         >
-          No sessions yet — start a chat.
+          Сессий пока нет — начните чат.
         </div>
       ) : (
         // Iter 013: bumped from 8 → 14 rows. The card is now the

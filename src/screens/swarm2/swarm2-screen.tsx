@@ -386,7 +386,7 @@ function useUpdatedAgo(fetchedAt: number | null): string {
         return
       }
       const diff = Math.floor((Date.now() - fetchedAt) / 1000)
-      if (diff < 5) setLabel('just now')
+      if (diff < 5) setLabel('только что')
       else if (diff < 60) setLabel(`${diff}s ago`)
       else setLabel(`${Math.floor(diff / 60)}m ago`)
     }
@@ -924,7 +924,7 @@ function ControlPlaneStage({
                             </>
                           ) : (
                             <button type="button" disabled={pendingTmux.has(member.id) || !tmuxAvailable} onClick={() => onStartAgentSession(member.id)} className={cn('rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] transition-colors', 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)] hover:opacity-90', (pendingTmux.has(member.id) || !tmuxAvailable) && 'cursor-not-allowed opacity-50')} title={tmuxAvailable ? `Start a live agent session in tmux (swarm-${member.id})` : 'tmux is not installed on this host'}>
-                              {pendingTmux.has(member.id) ? 'Starting…' : 'Start agent'}
+                              {pendingTmux.has(member.id) ? 'Starting…' : 'Запустить агента'}
                             </button>
                           )}
                         </div>
@@ -1497,8 +1497,8 @@ export function Swarm2Screen() {
                 </h1>
                 <p className="truncate text-xs text-[var(--theme-muted-2)]">
                   {members.length > 0
-                    ? `Detected ${members.length} worker${members.length === 1 ? '' : 's'} for planning, routing, reports, and reviewer-gated execution.`
-                    : 'Detected Hermes profiles and roster workers for planning, routing, reports, and reviewer-gated execution.'}
+                    ? `Обнаружено исполнителей: ${members.length} — для планирования, маршрутизации, отчётов и выполнения с проверкой ревьюером.`
+                    : 'Обнаруженные профили и исполнители для планирования, маршрутизации, отчётов и выполнения с проверкой ревьюером.'}
                 </p>
               </div>
             </div>
@@ -1536,8 +1536,8 @@ export function Swarm2Screen() {
                 type="button"
                 onClick={() => setNotificationsOpen((open) => !open)}
                 className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] text-base shadow-sm hover:bg-[var(--theme-card2)]"
-                aria-label="Swarm notifications"
-                title="Swarm notifications"
+                aria-label="Уведомления Swarm"
+                title="Уведомления Swarm"
               >
                 <HugeiconsIcon icon={AlarmClockIcon} size={17} strokeWidth={1.8} />
                 {actionableNotificationCount > 0 ? (
@@ -1588,7 +1588,7 @@ export function Swarm2Screen() {
                 className="inline-flex items-center gap-2 rounded-lg bg-[var(--theme-accent)] px-4 py-2 text-sm font-medium text-primary-950 shadow-sm hover:bg-[var(--theme-accent-strong)]"
               >
                 <HugeiconsIcon icon={MessageMultiple01Icon} size={13} />
-                Add Swarm
+                Добавить Swarm
               </button>
             </div>
           </div>

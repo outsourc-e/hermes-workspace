@@ -56,7 +56,7 @@ export function TokenMixHourCard({
         label: 'input',
         value: analytics.inputTokens,
         tone: 'var(--theme-accent)',
-        hint: 'Prompt tokens sent to the model.',
+        hint: 'Токены запроса, отправленные модели.',
       },
       {
         label: 'output',

@@ -114,7 +114,7 @@ export function useVoiceInput(
   const start = useCallback(async () => {
     if (callbacksRef.current.transcribe) {
       if (!supportsRecorderTranscription()) {
-        callbacksRef.current.onError?.('Audio recording not supported in this browser')
+        callbacksRef.current.onError?.('Запись звука не поддерживается в этом браузере')
         setState('error')
         return
       }
@@ -171,7 +171,7 @@ export function useVoiceInput(
           } catch (error) {
             setState('error')
             callbacksRef.current.onError?.(
-              error instanceof Error ? error.message : 'Transcription failed',
+              error instanceof Error ? error.message : 'Не удалось распознать речь',
             )
           }
         }
@@ -182,7 +182,7 @@ export function useVoiceInput(
       } catch (error) {
         setState('error')
         callbacksRef.current.onError?.(
-          error instanceof Error ? error.message : 'Microphone access denied',
+          error instanceof Error ? error.message : 'Доступ к микрофону запрещён',
         )
         return
       }
@@ -191,7 +191,7 @@ export function useVoiceInput(
     const SpeechRecognition = getSpeechRecognition()
     if (!SpeechRecognition) {
       callbacksRef.current.onError?.(
-        'Speech recognition not supported in this browser',
+        'Распознавание речи не поддерживается в этом браузере',
       )
       setState('error')
       return

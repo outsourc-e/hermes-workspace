@@ -378,7 +378,7 @@ function OrchestratorCard({
           <OrchestratorAvatar size={compact ? 40 : 88} />
           {!compact ? (
             <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-700">
-              Main Agent
+              Главный агент
             </span>
           ) : null}
         </div>
@@ -400,7 +400,7 @@ function OrchestratorCard({
                   if (e.key === 'Enter') commitEdit()
                   if (e.key === 'Escape') setIsEditing(false)
                 }}
-                placeholder="Agent name..."
+                placeholder="Имя агента..."
                 className="w-24 rounded border border-primary-200/25 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-accent-400"
                 maxLength={20}
               />
@@ -412,7 +412,7 @@ function OrchestratorCard({
                   'font-semibold text-primary-900 transition-colors hover:text-accent-600',
                   compact ? 'text-sm' : 'text-base',
                 )}
-                title="Click to rename"
+                title="Нажмите, чтобы переименовать"
               >
                 {displayName}
               </button>
@@ -550,16 +550,16 @@ function getStatusBubble(
   progress: number,
 ): AgentStatusBubble {
   if (status === 'thinking') {
-    return { type: 'thinking', text: 'Reasoning through next step' }
+    return { type: 'thinking', text: 'Продумываю следующий шаг' }
   }
   if (status === 'failed') {
-    return { type: 'error', text: 'Execution failed, awaiting retry' }
+    return { type: 'error', text: 'Сбой выполнения, ожидается повтор' }
   }
   if (status === 'complete') {
-    return { type: 'checkpoint', text: 'Checkpoint complete' }
+    return { type: 'checkpoint', text: 'Контрольная точка пройдена' }
   }
   if (status === 'queued') {
-    return { type: 'question', text: 'Queued for dispatch' }
+    return { type: 'question', text: 'В очереди на отправку' }
   }
   const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)))
   return { type: 'checkpoint', text: `${clampedProgress}% complete` }
@@ -885,7 +885,7 @@ export function AgentViewPanel() {
 
               {/* Center — title */}
               <h2 className="text-sm font-semibold text-primary-900">
-                Agent View
+                Вид агента
               </h2>
 
               {/* Right — inspector + close */}
@@ -897,7 +897,7 @@ export function AgentViewPanel() {
                   onClick={function handleClosePanel() {
                     setOpen(false)
                   }}
-                  aria-label="Hide Agent View"
+                  aria-label="Скрыть вид агента"
                 >
                   <HugeiconsIcon
                     icon={Cancel01Icon}
@@ -923,7 +923,7 @@ export function AgentViewPanel() {
                   {/* Centered Agents pill */}
                   <div className="mb-1 flex justify-center">
                     <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
-                      Agents
+                      Агенты
                     </span>
                   </div>
 
@@ -1101,7 +1101,7 @@ export function AgentViewPanel() {
                         {queuedNodes.length > 0 ? (
                           <motion.div layout className="mt-1.5 space-y-1">
                             <p className="text-[10px] text-primary-600 tabular-nums">
-                              Queue
+                              Очередь
                             </p>
                             <motion.div
                               layout
@@ -1163,7 +1163,7 @@ export function AgentViewPanel() {
                             size={20}
                             strokeWidth={1.5}
                           />
-                          ⚡ Active Agents
+                          ⚡ Активные агенты
                         </CollapsibleTrigger>
                         <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
                           {visibleCliAgents.length}
@@ -1215,7 +1215,7 @@ export function AgentViewPanel() {
                                       } catch { /* noop */ }
                                     }}
                                     className="shrink-0 rounded px-1 py-0.5 text-[9px] text-primary-400 hover:bg-red-100 hover:text-red-500 transition-colors"
-                                    title="Kill agent"
+                                    title="Завершить агента"
                                   >
                                     ✕
                                   </button>
@@ -1303,12 +1303,12 @@ export function AgentViewPanel() {
                       {activeCount}
                     </span>
                   </div>
-                  <h2 className="text-sm font-semibold text-primary-900">Agent View</h2>
+                  <h2 className="text-sm font-semibold text-primary-900">Вид агента</h2>
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
                     className="rounded-lg p-1.5 text-primary-500 hover:bg-primary-200"
-                    aria-label="Close"
+                    aria-label="Закрыть"
                   >
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
                       <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -1322,7 +1322,7 @@ export function AgentViewPanel() {
                   <section className="rounded-2xl bg-primary-200/15 p-1">
                     <div className="mb-1 flex justify-center">
                       <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
-                        Agents
+                        Агенты
                       </span>
                     </div>
                     <div className="mb-1 flex items-center justify-between px-1">
@@ -1351,16 +1351,16 @@ export function AgentViewPanel() {
                             footer={
                               <div className="flex items-center justify-between">
                                 {missionSessionIds.has(node.id) ? (
-                                  <span className="text-[10px] text-accent-400">Active mission</span>
+                                  <span className="text-[10px] text-accent-400">Активная миссия</span>
                                 ) : nonMissionActiveAgents.length > 0 ? (
-                                  <span className="text-[10px] text-primary-500">Outside mission</span>
+                                  <span className="text-[10px] text-primary-500">Вне миссии</span>
                                 ) : <span />}
                                 <button
                                   type="button"
                                   onClick={() => killAgent(node.id)}
                                   className="text-[10px] text-red-500 hover:text-red-700 font-medium"
                                 >
-                                  Kill
+                                  Завершить
                                 </button>
                               </div>
                             }
@@ -1394,7 +1394,7 @@ export function AgentViewPanel() {
                                     onClick={() => setSelectedAgentChat({ sessionKey: agent.id, agentName: agent.name, statusLabel: agent.status })}
                                     className="text-[10px] text-accent-600 hover:text-accent-800 font-medium"
                                   >
-                                    View
+                                    Просмотр
                                   </button>
                                 </div>
                               }
@@ -1423,7 +1423,7 @@ export function AgentViewPanel() {
               setOpen(true)
             }}
             className="fixed right-4 bottom-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-accent-500 to-accent-600 text-primary-50 shadow-lg"
-            aria-label="Open Agent View"
+            aria-label="Открыть вид агента"
           >
             <motion.span
               animate={

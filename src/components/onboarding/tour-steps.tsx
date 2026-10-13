@@ -5,7 +5,7 @@ export const tourSteps: Array<Step> = [
   {
     target: 'body',
     placement: 'center',
-    title: 'Welcome to Hermes Workspace! ⚕',
+    title: 'Добро пожаловать в AWG GPT!',
     content: (
       <div
         style={{
@@ -17,7 +17,7 @@ export const tourSteps: Array<Step> = [
       >
         <img
           src="/claude-avatar.webp"
-          alt="Hermes Agent"
+          alt="AWG GPT"
           style={{ width: 48, height: 48, borderRadius: 12 }}
         />
         <p style={{ textAlign: 'center', margin: 0 }}>
@@ -32,72 +32,72 @@ export const tourSteps: Array<Step> = [
   {
     target: '[data-tour="sidebar-container"]',
     placement: 'right',
-    title: 'Sidebar Navigation',
+    title: 'Боковая навигация',
     content:
-      'Navigate between all your tools here. Collapse/expand sections to customize your workspace.',
+      'Здесь можно переключаться между всеми инструментами. Сворачивайте и разворачивайте разделы под себя.',
   },
   // Step 3: New Session
   {
     target: '[data-tour="new-session"]',
     placement: 'right',
-    title: 'Start a New Chat',
+    title: 'Начать новый чат',
     content:
-      'Click here to start a new AI chat session. Each conversation is saved automatically.',
+      'Нажмите здесь, чтобы начать новый чат с ИИ. Каждый диалог сохраняется автоматически.',
   },
   // Step 4: Dashboard
   {
     target: '[data-tour="dashboard"]',
     placement: 'right',
-    title: 'Your Dashboard',
+    title: 'Ваша панель',
     content:
-      'Your overview of sessions, usage, and activity. See everything at a glance.',
+      'Обзор сессий, использования и активности. Всё на одном экране.',
   },
   // Step 5: Agent Hub
   {
     target: '[data-tour="agent-hub"]',
     placement: 'right',
-    title: 'Agent Hub',
+    title: 'Центр агентов',
     content:
-      'Manage your AI agents and configurations. Create custom agents with specialized behaviors.',
+      'Управляйте ИИ-агентами и их настройками. Создавайте своих агентов с особым поведением.',
   },
   // Step 7: Skills
   {
     target: '[data-tour="skills"]',
     placement: 'right',
-    title: 'Skills Library',
+    title: 'Библиотека навыков',
     content:
-      'Browse and install agent skills to extend capabilities. Add new tools and abilities to your agents.',
+      'Просматривайте и устанавливайте навыки, чтобы расширить возможности агентов.',
   },
   // Step 8: Terminal
   {
     target: '[data-tour="terminal"]',
     placement: 'right',
-    title: 'Built-in Terminal',
+    title: 'Встроенный терминал',
     content:
-      'Built-in terminal for quick commands. Execute shell commands without leaving Hermes Workspace.',
+      'Встроенный терминал для быстрых команд. Выполняйте команды, не выходя из AWG GPT.',
   },
   // Step 9: Usage Meter (in header)
   {
     target: '[data-tour="usage-meter"]',
     placement: 'bottom',
-    title: 'Usage Monitor',
+    title: 'Монитор использования',
     content:
-      'Monitor your AI provider usage in real-time. Track costs and API consumption.',
+      'Следите за использованием ИИ-провайдеров в реальном времени: затраты и расход API.',
   },
   // Step 10: Settings
   {
     target: '[data-tour="settings"]',
     placement: 'right',
-    title: 'Settings & Customization',
+    title: 'Настройки и персонализация',
     content:
-      'Configure providers, themes, accent colors, and more. Make Hermes Workspace yours.',
+      'Configure providers, themes, accent colors, and more. Make AWG GPT yours.',
   },
   // Step 11: Finish
   {
     target: 'body',
     placement: 'center',
-    title: "You're all set! 🎉",
+    title: "Всё готово! 🎉",
     content:
-      'Start chatting with your AI, explore the tools, and customize Hermes Workspace to fit your workflow. Need help? Press ? to see all keyboard shortcuts.',
+      'Начните общение с ИИ, изучите инструменты и настройте AWG GPT под свою работу. Нужна помощь? Нажмите ?, чтобы увидеть все горячие клавиши.',
   },
 ]

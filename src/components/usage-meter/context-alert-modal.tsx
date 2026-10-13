@@ -95,38 +95,38 @@ function ContextAlertModalComponent({
           {/* What this means */}
           <div className="bg-primary-50 rounded-lg p-3 mb-4">
             <p className="text-xs font-medium text-primary-800 mb-2">
-              What does this mean?
+              Что это значит?
             </p>
             <p className="text-xs text-primary-600 leading-relaxed">
               {isCritical
-                ? "Your conversation history is nearly at the model's limit. Responses may become less accurate as the model loses access to earlier context. You should start a new chat soon."
+                ? "История диалога почти достигла лимита модели. Ответы могут стать менее точными, так как модель теряет ранний контекст. Скоро стоит начать новый чат."
                 : isDanger
-                  ? 'Your conversation is getting long. The model may start forgetting earlier messages. Consider starting a new chat for best results.'
-                  : "The gateway will auto-compact your context soon (it triggers at ~40% usage). Older messages will be summarized. Consider writing a handoff or starting a new chat to preserve full context."}
+                  ? 'Диалог становится длинным. Модель может начать забывать ранние сообщения. Для лучшего результата начните новый чат.'
+                  : "Шлюз скоро автоматически сожмёт контекст (при ~40% заполнения). Старые сообщения будут кратко пересказаны. Подготовьте краткую сводку или начните новый чат, чтобы сохранить полный контекст."}
             </p>
           </div>
 
           {/* Recommendations */}
           <div className="space-y-2 mb-5">
             <p className="text-xs font-medium text-primary-800">
-              Recommendations
+              Рекомендации
             </p>
             <div className="space-y-1.5">
               {isCritical && (
                 <Recommendation
                   icon="🆕"
-                  text="Start a new chat to reset context"
+                  text="Начните новый чат, чтобы сбросить контекст"
                   emphasis
                 />
               )}
               <Recommendation
                 icon="📋"
-                text="Summarize important details before starting a new chat"
+                text="Кратко изложить важное перед началом нового чата"
               />
               {!isCritical && (
                 <Recommendation
                   icon="💡"
-                  text="Keep messages concise to use context efficiently"
+                  text="Пишите кратко, чтобы эффективнее использовать контекст"
                 />
               )}
             </div>
@@ -138,14 +138,14 @@ function ContextAlertModalComponent({
               onClick={onClose}
               className="rounded-lg border border-primary-200 bg-surface px-4 py-2 text-xs font-medium text-primary-700 hover:bg-primary-50 transition-colors"
             >
-              Got it
+              Понятно
             </button>
             {isDanger && (
               <a
                 href="/new"
                 className="rounded-lg bg-primary-900 px-4 py-2 text-xs font-medium text-white hover:bg-primary-800 transition-colors"
               >
-                New Chat
+                Новый чат
               </a>
             )}
           </div>

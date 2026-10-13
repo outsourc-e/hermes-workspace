@@ -191,15 +191,15 @@ function getActionableMessage(
     if (provider === 'openai') {
       return 'Run `chatgpt` in terminal to refresh your ChatGPT session, or update your API key in Settings → Providers.'
     }
-    return 'Re-authenticate your provider session or update your API key in Settings → Providers.'
+    return 'Авторизуйтесь у провайдера заново или обновите API-ключ в «Настройки → Провайдеры».'
   }
 
   if (status === 'missing_credentials') {
-    return "Add your API key in Settings → Providers, or run the provider's CLI to authenticate."
+    return "Добавьте API-ключ в «Настройки → Провайдеры» или авторизуйтесь через CLI провайдера."
   }
 
   if (status === 'error') {
-    return "Check your network connection and try refreshing. If the issue persists, check the provider's status page."
+    return "Проверьте подключение к сети и обновите страницу. Если проблема не уходит, посмотрите страницу статуса провайдера."
   }
 
   return originalMessage || 'Provider data unavailable.'
@@ -210,25 +210,25 @@ function statusBadge(status: ProviderUsage['status']) {
     case 'ok':
       return (
         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-          Connected
+          Подключено
         </span>
       )
     case 'auth_expired':
       return (
         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-          Auth Expired
+          Авторизация истекла
         </span>
       )
     case 'missing_credentials':
       return (
         <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
-          Not Configured
+          Не настроено
         </span>
       )
     case 'error':
       return (
         <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
-          Error
+          Ошибка
         </span>
       )
     default:
@@ -296,7 +296,7 @@ export function UsageDetailsModal({
       setIsRefreshing(false)
     } catch (error) {
       if (import.meta.env.DEV)
-        console.error('Failed to refresh provider data:', error)
+        console.error('Не удалось обновить данные провайдера:', error)
     } finally {
       setIsRefreshing(false)
     }
@@ -319,12 +319,12 @@ export function UsageDetailsModal({
     <div className="flex max-h-[80vh] flex-col gap-4 overflow-hidden p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <DialogTitle>Usage Overview</DialogTitle>
+          <DialogTitle>Обзор использования</DialogTitle>
           <DialogDescription>
-            Live usage from your gateway session and connected providers.
+            Использование в реальном времени по сессии шлюза и подключённым провайдерам.
           </DialogDescription>
         </div>
-        <DialogClose className="text-primary-700">Close</DialogClose>
+        <DialogClose className="text-primary-700">Закрыть</DialogClose>
       </div>
 
       <div className="flex w-fit items-center gap-1 rounded-full border border-primary-100 bg-primary-50 p-1 text-xs">
@@ -356,7 +356,7 @@ export function UsageDetailsModal({
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-3">
                 <div className="text-xs uppercase tracking-wide text-primary-500">
-                  Input Tokens
+                  Входные токены
                 </div>
                 <div className="text-xl font-semibold text-primary-900">
                   {formatTokens(usage.inputTokens)}
@@ -364,7 +364,7 @@ export function UsageDetailsModal({
               </div>
               <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-3">
                 <div className="text-xs uppercase tracking-wide text-primary-500">
-                  Output Tokens
+                  Выходные токены
                 </div>
                 <div className="text-xl font-semibold text-primary-900">
                   {formatTokens(usage.outputTokens)}
@@ -372,7 +372,7 @@ export function UsageDetailsModal({
               </div>
               <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-3">
                 <div className="text-xs uppercase tracking-wide text-primary-500">
-                  Daily Cost
+                  Стоимость за день
                 </div>
                 <div className="text-xl font-semibold text-primary-900">
                   {formatCurrency(usage.dailyCost)}
@@ -382,12 +382,12 @@ export function UsageDetailsModal({
 
             <div className="rounded-2xl border border-primary-200 bg-primary-50/70 p-4">
               <div className="mb-3 text-sm font-semibold text-primary-900">
-                Cost per model
+                Стоимость по модели
               </div>
               <div className="grid gap-2">
                 {usage.models.length === 0 ? (
                   <div className="text-sm text-primary-500">
-                    No model usage reported yet. Send a message to start tracking usage here.
+                    Данных об использовании моделей пока нет. Отправьте сообщение, чтобы начать учёт.
                   </div>
                 ) : (
                   usage.models.map((model) => (
@@ -413,12 +413,12 @@ export function UsageDetailsModal({
 
             <div className="rounded-2xl border border-primary-200 bg-primary-50/70 p-4">
               <div className="mb-3 text-sm font-semibold text-primary-900">
-                Session history
+                История сессий
               </div>
               <div className="grid gap-2">
                 {usage.sessions.length === 0 ? (
                   <div className="text-sm text-primary-500">
-                    No sessions reported yet. Start a chat to see session history here.
+                    Сессий пока нет. Начните чат, чтобы здесь появилась история.
                   </div>
                 ) : (
                   usage.sessions.map((session) => (
@@ -456,7 +456,7 @@ export function UsageDetailsModal({
                 Context usage: {Math.round(usage.contextPercent)}%
               </div>
               <Button size="sm" variant="outline" onClick={handleExport}>
-                Export CSV
+                Экспорт в CSV
               </Button>
             </div>
           </div>
@@ -487,7 +487,7 @@ export function UsageDetailsModal({
               {providerUsage.length === 0 ? (
                 <div className="rounded-2xl border border-primary-200 bg-primary-50/70 p-6 text-center">
                   <div className="text-sm font-medium text-primary-700">
-                    No providers connected. Add a provider in Settings to start chatting.
+                    Провайдеры не подключены. Добавьте провайдера в настройках, чтобы начать общение.
                   </div>
                   <div className="mt-1 text-xs text-primary-500">
                     Open Settings -{'>'} Providers to connect Claude CLI or add an API key.
@@ -563,7 +563,7 @@ export function UsageDetailsModal({
                                 }
                                 className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition hover:bg-primary-100"
                               >
-                                Set as Default
+                                Сделать основным
                               </button>
                             ) : null}
                           </div>

@@ -31,7 +31,7 @@ const QUERY_KEY = ['claude', 'tasks'] as const
 const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
 
 export const TASKS_BOARD_HELP_TEXT =
-  'Workspace Tasks is a lightweight task board. Drag cards to change status. Use Dashboard Kanban for native multi-board controls.'
+  'Задачи — лёгкая доска. Перетаскивайте карточки, чтобы менять статус. Для нескольких досок используйте канбан на панели.'
 
 function SkeletonCard() {
   return (
@@ -118,25 +118,25 @@ export function TasksScreen() {
   const createMutation = useMutation({
     mutationFn: createTask,
     onSuccess: () => { invalidate(); toast('Task created'); setShowCreate(false) },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to create task', { type: 'error' }),
+    onError: (e) => toast(e instanceof Error ? e.message : 'Не удалось создать задачу', { type: 'error' }),
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: CreateTaskInput }) => updateTask(id, input),
     onSuccess: () => { invalidate(); toast('Task updated'); setEditingTask(null) },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to update task', { type: 'error' }),
+    onError: (e) => toast(e instanceof Error ? e.message : 'Не удалось обновить задачу', { type: 'error' }),
   })
 
   const deleteMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: () => { invalidate(); toast('Task deleted') },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to delete task', { type: 'error' }),
+    onError: (e) => toast(e instanceof Error ? e.message : 'Не удалось удалить задачу', { type: 'error' }),
   })
 
   const moveMutation = useMutation({
     mutationFn: ({ id, column }: { id: string; column: TaskColumn }) => moveTask(id, column, 'user'),
     onSuccess: () => invalidate(),
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to move task', { type: 'error' }),
+    onError: (e) => toast(e instanceof Error ? e.message : 'Не удалось переместить задачу', { type: 'error' }),
   })
 
   function handleDragStart(e: React.DragEvent, taskId: string) {
@@ -186,10 +186,10 @@ export function TasksScreen() {
       <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-2xl font-medium text-ink">Tasks</h1>
+          <h1 className="text-2xl font-medium text-ink">Задачи</h1>
           {assigneeFilter && (
             <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
-              <span>Filtered by: <span className="capitalize" style={{ color: '#f59e0b' }}>{assigneeFilter}</span></span>
+              <span>Фильтр: <span className="capitalize" style={{ color: '#f59e0b' }}>{assigneeFilter}</span></span>
               <button
                 type="button"
                 onClick={() => setAssigneeFilter(null)}
@@ -231,12 +231,12 @@ export function TasksScreen() {
                 : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)]',
             )}
           >
-            {showDone ? 'Hide Done' : 'Show Done'}
+            {showDone ? 'Hide Done' : 'Показать выполненные'}
           </button>
           <button
             onClick={invalidate}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-            title="Refresh"
+            title="Обновить"
           >
             <HugeiconsIcon icon={RefreshIcon} size={16} className="text-[var(--theme-muted)]" />
           </button>
@@ -246,7 +246,7 @@ export function TasksScreen() {
             style={{ background: 'var(--theme-accent)' }}
           >
             <HugeiconsIcon icon={Add01Icon} size={14} />
-            New Task
+            Новая задача
           </button>
         </div>
       </div>
@@ -296,7 +296,7 @@ export function TasksScreen() {
                 <button
                   onClick={() => { setCreateColumn(col); setShowCreate(true) }}
                   className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
-                  title={`Add to ${COLUMN_LABELS[col]}`}
+                  title={`Добавить в «${COLUMN_LABELS[col]}»`}
                 >
                   <HugeiconsIcon icon={Add01Icon} size={14} className="text-[var(--theme-muted)]" />
                 </button>
@@ -311,12 +311,12 @@ export function TasksScreen() {
                     animate={{ opacity: 1 }}
                     className="flex flex-col items-center justify-center py-8 gap-2 text-red-400"
                   >
-                    <p className="text-xs font-medium">Failed to load tasks</p>
+                    <p className="text-xs font-medium">Не удалось загрузить задачи</p>
                     <button
                       onClick={() => tasksQuery.refetch()}
                       className="text-xs text-[var(--theme-accent)] hover:underline"
                     >
-                      Retry
+                      Повторить
                     </button>
                   </motion.div>
                 ) : tasksQuery.isLoading ? (
@@ -336,8 +336,8 @@ export function TasksScreen() {
                         className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--theme-muted)] opacity-60"
                       >
                         <HugeiconsIcon icon={CheckListIcon} size={22} />
-                        <p className="text-xs font-medium">No tasks</p>
-                        <p className="text-[10px]">Drop here or click + to add</p>
+                        <p className="text-xs font-medium">Нет задач</p>
+                        <p className="text-[10px]">Перетащите сюда или нажмите +, чтобы добавить</p>
                       </motion.div>
                     ) : (
                       colTasks.map(task => (

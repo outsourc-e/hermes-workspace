@@ -136,7 +136,7 @@ type SaveSettingPayload = {
 }
 
 // Models are fetched through the workspace API proxy to support Docker and
-// reverse-proxy deployments where the browser cannot reach Hermes Agent directly.
+// reverse-proxy deployments where the browser cannot reach AWG GPT directly.
 
 type ClaudeCatalogEntry =
   | string
@@ -236,15 +236,15 @@ async function fetchModels(): Promise<{
 }
 
 const TAB_ORDER: Array<{ id: SettingsTabId; label: string }> = [
-  { id: 'providers', label: 'Providers' },
-  { id: 'models', label: 'Models' },
-  { id: 'agents', label: 'AI & Agents' },
-  { id: 'session', label: 'Session' },
-  { id: 'memory', label: 'Memory' },
+  { id: 'providers', label: 'Провайдеры' },
+  { id: 'models', label: 'Модели' },
+  { id: 'agents', label: 'ИИ и агенты' },
+  { id: 'session', label: 'Сессия' },
+  { id: 'memory', label: 'Память' },
 ]
 
 const MEMORY_PROVIDER_OPTIONS: Array<SelectOption> = [
-  { label: 'Local', value: 'local' },
+  { label: 'Локально', value: 'local' },
   { label: 'OpenAI', value: 'openai' },
   { label: 'Gemini', value: 'gemini' },
   { label: 'Voyage', value: 'voyage' },
@@ -253,7 +253,7 @@ const MEMORY_PROVIDER_OPTIONS: Array<SelectOption> = [
 ]
 
 const MEMORY_FALLBACK_OPTIONS: Array<SelectOption> = [
-  { label: 'None', value: 'none' },
+  { label: 'Нет', value: 'none' },
   ...MEMORY_PROVIDER_OPTIONS,
 ]
 
@@ -262,9 +262,9 @@ const SETTINGS: Array<SettingDefinition> = [
     id: 'primary-model',
     tab: 'models',
     path: 'model.default',
-    label: 'Default model',
+    label: 'Модель по умолчанию',
     description:
-      'Backend default model used when a chat does not select a per-session override.',
+      'Модель бэкенда по умолчанию, если для чата не выбрана другая.',
     kind: 'text',
     placeholder: 'provider/model',
   },
@@ -272,9 +272,9 @@ const SETTINGS: Array<SettingDefinition> = [
     id: 'fallback-chain',
     tab: 'models',
     path: 'agents.defaults.model.fallbacks',
-    label: 'Fallback chain',
+    label: 'Цепочка запасных моделей',
     description:
-      'Ordered fallback models. Use one per line or separate with commas.',
+      'Запасные модели по порядку. По одной в строке или через запятую.',
     kind: 'multiline',
     rows: 3,
     placeholder: 'anthropic-oauth/claude-sonnet-4-6',
@@ -285,23 +285,23 @@ const SETTINGS: Array<SettingDefinition> = [
     id: 'context-tokens-models',
     tab: 'models',
     path: 'agents.defaults.contextTokens',
-    label: 'Context tokens',
+    label: 'Токены контекста',
     description:
-      'Default token budget applied to agents when no narrower override is present.',
+      'Лимит токенов по умолчанию для агентов, если не задан более узкий.',
     kind: 'number',
     min: 1,
     step: 1000,
   },
-  // Thinking/reasoning settings removed — not supported by Hermes Agent
+  // Thinking/reasoning settings removed — not supported by AWG GPT
   // Legacy settings removed: bootstrap, block streaming,
   // compaction, thinking, verbose, and fast mode do not apply here.
   {
     id: 'context-tokens-session',
     tab: 'session',
     path: 'agents.defaults.contextTokens',
-    label: 'Session context tokens',
+    label: 'Токены контекста сессии',
     description:
-      'Same agent default context budget surfaced here for session setup workflows.',
+      'Бюджет контекста агента по умолчанию, показанный здесь для настройки сессий.',
     kind: 'number',
     min: 1,
     step: 1000,
@@ -310,8 +310,8 @@ const SETTINGS: Array<SettingDefinition> = [
     id: 'memory-provider',
     tab: 'memory',
     path: 'agents.defaults.memorySearch.provider',
-    label: 'Memory search provider',
-    description: 'Embedding provider used for memory lookup and consolidation.',
+    label: 'Провайдер поиска по памяти',
+    description: 'Провайдер эмбеддингов для поиска и консолидации памяти.',
     kind: 'select',
     options: MEMORY_PROVIDER_OPTIONS,
   },
@@ -319,9 +319,9 @@ const SETTINGS: Array<SettingDefinition> = [
     id: 'memory-fallback',
     tab: 'memory',
     path: 'agents.defaults.memorySearch.fallback',
-    label: 'Memory fallback provider',
+    label: 'Запасной провайдер памяти',
     description:
-      'Fallback provider when the primary memory search provider is unavailable.',
+      'Запасной провайдер, если основной провайдер поиска по памяти недоступен.',
     kind: 'select',
     options: MEMORY_FALLBACK_OPTIONS,
   },
@@ -329,24 +329,24 @@ const SETTINGS: Array<SettingDefinition> = [
     id: 'memory-sync-on-session-start',
     tab: 'memory',
     path: 'agents.defaults.memorySearch.sync.onSessionStart',
-    label: 'Sync on session start',
-    description: 'Refresh indexed memory paths when a new session starts.',
+    label: 'Синхронизировать при старте сессии',
+    description: 'Обновлять индексируемые пути памяти при старте новой сессии.',
     kind: 'boolean',
   },
   {
     id: 'memory-sync-on-search',
     tab: 'memory',
     path: 'agents.defaults.memorySearch.sync.onSearch',
-    label: 'Sync on search',
-    description: 'Run a sync before memory search queries.',
+    label: 'Синхронизировать при поиске',
+    description: 'Синхронизировать перед поиском по памяти.',
     kind: 'boolean',
   },
   {
     id: 'memory-sync-interval',
     tab: 'memory',
     path: 'agents.defaults.memorySearch.sync.intervalMinutes',
-    label: 'Consolidation interval',
-    description: 'Background memory consolidation cadence, in minutes.',
+    label: 'Интервал консолидации',
+    description: 'Периодичность фоновой консолидации памяти, в минутах.',
     kind: 'number',
     min: 0,
     step: 5,
@@ -410,7 +410,7 @@ function buildProviderSummaries(payload: {
       name: getProviderDisplayName(providerId),
       description:
         metadata?.description ||
-        'Configured provider in your local Hermes setup.',
+        'Провайдер настроен в локальной конфигурации.',
       modelCount,
       status: modelCount > 0 ? 'active' : 'configured',
     })
@@ -619,7 +619,7 @@ function SettingCard(props: {
             </h3>
             {setting.unsupported ? (
               <span className="rounded-full border border-primary-300 bg-primary-100 px-2 py-0.5 text-[11px] font-medium text-primary-700">
-                Not available
+                Недоступно
               </span>
             ) : null}
             {isActiveSave ? (
@@ -787,7 +787,7 @@ type PerformanceDraft = {
 }
 
 const MODEL_PROVIDER_OPTIONS: Array<SelectOption> = [
-  { label: 'Custom', value: 'custom' },
+  { label: 'Своё', value: 'custom' },
   { label: 'OpenRouter', value: 'openrouter' },
   { label: 'Anthropic', value: 'anthropic' },
   { label: 'OpenAI', value: 'openai' },
@@ -918,7 +918,7 @@ function ModelConfigSection(props: {
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <label className="space-y-1.5">
           <span className="text-xs font-medium uppercase tracking-[0.12em] text-primary-600">
-            Provider
+            Провайдер
           </span>
           <select
             className="h-10 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 text-sm text-primary-900 outline-none"
@@ -940,7 +940,7 @@ function ModelConfigSection(props: {
 
         <label className="space-y-1.5">
           <span className="text-xs font-medium uppercase tracking-[0.12em] text-primary-600">
-            Model Name
+            Название модели
           </span>
           <Input
             value={value.model}
@@ -959,7 +959,7 @@ function ModelConfigSection(props: {
 
       <label className="mt-4 block space-y-1.5">
         <span className="text-xs font-medium uppercase tracking-[0.12em] text-primary-600">
-          Base URL
+          Базовый URL
         </span>
         <Input
           value={value.baseUrl}
@@ -1088,7 +1088,7 @@ function ActiveModelCard({
     },
     onError: (error) => {
       toast(
-        error instanceof Error ? error.message : 'Failed to save model config',
+        error instanceof Error ? error.message : 'Не удалось сохранить настройки модели',
         { type: 'error' },
       )
     },
@@ -1106,11 +1106,10 @@ function ActiveModelCard({
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <h3 className="text-base font-medium text-primary-900">
-            Model Configuration
+            Настройка модели
           </h3>
           <p className="text-sm text-primary-600">
-            Update the primary model, optional fallback, and stream timeout
-            settings saved in the active profile configuration.
+            Измените основную модель, запасную модель и тайм-ауты потока в конфигурации активного профиля.
           </p>
         </div>
         <Button
@@ -1124,17 +1123,17 @@ function ActiveModelCard({
 
       {configQuery.isPending ? (
         <p className="mt-4 text-sm text-primary-500">
-          Loading configuration...
+          Загрузка конфигурации...
         </p>
       ) : configQuery.error ? (
         <p className="mt-4 text-sm text-red-500">
-          Could not load config — is Hermes Agent running?
+          Не удалось загрузить конфигурацию — AWG GPT запущен?
         </p>
       ) : (
         <div className="mt-5 space-y-4">
           <ModelConfigSection
-            title="Primary Model"
-            description="Default provider, model, and base URL used for new Hermes Agent requests."
+            title="Основная модель"
+            description="Провайдер, модель и базовый URL по умолчанию для новых запросов AWG GPT."
             value={primaryConfig}
             onChange={setPrimaryConfig}
             modelOptions={modelOptions}
@@ -1146,11 +1145,10 @@ function ActiveModelCard({
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
                 <h3 className="text-sm font-semibold text-primary-900">
-                  Fallback Model
+                  Запасная модель
                 </h3>
                 <p className="text-sm text-primary-600">
-                  Optional secondary model Hermes Agent can use if the primary path
-                  fails.
+                  Необязательная запасная модель на случай сбоя основной.
                 </p>
               </div>
               <Button
@@ -1169,8 +1167,8 @@ function ActiveModelCard({
             {showFallback ? (
               <div className="mt-4">
                 <ModelConfigSection
-                  title="Fallback Settings"
-                  description="Keep these fields empty if you do not want a fallback model configured."
+                  title="Настройки запасной модели"
+                  description="Оставьте поля пустыми, если запасная модель не нужна."
                   value={fallbackConfig}
                   onChange={setFallbackConfig}
                   modelOptions={modelOptions}
@@ -1183,18 +1181,17 @@ function ActiveModelCard({
           <section className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-primary-900">
-                Performance
+                Производительность
               </h3>
               <p className="text-sm text-primary-600">
-                Increase these timeouts for slower local models or larger
-                prompts that stream output more gradually.
+                Увеличьте тайм-ауты для медленных локальных моделей или больших запросов с постепенным выводом.
               </p>
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <label className="space-y-1.5">
                 <span className="text-xs font-medium uppercase tracking-[0.12em] text-primary-600">
-                  Stream Stale Timeout
+                  Тайм-аут простоя потока
                 </span>
                 <Input
                   type="number"
@@ -1213,7 +1210,7 @@ function ActiveModelCard({
 
               <label className="space-y-1.5">
                 <span className="text-xs font-medium uppercase tracking-[0.12em] text-primary-600">
-                  Stream Read Timeout
+                  Тайм-аут чтения потока
                 </span>
                 <Input
                   type="number"
@@ -1233,7 +1230,7 @@ function ActiveModelCard({
 
             <p className="mt-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2 text-sm text-primary-600">
               Slow local runners such as Ollama and `llama-server` often need
-              more headroom before Hermes Agent decides a stream has stalled.
+              more headroom before AWG GPT decides a stream has stalled.
             </p>
           </section>
         </div>
@@ -1272,16 +1269,15 @@ function ProviderManagementSection(props: {
       <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
         <div className="space-y-1.5">
           <h2 className="text-base font-semibold text-primary-900">
-            Provider Setup
+            Настройка провайдера
           </h2>
           <p className="text-sm text-primary-600">
-            View configured providers and walk through safe setup instructions
-            for new providers.
+            Просмотр настроенных провайдеров и инструкции по безопасной настройке новых.
           </p>
         </div>
         <Button size="sm" onClick={onAddProvider}>
           <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
-          Add Provider
+          Добавить провайдера
         </Button>
       </header>
 
@@ -1289,11 +1285,10 @@ function ProviderManagementSection(props: {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-medium text-primary-900">
-              Configured Providers
+              Настроенные провайдеры
             </h3>
             <p className="mt-1 text-xs text-primary-600">
-              API keys stay in your local Hermes config and are never sent to
-              Studio.
+              API-ключи хранятся в локальной конфигурации и никуда не отправляются.
             </p>
           </div>
           <p className="text-xs text-primary-600 tabular-nums">
@@ -1304,21 +1299,21 @@ function ProviderManagementSection(props: {
 
         {modelsQuery.isPending ? (
           <p className="rounded-xl border border-primary-200 bg-white px-3 py-2 text-sm text-primary-600">
-            Loading providers from Hermes Agent...
+            Загрузка провайдеров из AWG GPT...
           </p>
         ) : null}
 
         {modelsQuery.error ? (
           <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
             <p className="mb-2 text-sm text-primary-700">
-              Unable to load providers right now. Check your Hermes Agent connection.
+              Сейчас не удаётся загрузить провайдеров. Проверьте подключение AWG GPT.
             </p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => modelsQuery.refetch()}
             >
-              Retry
+              Повторить
             </Button>
           </div>
         ) : null}
@@ -1328,8 +1323,7 @@ function ProviderManagementSection(props: {
         providerSummaries.length === 0 ? (
           <div className="rounded-xl border border-primary-200 bg-white px-4 py-4">
             <p className="text-sm text-primary-700">
-              No providers are configured yet. Use Add Provider to open setup
-              instructions.
+              Провайдеры ещё не настроены. Нажмите «Добавить провайдера», чтобы открыть инструкцию.
             </p>
           </div>
         ) : null}
@@ -1363,7 +1357,7 @@ function ProviderManagementSection(props: {
 
                   <div className="mt-3 flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50 px-2.5 py-2">
                     <span className="text-xs text-primary-600">
-                      Available models
+                      Доступные модели
                     </span>
                     <span className="text-sm font-medium text-primary-900 tabular-nums">
                       {provider.modelCount}
@@ -1386,7 +1380,7 @@ function ProviderManagementSection(props: {
                         size={14}
                         strokeWidth={1.5}
                       />
-                      Edit
+                      Изменить
                     </Button>
                     <Button
                       variant="outline"
@@ -1470,7 +1464,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
       toast(`${variables.label} saved`, { type: 'success' })
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to save setting', {
+      toast(error instanceof Error ? error.message : 'Не удалось сохранить настройку', {
         type: 'error',
       })
     },
@@ -1617,10 +1611,10 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
           <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm">
             <div className="space-y-1">
               <h1 className="hidden md:block text-lg font-semibold text-primary-900">
-                Settings
+                Настройки
               </h1>
               <p className="text-sm text-primary-600">
-                Configure providers plus Hermes Agent defaults in one place.
+                Провайдеры и параметры AWG GPT по умолчанию в одном месте.
               </p>
             </div>
 
@@ -1636,7 +1630,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
                 <Input
                   value={search}
                   type="search"
-                  placeholder="Search settings, paths, or descriptions"
+                  placeholder="Поиск настроек, путей и описаний"
                   className="pl-10"
                   onChange={(event) => {
                     setSearch(event.target.value)
@@ -1704,14 +1698,14 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
                 <TabsContent key={tab.id} value={tab.id} className="space-y-4">
                   {configQuery.isPending ? (
                     <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-600">
-                      Loading current configuration...
+                      Загрузка текущей конфигурации...
                     </div>
                   ) : null}
 
                   {configQuery.error ? (
                     <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
                       <p className="text-sm text-primary-700">
-                        Unable to load configuration right now.
+                        Сейчас не удаётся загрузить конфигурацию.
                       </p>
                       <Button
                         variant="outline"
@@ -1719,7 +1713,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
                         className="mt-3"
                         onClick={() => configQuery.refetch()}
                       >
-                        Retry
+                        Повторить
                       </Button>
                     </div>
                   ) : null}
@@ -1728,7 +1722,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
                   !configQuery.error &&
                   items.length === 0 ? (
                     <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-4 text-sm text-primary-600">
-                      No settings in this tab match your current search.
+                      На этой вкладке нет настроек, подходящих под поиск.
                     </div>
                   ) : null}
 

@@ -46,7 +46,7 @@ export function AgentChatMessages({
     return (
       <div className="grid min-h-40 place-items-center px-6 py-8">
         <p className="text-center text-sm text-pretty text-primary-700">
-          Start the conversation with this agent.
+          Начните диалог с этим агентом.
         </p>
       </div>
     )
@@ -119,7 +119,7 @@ export function AgentChatMessages({
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary-500/60" />
             <span className="relative inline-flex size-2 rounded-full bg-primary-600" />
           </span>
-          Agent is typing…
+          Агент печатает…
         </motion.div>
       ) : null}
 

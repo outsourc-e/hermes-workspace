@@ -54,7 +54,7 @@ export function ModelSuggestionToast({
             type="button"
             onClick={onDismiss}
             className="shrink-0 rounded-md p-1 text-primary-500 hover:bg-primary-200 hover:text-primary-900"
-            aria-label="Dismiss"
+            aria-label="Скрыть"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
           </button>
@@ -62,7 +62,7 @@ export function ModelSuggestionToast({
 
         <div className="flex gap-2">
           <Button size="sm" onClick={onSwitch} className="flex-1">
-            Switch
+            Переключить
           </Button>
           <Button
             size="sm"
@@ -70,7 +70,7 @@ export function ModelSuggestionToast({
             onClick={onDismissForSession}
             className="flex-1"
           >
-            Not for this session
+            Не для этой сессии
           </Button>
         </div>
       </div>

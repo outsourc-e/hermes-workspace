@@ -48,14 +48,14 @@ function percentChange(base: number, next: number): number {
 }
 
 function compareLowerIsBetter(base: number, next: number): DeltaResult {
-  if (next === base) return { tone: 'same', arrow: '=', label: 'Same' }
+  if (next === base) return { tone: 'same', arrow: '=', label: 'Без изменений' }
   const pct = percentChange(base, next)
   if (next < base) return { tone: 'better', arrow: '↑', label: `${pct.toFixed(1)}%` }
   return { tone: 'worse', arrow: '↓', label: `${pct.toFixed(1)}%` }
 }
 
 function compareCount(base: number, next: number): DeltaResult {
-  if (next === base) return { tone: 'same', arrow: '=', label: 'Same' }
+  if (next === base) return { tone: 'same', arrow: '=', label: 'Без изменений' }
   const pct = percentChange(base, next)
   if (next > base) return { tone: 'neutral', arrow: '↑', label: `${pct.toFixed(1)}%` }
   return { tone: 'neutral', arrow: '↓', label: `${pct.toFixed(1)}%` }
@@ -71,12 +71,12 @@ function statusScore(status: string): number {
 }
 
 function compareStatus(base: string, next: string): DeltaResult {
-  if (base === next) return { tone: 'same', arrow: '=', label: 'Same' }
+  if (base === next) return { tone: 'same', arrow: '=', label: 'Без изменений' }
   const baseScore = statusScore(base)
   const nextScore = statusScore(next)
-  if (nextScore > baseScore) return { tone: 'better', arrow: '↑', label: 'Improved' }
-  if (nextScore < baseScore) return { tone: 'worse', arrow: '↓', label: 'Regressed' }
-  return { tone: 'neutral', arrow: '↑', label: 'Changed' }
+  if (nextScore > baseScore) return { tone: 'better', arrow: '↑', label: 'Улучшено' }
+  if (nextScore < baseScore) return { tone: 'worse', arrow: '↓', label: 'Ухудшилось' }
+  return { tone: 'neutral', arrow: '↑', label: 'Изменено' }
 }
 
 function deltaClassName(tone: DeltaTone): string {
@@ -107,16 +107,16 @@ export function RunCompare({ runA, runB, onClose }: RunCompareProps) {
     <section className="w-full rounded-xl border border-primary-800 bg-primary-900 p-4">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-primary-100">Compare Runs</h3>
-          <p className="text-xs text-primary-400">Run metrics side by side</p>
+          <h3 className="text-sm font-semibold text-primary-100">Сравнить запуски</h3>
+          <p className="text-xs text-primary-400">Метрики запусков рядом</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="rounded-lg border border-primary-700 bg-primary-800 px-2 py-1 text-xs font-medium text-primary-200 transition-colors hover:border-accent-500 hover:text-accent-300"
-          aria-label="Close compare view"
+          aria-label="Закрыть сравнение"
         >
-          Close
+          Закрыть
         </button>
       </div>
 
@@ -137,31 +137,31 @@ export function RunCompare({ runA, runB, onClose }: RunCompareProps) {
           </div>
 
           <MetricRow
-            label="Duration"
+            label="Длительность"
             leftValue={runA.duration}
             rightValue={runB.duration}
             delta={durationDelta}
           />
           <MetricRow
-            label="Token Count"
+            label="Число токенов"
             leftValue={runA.tokenCount.toLocaleString()}
             rightValue={runB.tokenCount.toLocaleString()}
             delta={tokenDelta}
           />
           <MetricRow
-            label="Cost"
+            label="Стоимость"
             leftValue={fmtCost(runA.costEstimate)}
             rightValue={fmtCost(runB.costEstimate)}
             delta={costDelta}
           />
           <MetricRow
-            label="Agent Count"
+            label="Число агентов"
             leftValue={String(runA.agents.length)}
             rightValue={String(runB.agents.length)}
             delta={agentDelta}
           />
           <MetricRow
-            label="Status"
+            label="Статус"
             leftValue={runA.status}
             rightValue={runB.status}
             delta={statusDelta}

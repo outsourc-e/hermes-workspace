@@ -44,15 +44,15 @@ const TRUST_PILL: Record<
   { label: string; className: string }
 > = {
   official: {
-    label: 'Official',
+    label: 'Официальный',
     className: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
   },
   community: {
-    label: 'Community',
+    label: 'Сообщество',
     className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
   },
   unverified: {
-    label: 'Unverified',
+    label: 'Не проверено',
     className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
   },
 }
@@ -160,7 +160,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
     } catch (err) {
       // Ignore abort errors — the dialog was closed intentionally
       if (err instanceof Error && err.name === 'AbortError') return
-      setError(err instanceof Error ? err.message : 'Install failed')
+      setError(err instanceof Error ? err.message : 'Не удалось установить')
     } finally {
       setInstalling(false)
       abortControllerRef.current = null
@@ -221,7 +221,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
               {template.command ? (
                 <div>
                   <p className="mb-1 text-xs font-medium uppercase text-primary-400 tracking-wide">
-                    Command
+                    Команда
                   </p>
                   <p className="font-mono text-ink break-all">{template.command}</p>
                 </div>
@@ -231,7 +231,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
               {template.args && template.args.length > 0 ? (
                 <div>
                   <p className="mb-1 text-xs font-medium uppercase text-primary-400 tracking-wide">
-                    Args
+                    Аргументы
                   </p>
                   <ul className="space-y-0.5">
                     {template.args.map((arg, i) => (
@@ -257,7 +257,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
               {envKeys.length > 0 ? (
                 <div>
                   <p className="mb-1 text-xs font-medium uppercase text-primary-400 tracking-wide">
-                    Environment Variables
+                    Переменные окружения
                   </p>
                   <ul className="space-y-0.5">
                     {envKeys.map((key) => (
@@ -279,7 +279,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
                 data-testid="placeholder-fill-form"
               >
                 <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                  This template contains placeholder values. Fill in the fields below before installing.
+                  В шаблоне есть значения-заглушки. Заполните поля ниже перед установкой.
                 </p>
                 {placeholders.map((ph) => (
                   <label key={ph.path} className="flex flex-col gap-1 text-sm text-primary-500">
@@ -334,7 +334,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
             {/* Footer actions */}
             <div className="flex items-center justify-end gap-2 border-t border-primary-200 pt-3">
               <Button variant="ghost" size="sm" onClick={onClose} disabled={installing}>
-                Cancel
+                Отмена
               </Button>
               <Button
                 size="sm"

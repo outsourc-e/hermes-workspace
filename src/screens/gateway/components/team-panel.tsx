@@ -16,7 +16,7 @@ function formatRelativeTime(ts: number): string {
 // Presets shown in Agent Hub. 'auto' uses gateway default.
 // Additional models from gateway providers show in the chat model switcher.
 export const MODEL_PRESETS = [
-  { id: 'auto', label: 'Auto (Gateway Default)', desc: 'Uses your configured default model' },
+  { id: 'auto', label: 'Авто (по умолчанию шлюза)', desc: 'Uses your configured default model' },
   { id: 'opus', label: 'Claude Opus 4.6', desc: 'Deep reasoning — Anthropic' },
   { id: 'sonnet', label: 'Claude Sonnet 4.6', desc: 'Fast & capable — Anthropic' },
   { id: 'codex', label: 'GPT-5 Codex', desc: 'Code specialist — OpenAI' },
@@ -112,7 +112,7 @@ const MODEL_BADGE_COLOR: Record<ModelPresetId, string> = {
   flash: 'bg-violet-100 text-violet-700',
   minimax: 'bg-amber-100 text-amber-700',
   'pc1-coder': 'bg-cyan-100 text-cyan-700',
-  'pc1-planner': 'bg-indigo-100 text-indigo-700',
+  'pc1-planner': 'bg-[#e9e4f5] text-[#573a9b]',
   'pc1-critic': 'bg-purple-100 text-purple-700',
 }
 
@@ -211,9 +211,9 @@ export function TeamPanel({
     <div className="flex h-full flex-col border-r border-primary-200 bg-primary-50/40 dark:bg-neutral-900/20">
       <div className="border-b border-primary-200 px-3 pb-3 pt-2">
         <h2 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">
-          Team Setup
+          Настройка команды
         </h2>
-        <p className="text-[11px] text-primary-500">Choose a template or build your own.</p>
+        <p className="text-[11px] text-primary-500">Выберите шаблон или создайте свой.</p>
         <div className="mt-2 space-y-1.5">
           {TEAM_TEMPLATES.map((template) => (
             <button
@@ -238,7 +238,7 @@ export function TeamPanel({
       <div className="border-b border-primary-200 px-3 py-2.5">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-500">
-            Your Team
+            Ваша команда
           </h3>
           <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[11px] font-medium text-primary-700 dark:bg-neutral-800 dark:text-neutral-300">
             {team.length}
@@ -249,7 +249,7 @@ export function TeamPanel({
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2">
         {team.length === 0 ? (
           <div className="rounded-lg border border-dashed border-primary-300 bg-white/70 px-3 py-4 text-center text-xs text-primary-500 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-400">
-            No agents yet. Apply a template or add one manually.
+            Агентов пока нет. Примените шаблон или добавьте вручную.
           </div>
         ) : null}
 
@@ -333,7 +333,7 @@ export function TeamPanel({
                     ) : null}
                     {agentModelNotApplied?.[agent.id] ? (
                       <p className="mt-0.5 text-[9px] text-neutral-400 dark:text-neutral-500">
-                        Gateway used default model
+                        Шлюз использовал модель по умолчанию
                       </p>
                     ) : null}
                   </div>
@@ -354,7 +354,7 @@ export function TeamPanel({
                 {showRetry ? (
                   <button
                     type="button"
-                    title="Retry spawn"
+                    title="Повторить запуск"
                     onClick={(event) => {
                       event.stopPropagation()
                       onRetrySpawn?.(agent)
@@ -395,7 +395,7 @@ export function TeamPanel({
 
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                      Model
+                      Модель
                     </span>
                     <select
                       value={agent.modelId}
@@ -406,7 +406,7 @@ export function TeamPanel({
                       }}
                       className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                     >
-                      <optgroup label="Presets">
+                      <optgroup label="Пресеты">
                         {MODEL_PRESETS.map((preset) => (
                           <option key={preset.id} value={preset.id}>
                             {preset.label}
@@ -414,7 +414,7 @@ export function TeamPanel({
                         ))}
                       </optgroup>
                       {(gatewayModels?.length ?? 0) > 0 ? (
-                        <optgroup label="Available Models">
+                        <optgroup label="Доступные модели">
                           {gatewayModels?.map((model) => (
                             <option key={model.value} value={model.value}>
                               {model.label} ({model.provider})
@@ -427,7 +427,7 @@ export function TeamPanel({
 
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                      Role Description
+                      Описание роли
                     </span>
                     <textarea
                       value={agent.roleDescription}
@@ -437,14 +437,14 @@ export function TeamPanel({
                         })
                       }}
                       rows={3}
-                      placeholder="Define responsibilities and deliverables"
+                      placeholder="Определить зоны ответственности и результаты"
                       className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                     />
                   </label>
 
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                      Goal
+                      Цель
                     </span>
                     <textarea
                       value={agent.goal}
@@ -454,14 +454,14 @@ export function TeamPanel({
                         })
                       }}
                       rows={3}
-                      placeholder="e.g. Find the most actionable competitive insights"
+                      placeholder="Например: найти самые полезные выводы о конкурентах"
                       className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                     />
                   </label>
 
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                      Backstory
+                      Предыстория
                     </span>
                     <textarea
                       value={agent.backstory}
@@ -471,7 +471,7 @@ export function TeamPanel({
                         })
                       }}
                       rows={3}
-                      placeholder="e.g. You have 10 years of experience in competitive intelligence..."
+                      placeholder="Например: У тебя 10 лет опыта в конкурентной разведке..."
                       className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
                     />
                   </label>
@@ -480,7 +480,7 @@ export function TeamPanel({
                   {agentSessionKey ? (
                     <div>
                       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                        Session Key
+                        Ключ сессии
                       </span>
                       <p className="truncate rounded-md bg-primary-50 px-2 py-1.5 font-mono text-[10px] text-primary-700 dark:bg-neutral-800 dark:text-neutral-300">
                         {agentSessionKey}
@@ -492,7 +492,7 @@ export function TeamPanel({
                   {assignedTasks.length > 0 ? (
                     <div>
                       <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-primary-500">
-                        Active Tasks
+                        Активные задачи
                       </span>
                       <ul className="space-y-1">
                         {assignedTasks.map((task) => (
@@ -514,7 +514,7 @@ export function TeamPanel({
                       onClick={() => onKillSession?.(agent)}
                       className="w-full rounded-md bg-red-500 px-2 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-red-600"
                     >
-                      Kill Session
+                      Завершить сессию
                     </button>
                   ) : null}
                 </div>
@@ -531,7 +531,7 @@ export function TeamPanel({
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-primary-300 py-2.5 text-xs font-semibold text-primary-500 transition-colors hover:border-accent-400 hover:text-accent-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-accent-700 dark:hover:text-accent-300"
         >
           <span aria-hidden>+</span>
-          <span>Add Agent</span>
+          <span>Добавить агента</span>
         </button>
       </div>
     </div>

@@ -40,7 +40,7 @@ export function OperationsAgentJobs({
     },
     onError: (error) => {
       toast(
-        error instanceof Error ? error.message : 'Failed to update cron job',
+        error instanceof Error ? error.message : 'Не удалось обновить cron-задание',
         { type: 'error' },
       )
     },
@@ -71,7 +71,7 @@ export function OperationsAgentJobs({
     },
     onError: (error) => {
       toast(
-        error instanceof Error ? error.message : 'Failed to create cron job',
+        error instanceof Error ? error.message : 'Не удалось создать cron-задание',
         { type: 'error' },
       )
     },
@@ -82,7 +82,7 @@ export function OperationsAgentJobs({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-[var(--theme-text)]">
-            Scheduled Jobs
+            Запланированные задания
           </h3>
           <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
             Jobs tagged with `ops:{agentId}:*`
@@ -94,7 +94,7 @@ export function OperationsAgentJobs({
           onClick={() => setAdding((value) => !value)}
         >
           <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
-          Add Job
+          Добавить задание
         </Button>
       </div>
 
@@ -160,7 +160,7 @@ export function OperationsAgentJobs({
           })
         ) : (
           <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-6 text-sm text-[var(--theme-muted)]">
-            No cron jobs are linked to this agent yet.
+            К этому агенту пока не привязано cron-заданий.
           </div>
         )}
       </div>
@@ -169,16 +169,16 @@ export function OperationsAgentJobs({
         <div className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-2">
-              <span className="text-sm font-medium text-[var(--theme-text)]">Job Name</span>
+              <span className="text-sm font-medium text-[var(--theme-text)]">Название задания</span>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Daily scan"
+                placeholder="Ежедневное сканирование"
                 className="w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
               />
             </label>
             <label className="space-y-2">
-              <span className="text-sm font-medium text-[var(--theme-text)]">Schedule</span>
+              <span className="text-sm font-medium text-[var(--theme-text)]">Расписание</span>
               <input
                 value={schedule}
                 onChange={(event) => setSchedule(event.target.value)}
@@ -188,11 +188,11 @@ export function OperationsAgentJobs({
             </label>
           </div>
           <label className="mt-3 block space-y-2">
-            <span className="text-sm font-medium text-[var(--theme-text)]">Description</span>
+            <span className="text-sm font-medium text-[var(--theme-text)]">Описание</span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="What this job should do"
+              placeholder="Что должно делать это задание"
               className="min-h-[96px] w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
             />
           </label>
@@ -202,7 +202,7 @@ export function OperationsAgentJobs({
               className="border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
               onClick={() => setAdding(false)}
             >
-              Cancel
+              Отмена
             </Button>
             <Button
               className="bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"

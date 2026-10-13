@@ -144,19 +144,19 @@ type SkillSummary = {
 
 const KNOWN_CATEGORIES = [
   'All',
-  'Web & Frontend',
-  'Coding Agents',
-  'Git & GitHub',
-  'DevOps & Cloud',
-  'Browser & Automation',
-  'Image & Video',
-  'Search & Research',
-  'AI & LLMs',
-  'Productivity',
-  'Marketing & Sales',
-  'Communication',
-  'Data & Analytics',
-  'Finance & Crypto',
+  'Веб и фронтенд',
+  'Агенты для кода',
+  'Git и GitHub',
+  'DevOps и облако',
+  'Браузер и автоматизация',
+  'Изображения и видео',
+  'Поиск и исследования',
+  'ИИ и LLM',
+  'Продуктивность',
+  'Маркетинг и продажи',
+  'Коммуникации',
+  'Данные и аналитика',
+  'Финансы и крипто',
 ] as const
 
 const FEATURED_SKILLS: Array<{ id: string; group: string }> = [
@@ -170,9 +170,9 @@ const FEATURED_SKILLS: Array<{ id: string; group: string }> = [
     group: 'Developer Tools',
   },
   { id: 'veeramanikandanr48/azure-auth', group: 'Developer Tools' },
-  { id: 'dbalve/fastio-skills', group: 'Productivity' },
-  { id: 'gillberto1/moltwallet', group: 'Productivity' },
-  { id: 'veeramanikandanr48/backtest-expert', group: 'Productivity' },
+  { id: 'dbalve/fastio-skills', group: 'Продуктивность' },
+  { id: 'gillberto1/moltwallet', group: 'Продуктивность' },
+  { id: 'veeramanikandanr48/backtest-expert', group: 'Продуктивность' },
 ]
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -220,55 +220,55 @@ function normalizeSecurity(value: unknown): SecurityRisk {
 }
 
 const CATEGORY_ALIASES: Record<string, string> = {
-  research: 'Search & Research',
-  'search-and-research': 'Search & Research',
-  search: 'Search & Research',
-  feeds: 'Search & Research',
-  'web-frontend': 'Web & Frontend',
-  frontend: 'Web & Frontend',
-  web: 'Web & Frontend',
-  'software-development': 'Coding Agents',
-  coding: 'Coding Agents',
-  development: 'Coding Agents',
-  devops: 'DevOps & Cloud',
-  cloud: 'DevOps & Cloud',
-  'devops-cloud': 'DevOps & Cloud',
-  mlops: 'DevOps & Cloud',
-  git: 'Git & GitHub',
-  github: 'Git & GitHub',
-  'git-github': 'Git & GitHub',
-  browser: 'Browser & Automation',
-  automation: 'Browser & Automation',
-  'browser-automation': 'Browser & Automation',
-  image: 'Image & Video',
-  video: 'Image & Video',
-  media: 'Image & Video',
-  creative: 'Image & Video',
-  'image-video': 'Image & Video',
-  gifs: 'Image & Video',
-  diagramming: 'Image & Video',
-  'autonomous-ai-agents': 'AI & LLMs',
-  ai: 'AI & LLMs',
-  llm: 'AI & LLMs',
-  agents: 'AI & LLMs',
-  mcp: 'AI & LLMs',
-  'inference-sh': 'AI & LLMs',
-  'data-science': 'Data & Analytics',
-  data: 'Data & Analytics',
-  'social-media': 'Marketing & Sales',
-  social: 'Marketing & Sales',
-  email: 'Communication',
-  'note-taking': 'Productivity',
-  notetaking: 'Productivity',
-  notes: 'Productivity',
-  'smart-home': 'Productivity',
-  apple: 'Productivity',
-  leisure: 'Productivity',
-  gaming: 'Productivity',
-  'red-teaming': 'AI & LLMs',
-  domain: 'Productivity',
-  dogfood: 'Productivity',
-  productivity: 'Productivity',
+  research: 'Поиск и исследования',
+  'search-and-research': 'Поиск и исследования',
+  search: 'Поиск и исследования',
+  feeds: 'Поиск и исследования',
+  'web-frontend': 'Веб и фронтенд',
+  frontend: 'Веб и фронтенд',
+  web: 'Веб и фронтенд',
+  'software-development': 'Агенты для кода',
+  coding: 'Агенты для кода',
+  development: 'Агенты для кода',
+  devops: 'DevOps и облако',
+  cloud: 'DevOps и облако',
+  'devops-cloud': 'DevOps и облако',
+  mlops: 'DevOps и облако',
+  git: 'Git и GitHub',
+  github: 'Git и GitHub',
+  'git-github': 'Git и GitHub',
+  browser: 'Браузер и автоматизация',
+  automation: 'Браузер и автоматизация',
+  'browser-automation': 'Браузер и автоматизация',
+  image: 'Изображения и видео',
+  video: 'Изображения и видео',
+  media: 'Изображения и видео',
+  creative: 'Изображения и видео',
+  'image-video': 'Изображения и видео',
+  gifs: 'Изображения и видео',
+  diagramming: 'Изображения и видео',
+  'autonomous-ai-agents': 'ИИ и LLM',
+  ai: 'ИИ и LLM',
+  llm: 'ИИ и LLM',
+  agents: 'ИИ и LLM',
+  mcp: 'ИИ и LLM',
+  'inference-sh': 'ИИ и LLM',
+  'data-science': 'Данные и аналитика',
+  data: 'Данные и аналитика',
+  'social-media': 'Маркетинг и продажи',
+  social: 'Маркетинг и продажи',
+  email: 'Коммуникации',
+  'note-taking': 'Продуктивность',
+  notetaking: 'Продуктивность',
+  notes: 'Продуктивность',
+  'smart-home': 'Продуктивность',
+  apple: 'Продуктивность',
+  leisure: 'Продуктивность',
+  gaming: 'Продуктивность',
+  'red-teaming': 'ИИ и LLM',
+  domain: 'Продуктивность',
+  dogfood: 'Продуктивность',
+  productivity: 'Продуктивность',
 }
 
 const KNOWN_CATEGORY_SET = new Set<string>(
@@ -295,21 +295,21 @@ function guessCategory(record: Record<string, unknown>): string {
   if (direct) return normalizeCategoryLabel(direct)
   const tags = readStringArray(record.tags).map((tag) => tag.toLowerCase())
   if (tags.some((tag) => tag.includes('frontend') || tag.includes('react'))) {
-    return 'Web & Frontend'
+    return 'Веб и фронтенд'
   }
   if (tags.some((tag) => tag.includes('browser'))) {
-    return 'Browser & Automation'
+    return 'Браузер и автоматизация'
   }
   if (tags.some((tag) => tag.includes('git'))) {
-    return 'Git & GitHub'
+    return 'Git и GitHub'
   }
   if (tags.some((tag) => tag.includes('research') || tag.includes('search'))) {
-    return 'Search & Research'
+    return 'Поиск и исследования'
   }
   if (tags.some((tag) => tag.includes('ai') || tag.includes('llm'))) {
-    return 'AI & LLMs'
+    return 'ИИ и LLM'
   }
-  return 'Productivity'
+  return 'Продуктивность'
 }
 
 function normalizeSkill(value: unknown): SkillSummary | null {

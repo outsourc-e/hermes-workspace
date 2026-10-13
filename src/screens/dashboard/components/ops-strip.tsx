@@ -7,7 +7,7 @@ function formatPulse(iso: string | null): string {
   const ms = Date.parse(iso)
   if (!Number.isFinite(ms)) return '—'
   const diff = Date.now() - ms
-  if (diff < 0) return 'just now'
+  if (diff < 0) return 'только что'
   if (diff < 60_000) return '<1m ago'
   if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`
   if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`
@@ -54,9 +54,9 @@ function formatNextRun(iso: string | null): {
   text: string
   tone: string
 } {
-  if (!iso) return { text: 'no schedule', tone: 'var(--theme-muted)' }
+  if (!iso) return { text: 'нет расписания', tone: 'var(--theme-muted)' }
   const ms = Date.parse(iso)
-  if (!Number.isFinite(ms)) return { text: 'no schedule', tone: 'var(--theme-muted)' }
+  if (!Number.isFinite(ms)) return { text: 'нет расписания', tone: 'var(--theme-muted)' }
   const diff = ms - Date.now()
   if (diff < -7 * 86_400_000) {
     return { text: 'stale', tone: 'var(--theme-muted)' }
@@ -170,7 +170,7 @@ export function OpsStrip({
                 '1px solid color-mix(in srgb, var(--theme-warning) 35%, transparent)',
             }}
           >
-            restart pending
+            ожидается перезапуск
           </span>
         ) : null}
         {drift > 0 ? (
@@ -235,7 +235,7 @@ export function OpsStrip({
                   : 'transparent',
               color: 'var(--theme-muted)',
             }}
-            title="Open Kanban board"
+            title="Открыть канбан-доску"
           >
             <span>board</span>
             <span style={{ color: 'var(--theme-text)' }}>{kanban.total}</span>

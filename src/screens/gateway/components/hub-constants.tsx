@@ -140,16 +140,16 @@ export type MissionBoardDraft = {
 
 export const EXAMPLE_MISSIONS: Array<{ label: string; text: string }> = [
   {
-    label: 'Build a REST API',
-    text: 'Design and implement a REST API: define endpoints, write route handlers, add authentication middleware, write tests, and document all endpoints with OpenAPI spec.',
+    label: 'Создать REST API',
+    text: 'Спроектировать и реализовать REST API: определить эндпоинты, написать обработчики, добавить аутентификацию, написать тесты и описать все эндпоинты в спецификации OpenAPI.',
   },
   {
-    label: 'Research competitors',
-    text: 'Research top 5 competitors: analyze their product features, pricing models, target markets, and customer reviews. Summarize findings and identify gaps we can exploit.',
+    label: 'Изучить конкурентов',
+    text: 'Изучить 5 главных конкурентов: функции продуктов, модели ценообразования, целевые рынки и отзывы клиентов. Подвести итоги и найти пробелы, которыми можно воспользоваться.',
   },
   {
-    label: 'Write blog posts',
-    text: 'Create a 3-part blog series: outline topics, research each subject, write drafts, add SEO keywords, and prepare a publishing schedule with social media copy.',
+    label: 'Написать статьи для блога',
+    text: 'Создать серию из 3 статей: наметить темы, изучить каждую, написать черновики, добавить SEO-ключи и подготовить график публикаций с текстами для соцсетей.',
   },
 ]
 
@@ -159,17 +159,17 @@ export type ActiveTab = 'overview' | 'configure' | 'runs' | 'kanban' | 'analytic
 export type ConfigSection = 'agents' | 'teams' | 'keys'
 
 export const TAB_DEFS: Array<{ id: ActiveTab; icon: string; label: string }> = [
-  { id: 'overview', icon: '🏠', label: 'Overview' },
-  { id: 'runs', icon: '▶️', label: 'Runs' },
-  { id: 'kanban', icon: '📋', label: 'Board' },
-  { id: 'analytics', icon: '📊', label: 'Analytics' },
-  { id: 'configure', icon: '⚙️', label: 'Configure' },
+  { id: 'overview', icon: '🏠', label: 'Обзор' },
+  { id: 'runs', icon: '▶️', label: 'Запуски' },
+  { id: 'kanban', icon: '📋', label: 'Доска' },
+  { id: 'analytics', icon: '📊', label: 'Аналитика' },
+  { id: 'configure', icon: '⚙️', label: 'Настроить' },
 ]
 
 export const CONFIG_SECTIONS: Array<{ id: ConfigSection; icon: string; label: string }> = [
-  { id: 'agents', icon: '🤖', label: 'Agents' },
-  { id: 'teams', icon: '👥', label: 'Teams' },
-  { id: 'keys', icon: '🔑', label: 'API Keys' },
+  { id: 'agents', icon: '🤖', label: 'Агенты' },
+  { id: 'teams', icon: '👥', label: 'Команды' },
+  { id: 'keys', icon: '🔑', label: 'API-ключи' },
 ]
 
 export const HUB_PAGE_TITLE_CLASS = 'text-lg font-bold text-neutral-900 dark:text-neutral-100 md:text-xl'
@@ -192,12 +192,12 @@ export const TEAM_QUICK_TEMPLATES: Array<{
   tier: 'budget' | 'balanced' | 'max'
   agents: string[]
 }> = [
-  { id: 'research-budget', label: 'Research Lite', icon: '🔬', description: 'Fast research with minimal cost', templateId: 'research', tier: 'budget', agents: ['Atlas', 'Lens'] },
-  { id: 'research-max', label: 'Research Pro', icon: '🧪', description: 'Deep analysis with full team', templateId: 'research', tier: 'max', agents: ['Atlas', 'Lens', 'Cipher'] },
-  { id: 'coding-budget', label: 'Dev Lite', icon: '⚡', description: 'Quick coding tasks, single agent', templateId: 'coding', tier: 'budget', agents: ['Forge'] },
-  { id: 'coding-balanced', label: 'Dev Team', icon: '💻', description: 'Balanced dev team with review', templateId: 'coding', tier: 'balanced', agents: ['Forge', 'Sentinel', 'Spark'] },
-  { id: 'content-balanced', label: 'Content Studio', icon: '✍️', description: 'Writing, editing, and polish', templateId: 'content', tier: 'balanced', agents: ['Scout', 'Quill', 'Polish'] },
-  { id: 'full-max', label: 'Full Stack', icon: '🚀', description: 'Maximum output — all roles covered', templateId: 'coding', tier: 'max', agents: ['Forge', 'Sentinel', 'Spark', 'Atlas', 'Lens'] },
+  { id: 'research-budget', label: 'Исследование (лёгкое)', icon: '🔬', description: 'Быстрое исследование с минимальными затратами', templateId: 'research', tier: 'budget', agents: ['Atlas', 'Lens'] },
+  { id: 'research-max', label: 'Исследование (расширенное)', icon: '🧪', description: 'Глубокий анализ всей командой', templateId: 'research', tier: 'max', agents: ['Atlas', 'Lens', 'Cipher'] },
+  { id: 'coding-budget', label: 'Dev Lite', icon: '⚡', description: 'Быстрые задачи по коду, один агент', templateId: 'coding', tier: 'budget', agents: ['Forge'] },
+  { id: 'coding-balanced', label: 'Команда разработки', icon: '💻', description: 'Сбалансированная команда разработки с ревью', templateId: 'coding', tier: 'balanced', agents: ['Forge', 'Sentinel', 'Spark'] },
+  { id: 'content-balanced', label: 'Студия контента', icon: '✍️', description: 'Написание, редактирование и вычитка', templateId: 'content', tier: 'balanced', agents: ['Scout', 'Quill', 'Polish'] },
+  { id: 'full-max', label: 'Full Stack', icon: '🚀', description: 'Максимальный результат — охвачены все роли', templateId: 'coding', tier: 'max', agents: ['Forge', 'Sentinel', 'Spark', 'Atlas', 'Lens'] },
 ]
 
 export const SYSTEM_PROMPT_TEMPLATES: Array<{
@@ -210,7 +210,7 @@ export const SYSTEM_PROMPT_TEMPLATES: Array<{
 }> = [
   {
     id: 'senior-dev',
-    label: 'Senior Dev',
+    label: 'Старший разработчик',
     icon: '💻',
     roleHint: 'cod',
     category: 'engineering',
@@ -232,7 +232,7 @@ Output format:
   },
   {
     id: 'assistant',
-    label: 'General',
+    label: 'Общие',
     icon: '🤖',
     roleHint: 'any',
     category: 'general',

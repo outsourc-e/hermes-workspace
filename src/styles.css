@@ -233,7 +233,7 @@
 }
 
 :root {
-  --interface-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --interface-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --interface-density-scale: 1;
 }
 
@@ -778,7 +778,7 @@ code {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ── Hermes Workspace Themes ── */
+/* ── AWG GPT Themes ── */
 
 [data-theme='matrix'] {
   --theme-bg: #020804;
@@ -1158,95 +1158,95 @@ code {
    ============================================================ */
 
 [data-theme='claude-nous'] {
-  --theme-bg: #041c1c;
-  --theme-sidebar: #06282a;
-  --theme-panel: #06282a;
-  --theme-card: #082f31;
-  --theme-card2: #0a3638;
-  --theme-border: rgba(255, 230, 203, 0.2);
-  --theme-border-subtle: rgba(255, 230, 203, 0.1);
-  --theme-text: #ffe6cb;
-  --theme-muted: rgba(255, 230, 203, 0.6);
+  --theme-bg: #141316;
+  --theme-sidebar: #171519;
+  --theme-panel: #19171d;
+  --theme-card: #19171d;
+  --theme-card2: #211d27;
+  --theme-border: rgba(243, 241, 246, 0.14);
+  --theme-border-subtle: rgba(243, 241, 246, 0.08);
+  --theme-text: #f3f1f6;
+  --theme-muted: rgba(243, 241, 246, 0.6);
   --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
   --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.48);
   --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.58);
-  --theme-glass: rgba(4, 28, 28, 0.88);
-  --theme-focus: #ffac02;
-  --theme-accent: #ffac02;
-  --theme-accent-secondary: #ffe6cb;
-  --theme-accent-subtle: rgba(255, 172, 2, 0.12);
-  --theme-accent-border: rgba(255, 172, 2, 0.28);
-  --theme-active: #ffac02;
-  --theme-link: #ffe6cb;
-  --theme-success: #8fff89;
-  --theme-warning: #ffac02;
-  --theme-danger: #fb2c36;
-  --theme-stripe: rgba(255, 230, 203, 0.05);
-  --theme-header-bg: #041c1c;
-  --theme-header-border: rgba(255, 230, 203, 0.2);
-  --chat-user-bg: #08302d;
-  --chat-user-border: rgba(255, 172, 2, 0.28);
-  --chat-user-foreground: #ffe6cb;
-  --chat-assistant-bg: #06282a;
-  --chat-assistant-border: rgba(255, 230, 203, 0.1);
-  --chat-assistant-foreground: #ffe6cb;
-  --composer-bg: #06282a;
-  --composer-border: rgba(255, 230, 203, 0.2);
-  --composer-placeholder: rgba(255, 230, 203, 0.45);
-  --tool-card-bg: #06282a;
-  --tool-card-border: rgba(255, 230, 203, 0.15);
-  --tool-card-title: #ffe6cb;
-  --tool-card-muted: rgba(255, 230, 203, 0.55);
-  --code-bg: #02181a;
-  --code-border: rgba(255, 230, 203, 0.12);
-  --code-foreground: #8fff89;
-  --theme-input: #06282a;
+  --theme-glass: rgba(20, 19, 22, 0.88);
+  --theme-focus: #b79cff;
+  --theme-accent: #b79cff;
+  --theme-accent-secondary: #d0cad9;
+  --theme-accent-subtle: rgba(183, 156, 255, 0.12);
+  --theme-accent-border: rgba(183, 156, 255, 0.3);
+  --theme-active: #b79cff;
+  --theme-link: #b79cff;
+  --theme-success: #7fd9a0;
+  --theme-warning: #e0b45a;
+  --theme-danger: #f06a6a;
+  --theme-stripe: rgba(243, 241, 246, 0.04);
+  --theme-header-bg: #141316;
+  --theme-header-border: rgba(243, 241, 246, 0.12);
+  --chat-user-bg: #262030;
+  --chat-user-border: rgba(183, 156, 255, 0.28);
+  --chat-user-foreground: #f3f1f6;
+  --chat-assistant-bg: #19171d;
+  --chat-assistant-border: rgba(243, 241, 246, 0.08);
+  --chat-assistant-foreground: #f3f1f6;
+  --composer-bg: #19171d;
+  --composer-border: rgba(243, 241, 246, 0.16);
+  --composer-placeholder: rgba(243, 241, 246, 0.45);
+  --tool-card-bg: #19171d;
+  --tool-card-border: rgba(243, 241, 246, 0.12);
+  --tool-card-title: #f3f1f6;
+  --tool-card-muted: rgba(243, 241, 246, 0.55);
+  --code-bg: #0f0e11;
+  --code-border: rgba(243, 241, 246, 0.1);
+  --code-foreground: #d0cad9;
+  --theme-input: #19171d;
 }
 
 [data-theme='claude-nous-light'] {
-  --theme-bg: #f8faf8;
-  --theme-sidebar: #f2f6f4;
-  --theme-panel: #f4f7f5;
-  --theme-card: #fbfdfb;
-  --theme-card2: #f1f5f2;
-  --theme-border: rgba(30, 74, 92, 0.18);
-  --theme-border-subtle: rgba(30, 74, 92, 0.1);
-  --theme-text: #16315f;
-  --theme-muted: rgba(22, 49, 95, 0.6);
-  --theme-shadow-1: 0 0 0 rgba(22, 49, 95, 0);
-  --theme-shadow-2: 0 1px 2px rgba(22, 49, 95, 0.03);
-  --theme-shadow-3: 0 8px 24px rgba(22, 49, 95, 0.05);
-  --theme-glass: rgba(248, 250, 248, 0.92);
-  --theme-focus: #2557b7;
-  --theme-accent: #2557b7;
-  --theme-accent-secondary: #3f6fca;
-  --theme-accent-subtle: rgba(37, 87, 183, 0.07);
-  --theme-accent-border: rgba(37, 87, 183, 0.18);
-  --theme-active: #2557b7;
-  --theme-link: #2557b7;
-  --theme-success: #4f7c64;
+  --theme-bg: #f3f1f6;
+  --theme-sidebar: #efedf2;
+  --theme-panel: #f3f1f6;
+  --theme-card: #fbfafd;
+  --theme-card2: #efedf2;
+  --theme-border: rgba(81, 70, 92, 0.18);
+  --theme-border-subtle: rgba(81, 70, 92, 0.1);
+  --theme-text: #19171d;
+  --theme-muted: rgba(25, 23, 29, 0.6);
+  --theme-shadow-1: 0 0 0 rgba(25, 23, 29, 0);
+  --theme-shadow-2: 0 1px 2px rgba(25, 23, 29, 0.04);
+  --theme-shadow-3: 0 8px 24px rgba(25, 23, 29, 0.07);
+  --theme-glass: rgba(243, 241, 246, 0.92);
+  --theme-focus: #7657c7;
+  --theme-accent: #7657c7;
+  --theme-accent-secondary: #8d73d6;
+  --theme-accent-subtle: rgba(118, 87, 199, 0.08);
+  --theme-accent-border: rgba(118, 87, 199, 0.22);
+  --theme-active: #7657c7;
+  --theme-link: #7657c7;
+  --theme-success: #3f8a5f;
   --theme-warning: #9c6b2f;
-  --theme-danger: #a24b4b;
-  --theme-stripe: rgba(30, 74, 92, 0.05);
-  --theme-header-bg: #f2f6f4;
-  --theme-header-border: rgba(30, 74, 92, 0.16);
-  --chat-user-bg: #eef2f6;
-  --chat-user-border: rgba(37, 87, 183, 0.18);
-  --chat-user-foreground: #16315f;
-  --chat-assistant-bg: #f7faf8;
-  --chat-assistant-border: rgba(30, 74, 92, 0.1);
-  --chat-assistant-foreground: #16315f;
-  --composer-bg: #fbfdfb;
-  --composer-border: rgba(30, 74, 92, 0.18);
-  --composer-placeholder: rgba(22, 49, 95, 0.45);
-  --tool-card-bg: #f3f7f4;
-  --tool-card-border: rgba(30, 74, 92, 0.14);
-  --tool-card-title: #16315f;
-  --tool-card-muted: rgba(22, 49, 95, 0.55);
-  --code-bg: #f1f6f3;
-  --code-border: rgba(30, 74, 92, 0.14);
-  --code-foreground: #16315f;
-  --theme-input: #fbfdfb;
+  --theme-danger: #b3413f;
+  --theme-stripe: rgba(81, 70, 92, 0.05);
+  --theme-header-bg: #efedf2;
+  --theme-header-border: rgba(81, 70, 92, 0.16);
+  --chat-user-bg: #e9e4f5;
+  --chat-user-border: rgba(118, 87, 199, 0.22);
+  --chat-user-foreground: #19171d;
+  --chat-assistant-bg: #fbfafd;
+  --chat-assistant-border: rgba(81, 70, 92, 0.1);
+  --chat-assistant-foreground: #19171d;
+  --composer-bg: #fbfafd;
+  --composer-border: rgba(81, 70, 92, 0.2);
+  --composer-placeholder: rgba(25, 23, 29, 0.45);
+  --tool-card-bg: #f3f1f6;
+  --tool-card-border: rgba(81, 70, 92, 0.14);
+  --tool-card-title: #19171d;
+  --tool-card-muted: rgba(25, 23, 29, 0.55);
+  --code-bg: #efedf2;
+  --code-border: rgba(81, 70, 92, 0.14);
+  --code-foreground: #302a37;
+  --theme-input: #fbfafd;
 }
 
 [data-theme='claude-nous'] html,

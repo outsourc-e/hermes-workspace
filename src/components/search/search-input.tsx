@@ -34,7 +34,7 @@ export function SearchInput({
         ref={inputRef}
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
-        placeholder="Search chats, files, agents, skills..."
+        placeholder="Поиск по чатам, файлам, агентам, навыкам..."
         className={cn(
           'h-12 w-full rounded-xl border border-border bg-muted/60 pl-10 pr-24 text-sm text-foreground outline-none',
           'placeholder:text-muted-foreground focus:border-primary focus:bg-muted',
@@ -47,7 +47,7 @@ export function SearchInput({
           variant="ghost"
           onClick={onClear}
           className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:bg-muted"
-          aria-label="Clear search"
+          aria-label="Очистить поиск"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.5} />
         </Button>

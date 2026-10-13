@@ -10,7 +10,7 @@ import type { Components } from 'react-markdown'
 import { cn } from '@/lib/utils'
 
 /**
- * Rewrite Workspace-local `MEDIA:<path>` tokens emitted by Hermes Agent to the
+ * Rewrite Workspace-local `MEDIA:<path>` tokens emitted by AWG GPT to the
  * authenticated media endpoint. Messaging bridges intercept MEDIA tags before
  * rendering; the web chat sees raw markdown/HTML and needs this client-side
  * rewrite so browsers can load the file through Workspace instead of trying to

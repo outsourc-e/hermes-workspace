@@ -102,7 +102,7 @@ export const SaveModeDialog = memo(function SaveModeDialog({
           id="save-mode-title"
           className="mb-4 text-lg font-semibold text-primary-900"
         >
-          Save Mode
+          Сохранить режим
         </h2>
 
         <form onSubmit={handleSubmit}>
@@ -111,7 +111,7 @@ export const SaveModeDialog = memo(function SaveModeDialog({
               htmlFor="mode-name"
               className="mb-2 block text-sm font-medium text-primary-700"
             >
-              Mode Name
+              Название режима
             </label>
             <input
               ref={inputRef}
@@ -127,7 +127,7 @@ export const SaveModeDialog = memo(function SaveModeDialog({
                 error &&
                   'border-red-500 focus:border-red-500 focus:ring-red-500',
               )}
-              placeholder="e.g., Work Mode"
+              placeholder="Например: Рабочий режим"
               maxLength={50}
               aria-invalid={!!error}
               aria-describedby={error ? 'mode-name-error' : undefined}
@@ -154,8 +154,7 @@ export const SaveModeDialog = memo(function SaveModeDialog({
               <span>Include current model ({currentModel || 'none'})</span>
             </label>
             <p className="ml-6 mt-1 text-xs text-primary-500">
-              If unchecked, applying this mode will only update settings (not
-              model).
+              Если не отмечено, режим изменит только настройки, но не модель.
             </p>
           </div>
 
@@ -165,13 +164,13 @@ export const SaveModeDialog = memo(function SaveModeDialog({
               onClick={onClose}
               className="rounded-lg border border-primary-200 bg-surface px-4 py-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-400"
             >
-              Cancel
+              Отмена
             </button>
             <button
               type="submit"
               className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400"
             >
-              Save Mode
+              Сохранить режим
             </button>
           </div>
         </form>

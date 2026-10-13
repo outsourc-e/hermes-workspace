@@ -479,13 +479,13 @@ export function AgentOutputPanel({
       {/* Terminal output */}
       {sessionKey && streamDisconnected && !sessionEnded ? (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-400">
-          <span>Stream disconnected</span>
+          <span>Поток отключён</span>
           <button
             type="button"
             onClick={handleReconnect}
             className="rounded border border-amber-400 px-2 py-0.5 text-[10px] font-semibold text-amber-600 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40"
           >
-            Reconnect
+            Переподключиться
           </button>
         </div>
       ) : null}
@@ -525,7 +525,7 @@ export function AgentOutputPanel({
               <span className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</span>
             </>
           ) : messages.length === 0 && !sessionEnded ? (
-            <p className="animate-pulse text-[var(--theme-muted)]">Waiting for response…</p>
+            <p className="animate-pulse text-[var(--theme-muted)]">Ожидание ответа…</p>
           ) : (
             <>
               {sortedMessages.map((msg, index) =>
@@ -544,7 +544,7 @@ export function AgentOutputPanel({
                     className="my-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-900 dark:border-blue-900/30 dark:bg-blue-950/20 dark:text-blue-200"
                   >
                     <div className="mb-1 flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">You</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Вы</span>
                       <span className="text-[10px] text-[var(--theme-muted)] tabular-nums">{formatTimestamp(msg.timestamp)}</span>
                     </div>
                     <Markdown className="text-sm leading-6 text-blue-800 dark:text-blue-100 [&_p]:my-1 [&_ul]:my-2 [&_ol]:my-2">
@@ -591,7 +591,7 @@ export function AgentOutputPanel({
         // Fallback placeholder when no sessionKey
         <div className={cn('min-h-0 flex-1 overflow-y-auto rounded-lg bg-[var(--theme-card2)] p-3 font-mono text-sm leading-6 text-[var(--theme-text)]', compact ? 'min-h-0 flex-1 overflow-y-auto' : 'mt-1 min-h-[300px]')}>
           {tasks.length === 0 ? (
-            <p className="text-[var(--theme-muted)]">No dispatched tasks yet.</p>
+            <p className="text-[var(--theme-muted)]">Отправленных задач пока нет.</p>
           ) : (
             <>
               <p className="text-[var(--theme-muted)]">$ Dispatching to {agentName}…</p>
@@ -650,7 +650,7 @@ export function AgentOutputPanel({
             type="text"
             value={messageInput}
             onChange={(e) => setMessageInput(e.target.value)}
-            placeholder={`Message ${agentName}...`}
+            placeholder={`Сообщение для ${agentName}...`}
             disabled={sendingMessage}
             className="flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
           />
@@ -659,7 +659,7 @@ export function AgentOutputPanel({
             disabled={!messageInput.trim() || sendingMessage}
             className="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-40"
           >
-            Send
+            Отправить
           </button>
         </form>
       )}
@@ -710,7 +710,7 @@ export function AgentOutputPanel({
           type="button"
           onClick={onClose}
           className="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--theme-border)] text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
-          aria-label="Close agent output"
+          aria-label="Закрыть вывод агента"
         >
           ✕
         </button>

@@ -290,7 +290,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         markFailed(
           reason === 'handoff'
             ? 'Run stalled after handoff'
-            : 'No activity received after message was accepted',
+            : 'После принятия сообщения активности нет',
         )
       }, timeoutMs)
     },
@@ -440,7 +440,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
       const payload = data as Record<string, unknown>
 
       // [DEBUG TUI] Log every SSE event so we can see whether tool.* events arrive
-      // from Hermes Agent through Workspace. Toggle off by setting
+      // from AWG GPT through Workspace. Toggle off by setting
       // localStorage.removeItem('hermes:debug:sse')
       if (
         typeof window !== 'undefined' &&
@@ -500,7 +500,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           pushActivity({
             type: 'assistant_start',
             time: new Date().toLocaleTimeString(),
-            text: 'Assistant started',
+            text: 'Ассистент запущен',
           })
           processStoreEvent({
             type: 'chunk',
@@ -770,7 +770,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           ) {
             transitionToHandoff()
           } else {
-            markFailed('Hermes Agent connection closed')
+            markFailed('AWG GPT connection closed')
           }
           break
         }
@@ -913,8 +913,8 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
         markAccepted()
         schedulePostAcceptanceTimeout('accepted')
 
-        // HTTP 200 — message accepted by Hermes Agent. Clear optimistic "sending"
-        // status so the Retry timer never fires. Hermes Agent does NOT echo
+        // HTTP 200 — message accepted by AWG GPT. Clear optimistic "sending"
+        // status so the Retry timer never fires. AWG GPT does NOT echo
         // user messages via SSE, so this is the only confirmation we get.
         if (params.idempotencyKey && onMessageAccepted) {
           onMessageAccepted(
@@ -998,7 +998,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             (lifecyclePhase === 'accepted' || lifecyclePhase === 'active')
           ) {
             markFailed(
-              'Connection closed before response was received. The backend may still be processing — check server logs or retry.',
+              'Соединение закрылось до получения ответа. Бэкенд может ещё обрабатывать запрос — проверьте журналы сервера или повторите.',
             )
           } else {
             finishStream()

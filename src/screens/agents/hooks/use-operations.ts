@@ -608,7 +608,7 @@ export function useOperations() {
           ? `Next ${formatUpcomingTime(nextRunAt)}`
           : lastActivityAt
             ? `Last ${formatRelativeTime(lastActivityAt)}`
-            : 'No activity yet',
+            : 'Активности пока нет',
         progressValue: getProgressValue(status, latestSession),
         progressStatus: getProgressStatus(status, latestSession),
         recentOutputs,
@@ -646,7 +646,7 @@ export function useOperations() {
       }
       const currentAgents = normalizeAgentList(configQuery.data?.parsed?.agents?.list)
       if (currentAgents.some((agent) => agent.id === id)) {
-        throw new Error('A profile with this name already exists')
+        throw new Error('Профиль с таким названием уже есть')
       }
 
       await createClaudeProfile({
@@ -676,7 +676,7 @@ export function useOperations() {
       toast('Agent created', { type: 'success' })
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to create agent', {
+      toast(error instanceof Error ? error.message : 'Не удалось создать агента', {
         type: 'error',
       })
     },
@@ -711,7 +711,7 @@ export function useOperations() {
       toast('Agent settings saved', { type: 'success' })
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to save agent', {
+      toast(error instanceof Error ? error.message : 'Не удалось сохранить агента', {
         type: 'error',
       })
     },
@@ -733,7 +733,7 @@ export function useOperations() {
       toast('Agent deleted', { type: 'success' })
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : 'Failed to delete agent', {
+      toast(error instanceof Error ? error.message : 'Не удалось удалить агента', {
         type: 'error',
       })
     },

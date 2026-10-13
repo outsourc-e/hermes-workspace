@@ -81,28 +81,28 @@ export function StandaloneRuntimePane({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <TuiPill tone="live">Live TUI</TuiPill>
+                <TuiPill tone="live">Живой TUI</TuiPill>
                 <TuiPill>{terminalTargets.length} terminal{terminalTargets.length === 1 ? '' : 's'}</TuiPill>
                 {roomIds.length > 0 ? <TuiPill tone="warn">room {roomIds.join(', ')}</TuiPill> : null}
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">
-                Swarm tmux control
+                Управление tmux в Swarm
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-emerald-50/55">
-                Native Swarm2 TUI cards attached directly to the worker tmux sessions. Click a terminal to focus and type.
+                Карточки TUI подключены напрямую к tmux-сессиям исполнителей. Нажмите на терминал, чтобы сфокусироваться и ввести текст.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <TuiPill>Auto</TuiPill>
-              <TuiPill>Chat</TuiPill>
-              <TuiPill>Logs</TuiPill>
+              <TuiPill>Авто</TuiPill>
+              <TuiPill>Чат</TuiPill>
+              <TuiPill>Журналы</TuiPill>
             </div>
           </div>
         </div>
 
         {terminalTargets.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-emerald-400/16 bg-emerald-500/5 px-4 py-12 text-center text-sm text-emerald-100/55">
-            Select a worker or add workers to the room to open tmux terminals here.
+            Выберите исполнителя или добавьте их в комнату, чтобы открыть здесь tmux-терминалы.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">

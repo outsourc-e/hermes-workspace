@@ -34,15 +34,15 @@ export function DebugPanel({
         'absolute inset-y-0 right-0 z-40 flex h-full w-[400px] max-w-full translate-x-0 flex-col border-l border-primary-700/40 bg-[#0d0d0d] text-primary-100 shadow-2xl transition-transform duration-200',
       )}
       role="complementary"
-      aria-label="Debug analyzer"
+      aria-label="Анализатор отладки"
     >
       <div className="flex items-center gap-2 border-b border-primary-700/40 px-4 py-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-medium text-primary-100 text-balance">
-            Debug Analyzer
+            Анализатор отладки
           </h3>
           <p className="text-xs text-primary-400 text-pretty">
-            AI-assisted issue diagnosis for the active terminal
+            ИИ-диагностика проблем в активном терминале
           </p>
         </div>
         <Button
@@ -50,7 +50,7 @@ export function DebugPanel({
           variant="ghost"
           className="text-primary-300 hover:bg-primary-900 hover:text-primary-100"
           onClick={onClose}
-          aria-label="Close debug analyzer panel"
+          aria-label="Закрыть панель отладки"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={20} strokeWidth={1.5} />
         </Button>
@@ -73,7 +73,7 @@ export function DebugPanel({
           <div className="space-y-4">
             <section className="rounded-lg border border-accent-500/40 bg-accent-500/10 p-3">
               <h4 className="text-xs font-medium text-accent-200 text-balance">
-                Summary
+                Сводка
               </h4>
               <p className="mt-1 text-sm text-accent-100 text-pretty">
                 {analysis.summary}
@@ -82,7 +82,7 @@ export function DebugPanel({
 
             <section className="rounded-lg border border-primary-700/50 bg-primary-900/40 p-3">
               <h4 className="text-xs font-medium text-primary-300 text-balance">
-                Root Cause
+                Первопричина
               </h4>
               <p className="mt-1 text-sm text-primary-100 text-pretty">
                 {analysis.rootCause}
@@ -91,7 +91,7 @@ export function DebugPanel({
 
             <section>
               <h4 className="text-xs font-medium text-primary-300 text-balance">
-                Suggested Commands
+                Предлагаемые команды
               </h4>
               {analysis.suggestedCommands.length > 0 ? (
                 <ul className="mt-2 space-y-2">
@@ -127,7 +127,7 @@ export function DebugPanel({
                 </ul>
               ) : (
                 <p className="mt-2 text-xs text-primary-500 text-pretty">
-                  No command suggestions were returned.
+                  Подсказок команд не получено.
                 </p>
               )}
             </section>
@@ -135,7 +135,7 @@ export function DebugPanel({
             {analysis.docsLink ? (
               <section className="rounded-lg border border-primary-700/50 bg-primary-900/30 p-3">
                 <h4 className="text-xs font-medium text-primary-300 text-balance">
-                  Documentation
+                  Документация
                 </h4>
                 <a
                   href={analysis.docsLink}
@@ -152,7 +152,7 @@ export function DebugPanel({
 
         {!isLoading && !analysis ? (
           <p className="text-sm text-primary-500 text-pretty">
-            Click Debug to analyze the most recent terminal output.
+            Нажмите «Отладка», чтобы проанализировать последний вывод терминала.
           </p>
         ) : null}
       </div>

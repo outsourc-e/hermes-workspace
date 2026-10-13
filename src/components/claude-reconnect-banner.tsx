@@ -11,7 +11,7 @@ type BannerState = 'hidden' | 'disconnected' | 'connected'
 
 async function probeClaudeHealth(): Promise<boolean> {
   // Use the portable-aware connection status endpoint first,
-  // which works with both Hermes Agent and OpenAI-compatible backends.
+  // which works with both AWG GPT and OpenAI-compatible backends.
   try {
     const response = await fetch('/api/connection-status', {
       cache: 'no-store',
@@ -132,7 +132,7 @@ export function ClaudeReconnectBanner({
                   if (res.ok && data.ok) {
                     setMessage(
                       data.message ||
-                        'Auto-restarting Hermes Agent gateway…',
+                        'Auto-restarting AWG GPT gateway…',
                     )
                     // Probe again shortly so the banner clears as soon as
                     // the gateway answers /health.
@@ -156,7 +156,7 @@ export function ClaudeReconnectBanner({
             wasDisconnectedRef.current = true
             setBannerState('disconnected')
             setMessage(
-              error instanceof Error ? error.message : 'Connection failed',
+              error instanceof Error ? error.message : 'Не удалось подключиться',
             )
           }
           return false
@@ -210,17 +210,17 @@ export function ClaudeReconnectBanner({
       }
 
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Failed to start Hermes Agent')
+        throw new Error(payload.error || 'Не удалось запустить AWG GPT')
       }
 
       setMessage(
         payload.message === 'already running'
-          ? 'Hermes Agent is already running'
-          : 'Starting Hermes Agent…',
+          ? 'AWG GPT is already running'
+          : 'Starting AWG GPT…',
       )
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : 'Failed to start Hermes Agent',
+        error instanceof Error ? error.message : 'Не удалось запустить AWG GPT',
       )
     } finally {
       setIsStarting(false)
@@ -260,7 +260,7 @@ export function ClaudeReconnectBanner({
           />
           <div className="min-w-0">
             <p className="text-sm font-semibold">
-              {isDisconnected ? 'Hermes Agent not connected' : 'Connected'}
+              {isDisconnected ? 'AWG GPT not connected' : 'Connected'}
             </p>
             {message ? (
               <p className="truncate text-xs opacity-80">{message}</p>

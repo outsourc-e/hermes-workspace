@@ -16,9 +16,9 @@ export function AgentsScreen() {
               <HugeiconsIcon icon={BotIcon} size={24} strokeWidth={1.6} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-primary-900">Agents</h1>
+              <h1 className="text-base font-semibold text-primary-900">Агенты</h1>
               <p className="mt-1 text-sm text-primary-600">
-                Workspace agent management was removed during cleanup.
+                Управление агентами рабочего пространства удалено при очистке.
               </p>
             </div>
           </div>
@@ -26,27 +26,27 @@ export function AgentsScreen() {
             <WorkflowHelpModal
               compact
               eyebrow="Operations"
-              title="How Operations works"
+              title="Как работают операции"
               sections={[
                 {
-                  title: 'What this screen does',
+                  title: 'Что делает этот экран',
                   bullets: [
-                    'Operations is the setup and readiness layer for your agents.',
-                    'Use it to confirm which profiles are configured and which ones still need setup.',
+                    '«Операции» — слой настройки и готовности ваших агентов.',
+                    'Здесь видно, какие профили настроены, а каким ещё нужна настройка.',
                   ],
                 },
                 {
-                  title: 'Typical flow',
+                  title: 'Типовой сценарий',
                   bullets: [
                     'Repair or configure agents here first.',
-                    'Then use Conductor for mission-style dispatch and Swarm for coordinated multi-worker runs.',
+                    'Затем используйте Conductor для запуска миссий и Swarm для совместной работы нескольких исполнителей.',
                   ],
                 },
                 {
-                  title: 'FAQ',
+                  title: 'Вопросы и ответы',
                   bullets: [
                     'Needs setup usually means missing model or related runtime configuration.',
-                    'If an agent is broken in Operations, other dispatch surfaces will usually be unreliable too.',
+                    'Если агент не работает в «Операциях», остальные способы запуска, скорее всего, тоже будут нестабильны.',
                   ],
                 },
               ]}
@@ -56,16 +56,15 @@ export function AgentsScreen() {
               onClick={() => void navigate({ to: '/conductor' })}
             >
               <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.8} />
-              Open Conductor
+              Открыть Conductor
             </Button>
           </div>
         </header>
 
         <section className="rounded-xl border border-primary-200 bg-[var(--theme-card)] p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-primary-900">Screen simplified</h2>
+          <h2 className="text-lg font-semibold text-primary-900">Экран упрощён</h2>
           <p className="mt-2 max-w-2xl text-sm text-primary-600">
-            The deleted workspace daemon and project stack backed the previous agent directory.
-            Use Conductor for mission launch and the Gateway Conductor for live session visibility.
+            Удалённый демон рабочего пространства и стек проектов обслуживали прежний каталог агентов. Для запуска миссий используйте Conductor, а для просмотра живых сессий — Gateway Conductor.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
@@ -73,13 +72,13 @@ export function AgentsScreen() {
               className="border border-primary-200 bg-[var(--theme-card)] text-primary-700 hover:bg-primary-50"
               onClick={() => void navigate({ to: '/conductor' })}
             >
-              Open Conductor
+              Открыть Conductor
             </Button>
             <Button
               className="bg-accent-500 text-primary-950 hover:bg-accent-400"
               onClick={() => void navigate({ to: '/conductor' })}
             >
-              Start Mission
+              Начать миссию
             </Button>
           </div>
         </section>

@@ -44,7 +44,7 @@ export function formatLanguageName(language: string): string {
     sql: 'SQL',
     yaml: 'YAML',
     markdown: 'Markdown',
-    text: 'Plain Text',
+    text: 'Простой текст',
   }
   return names[language] || language.charAt(0).toUpperCase() + language.slice(1)
 }

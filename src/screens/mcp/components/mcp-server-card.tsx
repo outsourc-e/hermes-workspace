@@ -136,7 +136,7 @@ export function McpServerCard({ server, onEdit }: Props) {
             endpoint is available; the McpLogsDrawer component is still
             available at ./mcp-logs-drawer. */}
         <Button variant="outline" size="sm" onClick={() => onEdit(server)}>
-          Edit
+          Изменить
         </Button>
         {confirmDelete ? (
           <>
@@ -146,14 +146,14 @@ export function McpServerCard({ server, onEdit }: Props) {
               disabled={remove.isPending}
               onClick={() => remove.mutate({ name: server.name })}
             >
-              Confirm Delete
+              Подтвердить удаление
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setConfirmDelete(false)}
             >
-              Cancel
+              Отмена
             </Button>
           </>
         ) : (
@@ -163,7 +163,7 @@ export function McpServerCard({ server, onEdit }: Props) {
             className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/40"
             onClick={() => setConfirmDelete(true)}
           >
-            Delete
+            Удалить
           </Button>
         )}
       </div>
@@ -191,7 +191,7 @@ export function McpServerCard({ server, onEdit }: Props) {
           if (!showHint) return null
           return (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-              Edit server args/url — looks like a placeholder. Click Edit to fix.
+              Измените аргументы или URL сервера — это похоже на заглушку. Нажмите «Изменить».
             </p>
           )
         })()
@@ -203,7 +203,7 @@ export function McpServerCard({ server, onEdit }: Props) {
       ) : null}
       {oauth.data?.status === 'connected' ? (
         <p className="text-xs text-emerald-700 dark:text-emerald-300">
-          Reauth succeeded.
+          Повторная авторизация выполнена.
         </p>
       ) : null}
     </article>

@@ -24,10 +24,10 @@ function EarlyAccessRoute() {
           <img src="/hermesworld-logo.svg" alt="HermesWorld" className="h-10 w-10 rounded-2xl shadow-[0_0_34px_rgba(34,211,238,.18)]" />
           <div>
             <div className="font-serif text-lg font-bold tracking-[-0.03em] text-[#f8e4ac]">
-              Hermes<span className="text-cyan-200">World</span>
+              Агент<span className="text-cyan-200">Мир</span>
             </div>
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-[#bfb49a]/52">
-              Persistent agent RPG
+              Постоянный агент в формате RPG
             </div>
           </div>
         </div>
@@ -35,7 +35,7 @@ function EarlyAccessRoute() {
         <div className="mt-8">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#d9b35f]/30 bg-[#d9b35f]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#f8e4ac]">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan-200 shadow-[0_0_18px_rgba(34,211,238,.95)]" />
-            Early access — keys rolling out
+            Ранний доступ — ключи выдаются постепенно
           </span>
           <h1 className="mt-5 font-serif text-4xl font-bold leading-[0.92] tracking-[-0.045em] text-[#fff6df] sm:text-6xl">
             HermesWorld is opening soon.
@@ -54,7 +54,7 @@ function EarlyAccessRoute() {
               rel="noreferrer"
               className="group inline-flex items-center justify-center rounded-xl border border-[#ffe7a3]/55 bg-[linear-gradient(180deg,#ffe7a3,#d9a63f)] px-7 py-4 text-sm font-black uppercase tracking-[0.16em] text-[#11100b] shadow-[0_30px_90px_rgba(217,179,95,.32),inset_0_1px_0_rgba(255,255,255,.32)] transition hover:-translate-y-0.5 hover:brightness-110"
             >
-              Join Discord for keys
+              Ключи выдаются в Discord
               <span className="ml-2 transition group-hover:translate-x-1">→</span>
             </a>
             <a
@@ -63,13 +63,13 @@ function EarlyAccessRoute() {
               rel="noreferrer"
               className="inline-flex items-center justify-center rounded-xl border border-[#d9b35f]/24 bg-[#0b1118]/82 px-6 py-4 text-sm font-black uppercase tracking-[0.16em] text-[#f8e4ac]/85 shadow-[inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-xl transition hover:border-[#d9b35f]/55 hover:bg-[#121823]"
             >
-              Play locally on GitHub
+              Играть локально через GitHub
             </a>
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {[
-              ['1', 'Star the repo', 'Star Hermes Workspace on GitHub for updates.'],
+              ['1', 'Star the repo', 'Star AWG GPT on GitHub for updates.'],
               ['2', 'Hop in Discord', 'Get notified the moment public play is live.'],
               ['3', 'Watch the trailer', 'The launch trailer drops with the public world.'],
             ].map(([i, title, copy]) => (

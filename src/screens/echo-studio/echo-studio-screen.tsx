@@ -4,9 +4,9 @@ import { cn } from '@/lib/utils'
 type Tab = 'create' | 'manage' | 'theme'
 
 const QUICK_TEMPLATES = [
-  { id: 'analytics', label: 'Analytics Dashboard', icon: '</>' },
-  { id: 'system', label: 'System Monitor', icon: '☰' },
-  { id: 'chat', label: 'Chat Analytics', icon: '💬' },
+  { id: 'analytics', label: 'Панель аналитики', icon: '</>' },
+  { id: 'system', label: 'Мониторинг системы', icon: '☰' },
+  { id: 'chat', label: 'Аналитика чатов', icon: '💬' },
 ]
 
 const DEFAULT_PROMPT =
@@ -39,19 +39,19 @@ export function EchoStudioScreen() {
     const templates: Record<string, { id: string; title: string; prompt: string }> = {
       analytics: {
         id: 'tool-analytics',
-        title: 'Tool Analytics',
+        title: 'Аналитика инструментов',
         prompt:
           'A dashboard with a line graph showing tool usage over time, a period selector (week/month), top 3 KPI cards for most used tools, a live counter for active calls, and a detailed table below with project, tool name, count, date, and status columns.',
       },
       system: {
         id: 'system-monitor',
-        title: 'System Monitor',
+        title: 'Мониторинг системы',
         prompt:
           'A system monitoring dashboard with CPU/RAM/Disk gauges, a real-time process list, uptime counter, and alert history table. Include a dark theme and auto-refresh every 30 seconds.',
       },
       chat: {
         id: 'chat-analytics',
-        title: 'Chat Analytics',
+        title: 'Аналитика чатов',
         prompt:
           'A chat analytics dashboard showing messages per day as a bar chart, top users table, average response time trend, sentiment breakdown pie chart, and a searchable message log.',
       },
@@ -71,7 +71,7 @@ export function EchoStudioScreen() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">Echo Studio</h1>
           <p className="mt-1 text-sm text-primary-500">
-            Describe what you want. I'll build the full page with backend API.
+            Опишите, что нужно. Я соберу страницу целиком вместе с API.
           </p>
         </div>
 
@@ -102,7 +102,7 @@ export function EchoStudioScreen() {
                 {/* Page ID */}
                 <div>
                   <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-                    Page ID (URL Slug)
+                    ID страницы (часть URL)
                   </label>
                   <input
                     type="text"
@@ -116,13 +116,13 @@ export function EchoStudioScreen() {
                 {/* Page Title */}
                 <div>
                   <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-                    Page Title
+                    Заголовок страницы
                   </label>
                   <input
                     type="text"
                     value={pageTitle}
                     onChange={(e) => setPageTitle(e.target.value)}
-                    placeholder="e.g. Tool Analytics"
+                    placeholder="Например: Аналитика инструментов"
                     className="w-full rounded-xl border border-primary-200 bg-white px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-primary-400 focus:border-accent-500 dark:bg-neutral-900"
                   />
                 </div>
@@ -130,7 +130,7 @@ export function EchoStudioScreen() {
                 {/* Prompt */}
                 <div>
                   <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-                    What should this page do?
+                    Что должна делать эта страница?
                   </label>
                   <textarea
                     value={prompt}
@@ -162,7 +162,7 @@ export function EchoStudioScreen() {
                     ) : (
                       <>
                         <span>✨</span>
-                        Create Full Page + API
+                        Создать страницу и API
                       </>
                     )}
                   </button>
@@ -173,7 +173,7 @@ export function EchoStudioScreen() {
             {/* Quick Templates */}
             <div>
               <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-                Quick Templates
+                Быстрые шаблоны
               </h2>
               <div className="flex flex-wrap gap-3">
                 {QUICK_TEMPLATES.map((t) => (
@@ -192,9 +192,9 @@ export function EchoStudioScreen() {
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
-              <StatCard label="Screens Created" value={screensCreated} />
-              <StatCard label="Widgets Active" value={widgetsActive} />
-              <StatCard label="API Endpoints" value={apiEndpoints} />
+              <StatCard label="Создано экранов" value={screensCreated} />
+              <StatCard label="Активных виджетов" value={widgetsActive} />
+              <StatCard label="Эндпоинты API" value={apiEndpoints} />
             </div>
           </div>
         )}
@@ -202,9 +202,9 @@ export function EchoStudioScreen() {
         {/* Manage Tab */}
         {tab === 'manage' && (
           <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-8 text-center">
-            <p className="text-lg text-primary-500">No screens created yet.</p>
+            <p className="text-lg text-primary-500">Экранов пока нет.</p>
             <p className="mt-1 text-sm text-primary-400">
-              Use the Create tab to build your first dashboard.
+              Создайте первую панель на вкладке «Создать».
             </p>
           </div>
         )}
@@ -212,9 +212,9 @@ export function EchoStudioScreen() {
         {/* Theme Tab */}
         {tab === 'theme' && (
           <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-8 text-center">
-            <p className="text-lg text-primary-500">Theme customization coming soon.</p>
+            <p className="text-lg text-primary-500">Настройка темы появится позже.</p>
             <p className="mt-1 text-sm text-primary-400">
-              Choose from light, dark, and custom color schemes for your dashboards.
+              Светлая, тёмная и пользовательские цветовые схемы для панелей.
             </p>
           </div>
         )}

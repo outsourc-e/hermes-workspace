@@ -19,7 +19,7 @@ import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 
 const ORCHESTRATOR_NAME_KEY = 'swarm2:orchestrator:name'
-const DEFAULT_NAME = 'Main Agent'
+const DEFAULT_NAME = 'Главный агент'
 
 type SwarmCardMode = 'cards' | 'office'
 type AgentLens = 'all' | 'working' | 'reviewing' | 'blocked' | 'ready'
@@ -27,11 +27,11 @@ type AgentLens = 'all' | 'working' | 'reviewing' | 'blocked' | 'ready'
 const AGENT_PAGE_SIZE = 12
 
 const AGENT_LENSES: Array<{ id: AgentLens; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'working', label: 'Run' },
-  { id: 'reviewing', label: 'Review' },
-  { id: 'blocked', label: 'Blocked' },
-  { id: 'ready', label: 'Ready' },
+  { id: 'all', label: 'Все' },
+  { id: 'working', label: 'В работе' },
+  { id: 'reviewing', label: 'Проверка' },
+  { id: 'blocked', label: 'Блок' },
+  { id: 'ready', label: 'Готовы' },
 ]
 
 export type Swarm2OrchestratorCardProps = {
@@ -166,10 +166,10 @@ export function Swarm2OrchestratorCard({
         <div className="relative flex flex-col items-center gap-3 text-center">
           <div className="absolute left-0 top-0 flex shrink-0 items-center gap-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 shadow-sm">
             {([
-              ['cards', 'Control'],
-              ['kanban', 'Board'],
-              ['reports', 'Inbox'],
-              ['runtime', 'Runtime'],
+              ['cards', 'Управление'],
+              ['kanban', 'Доска'],
+              ['reports', 'Входящие'],
+              ['runtime', 'Среда'],
             ] as const).map(([mode, label]) => (
               <button
                 key={mode}
@@ -198,14 +198,14 @@ export function Swarm2OrchestratorCard({
                 size={13}
                 strokeWidth={1.8}
               />
-              Router
+              Маршрутизатор
             </button>
             <button
               type="button"
               onClick={openSettings}
               className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
-              aria-label="Orchestrator settings"
-              title="Orchestrator settings"
+              aria-label="Настройки оркестратора"
+              title="Настройки оркестратора"
             >
               <HugeiconsIcon
                 icon={Settings01Icon}
@@ -249,10 +249,10 @@ export function Swarm2OrchestratorCard({
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-[var(--theme-muted)]">
               <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1">
-                {totalWorkers} workers
+                {totalWorkers} исполн.
               </span>
               <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1">
-                {activeRuntimeCount} live
+                {activeRuntimeCount} онлайн
               </span>
             </div>
             {/* Reviewer gate text removed — reviewer routing should be derived from roster/config, not pinned in hero chrome. */}
@@ -301,14 +301,14 @@ export function Swarm2OrchestratorCard({
                   onClick={() => setSwarmCardMode('cards')}
                   className={cn('rounded-lg px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]', swarmCardMode === 'cards' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
                 >
-                  Active Swarm
+                  Активный Swarm
                 </button>
                 <button
                   type="button"
                   onClick={() => setSwarmCardMode('office')}
                   className={cn('rounded-lg px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]', swarmCardMode === 'office' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
                 >
-                  Office
+                  Офис
                 </button>
               </div>
               <div className={cn('flex items-center justify-center gap-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 justify-self-center md:justify-self-end', swarmCardMode === 'office' && 'opacity-40')}>
@@ -317,11 +317,11 @@ export function Swarm2OrchestratorCard({
                   onClick={() => cycleAgentPage(-1)}
                   disabled={filteredAgents.length <= AGENT_PAGE_SIZE}
                   className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
-                  aria-label="Previous agent page"
+                  aria-label="Предыдущая страница агентов"
                 >
                   ←
                 </button>
-                <div className="flex items-center gap-1 px-1" aria-label={`Agent page ${Math.min(agentPage + 1, agentPageCount)} of ${agentPageCount}`}>
+                <div className="flex items-center gap-1 px-1" aria-label={`Страница агентов ${Math.min(agentPage + 1, agentPageCount)} из ${agentPageCount}`}>
                   {Array.from({ length: Math.min(agentPageCount, 5) }).map((_, index) => (
                     <span
                       key={index}
@@ -337,7 +337,7 @@ export function Swarm2OrchestratorCard({
                   onClick={() => cycleAgentPage(1)}
                   disabled={filteredAgents.length <= AGENT_PAGE_SIZE}
                   className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
-                  aria-label="Next agent page"
+                  aria-label="Следующая страница агентов"
                 >
                   →
                 </button>
@@ -389,7 +389,7 @@ export function Swarm2OrchestratorCard({
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-[11px] text-[var(--theme-muted)]">
-                {activeAgents.length ? `No ${AGENT_LENSES[lensIndex]?.label.toLowerCase() ?? 'matching'} agents right now.` : 'Dispatch a mission to see each worker appear here with progress.'}
+                {activeAgents.length ? `No ${AGENT_LENSES[lensIndex]?.label.toLowerCase() ?? 'matching'} agents right now.` : 'Отправьте миссию, и здесь появится каждый исполнитель с прогрессом.'}
               </div>
             )}
           </div>
