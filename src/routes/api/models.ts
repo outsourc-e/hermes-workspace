@@ -349,9 +349,25 @@ function readClaudeConfigCatalog(): Array<ModelEntry> {
             })
           }
         }
+      } else {
+        for (const [modelId, metadata] of Object.entries(
+          asRecord(providerModels),
+        )) {
+          const id = modelId.trim()
+          if (!id) continue
+          const record = asRecord(metadata)
+          pushEntry({
+            ...record,
+            id,
+            name: readString(record.name) || id,
+            provider: readString(record.provider) || providerId,
+          })
+        }
       }
       const providerDefault =
-        readString(providerBlock.model) || readString(providerBlock.default)
+        readString(providerBlock.default_model) ||
+        readString(providerBlock.model) ||
+        readString(providerBlock.default)
       if (providerDefault) {
         pushEntry({
           id: providerDefault,
