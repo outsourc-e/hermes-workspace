@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import path from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readdirSync } = vi.hoisted(() => ({
   existsSync: vi.fn().mockReturnValue(false),
@@ -126,5 +125,175 @@ describe('models route', () => {
     expect(json.ok).toBe(true)
     expect(json.models[0].id).toBe('nest-model')
     expect(json.models[0].provider).toBe('anthropic')
+  })
+
+  async function getConfigModels(configYaml: string, modelsJson?: string) {
+    const envHome = '/mock/profiles/catalog'
+    process.env.HERMES_HOME = envHome
+    existsSync.mockImplementation(
+      (p: string) =>
+        p === `${envHome}/config.yaml` ||
+        (modelsJson !== undefined && p === `${envHome}/models.json`),
+    )
+    readFileSync.mockImplementation((p: string) => {
+      if (p === `${envHome}/config.yaml`) return configYaml
+      if (p === `${envHome}/models.json`) return modelsJson ?? ''
+      return ''
+    })
+    const get = await getHandler()
+    const res = await get({
+      request: new Request('http://localhost/api/models'),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(body.data).toEqual(body.models)
+    return body
+  }
+
+  it('reads dictionary model IDs with metadata and provider grouping', async () => {
+    const body = await getConfigModels(`
+providers:
+  llama.cpp:
+    default_model: Qwen3.6-35B
+    models:
+      Qwen3.6-35B:
+        context_length: 262144
+      Qwen3.8-Flash-Next:
+        id: ignored-metadata-id
+        name: Qwen Flash
+        context_length: 524288
+        max_tokens: 8192
+      " padded-model ": {}
+      empty-metadata:
+  another-provider:
+    models:
+      other-model: {}
+`)
+    expect(body.models).toEqual([
+      {
+        id: 'Qwen3.6-35B',
+        name: 'Qwen3.6-35B',
+        provider: 'llama.cpp',
+        context_length: 262144,
+      },
+      {
+        id: 'Qwen3.8-Flash-Next',
+        name: 'Qwen Flash',
+        provider: 'llama.cpp',
+        context_length: 524288,
+        max_tokens: 8192,
+      },
+      { id: 'padded-model', name: 'padded-model', provider: 'llama.cpp' },
+      { id: 'empty-metadata', name: 'empty-metadata', provider: 'llama.cpp' },
+      { id: 'other-model', name: 'other-model', provider: 'another-provider' },
+    ])
+    expect(body.configuredProviders).toEqual(['llama.cpp', 'another-provider'])
+  })
+
+  it('preserves legacy string and object arrays alongside dictionaries', async () => {
+    const body = await getConfigModels(`
+providers:
+  legacy:
+    models:
+      - " string-model "
+      - id: id-model
+        name: Display name
+        provider: explicit-provider
+      - model: model-field
+      - name: name-field
+      - ""
+      - null
+      - 42
+      - {}
+      - string-model
+  modern:
+    models:
+      dict-model: {}
+`)
+    expect(body.models).toEqual([
+      { id: 'string-model', name: 'string-model', provider: 'legacy' },
+      { id: 'id-model', name: 'Display name', provider: 'explicit-provider' },
+      { id: 'model-field', name: 'model-field', provider: 'legacy' },
+      { id: 'name-field', name: 'name-field', provider: 'legacy' },
+      { id: 'dict-model', name: 'dict-model', provider: 'modern' },
+    ])
+  })
+
+  it.each(['default_model', 'model', 'default'])(
+    'includes the provider %s even without a model list',
+    async (field) => {
+      const body = await getConfigModels(
+        `providers:\n  custom:\n    ${field}: " default-only "\n`,
+      )
+      expect(body.models).toEqual([
+        { id: 'default-only', name: 'default-only', provider: 'custom' },
+      ])
+    },
+  )
+
+  it('prefers default_model over the legacy provider default fields', async () => {
+    const body = await getConfigModels(`
+providers:
+  custom:
+    default_model: current-default
+    model: old-model
+    default: old-default
+`)
+    expect(body.models).toEqual([
+      { id: 'current-default', name: 'current-default', provider: 'custom' },
+    ])
+  })
+
+  it('ignores blank dictionary IDs and tolerates malformed provider blocks', async () => {
+    const body = await getConfigModels(`
+providers:
+  missing:
+  invalid: 42
+  invalid-models:
+    models: false
+  valid:
+    default_model: " "
+    model: fallback
+    models:
+      " ": {name: ignored}
+      valid-model: {}
+`)
+    expect(body.models).toEqual([
+      { id: 'valid-model', name: 'valid-model', provider: 'valid' },
+      { id: 'fallback', name: 'fallback', provider: 'valid' },
+    ])
+  })
+
+  it('merges the catalog with models.json, top-level defaults and aliases without duplicates', async () => {
+    const body = await getConfigModels(
+      `
+model:
+  default: top-default
+  provider: custom
+providers:
+  custom:
+    default_model: listed
+    models:
+      top-default: {}
+      listed: {}
+      additional: {}
+model_aliases:
+  fast: custom/additional
+`,
+      '[{"model":"listed","name":"Existing name","provider":"custom"}]',
+    )
+    expect(body.models).toEqual([
+      { id: 'top-default', name: 'top-default', provider: 'custom' },
+      { id: 'listed', name: 'Existing name', provider: 'custom' },
+      { id: 'additional', name: 'additional', provider: 'custom' },
+      {
+        id: 'fast',
+        name: 'fast → custom/additional',
+        provider: 'custom',
+        alias: true,
+        target: 'custom/additional',
+      },
+    ])
   })
 })
