@@ -42,7 +42,7 @@
     "@tanstack/react-router": "1.166.7",
     "@tanstack/react-router-devtools": "1.166.7",
     "@tanstack/react-router-ssr-query": "1.166.7",
-    "@tanstack/react-start": "1.166.8",
+    "@tanstack/react-start": "1.168.60",
     "@tanstack/router-plugin": "1.166.7",
     "@types/react-grid-layout": "^1.3.6",
     "class-variance-authority": "^0.7.1",
