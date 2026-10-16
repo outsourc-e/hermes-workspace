@@ -408,6 +408,8 @@ const MAX_IMAGE_DIMENSION = 1920
 const IMAGE_QUALITY = 0.85
 /** Safe image attachment limit after processing (1MB). */
 const MAX_TRANSPORT_IMAGE_SIZE = 1 * 1024 * 1024
+/** Safe video attachment limit for portable multimodal requests. */
+const MAX_TRANSPORT_VIDEO_SIZE = 10 * 1024 * 1024
 
 const IMAGE_EXTENSION_TO_MIME: Record<string, string> = {
   png: 'image/png',
@@ -466,6 +468,14 @@ function isImageFile(file: File): boolean {
   return inferImageMimeTypeFromFileName(file.name).length > 0
 }
 
+function isVideoMimeType(value: string): boolean {
+  return normalizeMimeType(value).startsWith('video/')
+}
+
+function isVideoFile(file: File): boolean {
+  return isVideoMimeType(file.type)
+}
+
 function isTextFile(file: File): boolean {
   if (isTextMimeType(file.type)) return true
   return inferTextMimeTypeFromFileName(file.name).length > 0
@@ -492,6 +502,7 @@ function hasAttachableData(dt: DataTransfer | null): boolean {
       (item) =>
         item.kind === 'file' &&
         (isImageMimeType(item.type) ||
+          isVideoMimeType(item.type) ||
           isTextMimeType(item.type) ||
           item.type.trim().length === 0),
     )
@@ -500,7 +511,10 @@ function hasAttachableData(dt: DataTransfer | null): boolean {
   const files = Array.from(dt.files)
   return files.some(
     (file) =>
-      isImageFile(file) || isTextFile(file) || file.type.trim().length === 0,
+      isImageFile(file) ||
+      isVideoFile(file) ||
+      isTextFile(file) ||
+      file.type.trim().length === 0,
   )
 }
 
@@ -1457,8 +1471,9 @@ function ChatComposerComponent({
         files.map(
           async (file, index): Promise<ChatComposerAttachment | null> => {
             const imageFile = isImageFile(file)
+            const videoFile = isVideoFile(file)
             const textFile = isTextFile(file)
-            if (!imageFile && !textFile && file.type.trim().length > 0) {
+            if (!imageFile && !videoFile && !textFile && file.type.trim().length > 0) {
               return null
             }
 
@@ -1489,6 +1504,27 @@ function ChatComposerComponent({
                   'text/plain',
                 size: textBytes,
                 dataUrl: textContent,
+                kind: 'file',
+              }
+            }
+
+            if (videoFile) {
+              const dataUrl = await readFileAsDataUrl(file)
+              if (!dataUrl) return null
+              const transportBytes = estimateDataUrlBytes(dataUrl)
+              if (transportBytes > MAX_TRANSPORT_VIDEO_SIZE) {
+                toast(
+                  `Video is ${(transportBytes / (1024 * 1024)).toFixed(2)}mb — the portable chat limit is 10mb.`,
+                  { type: 'warning' },
+                )
+                return null
+              }
+              return {
+                id: crypto.randomUUID(),
+                name: file.name || `attached-video-${timestamp}-${index + 1}`,
+                contentType: normalizeMimeType(file.type) || 'video/mp4',
+                size: transportBytes,
+                dataUrl,
                 kind: 'file',
               }
             }
@@ -2154,7 +2190,7 @@ function ChatComposerComponent({
       <input
         ref={attachmentInputRef}
         type="file"
-        accept="image/*,.md,.txt,.json,.csv,.ts,.tsx,.js,.py"
+        accept="image/*,video/*,.md,.txt,.json,.csv,.ts,.tsx,.js,.py"
         multiple
         className="hidden"
         onChange={handleAttachmentInputChange}

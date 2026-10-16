@@ -128,14 +128,14 @@ function getChatMessage(
 
 /**
  * Build OpenAI-compatible multimodal content for portable mode.
- * If there are image attachments, returns an array of content parts;
+ * If there are image or video attachments, returns an array of content parts;
  * otherwise returns a plain string.
  */
 function buildMultimodalContent(
   message: string,
   attachments?: Array<Record<string, unknown>>,
 ): string | Array<OpenAICompatContentPart> {
-  const imageParts: Array<OpenAICompatContentPart> = []
+  const mediaParts: Array<OpenAICompatContentPart> = []
 
   if (attachments && attachments.length > 0) {
     for (const att of attachments) {
@@ -143,7 +143,10 @@ function buildMultimodalContent(
         att.mimeType ||
         att.mediaType ||
         '') as string
-      if (!mime.toLowerCase().startsWith('image/')) continue
+      const normalizedMime = mime.toLowerCase()
+      const isImage = normalizedMime.startsWith('image/')
+      const isVideo = normalizedMime.startsWith('video/')
+      if (!isImage && !isVideo) continue
 
       let b64 = (att.base64 || att.content || att.data || '') as string
       if (!b64) {
@@ -154,21 +157,28 @@ function buildMultimodalContent(
       }
       if (!b64) continue
 
-      imageParts.push({
-        type: 'image_url',
-        image_url: { url: `data:${mime};base64,${b64}` },
-      })
+      if (isVideo) {
+        mediaParts.push({
+          type: 'video_url',
+          video_url: { url: `data:${mime};base64,${b64}` },
+        })
+      } else {
+        mediaParts.push({
+          type: 'image_url',
+          image_url: { url: `data:${mime};base64,${b64}` },
+        })
+      }
     }
   }
 
-  if (imageParts.length === 0) {
+  if (mediaParts.length === 0) {
     return getChatMessage(message, attachments)
   }
 
   const parts: Array<OpenAICompatContentPart> = []
   const text = message.trim() || 'Please review the attached content.'
   parts.push({ type: 'text', text })
-  parts.push(...imageParts)
+  parts.push(...mediaParts)
   return parts
 }
 
