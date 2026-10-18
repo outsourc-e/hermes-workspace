@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { ProviderLogo } from '@/components/provider-logo'
+import { PROVIDER_DIRECTORY } from '@/lib/provider-catalog'
 
 const KNOWN_PROVIDER_PREFIXES = [
   'openrouter',
@@ -59,60 +60,36 @@ type GatewayStatusResponse = {
   hermesUrl?: string
 }
 
-const PROVIDERS = [
-  {
-    id: 'nous',
-    name: 'Nous Portal',
-    logo: '/providers/nous.png',
-    desc: 'Free via OAuth',
-    authType: 'oauth',
-  },
-  {
-    id: 'openai-codex',
-    name: 'OpenAI Codex',
-    logo: '/providers/openai.png',
-    desc: 'Free via ChatGPT Pro',
-    authType: 'oauth',
-  },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    logo: '/providers/anthropic.png',
-    desc: 'API key required',
-    authType: 'api_key',
-    envKey: 'ANTHROPIC_API_KEY',
-  },
-  {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    logo: '/providers/openrouter.png',
-    desc: 'API key required',
-    authType: 'api_key',
-    envKey: 'OPENROUTER_API_KEY',
-  },
-  {
-    id: 'ollama',
-    name: 'Ollama',
-    logo: '/providers/ollama.png',
-    desc: 'Local models, no key needed',
-    authType: 'none',
-  },
-  {
-    id: 'atomic-chat',
-    name: 'Atomic Chat',
-    logo: '/providers/atomic-chat.png',
-    desc: 'Local LLMs via Atomic Chat desktop app',
-    authType: 'none',
-  },
-  {
-    id: 'custom',
-    name: 'Custom (OpenAI-compat)',
-    logo: '/providers/openai.png',
-    desc: 'Any OpenAI-compatible endpoint',
-    authType: 'custom',
-  },
+// Core identity fields from the shared provider directory; onboarding adds
+// per-entry helper descriptions and keeps its own entry order.
+const ONBOARDING_PROVIDER_IDS = [
+  'nous',
+  'openai-codex',
+  'anthropic',
+  'openrouter',
+  'ollama',
+  'atomic-chat',
+  'custom',
 ]
 
+const ONBOARDING_PROVIDER_DESCS: Record<string, string> = {
+  nous: 'Free via OAuth',
+  'openai-codex': 'Free via ChatGPT Pro',
+  anthropic: 'API key required',
+  openrouter: 'API key required',
+  ollama: 'Local models, no key needed',
+  'atomic-chat': 'Local LLMs via Atomic Chat desktop app',
+  custom: 'Any OpenAI-compatible endpoint',
+}
+
+const PROVIDERS = ONBOARDING_PROVIDER_IDS.map((id) => {
+  const core = PROVIDER_DIRECTORY.find((entry) => entry.id === id)!
+  return {
+    ...core,
+    ...(id === 'custom' ? { logo: '/providers/openai.png', authType: 'custom' as const } : {}),
+    desc: ONBOARDING_PROVIDER_DESCS[id],
+  }
+})
 function getEnhancedFeatureNames(
   capabilities?: GatewayStatusResponse['capabilities'],
 ): Array<string> {

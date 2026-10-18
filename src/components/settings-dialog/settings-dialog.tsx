@@ -48,6 +48,7 @@ import BackendUnavailableState from '@/components/backend-unavailable-state'
 import { applyAccentColor } from '@/lib/accent-colors'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
+import { PROVIDER_DIRECTORY } from '@/lib/provider-catalog'
 import { ProviderLogo } from '@/components/provider-logo'
 import {
   DialogClose,
@@ -150,94 +151,25 @@ const SETTINGS_CARD_CLASS =
 
 // ── Section components ──────────────────────────────────────────────────
 
-const PROVIDER_CARDS: Array<{
-  id: string
-  name: string
-  logo: string
-  models: Array<string>
-  authType: 'oauth' | 'api_key' | 'none'
-  envKey?: string
-}> = [
-  // Local providers first — zero setup
-  {
-    id: 'ollama',
-    name: 'Ollama',
-    logo: '/providers/ollama.png',
-    models: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'],
-    authType: 'none',
-  },
-  {
-    id: 'atomic-chat',
-    name: 'Atomic Chat',
-    logo: '/providers/atomic-chat.png',
-    models: ['llama-3.2-3b', 'qwen2.5-7b', 'gemma-3-4b'],
-    authType: 'none',
-  },
-  // Cloud providers
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    logo: '/providers/anthropic.png',
-    models: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'],
-    authType: 'api_key',
-    envKey: 'ANTHROPIC_API_KEY',
-  },
-  {
-    id: 'nous',
-    name: 'Nous Portal',
-    logo: '/providers/nous.png',
-    models: ['xiaomi/mimo-v2-pro', 'xiaomi/mimo-v2-omni', 'hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'],
-    authType: 'oauth',
-  },
-  {
-    id: 'openai-codex',
-    name: 'OpenAI Codex',
-    logo: '/providers/openai.png',
-    models: ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'],
-    authType: 'oauth',
-  },
-  {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    logo: '/providers/openrouter.png',
-    models: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'],
-    authType: 'api_key',
-    envKey: 'OPENROUTER_API_KEY',
-  },
-  {
-    id: 'zai',
-    name: 'Z.AI / GLM',
-    logo: '/providers/zhipu.png',
-    models: ['glm-4-plus', 'glm-4-air'],
-    authType: 'api_key',
-    envKey: 'GLM_API_KEY',
-  },
-  {
-    id: 'kimi-coding',
-    name: 'Kimi',
-    logo: '/providers/kimi.png',
-    models: ['kimi-latest', 'moonshot-v1-128k'],
-    authType: 'api_key',
-    envKey: 'KIMI_API_KEY',
-  },
-  {
-    id: 'minimax',
-    name: 'MiniMax',
-    logo: '/providers/minimax.png',
-    models: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'],
-    authType: 'api_key',
-    envKey: 'MINIMAX_API_KEY',
-  },
-  {
-    id: 'xiaomi',
-    name: 'Xiaomi MiMo',
-    logo: '/providers/xiaomi.png',
-    models: ['mimo-v2-pro', 'mimo-v2-omni', 'mimo-v2-flash'],
-    authType: 'api_key',
-    envKey: 'XIAOMI_API_KEY',
-  },
-  { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key' },
-]
+// Surface-specific model shortlists per provider (dialog picks 3-4 quick
+// models); identity fields come from lib/provider-catalog PROVIDER_DIRECTORY.
+const PROVIDER_MODELS: Record<string, Array<string>> = {
+  ollama: ['llama3.1:70b', 'qwen3:32b', 'deepseek-r1:32b'],
+  'atomic-chat': ['llama-3.2-3b', 'qwen2.5-7b', 'gemma-3-4b'],
+  anthropic: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-3-5'],
+  nous: ['xiaomi/mimo-v2-pro', 'xiaomi/mimo-v2-omni', 'hermes-3-llama-3.1-405b', 'hermes-3-llama-3.1-70b'],
+  'openai-codex': ['gpt-5.4', 'gpt-5.3-codex', 'gpt-4o'],
+  openrouter: ['auto', 'deepseek/deepseek-r1', 'google/gemini-2.5-pro'],
+  zai: ['glm-4-plus', 'glm-4-air'],
+  'kimi-coding': ['kimi-latest', 'moonshot-v1-128k'],
+  minimax: ['MiniMax-M2.5', 'MiniMax-M2.5-Lightning'],
+  xiaomi: ['mimo-v2-pro', 'mimo-v2-omni', 'mimo-v2-flash'],
+}
+
+const PROVIDER_CARDS = PROVIDER_DIRECTORY.map((p) => ({
+  ...p,
+  models: PROVIDER_MODELS[p.id] ?? [],
+}))
 
 function HermesContent() {
   const configAvailable = useFeatureAvailable('config')

@@ -238,3 +238,32 @@ export function buildConfigExample(
 
   return provider.configExample
 }
+
+// ── UI provider directory ────────────────────────────────────────────────
+// Core identity (name/logo/auth/env key) shared by the settings dialog and
+// onboarding provider lists, which previously duplicated these fields and
+// drifted. Surface-specific data (model lists, descriptions) stays local.
+
+export type ProviderDirectoryEntry = {
+  id: string
+  name: string
+  logo: string
+  authType: 'oauth' | 'api_key' | 'none'
+  envKey?: string
+}
+
+export const PROVIDER_DIRECTORY: Array<ProviderDirectoryEntry> = [
+  // Local providers first — zero setup
+  { id: 'ollama', name: 'Ollama', logo: '/providers/ollama.png', authType: 'none' },
+  { id: 'atomic-chat', name: 'Atomic Chat', logo: '/providers/atomic-chat.png', authType: 'none' },
+  // Cloud providers
+  { id: 'anthropic', name: 'Anthropic', logo: '/providers/anthropic.png', authType: 'api_key', envKey: 'ANTHROPIC_API_KEY' },
+  { id: 'nous', name: 'Nous Portal', logo: '/providers/nous.png', authType: 'oauth' },
+  { id: 'openai-codex', name: 'OpenAI Codex', logo: '/providers/openai.png', authType: 'oauth' },
+  { id: 'openrouter', name: 'OpenRouter', logo: '/providers/openrouter.png', authType: 'api_key', envKey: 'OPENROUTER_API_KEY' },
+  { id: 'zai', name: 'Z.AI / GLM', logo: '/providers/zhipu.png', authType: 'api_key', envKey: 'GLM_API_KEY' },
+  { id: 'kimi-coding', name: 'Kimi', logo: '/providers/kimi.png', authType: 'api_key', envKey: 'KIMI_API_KEY' },
+  { id: 'minimax', name: 'MiniMax', logo: '/providers/minimax.png', authType: 'api_key', envKey: 'MINIMAX_API_KEY' },
+  { id: 'xiaomi', name: 'Xiaomi', logo: '/providers/xiaomi.png', authType: 'api_key', envKey: 'XIAOMI_API_KEY' },
+  { id: 'custom', name: 'Custom', logo: '', authType: 'api_key' },
+]
