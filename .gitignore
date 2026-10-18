@@ -134,7 +134,19 @@ docs/specs/
 release/
 __pycache__/
 
-.env.docker
-.env.bak
+# blanket env protection — real secrets must never reach git; keep .example tracked
+.env.*
+!.env.example
 .runtime/
-workspace-final-markdown-review.md
+
+# generated artifacts & one-off data
+sbom*.json
+failed_*.csv
+run/
+twenty/
+*.dump
+ops/backups/
+temp_*.py
+
+# ops secrets — never commit
+ops/secrets/
