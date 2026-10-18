@@ -1,0 +1,16 @@
+{
+  "name": "@ai-protect/nano",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@ai-protect/shared": "workspace:*",
+    "@ai-protect/core": "workspace:*",
+    "@types/dom-chromium-ai": "^0.0.11",
+    "zod": "^3.25.76"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapter": "./src/adapter.ts"
+  }
+}

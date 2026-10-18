@@ -132,6 +132,18 @@ importers:
         specifier: ^5.0.11
         version: 5.0.11(@types/react@19.2.14)(immer@11.1.4)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
     devDependencies:
+      '@ai-protect/core':
+        specifier: workspace:*
+        version: link:packages/ai-protect-core
+      '@ai-protect/nano':
+        specifier: workspace:*
+        version: link:packages/ai-protect-nano
+      '@ai-protect/policy':
+        specifier: workspace:*
+        version: link:packages/ai-protect-policy
+      '@ai-protect/shared':
+        specifier: workspace:*
+        version: link:packages/ai-protect-shared
       '@cyclonedx/cyclonedx-npm':
         specifier: ^6.0.1
         version: 6.0.1

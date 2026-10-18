@@ -1,0 +1,13 @@
+{
+  "name": "@ai-protect/policy",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@ai-protect/shared": "workspace:*",
+    "zod": "^3.25.76"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

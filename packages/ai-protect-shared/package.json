@@ -1,0 +1,15 @@
+{
+  "name": "@ai-protect/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./schemas": "./src/schemas.ts",
+    "./constants": "./src/constants.ts"
+  }
+}

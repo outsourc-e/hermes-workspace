@@ -1,0 +1,18 @@
+{
+  "name": "@ai-protect/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@ai-protect/shared": "workspace:*",
+    "zod": "^3.25.76"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./pii-patterns": "./src/pii-patterns.ts",
+    "./aho-corasick": "./src/aho-corasick.ts",
+    "./substitute": "./src/substitute.ts",
+    "./rehydrator": "./src/rehydrator.ts",
+    "./audit": "./src/audit.ts"
+  }
+}
