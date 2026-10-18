@@ -34,6 +34,7 @@ import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-inpu
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiSwarmKanbanRouteImport } from './routes/api/swarm-kanban'
 import { Route as ApiStartHermesRouteImport } from './routes/api/start-hermes'
+import { Route as ApiStartAllRouteImport } from './routes/api/start-all'
 import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
@@ -41,7 +42,6 @@ import { Route as ApiSessionStatusRouteImport } from './routes/api/session-statu
 import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
-import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
@@ -97,6 +97,7 @@ import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/c
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
 import { Route as ApiHermesProxySplatRouteImport } from './routes/api/hermes-proxy/$'
 import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs.$jobId'
+import { Route as ApiChatNewRouteImport } from './routes/api/chat/new'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 
@@ -225,6 +226,11 @@ const ApiStartHermesRoute = ApiStartHermesRouteImport.update({
   path: '/api/start-hermes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStartAllRoute = ApiStartAllRouteImport.update({
+  id: '/api/start-all',
+  path: '/api/start-all',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStartAgentRoute = ApiStartAgentRouteImport.update({
   id: '/api/start-agent',
   path: '/api/start-agent',
@@ -258,11 +264,6 @@ const ApiSessionHistoryRoute = ApiSessionHistoryRouteImport.update({
 const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
   id: '/api/send-stream',
   path: '/api/send-stream',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSendRoute = ApiSendRouteImport.update({
-  id: '/api/send',
-  path: '/api/send',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
@@ -540,6 +541,11 @@ const ApiHermesJobsJobIdRoute = ApiHermesJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiHermesJobsRoute,
 } as any)
+const ApiChatNewRoute = ApiChatNewRouteImport.update({
+  id: '/api/chat/new',
+  path: '/api/chat/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -592,7 +598,6 @@ export interface FileRoutesByFullPath {
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
-  '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
@@ -600,6 +605,7 @@ export interface FileRoutesByFullPath {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
+  '/api/start-all': typeof ApiStartAllRoute
   '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
@@ -612,6 +618,7 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/chat/new': typeof ApiChatNewRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -683,7 +690,6 @@ export interface FileRoutesByTo {
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
-  '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
@@ -691,6 +697,7 @@ export interface FileRoutesByTo {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
+  '/api/start-all': typeof ApiStartAllRoute
   '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
@@ -703,6 +710,7 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/chat/new': typeof ApiChatNewRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -776,7 +784,6 @@ export interface FileRoutesById {
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
-  '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
   '/api/session-send': typeof ApiSessionSendRoute
@@ -784,6 +791,7 @@ export interface FileRoutesById {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
+  '/api/start-all': typeof ApiStartAllRoute
   '/api/start-hermes': typeof ApiStartHermesRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
@@ -796,6 +804,7 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/chat/new': typeof ApiChatNewRoute
   '/api/hermes-jobs/$jobId': typeof ApiHermesJobsJobIdRoute
   '/api/hermes-proxy/$': typeof ApiHermesProxySplatRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -870,7 +879,6 @@ export interface FileRouteTypes {
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
-    | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
     | '/api/session-send'
@@ -878,6 +886,7 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
+    | '/api/start-all'
     | '/api/start-hermes'
     | '/api/swarm-kanban'
     | '/api/terminal-close'
@@ -890,6 +899,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/chat/new'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -961,7 +971,6 @@ export interface FileRouteTypes {
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
-    | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
     | '/api/session-send'
@@ -969,6 +978,7 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
+    | '/api/start-all'
     | '/api/start-hermes'
     | '/api/swarm-kanban'
     | '/api/terminal-close'
@@ -981,6 +991,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat'
     | '/settings'
+    | '/api/chat/new'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1053,7 +1064,6 @@ export interface FileRouteTypes {
     | '/api/paths'
     | '/api/ping'
     | '/api/preview-file'
-    | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
     | '/api/session-send'
@@ -1061,6 +1071,7 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/start-agent'
+    | '/api/start-all'
     | '/api/start-hermes'
     | '/api/swarm-kanban'
     | '/api/terminal-close'
@@ -1073,6 +1084,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/chat/new'
     | '/api/hermes-jobs/$jobId'
     | '/api/hermes-proxy/$'
     | '/api/hermes-tasks/$taskId'
@@ -1146,7 +1158,6 @@ export interface RootRouteChildren {
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
-  ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
   ApiSessionSendRoute: typeof ApiSessionSendRoute
@@ -1154,6 +1165,7 @@ export interface RootRouteChildren {
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRouteWithChildren
   ApiStartAgentRoute: typeof ApiStartAgentRoute
+  ApiStartAllRoute: typeof ApiStartAllRoute
   ApiStartHermesRoute: typeof ApiStartHermesRoute
   ApiSwarmKanbanRoute: typeof ApiSwarmKanbanRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
@@ -1163,6 +1175,7 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiChatNewRoute: typeof ApiChatNewRoute
   ApiHermesProxySplatRoute: typeof ApiHermesProxySplatRoute
   ApiKnowledgeConfigRoute: typeof ApiKnowledgeConfigRoute
   ApiKnowledgeGraphRoute: typeof ApiKnowledgeGraphRoute
@@ -1361,6 +1374,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStartHermesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/start-all': {
+      id: '/api/start-all'
+      path: '/api/start-all'
+      fullPath: '/api/start-all'
+      preLoaderRoute: typeof ApiStartAllRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/start-agent': {
       id: '/api/start-agent'
       path: '/api/start-agent'
@@ -1408,13 +1428,6 @@ declare module '@tanstack/react-router' {
       path: '/api/send-stream'
       fullPath: '/api/send-stream'
       preLoaderRoute: typeof ApiSendStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/send': {
-      id: '/api/send'
-      path: '/api/send'
-      fullPath: '/api/send'
-      preLoaderRoute: typeof ApiSendRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/preview-file': {
@@ -1802,6 +1815,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesJobsJobIdRouteImport
       parentRoute: typeof ApiHermesJobsRoute
     }
+    '/api/chat/new': {
+      id: '/api/chat/new'
+      path: '/api/chat/new'
+      fullPath: '/api/chat/new'
+      preLoaderRoute: typeof ApiChatNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -1950,7 +1970,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
-  ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,
   ApiSessionSendRoute: ApiSessionSendRoute,
@@ -1958,6 +1977,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRouteWithChildren,
   ApiStartAgentRoute: ApiStartAgentRoute,
+  ApiStartAllRoute: ApiStartAllRoute,
   ApiStartHermesRoute: ApiStartHermesRoute,
   ApiSwarmKanbanRoute: ApiSwarmKanbanRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
@@ -1967,6 +1987,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiChatNewRoute: ApiChatNewRoute,
   ApiHermesProxySplatRoute: ApiHermesProxySplatRoute,
   ApiKnowledgeConfigRoute: ApiKnowledgeConfigRoute,
   ApiKnowledgeGraphRoute: ApiKnowledgeGraphRoute,
