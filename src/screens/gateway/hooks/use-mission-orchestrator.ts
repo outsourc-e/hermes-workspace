@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { killAgentSession, toggleAgentPause } from '@/lib/gateway-api'
 import { useMissionStore, type ActiveMission, type MissionProcessType } from '@/stores/mission-store'
 import { emitFeedEvent } from '../components/feed-event-bus'
-import { resolveGatewayModelId } from '../components/hub-utils'
+import { resolveGatewayModelId } from '../lib/model-resolver'
 import type { HubTask, TaskStatus } from '../components/task-board'
 import type { AgentSessionStatusEntry, TeamMember } from '../components/team-panel'
 
