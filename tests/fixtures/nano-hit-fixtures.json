@@ -1,0 +1,5 @@
+[
+  {"text": "Projekt Titan wurde verschoben", "mockNano": {"hits":[{"lexId":"CS_021","surface":"Projekt Titan","start":0,"end":13,"confidence":0.92}]}},
+  {"text": "TITAN-Project Phase 2", "mockNano": {"hits":[{"lexId":"CS_022","surface":"TITAN-Project Phase 2","start":0,"end":21,"confidence":0.88}]}},
+  {"text": "max mueller email", "mockNano": {"hits":[{"lexId":"PERSON","surface":"max mueller","start":0,"end":10,"confidence":0.85,"entityType":"PERSON"}]}}
+]

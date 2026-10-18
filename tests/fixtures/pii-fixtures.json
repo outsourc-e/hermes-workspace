@@ -1,0 +1,8 @@
+[
+  {"input": "Contact Max Müller via max.mueller@example.com", "expectedPlaceholders": ["[EMAIL_1]"], "labels": ["EMAIL"]},
+  {"input": "IBAN DE44500604000001234567", "expectedPlaceholders": ["[IBAN_1]"]},
+  {"input": "apiKey = \"sk-live-abcdef1234567890\" und secret = \"s3cr3tHALBLEITER\"", "expectedPlaceholders": ["[API_KEY_1]"]},
+  {"input": "databaseCredentials = \"postgres://user:pass@host/db\"", "expectedPlaceholders": ["[DB_CRED_1]"]},
+  {"input": "Call +49 170 1234567", "expectedPlaceholders": ["[PHONE_1]"]},
+  {"input": "192.168.0.42 internal IP", "expectedPlaceholders": ["[IP_1]"]}
+]

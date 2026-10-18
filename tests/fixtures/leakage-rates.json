@@ -1,0 +1,10 @@
+{
+  "DeepSeek": 12.63,
+  "ChatGPT": 8.38,
+  "Copilot": 8.31,
+  "Claude": 6.43,
+  "Gemini Enterprise": 6.14,
+  "Gemini": 4.5,
+  "Copilot M365": 3.65,
+  "threshold_note": "CI fails if simulated leakage after substitution > 3.65 (best-in-class M365)"
+}
