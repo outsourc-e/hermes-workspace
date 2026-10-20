@@ -53,6 +53,7 @@ export const MODEL_PRESET_MAP: Record<string, string> = {
   sonnet: 'anthropic/claude-sonnet-4-6',
   codex: 'openai/gpt-5.3-codex',
   flash: 'google/gemini-2.5-flash',
+  'minimax-flash': 'minimax/MiniMax-M3.1-Flash',
   minimax: 'minimax/MiniMax-M3',
 }
 

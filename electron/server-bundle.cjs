@@ -268025,6 +268025,9 @@ function resolveSwarmModelLabel(label) {
   if (/^gpt[- ]?5\.3[- ]codex(?:[- ]?spark)?$/.test(normalized)) {
     return { provider: "openai-codex", default: "gpt-5.3-codex-spark" };
   }
+  if (/^minimax(?:\s*m)?\s*3$|^minimax m?3$/.test(normalized)) {
+    return { provider: "minimax", default: "MiniMax-M3" };
+  }
   if (/^minimax(?:\s*m)?\s*2\.7$|^minimax m?2\.7$/.test(normalized)) {
     return { provider: "minimax", default: "MiniMax-M2.7" };
   }
@@ -281051,6 +281054,7 @@ var init_router_BMEomgJZ = __esm({
       "gemini-2.0-flash": "Gemini 2.0 Flash",
       "gemini-2.5-pro": "Gemini 2.5 Pro",
       "gemini-2.5-flash": "Gemini 2.5 Flash",
+      "MiniMax-M3": "MiniMax M3",
       "MiniMax-M2.7": "MiniMax M2.7",
       "MiniMax-M2.7-Lightning": "MiniMax M2.7 Lightning"
     };
@@ -281382,7 +281386,7 @@ var init_router_BMEomgJZ = __esm({
         name: "MiniMax",
         description: "MiniMax foundation models and multimodal APIs.",
         authTypes: ["api-key"],
-        docsUrl: "https://www.minimax.io/platform",
+        docsUrl: "https://platform.minimax.io/docs/api-reference/api-overview",
         configExample: JSON.stringify(
           {
             auth: {
@@ -282433,7 +282437,7 @@ var init_router_BMEomgJZ = __esm({
         id: "minimax",
         name: "MiniMax",
         logo: "/providers/minimax.png",
-        models: ["MiniMax-M2.5", "MiniMax-M2.5-Lightning"],
+        models: ["MiniMax-M3", "MiniMax-M2.7"],
         authType: "api_key",
         envKey: "MINIMAX_API_KEY"
       },
@@ -288155,7 +288159,9 @@ Rules:
       "o3-mini": 2e5,
       "gemini-2.5-flash": 1e6,
       "gemini-2.5-pro": 1e6,
-      "kimi-k2.6": 256e3
+      "kimi-k2.6": 256e3,
+      "MiniMax-M3": 1e6,
+      "MiniMax-M2.7": 204800
     };
     CHARS_PER_TOKEN = 3.5;
     Route$1p = createFileRoute("/api/session-status")({
