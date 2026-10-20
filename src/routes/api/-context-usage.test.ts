@@ -37,10 +37,14 @@ afterEach(() => {
 })
 
 describe('context usage estimation', () => {
-  it('uses the model-specific fallback context window for MiniMax-M2.7', async () => {
+  it.each([
+    ['MiniMax-M3.1-Flash', 1_000_000],
+    ['MiniMax-M3', 1_000_000],
+    ['MiniMax-M2.7', 204_800],
+  ])('uses the model-specific fallback context window for %s', async (model, maxTokens) => {
     vi.mocked(getLocalSession).mockReturnValue({
       id: 'local-minimax',
-      model: 'MiniMax-M2.7',
+      model,
     } as any)
     vi.mocked(getLocalMessages).mockReturnValue([{ content: 'hello' }] as any)
 
@@ -51,8 +55,8 @@ describe('context usage estimation', () => {
 
     expect(snapshot).toMatchObject({
       ok: true,
-      model: 'MiniMax-M2.7',
-      maxTokens: 204_800,
+      model,
+      maxTokens,
     })
   })
 
