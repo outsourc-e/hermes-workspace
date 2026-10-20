@@ -4,9 +4,6 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   BrainIcon,
-  Building01Icon,
-  Castle02Icon,
-  Chat01Icon,
   CheckListIcon,
   Clock01Icon,
   ComputerTerminal01Icon,
@@ -15,7 +12,6 @@ import {
   McpServerIcon,
   MessageMultiple01Icon,
   Moon02Icon,
-  PencilEdit02Icon,
   PuzzleIcon,
   Rocket01Icon,
   Search01Icon,
@@ -23,9 +19,11 @@ import {
   Sun02Icon,
   UserGroupIcon,
   UserMultipleIcon,
+  ViewOffIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
@@ -63,6 +61,8 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { fetchExternalRuntimes } from '@/lib/external-harness-api'
+import { useHarnessVisibility } from '@/screens/chat/harness-visibility'
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -225,7 +225,8 @@ function NavItem({
               style={
                 item.badge === 'NEW'
                   ? {
-                      background: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
+                      background:
+                        'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
                       color: '#0b1320',
                       boxShadow: '0 0 8px rgba(250,204,21,0.4)',
                       letterSpacing: '0.08em',
@@ -485,6 +486,161 @@ function CollapsibleSection({
   )
 }
 
+function HarnessChatNav({
+  expanded,
+  onToggle,
+  isCollapsed,
+  transition,
+  active,
+  onSelectSession,
+}: {
+  expanded: boolean
+  onToggle: () => void
+  isCollapsed: boolean
+  transition: Record<string, unknown>
+  active: boolean
+  onSelectSession?: () => void
+}) {
+  const { hiddenIds, hiddenSet } = useHarnessVisibility()
+  const runtimesQuery = useQuery({
+    queryKey: ['external-harnesses'],
+    queryFn: fetchExternalRuntimes,
+    refetchInterval: 15_000,
+  })
+
+  if (isCollapsed) {
+    return (
+      <NavItem
+        item={{
+          kind: 'link',
+          to: '/chat',
+          icon: MessageMultiple01Icon,
+          label: 'Chat',
+          active,
+        }}
+        isCollapsed
+        transition={transition}
+        onSelectSession={onSelectSession}
+      />
+    )
+  }
+
+  return (
+    <div>
+      <div
+        className={cn(
+          'flex min-h-10 items-center rounded-lg transition-colors',
+          active
+            ? 'bg-accent-500/10 text-accent-600'
+            : 'text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
+        )}
+      >
+        <Link
+          to="/chat"
+          onClick={onSelectSession}
+          className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-sm font-medium"
+        >
+          <HugeiconsIcon
+            icon={MessageMultiple01Icon}
+            size={20}
+            strokeWidth={1.5}
+            className="size-5 shrink-0"
+          />
+          <span className="truncate">Chat</span>
+        </Link>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="mr-1 flex size-8 items-center justify-center rounded-md hover:bg-primary-300/50"
+          aria-label={
+            expanded ? 'Collapse chat harnesses' : 'Expand chat harnesses'
+          }
+        >
+          <HugeiconsIcon
+            icon={ArrowDown01Icon}
+            size={14}
+            className={cn(
+              'transition-transform',
+              expanded ? 'rotate-0' : '-rotate-90',
+            )}
+          />
+        </button>
+      </div>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="ml-5 overflow-hidden border-l border-primary-200 pl-2"
+          >
+            <Link
+              to="/chat"
+              onClick={onSelectSession}
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-primary-600 hover:bg-primary-100 hover:text-primary-900"
+            >
+              <span className="size-1.5 rounded-full bg-violet-500" />
+              All agents
+            </Link>
+            {!hiddenSet.has('hermes-native') && (
+              <Link
+                to="/chat/$sessionKey"
+                params={{ sessionKey: 'main' }}
+                onClick={onSelectSession}
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-primary-600 hover:bg-primary-100 hover:text-primary-900"
+              >
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                Hermes
+              </Link>
+            )}
+            {(runtimesQuery.data?.runtimes ?? [])
+              .filter((runtime) => !hiddenSet.has(runtime.id))
+              .map((runtime) => (
+              <Link
+                key={runtime.id}
+                to="/chat/harness/$runtimeId"
+                params={{ runtimeId: runtime.id }}
+                onClick={onSelectSession}
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-primary-600 hover:bg-primary-100 hover:text-primary-900"
+              >
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full',
+                    runtime.status === 'online'
+                      ? 'bg-emerald-500'
+                      : runtime.status === 'offline' ||
+                          runtime.status === 'missing'
+                        ? 'bg-red-500'
+                        : 'bg-amber-400',
+                  )}
+                />
+                <span className="truncate">
+                  {runtime.backend === 'hermes'
+                    ? 'Hermes CLI'
+                    : runtime.backend === 'openclaw-gateway'
+                      ? 'OpenClaw Gateway'
+                      : runtime.name}
+                </span>
+              </Link>
+              ))}
+            {hiddenIds.length > 0 && (
+              <Link
+                to="/chat"
+                onClick={onSelectSession}
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-primary-400 hover:bg-primary-100 hover:text-primary-700"
+              >
+                <HugeiconsIcon icon={ViewOffIcon} size={12} />
+                {hiddenIds.length} hidden
+              </Link>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ── Persist helper ──────────────────────────────────────────────────────
 
 function usePersistedBool(key: string, defaultValue: boolean) {
@@ -547,7 +703,9 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'claude')
+      handleOpenSettings(
+        detail.section === 'appearance' ? 'appearance' : 'claude',
+      )
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
@@ -572,13 +730,11 @@ function ChatSidebarComponent({
   // Route active states
   const isChatActive =
     pathname === '/' || pathname === '/new' || pathname.startsWith('/chat')
-  const isNewSessionActive =
-    pathname === '/new' || pathname.startsWith('/chat/new')
+  const showNativeSessions = /^\/chat\/[^/]+$/.test(pathname)
   const _isSettingsActive = pathname === '/settings'
   const isSkillsActive = pathname === '/skills'
   const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
-  const isPlaygroundActive = pathname === '/playground'
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
@@ -613,6 +769,14 @@ function ChatSidebarComponent({
   const [mainExpanded, toggleMain] = usePersistedBool(
     'claude-sidebar-main-expanded',
     true,
+  )
+  const [chatExpanded, toggleChat] = usePersistedBool(
+    'hermes-sidebar-chat-expanded',
+    true,
+  )
+  const [workspaceExpanded, toggleWorkspace] = usePersistedBool(
+    'hermes-sidebar-workspace-expanded',
+    false,
   )
   const [knowledgeExpanded, toggleKnowledge] = usePersistedBool(
     'claude-sidebar-knowledge-expanded',
@@ -781,24 +945,42 @@ function ChatSidebarComponent({
     onClick: openSearchModal,
   }
 
-  const isDashboardActive = pathname === '/dashboard'
-
   const mainItems: Array<NavItemDef> = [
     {
       kind: 'link',
-      to: '/dashboard',
-      icon: DashboardSquare01Icon,
-      label: t('nav.dashboard'),
-      active: isDashboardActive,
+      to: '/operations',
+      icon: UserMultipleIcon,
+      label: 'Assistants',
+      active: isOperationsActive,
     },
     {
       kind: 'link',
-      to: '/chat',
-      icon: MessageMultiple01Icon,
-      label: t('nav.chat'),
-      active: isChatActive,
+      to: '/tasks',
+      icon: CheckListIcon,
+      label: 'Tasks',
+      active: isTasksActive,
     },
+    {
+      kind: 'link',
+      to: '/swarm',
+      icon: UserGroupIcon,
+      label: 'Teams',
+      active: isSwarmActive,
+    },
+    ...(echoStudioEnabled
+      ? [
+          {
+            kind: 'link' as const,
+            to: '/echo-studio',
+            icon: DashboardSquare01Icon,
+            label: 'Echo Studio',
+            active: pathname.startsWith('/echo-studio'),
+          },
+        ]
+      : []),
+  ]
 
+  const workspaceItems: Array<NavItemDef> = [
     {
       kind: 'link',
       to: '/files',
@@ -822,44 +1004,11 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/tasks',
-      icon: CheckListIcon,
-      label: 'Tasks',
-      active: isTasksActive,
-    },
-    {
-      kind: 'link',
       to: '/conductor',
       icon: Rocket01Icon,
       label: 'Conductor',
       active: isConductorActive,
     },
-    {
-      kind: 'link',
-      to: '/operations',
-      icon: UserMultipleIcon,
-      label: 'Operations',
-      active: isOperationsActive,
-    },
-    {
-      kind: 'link',
-      to: '/swarm',
-      icon: UserGroupIcon,
-      label: 'Swarm',
-      active: isSwarmActive,
-    },
-    ...(echoStudioEnabled
-      ? [
-          {
-            kind: 'link' as const,
-            to: '/echo-studio',
-            icon: DashboardSquare01Icon,
-            label: 'Echo Studio',
-            active: pathname.startsWith('/echo-studio'),
-          },
-        ]
-      : []),
-
   ]
 
   const knowledgeItems: Array<NavItemDef> = [
@@ -1018,80 +1167,12 @@ function ChatSidebarComponent({
         </motion.div>
       </div>
 
-      {/* ── New Session button ──────────────────────────────────────── */}
-      {!isVisuallyCollapsed && (
-        <div className="px-2 pb-1">
-          <Link
-            to="/chat/$sessionKey"
-            params={{ sessionKey: 'new' }}
-            onClick={() => {
-              onSelectSession?.()
-            }}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
-              isNewSessionActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
-            )}
-            data-tour="new-session"
-          >
-            <HugeiconsIcon
-              icon={PencilEdit02Icon}
-              size={20}
-              strokeWidth={1.5}
-              className="size-5 shrink-0"
-            />
-            <span>New Session</span>
-          </Link>
-        </div>
-      )}
-
-      {/* ── HermesWorld featured link (gold castle, NEW badge) ────── */}
-      {/* Hide when VITE_HERMESWORLD_ENABLED is explicitly '0' */}
-      {!isVisuallyCollapsed &&
-        (import.meta as any).env?.VITE_HERMESWORLD_ENABLED !== '0' && (
-        <div className="px-2 pb-2">
-          <Link
-            to="/playground"
-            onClick={() => onSelectSession?.()}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'group w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
-              isPlaygroundActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
-            )}
-            data-tour="hermesworld"
-          >
-            <HugeiconsIcon
-              icon={Castle02Icon}
-              size={20}
-              strokeWidth={1.5}
-              className="size-5 shrink-0"
-              style={{ color: '#facc15' }}
-            />
-            <span>HermesWorld</span>
-            <span
-              className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
-              style={{
-                background:
-                  'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
-                color: '#0b1320',
-                boxShadow: '0 0 8px rgba(250,204,21,0.4)',
-                letterSpacing: '0.08em',
-              }}
-            >
-              NEW
-            </span>
-          </Link>
-        </div>
-      )}
-
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
         <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
           <SectionLabel
-            label="Main"
+            label="Command"
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
@@ -1099,9 +1180,36 @@ function ChatSidebarComponent({
             onToggle={toggleMain}
             navigateTo={mainNav}
           />
+          {(mainExpanded || isCollapsed) && (
+            <HarnessChatNav
+              expanded={chatExpanded}
+              onToggle={toggleChat}
+              isCollapsed={isVisuallyCollapsed}
+              transition={transition}
+              active={isChatActive}
+              onSelectSession={onSelectSession}
+            />
+          )}
           <CollapsibleSection
             expanded={mainExpanded || isCollapsed}
             items={mainItems}
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
+
+          <SectionLabel
+            label="Workspace"
+            isCollapsed={isVisuallyCollapsed}
+            transition={transition}
+            collapsible
+            expanded={workspaceExpanded}
+            onToggle={toggleWorkspace}
+            navigateTo="/files"
+          />
+          <CollapsibleSection
+            expanded={workspaceExpanded || isCollapsed}
+            items={workspaceItems}
             isCollapsed={isVisuallyCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
@@ -1135,7 +1243,10 @@ function ChatSidebarComponent({
         </div>
 
         {/* Sessions list */}
-        <div className={cn('shrink-0 mt-1', isMobile && 'order-1')}>
+        <div
+          className={cn('shrink-0 mt-1', isMobile && 'order-1')}
+          hidden={!showNativeSessions}
+        >
           <AnimatePresence initial={false}>
             {!isVisuallyCollapsed && (
               <motion.div

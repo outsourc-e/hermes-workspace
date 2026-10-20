@@ -15,6 +15,11 @@ try {
 }
 
 const APP_PORT = 3847
+const AIONCORE_PORT = 25808
+const AIONCORE_BASE_URL = (
+  process.env.AIONCORE_URL || `http://127.0.0.1:${AIONCORE_PORT}`
+).replace(/\/$/, '')
+const AIONCORE_URL = `${AIONCORE_BASE_URL}/health`
 const HERMES_GATEWAY_URL = 'http://127.0.0.1:8642/health'
 const HERMES_DASHBOARD_URL = 'http://127.0.0.1:9119/api/status'
 const HERMES_INSTALL_SCRIPT =
@@ -25,6 +30,7 @@ let localServer = null
 let localServerPort = APP_PORT
 let localServerReady = false
 let installProcess = null
+let aionCoreProcess = null
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) app.quit()
@@ -176,7 +182,11 @@ function isHermesInstalled() {
 }
 
 function getTempDir() {
-  return process.env.TEMP || process.env.TMP || (process.platform === 'win32' ? 'C:\\Windows\\Temp' : '/tmp')
+  return (
+    process.env.TEMP ||
+    process.env.TMP ||
+    (process.platform === 'win32' ? 'C:\\Windows\\Temp' : '/tmp')
+  )
 }
 
 async function getBootstrapStatus() {
@@ -184,10 +194,115 @@ async function getBootstrapStatus() {
     hermesInstalled: isHermesInstalled(),
     gatewayReachable: await checkHttp(HERMES_GATEWAY_URL),
     dashboardReachable: await checkHttp(HERMES_DASHBOARD_URL),
+    aionCoreReachable: await checkHttp(AIONCORE_URL),
     installerRunning: Boolean(installProcess && !installProcess.killed),
     localServerReady,
     localServerPort,
   }
+}
+
+function resolveAionCoreBinary() {
+  const platformArch = `${process.platform}-${process.arch}`
+  const executable = process.platform === 'win32' ? 'aioncore.exe' : 'aioncore'
+  const candidates = [
+    process.env.AIONCORE_BIN,
+    join(
+      process.resourcesPath || '',
+      'bundled-aioncore',
+      platformArch,
+      executable,
+    ),
+    join(__dirname, '..', 'vendor', 'aioncore', platformArch, executable),
+  ]
+
+  if (process.platform === 'darwin') {
+    candidates.push(
+      join(
+        '/Applications/AionUi.app/Contents/Resources/bundled-aioncore',
+        platformArch,
+        executable,
+      ),
+    )
+  }
+
+  return (
+    candidates.find((candidate) => candidate && existsSync(candidate)) || null
+  )
+}
+
+async function ensureAionCoreBackend() {
+  if (await checkHttp(AIONCORE_URL, 1000)) {
+    return { available: true, started: false }
+  }
+  if (process.env.AIONCORE_URL) {
+    console.warn(
+      `[hermes-workspace] Configured AionCore is unreachable at ${AIONCORE_BASE_URL}`,
+    )
+    return { available: false, started: false }
+  }
+  if (aionCoreProcess && !aionCoreProcess.killed) {
+    return { available: false, started: true }
+  }
+
+  const binary = resolveAionCoreBinary()
+  if (!binary) {
+    console.warn(
+      '[hermes-workspace] AionCore not found; set AIONCORE_BIN or install AionUi to enable the ACP harness hub.',
+    )
+    return { available: false, started: false }
+  }
+
+  const dataDir = join(app.getPath('userData'), 'aioncore-companion')
+  const logDir = join(app.getPath('logs'), 'aioncore')
+  const workDir =
+    process.env.AIONCORE_WORK_DIR || join(app.getPath('home'), 'workspace')
+  fs.mkdirSync(dataDir, { recursive: true })
+  fs.mkdirSync(logDir, { recursive: true })
+  fs.mkdirSync(workDir, { recursive: true })
+
+  const logFile = join(logDir, 'aioncore.log')
+  const logFd = fs.openSync(logFile, 'a')
+  aionCoreProcess = spawn(
+    binary,
+    [
+      '--local',
+      '--port',
+      String(AIONCORE_PORT),
+      '--data-dir',
+      dataDir,
+      '--work-dir',
+      workDir,
+      '--log-dir',
+      logDir,
+      '--parent-pid',
+      String(process.pid),
+      '--app-version',
+      app.getVersion(),
+      '--managed-resources-mode',
+      'bundled',
+    ],
+    {
+      stdio: ['ignore', logFd, logFd],
+      env: { ...process.env },
+      windowsHide: true,
+    },
+  )
+  fs.closeSync(logFd)
+  aionCoreProcess.once('exit', (code) => {
+    if (code && code !== 0) {
+      console.warn(`[hermes-workspace] AionCore exited with code ${code}`)
+    }
+    aionCoreProcess = null
+  })
+
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    if (await checkHttp(AIONCORE_URL, 500)) {
+      return { available: true, started: true }
+    }
+  }
+
+  return { available: false, started: true }
 }
 
 function spawnDetached(command, label) {
@@ -228,11 +343,13 @@ async function installHermesInBackground() {
     return { started: false, reason: 'already-running' }
   }
   // Windows: pip install (no curl|bash). macOS/Linux: use install script.
-  const installCmd = process.platform === 'win32'
-    ? 'pip install hermes-agent'
-    : HERMES_INSTALL_SCRIPT
+  const installCmd =
+    process.platform === 'win32'
+      ? 'pip install hermes-agent'
+      : HERMES_INSTALL_SCRIPT
   const shell = process.platform === 'win32' ? 'cmd' : 'bash'
-  const args = process.platform === 'win32' ? ['/c', installCmd] : ['-lc', installCmd]
+  const args =
+    process.platform === 'win32' ? ['/c', installCmd] : ['-lc', installCmd]
   installProcess = spawn(shell, args, {
     detached: false,
     stdio: 'ignore',
@@ -258,9 +375,10 @@ async function ensureHermesBackend() {
     spawnDetached('hermes gateway run', 'gateway')
   }
   if (!dashboardReachable) {
-    const dashboardCmd = process.platform === 'win32'
-      ? 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
-      : 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
+    const dashboardCmd =
+      process.platform === 'win32'
+        ? 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
+        : 'hermes dashboard --port 9119 --host 127.0.0.1 --no-open'
     spawnDetached(dashboardCmd, 'dashboard')
   }
 
@@ -342,6 +460,7 @@ function startLocalServer() {
 
 async function createWindow() {
   await startLocalServer()
+  void ensureAionCoreBackend()
 
   mainWindow = new BrowserWindow({
     width: 1480,
@@ -411,6 +530,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   localServer?.kill()
+  aionCoreProcess?.kill()
 })
 
 app.setName('hermes-workspace')

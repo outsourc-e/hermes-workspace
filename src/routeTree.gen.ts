@@ -93,6 +93,8 @@ import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiExternalConversationsRouteImport } from './routes/api/external-conversations'
+import { Route as ApiExternalAgentsRouteImport } from './routes/api/external-agents'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -112,6 +114,8 @@ import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
 import { Route as ApiAgentBusRouteImport } from './routes/api/agent-bus'
+import { Route as ChatHarnessRuntimeIdRouteImport } from './routes/chat/harness/$runtimeId'
+import { Route as ChatExternalConversationIdRouteImport } from './routes/chat/external/$conversationId'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
@@ -158,6 +162,7 @@ import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-ta
 import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
 import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
 import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
+import { Route as ApiExternalConversationsConversationIdRouteImport } from './routes/api/external-conversations.$conversationId'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
@@ -168,6 +173,7 @@ import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 import { Route as ApiHermesworldReservationsConfirmRouteImport } from './routes/api/hermesworld/reservations/confirm'
+import { Route as ApiExternalConversationsConversationIdMessagesRouteImport } from './routes/api/external-conversations.$conversationId.messages'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
 
 const WorldRoute = WorldRouteImport.update({
@@ -591,6 +597,17 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExternalConversationsRoute =
+  ApiExternalConversationsRouteImport.update({
+    id: '/api/external-conversations',
+    path: '/api/external-conversations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiExternalAgentsRoute = ApiExternalAgentsRouteImport.update({
+  id: '/api/external-agents',
+  path: '/api/external-agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
@@ -686,6 +703,17 @@ const ApiAgentBusRoute = ApiAgentBusRouteImport.update({
   path: '/api/agent-bus',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatHarnessRuntimeIdRoute = ChatHarnessRuntimeIdRouteImport.update({
+  id: '/chat/harness/$runtimeId',
+  path: '/chat/harness/$runtimeId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatExternalConversationIdRoute =
+  ChatExternalConversationIdRouteImport.update({
+    id: '/chat/external/$conversationId',
+    path: '/chat/external/$conversationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
   id: '/api/update/workspace',
   path: '/api/update/workspace',
@@ -919,6 +947,12 @@ const ApiExternalMemoryCandidatesRoute =
     path: '/api/external-memory/candidates',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiExternalConversationsConversationIdRoute =
+  ApiExternalConversationsConversationIdRouteImport.update({
+    id: '/$conversationId',
+    path: '/$conversationId',
+    getParentRoute: () => ApiExternalConversationsRoute,
+  } as any)
 const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   id: '/api/dashboard/overview',
   path: '/api/dashboard/overview',
@@ -972,6 +1006,12 @@ const ApiHermesworldReservationsConfirmRoute =
     path: '/confirm',
     getParentRoute: () => ApiHermesworldReservationsRoute,
   } as any)
+const ApiExternalConversationsConversationIdMessagesRoute =
+  ApiExternalConversationsConversationIdMessagesRouteImport.update({
+    id: '/messages',
+    path: '/messages',
+    getParentRoute: () => ApiExternalConversationsConversationIdRoute,
+  } as any)
 const ApiRunsSessionKeyRunIdAbandonRoute =
   ApiRunsSessionKeyRunIdAbandonRouteImport.update({
     id: '/api/runs/$sessionKey/$runId/abandon',
@@ -1023,6 +1063,8 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/external-agents': typeof ApiExternalAgentsRoute
+  '/api/external-conversations': typeof ApiExternalConversationsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -1088,6 +1130,7 @@ export interface FileRoutesByFullPath {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/external-conversations/$conversationId': typeof ApiExternalConversationsConversationIdRouteWithChildren
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1134,6 +1177,9 @@ export interface FileRoutesByFullPath {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/chat/external/$conversationId': typeof ChatExternalConversationIdRoute
+  '/chat/harness/$runtimeId': typeof ChatHarnessRuntimeIdRoute
+  '/api/external-conversations/$conversationId/messages': typeof ApiExternalConversationsConversationIdMessagesRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1184,6 +1230,8 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/external-agents': typeof ApiExternalAgentsRoute
+  '/api/external-conversations': typeof ApiExternalConversationsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -1249,6 +1297,7 @@ export interface FileRoutesByTo {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/external-conversations/$conversationId': typeof ApiExternalConversationsConversationIdRouteWithChildren
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1295,6 +1344,9 @@ export interface FileRoutesByTo {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/chat/external/$conversationId': typeof ChatExternalConversationIdRoute
+  '/chat/harness/$runtimeId': typeof ChatHarnessRuntimeIdRoute
+  '/api/external-conversations/$conversationId/messages': typeof ApiExternalConversationsConversationIdMessagesRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1347,6 +1399,8 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/external-agents': typeof ApiExternalAgentsRoute
+  '/api/external-conversations': typeof ApiExternalConversationsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -1412,6 +1466,7 @@ export interface FileRoutesById {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/external-conversations/$conversationId': typeof ApiExternalConversationsConversationIdRouteWithChildren
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1458,6 +1513,9 @@ export interface FileRoutesById {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/chat/external/$conversationId': typeof ChatExternalConversationIdRoute
+  '/chat/harness/$runtimeId': typeof ChatHarnessRuntimeIdRoute
+  '/api/external-conversations/$conversationId/messages': typeof ApiExternalConversationsConversationIdMessagesRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
@@ -1511,6 +1569,8 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/external-agents'
+    | '/api/external-conversations'
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -1576,6 +1636,7 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/external-conversations/$conversationId'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -1622,6 +1683,9 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/chat/external/$conversationId'
+    | '/chat/harness/$runtimeId'
+    | '/api/external-conversations/$conversationId/messages'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -1672,6 +1736,8 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/external-agents'
+    | '/api/external-conversations'
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -1737,6 +1803,7 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/external-conversations/$conversationId'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -1783,6 +1850,9 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/chat/external/$conversationId'
+    | '/chat/harness/$runtimeId'
+    | '/api/external-conversations/$conversationId/messages'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -1834,6 +1904,8 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/external-agents'
+    | '/api/external-conversations'
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -1899,6 +1971,7 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/external-conversations/$conversationId'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -1945,6 +2018,9 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/chat/external/$conversationId'
+    | '/chat/harness/$runtimeId'
+    | '/api/external-conversations/$conversationId/messages'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
@@ -1997,6 +2073,8 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiExternalAgentsRoute: typeof ApiExternalAgentsRoute
+  ApiExternalConversationsRoute: typeof ApiExternalConversationsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
@@ -2082,6 +2160,8 @@ export interface RootRouteChildren {
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
+  ChatExternalConversationIdRoute: typeof ChatExternalConversationIdRoute
+  ChatHarnessRuntimeIdRoute: typeof ChatHarnessRuntimeIdRoute
   ApiRunsSessionKeyRunIdAbandonRoute: typeof ApiRunsSessionKeyRunIdAbandonRoute
 }
 
@@ -2675,6 +2755,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/external-conversations': {
+      id: '/api/external-conversations'
+      path: '/api/external-conversations'
+      fullPath: '/api/external-conversations'
+      preLoaderRoute: typeof ApiExternalConversationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/external-agents': {
+      id: '/api/external-agents'
+      path: '/api/external-agents'
+      fullPath: '/api/external-agents'
+      preLoaderRoute: typeof ApiExternalAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/events': {
       id: '/api/events'
       path: '/api/events'
@@ -2806,6 +2900,20 @@ declare module '@tanstack/react-router' {
       path: '/api/agent-bus'
       fullPath: '/api/agent-bus'
       preLoaderRoute: typeof ApiAgentBusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/harness/$runtimeId': {
+      id: '/chat/harness/$runtimeId'
+      path: '/chat/harness/$runtimeId'
+      fullPath: '/chat/harness/$runtimeId'
+      preLoaderRoute: typeof ChatHarnessRuntimeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/external/$conversationId': {
+      id: '/chat/external/$conversationId'
+      path: '/chat/external/$conversationId'
+      fullPath: '/chat/external/$conversationId'
+      preLoaderRoute: typeof ChatExternalConversationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/update/workspace': {
@@ -3130,6 +3238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExternalMemoryCandidatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/external-conversations/$conversationId': {
+      id: '/api/external-conversations/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/api/external-conversations/$conversationId'
+      preLoaderRoute: typeof ApiExternalConversationsConversationIdRouteImport
+      parentRoute: typeof ApiExternalConversationsRoute
+    }
     '/api/dashboard/overview': {
       id: '/api/dashboard/overview'
       path: '/api/dashboard/overview'
@@ -3199,6 +3314,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/hermesworld/reservations/confirm'
       preLoaderRoute: typeof ApiHermesworldReservationsConfirmRouteImport
       parentRoute: typeof ApiHermesworldReservationsRoute
+    }
+    '/api/external-conversations/$conversationId/messages': {
+      id: '/api/external-conversations/$conversationId/messages'
+      path: '/messages'
+      fullPath: '/api/external-conversations/$conversationId/messages'
+      preLoaderRoute: typeof ApiExternalConversationsConversationIdMessagesRouteImport
+      parentRoute: typeof ApiExternalConversationsConversationIdRoute
     }
     '/api/runs/$sessionKey/$runId/abandon': {
       id: '/api/runs/$sessionKey/$runId/abandon'
@@ -3270,6 +3392,36 @@ const ApiClaudeTasksRouteChildren: ApiClaudeTasksRouteChildren = {
 const ApiClaudeTasksRouteWithChildren = ApiClaudeTasksRoute._addFileChildren(
   ApiClaudeTasksRouteChildren,
 )
+
+interface ApiExternalConversationsConversationIdRouteChildren {
+  ApiExternalConversationsConversationIdMessagesRoute: typeof ApiExternalConversationsConversationIdMessagesRoute
+}
+
+const ApiExternalConversationsConversationIdRouteChildren: ApiExternalConversationsConversationIdRouteChildren =
+  {
+    ApiExternalConversationsConversationIdMessagesRoute:
+      ApiExternalConversationsConversationIdMessagesRoute,
+  }
+
+const ApiExternalConversationsConversationIdRouteWithChildren =
+  ApiExternalConversationsConversationIdRoute._addFileChildren(
+    ApiExternalConversationsConversationIdRouteChildren,
+  )
+
+interface ApiExternalConversationsRouteChildren {
+  ApiExternalConversationsConversationIdRoute: typeof ApiExternalConversationsConversationIdRouteWithChildren
+}
+
+const ApiExternalConversationsRouteChildren: ApiExternalConversationsRouteChildren =
+  {
+    ApiExternalConversationsConversationIdRoute:
+      ApiExternalConversationsConversationIdRouteWithChildren,
+  }
+
+const ApiExternalConversationsRouteWithChildren =
+  ApiExternalConversationsRoute._addFileChildren(
+    ApiExternalConversationsRouteChildren,
+  )
 
 interface ApiHermesTasksRouteChildren {
   ApiHermesTasksTaskIdRoute: typeof ApiHermesTasksTaskIdRoute
@@ -3466,6 +3618,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiExternalAgentsRoute: ApiExternalAgentsRoute,
+  ApiExternalConversationsRoute: ApiExternalConversationsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
@@ -3551,6 +3705,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
+  ChatExternalConversationIdRoute: ChatExternalConversationIdRoute,
+  ChatHarnessRuntimeIdRoute: ChatHarnessRuntimeIdRoute,
   ApiRunsSessionKeyRunIdAbandonRoute: ApiRunsSessionKeyRunIdAbandonRoute,
 }
 export const routeTree = rootRouteImport

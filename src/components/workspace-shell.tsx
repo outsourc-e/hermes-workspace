@@ -99,18 +99,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
   const getTabIndex = useCallback((path: string): number => {
-    if (path === '/dashboard') return 0
-    if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
-    if (path.startsWith('/files')) return 2
-    if (path.startsWith('/terminal')) return 3
-    if (path.startsWith('/jobs')) return 4
-    if (path === '/swarm' || path.startsWith('/swarm2')) return 5
-    if (path.startsWith('/echo-studio')) return 5
-    if (path.startsWith('/memory')) return 6
-    if (path.startsWith('/skills')) return 7
-    if (path.startsWith('/mcp')) return 8
-    if (path.startsWith('/profiles')) return 9
-    if (path.startsWith('/settings')) return 10
+    if (path.startsWith('/chat') || path === '/new' || path === '/') return 0
+    if (path.startsWith('/operations')) return 1
+    if (path.startsWith('/tasks')) return 2
+    if (path === '/swarm' || path.startsWith('/swarm2')) return 3
     return -1
   }, [])
 
@@ -178,8 +170,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/files')) return 'Files'
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/conductor')) return 'Conductor'
-    if (pathname.startsWith('/operations')) return 'Operations'
-    if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Swarm'
+    if (pathname.startsWith('/operations')) return 'Assistants'
+    if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Teams'
     if (pathname.startsWith('/echo-studio')) return 'Echo Studio'
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
@@ -193,7 +185,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
-  const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const isOnChatRoute =
+    pathname === '/chat' || pathname.startsWith('/chat/') || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
   const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
   const isOnHermesWorldLandingRoute = pathname === '/hermes-world' || pathname.startsWith('/hermes-world/') || pathname === '/world' || pathname.startsWith('/world/')

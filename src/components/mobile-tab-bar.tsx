@@ -1,18 +1,10 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BrainIcon,
-  Building01Icon,
   Chat01Icon,
-  Clock01Icon,
-  CommandLineIcon,
-  DashboardSquare01Icon,
-  File01Icon,
-  McpServerIcon,
-  PuzzleIcon,
-  Rocket01Icon,
-  Settings01Icon,
+  CheckListIcon,
   UserGroupIcon,
+  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import {
   useCallback,
@@ -47,89 +39,32 @@ type TabItem = {
 
 export const MOBILE_NAV_TABS: Array<TabItem> = [
   {
-    id: 'dashboard',
-    label: 'Home',
-    icon: DashboardSquare01Icon,
-    to: '/dashboard',
-    match: (p) => p === '/dashboard',
-  },
-  {
     id: 'chat',
     label: 'Chat',
     icon: Chat01Icon,
-    to: '/chat/main',
+    to: '/chat',
     match: (p) => p.startsWith('/chat') || p === '/new',
   },
   {
-    id: 'playground',
-    label: 'Play',
-    icon: Rocket01Icon,
-    to: '/playground',
-    match: (p) => p.startsWith('/playground'),
+    id: 'operations',
+    label: 'Assistants',
+    icon: UserMultipleIcon,
+    to: '/operations',
+    match: (p) => p.startsWith('/operations'),
   },
   {
-    id: 'files',
-    label: 'Files',
-    icon: File01Icon,
-    to: '/files',
-    match: (p) => p.startsWith('/files'),
+    id: 'tasks',
+    label: 'Tasks',
+    icon: CheckListIcon,
+    to: '/tasks',
+    match: (p) => p.startsWith('/tasks'),
   },
   {
-    id: 'terminal',
-    label: 'Terminal',
-    icon: CommandLineIcon,
-    to: '/terminal',
-    match: (p) => p.startsWith('/terminal'),
-  },
-  {
-    id: 'jobs',
-    label: 'Jobs',
-    icon: Clock01Icon,
-    to: '/jobs',
-    match: (p) => p.startsWith('/jobs'),
-  },
-  {
-    id: 'swarm',
-    label: 'Swarm',
+    id: 'teams',
+    label: 'Teams',
     icon: UserGroupIcon,
     to: '/swarm',
     match: (p) => p === '/swarm' || p.startsWith('/swarm2'),
-  },
-
-  {
-    id: 'memory',
-    label: 'Memory',
-    icon: BrainIcon,
-    to: '/memory',
-    match: (p) => p.startsWith('/memory'),
-  },
-  {
-    id: 'skills',
-    label: 'Skills',
-    icon: PuzzleIcon,
-    to: '/skills',
-    match: (p) => p.startsWith('/skills'),
-  },
-  {
-    id: 'mcp',
-    label: 'MCP',
-    icon: McpServerIcon,
-    to: '/mcp',
-    match: (p) => p.startsWith('/mcp'),
-  },
-  {
-    id: 'profiles',
-    label: 'Profiles',
-    icon: UserGroupIcon,
-    to: '/profiles',
-    match: (p) => p.startsWith('/profiles'),
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: Settings01Icon,
-    to: '/settings',
-    match: (p) => p.startsWith('/settings'),
   },
 ]
 
