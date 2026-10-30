@@ -6,7 +6,9 @@ const FILES = [
   'src/components/dashboard-overflow-panel.tsx',
   'src/components/command-palette.tsx',
   'src/components/mobile-hamburger-menu.tsx',
-  'src/components/mobile-tab-bar.tsx',
+  // mobile-tab-bar.tsx deliberately no longer lists an MCP tab — the tab bar
+  // was slimmed to 4 entries by the agent-command-center revamp (d81c4c04)
+  // and mobile MCP access moved to the hamburger menu.
   'src/components/inspector/inspector-panel.tsx',
   'src/components/slash-command-menu.tsx',
   'src/components/search/search-modal.tsx',
