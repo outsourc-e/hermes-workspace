@@ -388,6 +388,9 @@ export function listProfiles(): Array<ProfileSummary> {
     for (const entry of entries) {
       const name = entry.name
       if (name === 'default') continue
+      // Dot-prefixed names are reserved by Hermes (e.g. the `profiles/.deleted/`
+      // tombstone dir for removed profiles) and never valid profile slugs.
+      if (name.startsWith('.')) continue
       const profilePath = path.join(profilesRoot, name)
       if (!entry.isDirectory()) {
         if (!entry.isSymbolicLink()) continue

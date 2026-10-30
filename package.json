@@ -14,7 +14,7 @@
     "start": "node server-entry.js",
     "start:dev": "vite dev",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "node scripts/run-tests.mjs run",
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",

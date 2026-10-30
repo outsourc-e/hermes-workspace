@@ -7,6 +7,19 @@ import { loadWorkspaceCatalog, saveWorkspaceSelection } from './workspace'
 const originalEnv = { ...process.env }
 let tempRoot = ''
 
+// Fixtures must never live inside ~/.hermes: the workspace-route guard
+// `isHermesStatePath` rejects anything under the Hermes state root, and on
+// agent-managed boxes $TMPDIR itself sits inside `~/.hermes` (scratch dir).
+function systemTmpBase(): string {
+  const base = os.tmpdir()
+  const hermesRoot = path.join(os.homedir(), '.hermes')
+  const relative = path.relative(hermesRoot, base)
+  if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
+    return '/tmp'
+  }
+  return base
+}
+
 async function makeDir(...parts: Array<string>) {
   const dir = path.join(...parts)
   await fs.mkdir(dir, { recursive: true })
@@ -14,7 +27,7 @@ async function makeDir(...parts: Array<string>) {
 }
 
 beforeEach(async () => {
-  tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'hermes-workspace-route-'))
+  tempRoot = await fs.mkdtemp(path.join(systemTmpBase(), 'hermes-workspace-route-'))
   process.env = { ...originalEnv }
   process.env.HERMES_HOME = path.join(tempRoot, '.hermes')
   delete process.env.HERMES_WORKSPACE_DIR

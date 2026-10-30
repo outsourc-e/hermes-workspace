@@ -20,10 +20,13 @@ describe('swarm2 navigation alias handling', () => {
   })
 
   it('keeps /swarm as the only user-visible swarm tab', () => {
-    const swarm = MOBILE_NAV_TABS.find((item) => item.id === 'swarm')
+    // The tab bar ids were renamed by the agent-command-center revamp
+    // (d81c4c04): the swarm tab now carries id 'teams' but still deep-links
+    // to /swarm, and no 'swarm2' alias may leak into the mobile bar.
+    const swarmTab = MOBILE_NAV_TABS.find((item) => item.to === '/swarm')
+    expect(swarmTab).toBeDefined()
+    expect(swarmTab?.to).toBe('/swarm')
     const swarm2 = MOBILE_NAV_TABS.find((item) => item.id === 'swarm2')
-
-    expect(swarm?.to).toBe('/swarm')
     expect(swarm2).toBeUndefined()
   })
 })
