@@ -138,4 +138,22 @@ describe('listProfiles', () => {
     )
     expect(readProfile('ops').systemPrompt).toBe('Config prompt wins')
   })
+
+  it('skips dot-prefixed tombstone dirs such as profiles/.deleted', () => {
+    const hermesRoot = path.join(tempHome, '.hermes')
+    const tombstoneRoot = path.join(hermesRoot, 'profiles', '.deleted')
+
+    fs.mkdirSync(tombstoneRoot, { recursive: true })
+    fs.writeFileSync(path.join(tombstoneRoot, 'trader'), 'deleted\n', 'utf-8')
+    fs.writeFileSync(
+      path.join(hermesRoot, 'config.yaml'),
+      'model: root-model\ndescription: Root default\n',
+      'utf-8',
+    )
+
+    const names = listProfiles().map((profile) => profile.name)
+
+    expect(names).toContain('default')
+    expect(names).not.toContain('.deleted')
+  })
 })
