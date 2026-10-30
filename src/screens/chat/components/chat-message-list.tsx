@@ -556,13 +556,89 @@ export function buildDisplayEntries(
   })
 
   if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
-    }
+    // Trailing tool-only assistant messages (after the final text reply) are
+    // intentionally NOT attached to the last display entry — they render as a
+    // collapsed summary via getTrailingToolOnlyTurnSummary instead.
+    void pendingAssistantToolMessages
   }
 
   return entries
+}
+
+export type TrailingToolOnlyTurnSummary = {
+  count: number
+  toolNames: Array<string>
+  hasFinalAssistantText: boolean
+}
+
+/**
+ * Detects a trailing run of tool-only assistant messages/results that come
+ * after the final visible assistant text reply — the persisted-but-hidden
+ * "turn was still working" tail that buildDisplayEntries keeps unattached.
+ * Returns null when the thread already ends with assistant text (nothing to
+ * surface).
+ */
+export function getTrailingToolOnlyTurnSummary(
+  messages: Array<ChatMessage>,
+): TrailingToolOnlyTurnSummary | null {
+  let index = messages.length - 1
+  if (index < 0) return null
+
+  const last = messages[index]
+  if (last.role === 'assistant' ? !isAssistantToolCallOnlyMessage(last) : false) {
+    return null
+  }
+
+  let trailingRun = 0
+  const toolNames: Array<string> = []
+  let firstRunIndex = index
+
+  while (index >= 0) {
+    const message = messages[index]
+    if (
+      isAssistantToolCallOnlyMessage(message) ||
+      message.role === 'tool' ||
+      message.role === 'toolResult'
+    ) {
+      firstRunIndex = index
+      trailingRun++
+      index--
+      continue
+    }
+    break
+  }
+
+  if (trailingRun === 0) return null
+
+  // Collect tool names in chronological order across the run.
+  for (let i = firstRunIndex; i <= messages.length - 1; i++) {
+    const message = messages[i]
+    const names =
+      message.role === 'tool' || message.role === 'toolResult'
+        ? [readString2(message.toolName)]
+        : getToolCallsFromMessage(message).map((call: { name?: string }) => readString2(call?.name))
+    for (const name of names) {
+      if (name && !toolNames.includes(name)) toolNames.push(name)
+    }
+  }
+
+  // Did a visible assistant text reply precede the trailing run?
+  let hasFinalAssistantText = false
+  for (let i = firstRunIndex - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role === 'assistant' && !isAssistantToolCallOnlyMessage(message)) {
+      if (textFromMessage(message).trim().length > 0) {
+        hasFinalAssistantText = true
+      }
+      break
+    }
+  }
+
+  return { count: trailingRun, toolNames, hasFinalAssistantText }
+}
+
+function readString2(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 function escapeAttributeSelector(value: string): string {
