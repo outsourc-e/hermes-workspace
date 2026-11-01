@@ -78,7 +78,7 @@
     "xterm-addon-search": "^0.13.0",
     "xterm-addon-web-links": "^0.9.0",
     "yaml": "^2.8.2",
-    "zod": "^3.25.76",
+    "zod": "^4.6.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
