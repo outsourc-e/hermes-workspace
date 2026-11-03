@@ -1,3 +1,4 @@
+import { authenticatedDashboardFetch } from './dashboard-auth'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -219,10 +220,11 @@ async function fetchDashboardProfiles(): Promise<{
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
 
-    const response = await fetch(`${dashboardUrl}/api/profiles`, {
-      headers,
-      signal: AbortSignal.timeout(5000),
-    })
+    const response = await authenticatedDashboardFetch(
+      dashboardUrl,
+      '/api/profiles',
+      { signal: AbortSignal.timeout(5000) },
+    )
     if (!response.ok) return null
 
     const data = (await response.json()) as {
