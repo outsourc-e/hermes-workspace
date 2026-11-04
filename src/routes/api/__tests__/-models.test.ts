@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { getGatewayCapabilities } from '../../../server/claude-api'
 import path from 'node:path'
 
 const { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readdirSync } = vi.hoisted(() => ({
@@ -43,7 +44,7 @@ vi.mock('../../../server/gateway-capabilities', () => ({
 
 vi.mock('../../../server/claude-api', () => ({
   ensureGatewayProbed: vi.fn(),
-  getGatewayCapabilities: () => ({ models: false }),
+  getGatewayCapabilities: vi.fn(() => ({ models: false })),
 }))
 
 vi.mock('../../../server/local-provider-discovery', () => ({
@@ -54,8 +55,15 @@ vi.mock('../../../server/local-provider-discovery', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  existsSync.mockReturnValue(false)
+  readFileSync.mockReturnValue('')
+  vi.mocked(getGatewayCapabilities).mockReturnValue({ models: false } as any)
   delete process.env.HERMES_HOME
   delete process.env.CLAUDE_HOME
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('models route', () => {
@@ -70,6 +78,31 @@ describe('models route', () => {
     const get = (mod as any).Route.server.handlers.GET
     return get
   }
+
+  it('refreshes the ordinary catalog while preserving saved defaults and custom models', async () => {
+    process.env.HERMES_HOME = '/mock/minimax'
+    existsSync.mockImplementation((p: string) => p.startsWith('/mock/minimax/'))
+    readFileSync.mockImplementation((p: string) => p.endsWith('config.yaml')
+      ? 'model:\n  provider: minimax\n  default: MiniMax-M2.7\n'
+      : '[{"model":"MiniMax-M2.5","provider":"minimax"},{"model":"custom/model","provider":"custom"}]')
+    vi.mocked(getGatewayCapabilities).mockReturnValue({ models: true } as any)
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [
+      { id: 'MiniMax-M2.7', provider: 'minimax' },
+      { id: 'MiniMax-M2.5', provider: 'minimax' },
+      { id: 'MiniMax-M2.1', provider: 'minimax' },
+      { id: 'MiniMax-M3', provider: 'minimax' },
+      { id: 'speech-02-hd', provider: 'minimax' },
+    ] })))
+    const get = await getHandler()
+    const response = await get({ request: new Request('http://localhost/api/models') })
+    const payload = await response.json()
+    expect(payload.models.map((model: { id: string }) => model.id)).toEqual([
+      'MiniMax-M2.7', 'MiniMax-M2.5', 'custom/model',
+      'MiniMax-M3.1-Flash', 'MiniMax-M3', 'speech-02-hd',
+    ])
+    expect(writeFileSync).not.toHaveBeenCalled()
+    vi.mocked(getGatewayCapabilities).mockReturnValue({ models: false } as any)
+  })
 
   it('GET returns ok:true and empty models without config', async () => {
     const get = await getHandler()

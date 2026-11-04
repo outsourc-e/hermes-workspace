@@ -58,6 +58,9 @@ export function resolveSwarmModelLabel(
   }
 
   // MiniMax
+  if (/^minimax[- ]m?3\.1[- ]flash$/.test(normalized)) {
+    return { provider: 'minimax', default: 'MiniMax-M3.1-Flash' }
+  }
   if (/^minimax(?:\s*m)?\s*3$|^minimax m?3$/.test(normalized)) {
     return { provider: 'minimax', default: 'MiniMax-M3' }
   }

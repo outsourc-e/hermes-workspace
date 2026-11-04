@@ -5,6 +5,7 @@ import YAML from 'yaml'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { currentMiniMaxModels } from '../../lib/minimax-models'
 import {
   ensureGatewayProbed,
   getGatewayCapabilities,
@@ -445,7 +446,7 @@ export const Route = createFileRoute('/api/models')({
           // from the CLI/backend model universe.
           if (getGatewayCapabilities().models) {
             const hermesModels = await fetchClaudeModels()
-            models = mergeModelEntries(models, hermesModels)
+            models = mergeModelEntries(models, currentMiniMaxModels(hermesModels))
             source = source === 'models.json' ? 'models.json+hermes-agent' : 'hermes-agent'
           }
 

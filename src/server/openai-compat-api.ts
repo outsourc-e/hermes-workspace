@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { CLAUDE_API } from './gateway-capabilities'
+import { currentMiniMaxModels } from '../lib/minimax-models'
 
 /**
  * Optional bearer token for authenticated OpenAI-compatible endpoints
@@ -58,13 +59,14 @@ async function getDefaultModel(): Promise<string> {
       signal: AbortSignal.timeout(3_000),
     })
     if (res.ok) {
-      const data = (await res.json()) as { data?: Array<{ id: string }> }
-      if (data.data && data.data.length > 0) {
+      const data = (await res.json()) as { data?: Array<{ id: string; provider?: string }> }
+      const models = currentMiniMaxModels(data.data ?? [])
+      if (models.length > 0) {
         // Prefer a known-good chat model over the first alphabetical one
-        const preferred = data.data.find((m) =>
-          /qwen|llama|mistral|gemma/i.test(m.id),
+        const preferred = models.find((m) =>
+          /qwen|llama|mistral|gemma/i.test(m.id ?? ''),
         )
-        _cachedDefaultModel = preferred?.id ?? data.data[0].id
+        _cachedDefaultModel = preferred?.id ?? models[0].id ?? 'default'
         return _cachedDefaultModel
       }
     }
