@@ -268025,6 +268025,9 @@ function resolveSwarmModelLabel(label) {
   if (/^gpt[- ]?5\.3[- ]codex(?:[- ]?spark)?$/.test(normalized)) {
     return { provider: "openai-codex", default: "gpt-5.3-codex-spark" };
   }
+  if (/^minimax[- ]m?3\.1[- ]flash$/.test(normalized)) {
+    return { provider: "minimax", default: "MiniMax-M3.1-Flash" };
+  }
   if (/^minimax(?:\s*m)?\s*3$|^minimax m?3$/.test(normalized)) {
     return { provider: "minimax", default: "MiniMax-M3" };
   }
@@ -273330,6 +273333,54 @@ function getBearerToken() {
   }
   return "";
 }
+var MINIMAX_TEXT_MODELS = ["MiniMax-M3.1-Flash", "MiniMax-M3"];
+function currentMiniMaxModels(models) {
+  const result = [];
+  const directRoutes = /* @__PURE__ */ new Set();
+  const gatewayRoutes = /* @__PURE__ */ new Set();
+  for (const model of models) {
+    const id3 = model.id ?? "";
+    const provider = model.provider?.toLowerCase() ?? "";
+    const direct = id3.match(/^(?:(minimax(?:-cn)?)\/)?(MiniMax-M\d[^/:]*)$/);
+    if (direct && ["", "unknown", "minimax", "minimax-cn"].includes(provider)) {
+      const prefix3 = direct[1] ? `${direct[1]}/` : "";
+      const route = `${provider}:${prefix3}`;
+      if (!directRoutes.has(route)) {
+        directRoutes.add(route);
+        for (const current3 of MINIMAX_TEXT_MODELS) {
+          const currentId = `${prefix3}${current3}`;
+          result.push(
+            models.find(
+              (entry) => entry.id === currentId && entry.provider === model.provider
+            ) ?? {
+              id: currentId,
+              name: current3,
+              provider: model.provider
+            }
+          );
+        }
+      }
+      continue;
+    }
+    const gateway = id3.match(/^(?:openrouter\/)?minimax\/(minimax-m[^/]+)$/i);
+    if (gateway && (provider === "openrouter" || id3.startsWith("openrouter/"))) {
+      const prefix3 = id3.slice(0, id3.length - gateway[1].length);
+      const route = `${provider}:${prefix3}`;
+      if (!gatewayRoutes.has(route)) {
+        gatewayRoutes.add(route);
+        for (const current3 of ["minimax-m3.1-flash:free", "minimax-m3"]) {
+          const entry = models.find(
+            (candidate) => candidate.id === `${prefix3}${current3}` && candidate.provider === model.provider
+          );
+          if (entry) result.push(entry);
+        }
+      }
+      continue;
+    }
+    result.push(model);
+  }
+  return result;
+}
 async function getDefaultModel() {
   if (_cachedDefaultModel) return _cachedDefaultModel;
   if (process.env.CLAUDE_DEFAULT_MODEL) {
@@ -273346,11 +273397,12 @@ async function getDefaultModel() {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.data && data.data.length > 0) {
-        const preferred = data.data.find(
-          (m5) => /qwen|llama|mistral|gemma/i.test(m5.id)
+      const models = currentMiniMaxModels(data.data ?? []);
+      if (models.length > 0) {
+        const preferred = models.find(
+          (m5) => /qwen|llama|mistral|gemma/i.test(m5.id ?? "")
         );
-        _cachedDefaultModel = preferred?.id ?? data.data[0].id;
+        _cachedDefaultModel = preferred?.id ?? models[0].id ?? "default";
         return _cachedDefaultModel;
       }
     }
@@ -281054,6 +281106,7 @@ var init_router_BMEomgJZ = __esm({
       "gemini-2.0-flash": "Gemini 2.0 Flash",
       "gemini-2.5-pro": "Gemini 2.5 Pro",
       "gemini-2.5-flash": "Gemini 2.5 Flash",
+      "MiniMax-M3.1-Flash": "MiniMax M3.1 Flash",
       "MiniMax-M3": "MiniMax M3",
       "MiniMax-M2.7": "MiniMax M2.7",
       "MiniMax-M2.7-Lightning": "MiniMax M2.7 Lightning"
@@ -282437,7 +282490,7 @@ var init_router_BMEomgJZ = __esm({
         id: "minimax",
         name: "MiniMax",
         logo: "/providers/minimax.png",
-        models: ["MiniMax-M3", "MiniMax-M2.7"],
+        models: ["MiniMax-M3.1-Flash", "MiniMax-M3"],
         authType: "api_key",
         envKey: "MINIMAX_API_KEY"
       },
@@ -288160,6 +288213,7 @@ Rules:
       "gemini-2.5-flash": 1e6,
       "gemini-2.5-pro": 1e6,
       "kimi-k2.6": 256e3,
+      "MiniMax-M3.1-Flash": 1e6,
       "MiniMax-M3": 1e6,
       "MiniMax-M2.7": 204800
     };
@@ -289875,7 +289929,7 @@ data: ${JSON.stringify(data)}
               }
               if (getCapabilities().models) {
                 const hermesModels = await fetchClaudeModels();
-                models = mergeModelEntries(models, hermesModels);
+                models = mergeModelEntries(models, currentMiniMaxModels(hermesModels));
                 source = source === "models.json" ? "models.json+hermes-agent" : "hermes-agent";
               }
               await ensureDiscovery();
