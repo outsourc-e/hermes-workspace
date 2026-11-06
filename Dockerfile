@@ -37,6 +37,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=gosu_source /gosu /usr/local/bin/gosu
 
+# uv/uvx: some stdio MCP presets ship as Python packages only (the Fetch server
+# has no npm distribution), so the catalog launches them with `uvx`.
+COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /uvx /bin/
+
 WORKDIR /app
 
 # Copy build artefacts + runtime deps.

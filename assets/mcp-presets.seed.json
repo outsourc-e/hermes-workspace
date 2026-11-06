@@ -112,8 +112,8 @@
       "template": {
         "name": "fetch",
         "transportType": "stdio",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-fetch"],
+        "command": "uvx",
+        "args": ["mcp-server-fetch"],
         "authType": "none",
         "toolMode": "all"
       }
