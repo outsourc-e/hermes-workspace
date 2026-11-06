@@ -65,6 +65,7 @@ export function resolveHermesConfigPaths(): HermesConfigPaths {
     configPath: path.join(hermesHome, 'config.yaml'),
     envPath: path.join(hermesHome, '.env'),
     authProfilesPath: path.join(hermesHome, 'auth-profiles.json'),
+    authStorePath: path.join(hermesHome, 'auth.json'),
   }
 }
 
@@ -139,9 +140,9 @@ function writeEnv(envPath: string, env: Record<string, string>): void {
   fs.writeFileSync(envPath, stringifyEnv(env), 'utf-8')
 }
 
-function readAuthProfiles(authProfilesPath: string): Record<string, unknown> {
+function readJsonFile(filePath: string): Record<string, unknown> {
   try {
-    const raw = fs.readFileSync(authProfilesPath, 'utf-8')
+    const raw = fs.readFileSync(filePath, 'utf-8')
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
@@ -151,11 +152,49 @@ function readAuthProfiles(authProfilesPath: string): Record<string, unknown> {
   }
 }
 
+function readAuthProfiles(
+  authProfilesPath: string,
+  authStorePath: string,
+): Record<string, unknown> {
+  const legacy = readJsonFile(authProfilesPath)
+  const merged: Record<string, unknown> = { ...legacy }
+  const profiles: Record<string, unknown> = {
+    ...(legacy.profiles && typeof legacy.profiles === 'object' && !Array.isArray(legacy.profiles)
+      ? (legacy.profiles as Record<string, unknown>)
+      : {}),
+  }
+
+  // Hermes Agent keeps OAuth credentials in auth.json (providers.<id>.access_token),
+  // not in auth-profiles.json. Surface them under the same `profiles` shape the
+  // config normalizer already understands so the workspace detects the login.
+  const store = readJsonFile(authStorePath)
+  const providers = store.providers
+  if (providers && typeof providers === 'object' && !Array.isArray(providers)) {
+    for (const [providerId, value] of Object.entries(providers as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+      const record = value as Record<string, unknown>
+      const token = typeof record.access_token === 'string' ? record.access_token : ''
+      if (!token) continue
+      const key = `${providerId}:default`
+      if (profiles[key]) continue
+      profiles[key] = { accessToken: token, token }
+    }
+  }
+
+  merged.profiles = profiles
+  // Keep the auth store's active provider so the config normalizer can resolve the
+  // default model when Hermes flattened `model:` and dropped `provider:`.
+  if (merged.active_provider === undefined && typeof store.active_provider === 'string') {
+    merged.active_provider = store.active_provider
+  }
+  return merged
+}
+
 export function readHermesConfigFiles(paths: HermesConfigPaths): HermesConfigFiles {
   return {
     config: readYamlConfig(paths.configPath),
     env: readEnv(paths.envPath),
-    authProfiles: readAuthProfiles(paths.authProfilesPath),
+    authProfiles: readAuthProfiles(paths.authProfilesPath, paths.authStorePath),
   }
 }
 

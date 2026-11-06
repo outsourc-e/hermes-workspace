@@ -6,6 +6,7 @@ const paths = {
   configPath: '/tmp/hermes/config.yaml',
   envPath: '/tmp/hermes/.env',
   authProfilesPath: '/tmp/hermes/auth-profiles.json',
+  authStorePath: '/tmp/hermes/auth.json',
 }
 
 describe('normalizeHermesConfigState', () => {

@@ -12,6 +12,7 @@ export type HermesConfigPaths = {
   configPath: string
   envPath: string
   authProfilesPath: string
+  authStorePath: string
 }
 
 export type HermesProviderState = {
@@ -116,9 +117,16 @@ function maskSecret(value: string): string {
   return `${value.slice(0, 4)}...${value.slice(-4)}`
 }
 
-function readDefaultModel(config: Record<string, unknown>): HermesConfigState['defaultModel'] {
+function readDefaultModel(
+  config: Record<string, unknown>,
+  authProfiles: Record<string, unknown>,
+): HermesConfigState['defaultModel'] {
+  // Hermes may flatten `model:` to a scalar and drop the explicit `provider:` key,
+  // keeping the active provider only in the auth store (active_provider). Fall back
+  // to it so the workspace still resolves the default provider/model pair.
+  const storeProvider = readString(authProfiles.active_provider)
   const flatModel = readString(config.model)
-  const flatProvider = readString(config.provider)
+  const flatProvider = readString(config.provider) || storeProvider
   if (flatModel && flatProvider) {
     return { provider: flatProvider, model: flatModel, source: 'flat' }
   }
@@ -171,7 +179,7 @@ function customProviderApiMode(entry: Record<string, unknown>): string {
 }
 
 export function normalizeHermesConfigState(input: NormalizeHermesConfigInput): HermesConfigState {
-  const defaultModel = readDefaultModel(input.config)
+  const defaultModel = readDefaultModel(input.config, input.authProfiles)
   const customEntries = readCustomProviderEntries(input.config)
   const customByName = new Map(customEntries.map((entry) => [customProviderName(entry), entry]))
   const localById = new Map(input.localProviders.map((provider) => [provider.id, provider]))
