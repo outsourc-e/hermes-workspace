@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ops.ollama-2</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Applications/Ollama.app/Contents/Resources/ollama</string>
+    <string>serve</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OLLAMA_HOST</key><string>127.0.0.1:21434</string>
+    <key>OLLAMA_CONTEXT_LENGTH</key><string>65536</string>
+    <key>OLLAMA_NUM_PARALLEL</key><string>1</string>
+    <key>OLLAMA_KEEP_ALIVE</key><string>-1</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>Comment</key><string>R7 lane 2: supervised second Ollama upstream on :21434 (qwen35 arch does not support num_parallel slots; capacity comes from two instances fanned out by fleet_proxy). Shares the read-only model store; KeepAlive applies the R6 supervision lesson to both fleet upstreams.</string>
+  <key>StandardOutPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/ollama-2.log</string>
+  <key>StandardErrorPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/ollama-2.log</string>
+</dict>
+</plist>

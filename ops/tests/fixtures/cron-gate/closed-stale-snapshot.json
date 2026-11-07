@@ -1,0 +1,33 @@
+{
+  "summary": {
+    "generated_at": "2026-11-05T20:21:29",
+    "window_hours": 24,
+    "ok": 1,
+    "warn": 0,
+    "fail": 1,
+    "jobs_tracked": 2
+  },
+  "jobs": [
+    {
+      "id": "base0000",
+      "name": "base-ok",
+      "active": true,
+      "verdict": "ok"
+    },
+    {
+      "id": "x1",
+      "name": "KRITIS East distiller",
+      "active": true,
+      "cadence_minutes": 720,
+      "runs_24h": 2,
+      "failed_24h": 0,
+      "artifact": {
+        "exists": false,
+        "path": "/tmp/x",
+        "fresh": false
+      },
+      "verdict": "fail",
+      "reasons": []
+    }
+  ]
+}

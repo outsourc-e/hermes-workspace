@@ -1,0 +1,13 @@
+# chief-of-staff staff roster — subordinate agents the CoS checks off nightly.
+# Format: agent-name|buzz-channel|expected-cadence|research-or-output-dir
+# expected-cadence: daily | every-3-days | as-run
+# The CoS verifies the LATEST digest per agent exists within its cadence window,
+# extracts needs-decision items, and flags misses in Morning Brief section 5.
+competitor-scout|#competitors|daily|
+customer-watcher|#customers|daily|
+partner-radar|#partners|daily|
+product-intel|#product-intel|every-3-days|docs/ops/intel/knowledge-base
+fleet-health-monitor|#night-runs|daily|docs/ops/research
+watchdog|#night-runs|daily|
+crm-sync|#crm-sync|as-run|
+doc-agent|#approvals|as-run|

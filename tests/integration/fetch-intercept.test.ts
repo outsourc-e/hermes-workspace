@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 describe("fetch intercept (content.ts logic port)", () => {
   it("substitutes via substituteExact before fetch", async () => {
-    const { substituteExact } = await import("../../packages/ai-protect-core/src/substitute.js");
+    const { substituteExact } = await import("@ai-protect/core/substitute");
     const lex = [{ id: "CS_021", secret: "Project Titan", decoy: "Project Atlas", type: "codename" as const }];
     const body = JSON.stringify({ messages: [{ content: "Project Titan status at chatgpt.com" }] });
     const data = JSON.parse(body);

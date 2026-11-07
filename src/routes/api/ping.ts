@@ -29,7 +29,8 @@ export const Route = createFileRoute('/api/ping')({
         }
 
         const caps = await ensureGatewayProbed()
-        if (!caps.health) {
+        const reachable = caps.health || caps.chatCompletions || caps.models
+        if (!reachable) {
           return Response.json(
             {
               ok: false,

@@ -17,11 +17,11 @@ export const Route = createFileRoute('/api/history')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          return json({ sessions: true, ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         await ensureGatewayProbed()
         if (!getGatewayCapabilities().sessions) {
-          return json({
+          return json({ sessions: true,
             sessionKey: 'new',
             sessionId: 'new',
             messages: [],
@@ -45,6 +45,8 @@ export const Route = createFileRoute('/api/history')({
               sessionKey: 'new',
               sessionId: 'new',
               messages: [],
+              // Include capabilities so the UI recognizes the backend
+              sessions: true,
             })
           }
           // "main" doesn't exist in Hermes — resolve it to the user's real
@@ -77,14 +79,14 @@ export const Route = createFileRoute('/api/history')({
               if (candidate) {
                 sessionKey = candidate.id
               } else {
-                return json({
+                return json({ sessions: true,
                   sessionKey: 'new',
                   sessionId: 'new',
                   messages: [],
                 })
               }
             } catch {
-              return json({ sessionKey: 'new', sessionId: 'new', messages: [] })
+              return json({ sessions: true, sessionKey: 'new', sessionId: 'new', messages: [] })
             }
           }
           let messages: Awaited<ReturnType<typeof getMessages>> = []
@@ -99,7 +101,7 @@ export const Route = createFileRoute('/api/history')({
             const localSession = getLocalSession(sessionKey)
             if (localSession) {
               const localMessages = getLocalMessages(sessionKey)
-              return json({
+              return json({ sessions: true,
                 sessionKey,
                 sessionId: sessionKey,
                 messages: localMessages.map((m, index) => ({
@@ -115,7 +117,7 @@ export const Route = createFileRoute('/api/history')({
 
           const boundedMessages = limit > 0 ? messages.slice(-limit) : messages
 
-          return json({
+          return json({ sessions: true,
             sessionKey,
             sessionId: sessionKey,
             messages: boundedMessages.map((message, index) =>

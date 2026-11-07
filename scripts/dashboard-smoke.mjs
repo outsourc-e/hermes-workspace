@@ -2,10 +2,10 @@
 /**
  * Dashboard Smoke Test — validates API endpoints return expected shapes.
  * Usage: node scripts/dashboard-smoke.mjs [baseUrl]
- * Default: http://localhost:3000
+ * Default: http://localhost:3001
  */
 
-const BASE = process.argv[2] || 'http://localhost:3000'
+const BASE = process.argv[2] || 'http://localhost:3001'
 let passed = 0
 let failed = 0
 

@@ -1,0 +1,5 @@
+# partner-radar — partner candidate watchlist (leave commented to skip nightly run intentionally).
+# Uncomment and populate when you have 1+ active partner candidates to score.
+# Entries are plain names or domains, one per line.
+TrueFoundry
+# Keep empty = runner exits with "empty target list" (expected) and fleet-health reports SKIPPED, not red.

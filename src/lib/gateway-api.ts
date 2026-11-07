@@ -140,7 +140,7 @@ export type SessionHistoryMessage = {
 
 export type SessionHistoryResponse = {
   ok?: boolean
-  messages?: SessionHistoryMessage[]
+  messages?: Array<SessionHistoryMessage>
   error?: string
 }
 
@@ -232,7 +232,7 @@ export async function fetchSessionStatus(
 
 export async function fetchModels(): Promise<GatewayModelsResponse> {
   const controller = new AbortController()
-  const timeout = globalThis.setTimeout(() => controller.abort(), 7000)
+  const timeout = globalThis.setTimeout(() => controller.abort(), 20000)
 
   try {
     const response = await fetch(makeEndpoint('/api/models'), {
@@ -256,7 +256,11 @@ export async function fetchModels(): Promise<GatewayModelsResponse> {
     }
   } catch (error) {
     if (isAbortError(error)) {
-      throw new Error('Gateway disconnected')
+      // A timeout abort is NOT a real disconnect — the backend may still be
+      // starting up or probing capabilities. Don't mislabel it.
+      throw new Error(
+        'Gateway is taking too long to respond. It may still be starting up.',
+      )
     }
     throw error
   } finally {
@@ -433,8 +437,8 @@ export type GatewayApprovalEntry = {
 
 export type GatewayApprovalsResponse = {
   ok?: boolean
-  approvals?: GatewayApprovalEntry[]
-  pending?: GatewayApprovalEntry[]
+  approvals?: Array<GatewayApprovalEntry>
+  pending?: Array<GatewayApprovalEntry>
 }
 
 export async function fetchGatewayApprovals(): Promise<GatewayApprovalsResponse> {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { substituteExact } from "../../packages/ai-protect-core/src/substitute.js";
+import { substituteExact } from "@ai-protect/core/substitute";
 
 describe("perf budget exact (deck 14.5TB replay) — tuned for M2 Max 64GB", () => {
   it("p95 < 1.0ms on M2 Max (was <2ms generic) + p50 < 0.5ms", () => {

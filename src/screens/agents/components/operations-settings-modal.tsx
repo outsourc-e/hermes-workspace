@@ -39,7 +39,7 @@ function ModelSelector({
 }: {
   value: string
   onChange: (nextValue: string) => void
-  models: AvailableModel[]
+  models: Array<AvailableModel>
 }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -191,6 +191,13 @@ export function OperationsSettingsModal({
               onChange={(defaultModel) => setDraft((current) => ({ ...current, defaultModel }))}
               models={models}
             />
+            {modelsQuery.error ? (
+              <p className="text-xs text-red-600">
+                {modelsQuery.error instanceof Error
+                  ? modelsQuery.error.message
+                  : 'Unable to load models. Check your Hermes connection.'}
+              </p>
+            ) : null}
           </label>
 
           <label className="flex items-center justify-between rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">

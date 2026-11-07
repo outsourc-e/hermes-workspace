@@ -1,0 +1,20 @@
+# chief-of-staff GitHub settings + blocklist
+# Auto-discovery rule: repos owned by andreasnahrgang, NOT forks, pushed within
+# COS_PUSH_WINDOW_DAYS, minus everything listed under BLOCKLIST below.
+# Approved feature proposals create ISSUES only in discovered repos.
+
+SETTINGS
+push_window_days=14
+max_active_projects=8
+default_labels=chief-of-staff,feature-proposal
+
+BLOCKLIST
+# never receive automated issues (add one repo name per line)
+prompts.chat
+simplex-chat
+CopilotKit
+openwrt
+sherlock
+markitup
+magika
+nanochat

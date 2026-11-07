@@ -1,0 +1,8 @@
+# product-intel research targets — Name|URL|type
+# Managed via ops/bin/intel-add-target.sh (owner-approved additions only).
+# The two own products are baseline, not targets: see knowledge-base/own-products.md
+Protecto|https://www.protecto.ai/|competitor
+Straiker|https://www.straiker.ai/products/discover-ai|competitor
+Harmonic Security|https://www.harmonic.security/solutions/shadow-ai-detection|competitor
+Nightfall AI|https://www.nightfall.ai/|competitor
+TrueFoundry|https://www.truefoundry.com/|partner-candidate

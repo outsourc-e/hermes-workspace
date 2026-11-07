@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { LEAKAGE_RATES_LAYERX_2026 } from "../../packages/ai-protect-shared/src/constants.js";
-import { ManagedPolicySchema } from "../../packages/ai-protect-shared/src/schemas.js";
+import { LEAKAGE_RATES_LAYERX_2026 } from "@ai-protect/shared/constants";
+import { ManagedPolicySchema } from "@ai-protect/shared/schemas";
 
 describe("compliance — EU AI Act / leakage thresholds", () => {
   it("LayerX 2026 thresholds are present for regression", () => {

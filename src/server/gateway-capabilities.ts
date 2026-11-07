@@ -16,6 +16,7 @@
  *   3. Default localhost (8642 / 9119).
  */
 
+import 'dotenv/config'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -136,8 +137,9 @@ export const HERMES_UPGRADE_INSTRUCTIONS =
 
 export const SESSIONS_API_UNAVAILABLE_MESSAGE = `Your Hermes backend does not support the sessions API. ${HERMES_UPGRADE_INSTRUCTIONS}`
 
-const PROBE_TIMEOUT_MS = 3_000
-const PROBE_TTL_MS = 120_000
+const PROBE_TIMEOUT_MS = 5_000
+const PROBE_TTL_HEALTHY_MS = 120_000
+const PROBE_TTL_DISCONNECTED_MS = 15_000
 const DASHBOARD_TOKEN_REGEX =
   /window\.__HERMES_SESSION_TOKEN__\s*=\s*["'](.+?)["']/
 
@@ -574,8 +576,14 @@ export async function probeGateway(options?: {
   }
 }
 
+function effectiveProbeTtl(caps: { health: boolean; chatCompletions: boolean }): number {
+  if (caps.health || caps.chatCompletions) return PROBE_TTL_HEALTHY_MS
+  return PROBE_TTL_DISCONNECTED_MS
+}
+
 export async function ensureGatewayProbed(): Promise<GatewayCapabilities> {
-  const isStale = Date.now() - lastProbeAt > PROBE_TTL_MS
+  const ttl = effectiveProbeTtl(capabilities)
+  const isStale = Date.now() - lastProbeAt > ttl
   if (!capabilities.probed || isStale) {
     return probeGateway({ force: isStale })
   }

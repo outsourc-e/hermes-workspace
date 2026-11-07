@@ -1,0 +1,41 @@
+{
+  "summary": {
+    "generated_at": "2026-11-05T22:46:29",
+    "window_hours": 24,
+    "ok": 1,
+    "warn": 0,
+    "fail": 2,
+    "jobs_tracked": 3
+  },
+  "jobs": [
+    {
+      "id": "base0000",
+      "name": "base-ok",
+      "active": true,
+      "verdict": "ok"
+    },
+    {
+      "id": "s1",
+      "name": "Topic news digest",
+      "active": true,
+      "cadence_minutes": 1440,
+      "runs_24h": 0,
+      "failed_24h": 0,
+      "stalled_running_minutes": 190,
+      "verdict": "fail",
+      "reasons": []
+    },
+    {
+      "id": "s2",
+      "name": "Lusha-Twenty Sync",
+      "active": true,
+      "cadence_minutes": 1440,
+      "runs_24h": 0,
+      "failed_24h": 0,
+      "verdict": "fail",
+      "reasons": [
+        "no executions in last 24h"
+      ]
+    }
+  ]
+}

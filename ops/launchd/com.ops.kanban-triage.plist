@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ops.kanban-triage</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/andreasnahrgang/hermes-workspace/ops/bin/kanban-triage.sh</string>
+    <string>--days</string>
+    <string>14</string>
+    <string>--execute</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>6</integer>
+    <key>Minute</key><integer>50</integer>
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/Users/andreasnahrgang/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>Comment</key><string>B2 follow-up: daily 06:50 scheduled kanban triage — parks automated ready/queued cards older than 14 days via sticky kernel blocks (needs_input), immune to the gateway recompute_ready auto-recovery. Dry-run report stays in the log tail before each execute.</string>
+  <key>StandardOutPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/kanban-triage.log</string>
+  <key>StandardErrorPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/kanban-triage.log</string>
+</dict>
+</plist>

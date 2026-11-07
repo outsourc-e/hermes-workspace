@@ -67,7 +67,7 @@ describe.skipIf(!hasLanguageModel)("live Nano — M2 Max 64GB (Chrome 151)", () 
 
 describe("live Nano — fallback check (always runs, Node)", () => {
   it("core substituteExact still works without Nano (regression guard for M2 Max live mode)", async () => {
-    const { substituteExact } = await import("../../packages/ai-protect-core/src/substitute.js");
+    const { substituteExact } = await import("@ai-protect/core/substitute");
     const lex = [{ id: "CS_021", secret: "Project Titan", decoy: "Project Atlas", type: "codename" as const }];
     const r = substituteExact("Project Titan Status", { policyHash: "h", lexicon: lex as any });
     expect(r.cleanText).toBe("Project Atlas Status");

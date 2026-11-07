@@ -1,0 +1,618 @@
+{
+  "jobs": [
+    {
+      "id": "2424666b22a9",
+      "name": "Shadow AI Update",
+      "prompt": "[IMPORTANT: You are running as a scheduled cron job. DELIVERY: Your final response will be automatically delivered to the user — do NOT use send_message. SILENT: If genuinely nothing new, respond with exactly \"[SILENT]\" (nothing else).\n\nThe Shadow AI gatherer ALREADY RAN as this job's pre-step (shadow_ai_gatherer.sh — fetches Hacker News RSS, writes /tmp/shadow_ai_raw.txt, and appends raw hits to the Obsidian note 'Shadow AI Research.md' itself).\nYour ONLY job: read /tmp/shadow_ai_raw.txt and produce a <=5-bullet summary of today's hits (one line each, with links). DO NOT write files. DO NOT append to Obsidian — that is done by the gatherer. If the file says 'No matches today', respond with exactly: [SILENT]",
+      "skills": [],
+      "skill": "web_search",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "shadow_ai_gatherer.sh",
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 1440,
+        "display": "every 1440m"
+      },
+      "schedule_display": "every 1440m",
+      "repeat": {
+        "times": null,
+        "completed": 162
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-05-27T09:22:53.650254+02:00",
+      "next_run_at": "2026-11-06T12:38:22.389221+01:00",
+      "last_run_at": "2026-11-05T22:46:19.143825+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "profile": null,
+      "fire_claim": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T11:58:21.021662+01:00",
+        "dispatched_at": "2026-11-05T12:25:35.932053+01:00",
+        "lateness_seconds": 1634.9,
+        "kind": "late"
+      },
+      "last_failure": {
+        "at": "2026-11-05T12:38:22.389221+01:00",
+        "detail": "RuntimeError: Operation interrupted: waiting for model response (763.2s elapsed)."
+      },
+      "canonical_completions": [
+        "54d1de13cf0c4266b713fba81d6e0fd3"
+      ]
+    },
+    {
+      "id": "6de6ca2e7086",
+      "name": "Lusha-Twenty Inbox Sync",
+      "prompt": "[IMPORTANT: You are running as a scheduled cron job. DELIVERY: Your final response will be automatically delivered to the user — do NOT use send_message or try to deliver the output yourself. SILENT: If there is genuinely nothing new to report, respond with exactly \"[SILENT]\" (nothing else). Never combine [SILENT] with content.\n\nThe Lusha→Twenty inbox watcher ALREADY RAN as this job's pre-step (lusha_inbox_sync.sh — deterministic, interpreter-pinned). Its log is ~/twenty/sync_lusha.log.\nYour ONLY job: read the tail of that log and report the outcome in <=5 bullets: how many leads were found, how many enriched/upserted into Twenty, any errors.\nDO NOT run any commands except reading the log file. DO NOT write files. DO NOT run the watcher again. If no leads were processed today, respond with exactly: [SILENT]",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": "custom",
+      "base_url": null,
+      "script": "lusha_inbox_sync.sh",
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 1440,
+        "display": "every 1440m"
+      },
+      "schedule_display": "every 1440m",
+      "repeat": {
+        "times": null,
+        "completed": 387
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-05T16:46:02.501045+02:00",
+      "next_run_at": "2026-11-06T12:38:22.405440+01:00",
+      "last_run_at": "2026-11-05T22:44:41.298635+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "profile": null,
+      "fire_claim": null,
+      "provider_snapshot": null,
+      "model_snapshot": "gemma4:12b",
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T11:58:20.650430+01:00",
+        "dispatched_at": "2026-11-05T12:25:35.932053+01:00",
+        "lateness_seconds": 1635.3,
+        "kind": "late"
+      },
+      "drift_alerted": true,
+      "last_failure": {
+        "at": "2026-11-05T12:38:22.405440+01:00",
+        "detail": "RuntimeError: Operation interrupted: waiting for model response (763.1s elapsed)."
+      },
+      "canonical_completions": [
+        "6e66f8a9b09e4955bee93470c554b32c"
+      ]
+    },
+    {
+      "id": "79442a28f4c1",
+      "name": "KRITIS Sync - East (Vienna/Lower Austria)",
+      "prompt": "python3 /Users/andreasnahrgang/.hermes/scripts/synth.py kritis_east",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "synth.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
+      "repeat": {
+        "times": null,
+        "completed": 266
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-07T15:56:29.235937+02:00",
+      "next_run_at": "2026-11-06T10:36:38.845800+01:00",
+      "last_run_at": "2026-11-05T22:36:38.845800+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "profile": null,
+      "fire_claim": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T19:55:49.510578+01:00",
+        "dispatched_at": "2026-11-05T20:01:57.359109+01:00",
+        "lateness_seconds": 367.8,
+        "kind": "late"
+      }
+    },
+    {
+      "id": "097216ccdf9f",
+      "name": "KRITIS Sync - West/Central (Default)",
+      "prompt": "python3 /Users/andreasnahrgang/.hermes/scripts/synth.py kritis_west",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "synth.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
+      "repeat": {
+        "times": null,
+        "completed": 244
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-19T08:26:36.368371+02:00",
+      "next_run_at": "2026-11-06T10:36:38.844409+01:00",
+      "last_run_at": "2026-11-05T22:36:38.844409+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T20:08:03.596138+01:00",
+        "dispatched_at": "2026-11-05T20:18:54.572143+01:00",
+        "lateness_seconds": 651.0,
+        "kind": "late"
+      },
+      "last_failure": {
+        "at": "2026-11-05T08:08:03.596138+01:00",
+        "detail": "Script timed out after 3600s: /Users/andreasnahrgang/.hermes/scripts/synth.py"
+      }
+    },
+    {
+      "id": "979a3af62036",
+      "name": "KRITIS Master Audit & Consolidation (Default)",
+      "prompt": "python3 /Users/andreasnahrgang/.hermes/scripts/synth.py kritis_master",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "synth.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 10080,
+        "display": "every 10080m"
+      },
+      "schedule_display": "every 10080m",
+      "repeat": {
+        "times": null,
+        "completed": 20
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-19T09:11:06.280648+02:00",
+      "next_run_at": "2026-11-10T14:05:35.621142+01:00",
+      "last_run_at": "2026-11-03T14:05:35.621142+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-03T13:59:16.223787+01:00",
+        "dispatched_at": "2026-11-03T13:59:47.608337+01:00",
+        "lateness_seconds": 31.4,
+        "kind": "on_time"
+      }
+    },
+    {
+      "id": "f3221063fb96",
+      "name": "Shadow AI Vacuum (Step 1)",
+      "prompt": "Run the Shadow AI vacuum script to gather raw data into /tmp/shadow_ai_raw.txt.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "shadow_ai_vacuum.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 0 * * 0",
+        "display": "0 0 * * 0"
+      },
+      "schedule_display": "0 0 * * 0",
+      "repeat": {
+        "times": null,
+        "completed": 22
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-22T00:15:00.743532+02:00",
+      "next_run_at": "2026-11-08T00:00:00+01:00",
+      "last_run_at": "2026-11-01T02:16:49.579877+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-01T00:00:00+01:00",
+        "dispatched_at": "2026-11-01T02:16:46.529945+01:00",
+        "lateness_seconds": 8206.5,
+        "kind": "catch_up"
+      }
+    },
+    {
+      "id": "efa73ce56936",
+      "name": "Shadow AI Distiller (Step 2)",
+      "prompt": "python3 /Users/andreasnahrgang/.hermes/scripts/synth.py shadow_ai",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "synth.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "5 0 * * 0",
+        "display": "5 0 * * 0"
+      },
+      "schedule_display": "5 0 * * 0",
+      "repeat": {
+        "times": null,
+        "completed": 24
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-22T00:15:53.336972+02:00",
+      "next_run_at": "2026-11-08T00:05:00+01:00",
+      "last_run_at": "2026-11-01T11:59:01.883251+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": [
+        "web",
+        "file",
+        "skills"
+      ],
+      "workdir": null,
+      "fire_claim": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-01T00:05:00+01:00",
+        "dispatched_at": "2026-11-01T02:16:46.529945+01:00",
+        "lateness_seconds": 7906.5,
+        "kind": "catch_up"
+      }
+    },
+    {
+      "id": "3ea46f176983",
+      "name": "AI-Protect Vacuum (Step 1)",
+      "prompt": "Run the vacuum script for AI-PROTECT target.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "vacuum_ai_protect.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
+      "repeat": {
+        "times": null,
+        "completed": 268
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-22T08:00:19.909682+02:00",
+      "next_run_at": "2026-11-06T09:20:14.637304+01:00",
+      "last_run_at": "2026-11-05T21:20:14.637304+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T21:19:41.670464+01:00",
+        "dispatched_at": "2026-11-05T21:20:13.013161+01:00",
+        "lateness_seconds": 31.3,
+        "kind": "on_time"
+      },
+      "last_failure": {
+        "at": "2026-11-04T09:09:01.634157+01:00",
+        "detail": "Script exited with code 1\nstderr:\nTraceback (most recent call last):\n  File \"/Users/andreasnahrgang/.hermes/scripts/generic_vacuum.py\", line 2, in <module>\n    import requests\nModuleNotFoundError: No module named 'requests'"
+      }
+    },
+    {
+      "id": "02ec11171558",
+      "name": "AI-Protect Distiller (Step 2)",
+      "prompt": "python3 /Users/andreasnahrgang/.hermes/scripts/synth.py ai_protect",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "synth.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
+      "repeat": {
+        "times": null,
+        "completed": 243
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-22T08:01:03.910043+02:00",
+      "next_run_at": "2026-11-06T10:39:16.916176+01:00",
+      "last_run_at": "2026-11-05T22:39:16.916176+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": [
+        "web",
+        "file",
+        "skills"
+      ],
+      "workdir": null,
+      "fire_claim": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T20:08:03.647022+01:00",
+        "dispatched_at": "2026-11-05T20:18:54.572143+01:00",
+        "lateness_seconds": 650.9,
+        "kind": "late"
+      },
+      "last_failure": {
+        "at": "2026-11-05T08:08:03.647022+01:00",
+        "detail": "Script timed out after 3600s: /Users/andreasnahrgang/.hermes/scripts/synth.py"
+      }
+    },
+    {
+      "id": "559c061fff6c",
+      "name": "KRITIS South Vacuum (Step 1)",
+      "prompt": "Run the vacuum script for KRITIS-SOUTH target.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "vacuum_kritis_south.sh",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
+      "repeat": {
+        "times": null,
+        "completed": 268
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-22T08:02:18.237409+02:00",
+      "next_run_at": "2026-11-06T09:20:14.685809+01:00",
+      "last_run_at": "2026-11-05T21:20:14.685809+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T21:19:41.699430+01:00",
+        "dispatched_at": "2026-11-05T21:20:13.013161+01:00",
+        "lateness_seconds": 31.3,
+        "kind": "on_time"
+      },
+      "last_failure": {
+        "at": "2026-11-04T09:09:01.631696+01:00",
+        "detail": "Script exited with code 1\nstderr:\nTraceback (most recent call last):\n  File \"/Users/andreasnahrgang/.hermes/scripts/generic_vacuum.py\", line 2, in <module>\n    import requests\nModuleNotFoundError: No module named 'requests'"
+      }
+    },
+    {
+      "id": "87f724438caf",
+      "name": "KRITIS South Distiller (Step 2)",
+      "prompt": "python3 /Users/andreasnahrgang/.hermes/scripts/synth.py kritis_south",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "synth.py",
+      "no_agent": true,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 720,
+        "display": "every 720m"
+      },
+      "schedule_display": "every 720m",
+      "repeat": {
+        "times": null,
+        "completed": 243
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-22T08:03:02.403871+02:00",
+      "next_run_at": "2026-11-06T10:39:16.900023+01:00",
+      "last_run_at": "2026-11-05T22:39:16.900023+01:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": [
+        "web",
+        "file",
+        "skills"
+      ],
+      "workdir": null,
+      "fire_claim": null,
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "failure_streak": 0,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T20:08:03.665209+01:00",
+        "dispatched_at": "2026-11-05T20:18:54.572143+01:00",
+        "lateness_seconds": 650.9,
+        "kind": "late"
+      },
+      "last_failure": {
+        "at": "2026-11-05T08:08:03.665209+01:00",
+        "detail": "Script timed out after 3600s: /Users/andreasnahrgang/.hermes/scripts/synth.py"
+      }
+    },
+    {
+      "id": "ce7963e57fad",
+      "name": "Topic news digest",
+      "prompt": "Search the web for new and noteworthy items about: shadow AI. Dedupe against what you sent in previous runs — only include genuinely new developments. Deliver a tight digest of at most 5 bullets, each one line with a link. If nothing new since last run, respond with [SILENT].",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": "custom",
+      "provider_snapshot": null,
+      "model_snapshot": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 21 * * *",
+        "display": "0 21 * * *"
+      },
+      "schedule_display": "0 21 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 109
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-07-13T10:21:07.428300+02:00",
+      "next_run_at": "2026-11-06T21:00:00+01:00",
+      "last_run_at": "2026-11-05T21:20:16.887978+01:00",
+      "last_status": "error",
+      "last_error": "RuntimeError: Operation interrupted: waiting for model response (1047.5s elapsed).",
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null,
+      "fire_claim": null,
+      "failure_streak": 2,
+      "last_dispatch": {
+        "scheduled_at": "2026-11-05T21:00:00+01:00",
+        "dispatched_at": "2026-11-05T21:02:45.971477+01:00",
+        "lateness_seconds": 166.0,
+        "kind": "on_time"
+      },
+      "last_failure": {
+        "at": "2026-11-05T21:20:16.887978+01:00",
+        "detail": "RuntimeError: Operation interrupted: waiting for model response (1047.5s elapsed)."
+      },
+      "canonical_completions": [
+        "107a63f869134294b59338e5845cc80e"
+      ]
+    }
+  ],
+  "updated_at": "2026-11-05T22:46:19.144812+01:00"
+}

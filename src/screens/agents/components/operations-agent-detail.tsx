@@ -8,10 +8,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
-import {
-  fetchModels,
-  type GatewayModelCatalogEntry,
-} from '@/lib/gateway-api'
+import { fetchModels, type GatewayModelCatalogEntry } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
 import type { OperationsAgent } from '../hooks/use-operations'
 
@@ -48,7 +45,7 @@ function ModelSelector({
 }: {
   value: string
   onChange: (nextValue: string) => void
-  models: AvailableModel[]
+  models: Array<AvailableModel>
 }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -263,6 +260,13 @@ export function OperationsAgentDetail({
         <label className="mt-4 block space-y-2">
           <span className="text-sm font-medium text-[var(--theme-text)]">Model</span>
           <ModelSelector value={model} onChange={setModel} models={models} />
+          {modelsQuery.error ? (
+            <p className="text-xs text-red-600">
+              {modelsQuery.error instanceof Error
+                ? modelsQuery.error.message
+                : 'Unable to load models. Check your Hermes connection.'}
+            </p>
+          ) : null}
         </label>
 
         <label className="mt-4 block space-y-2">

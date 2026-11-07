@@ -1,0 +1,18 @@
+{
+  "summary": {
+    "generated_at": "2026-11-05T22:41:29",
+    "window_hours": 24,
+    "ok": 1,
+    "warn": 0,
+    "fail": 0,
+    "jobs_tracked": 1
+  },
+  "jobs": [
+    {
+      "id": "base0000",
+      "name": "base-ok",
+      "active": true,
+      "verdict": "ok"
+    }
+  ]
+}

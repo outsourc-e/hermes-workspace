@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "properties": {
+    "company_secrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "pattern": "^CS_\\d+$" },
+          "secret": { "type": "string", "minLength": 2 },
+          "decoy": { "type": "string", "minLength": 2 },
+          "type": { "type": "string", "enum": ["codename", "pricing_phrase", "strategic", "supplier", "ip_phrase", "other"] }
+        },
+        "required": ["id", "secret", "decoy", "type"]
+      }
+    },
+    "pii": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "placeholderStyle": { "type": "string", "enum": ["bracketed_index", "custom_label"] }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "properties": {
+        "forceInstall": { "type": "boolean" },
+        "antiTamperDevToolsBlock": { "type": "boolean" },
+        "allowedLLMDomains": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "version": { "type": "string" },
+    "policyHash": { "type": "string" }
+  }
+}

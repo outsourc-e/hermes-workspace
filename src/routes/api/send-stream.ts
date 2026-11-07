@@ -20,6 +20,7 @@ import {
   createSession,
   ensureGatewayProbed,
   getGatewayCapabilities,
+  getSession,
   listSessions,
   streamChat,
 } from '../../server/hermes-api'
@@ -363,6 +364,27 @@ export const Route = createFileRoute('/api/send-stream')({
                   const session = await createSession()
                   sessionKey = session.id
                   resolvedFriendlyId = session.id
+                }
+              }
+
+              // Session-create vs first-send race: the client may reference a
+              // session id before the gateway's POST /api/sessions for it has
+              // completed. Observed as gateway 404 session_not_found
+              // (2026-11-02, d352cbe8…, access log: stream 1 ms before the
+              // 201 create). Ensure the gateway holds the session,
+              // re-creating it idempotently when it is still unknown,
+              // before streaming.
+              if (!SESSION_BOOTSTRAP_KEYS.has(sessionKey)) {
+                try {
+                  await getSession(sessionKey)
+                } catch {
+                  try {
+                    const ensured = await createSession({ id: sessionKey })
+                    sessionKey = ensured.id
+                    resolvedFriendlyId = ensured.id
+                  } catch {
+                    // Let streamChat surface the original gateway error.
+                  }
                 }
               }
 

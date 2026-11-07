@@ -195,7 +195,7 @@ available.
 
 ## Step 7 — Verify in browser
 
-Open `http://localhost:3000` (or whatever port Vite reports).
+Open `http://localhost:3001` (or whatever port Vite reports).
 
 - **Full UI with chat** = success.
 - **"Connect Backend" / "Skip setup" onboarding screen** = gateway not reachable

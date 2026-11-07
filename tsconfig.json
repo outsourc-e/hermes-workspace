@@ -12,7 +12,7 @@
     "jsx": "react-jsx",
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "chrome", "dom-chromium-ai"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -28,7 +28,15 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@ai-protect/shared": ["./packages/ai-protect-shared/src/index.ts"],
+      "@ai-protect/shared/*": ["./packages/ai-protect-shared/src/*"],
+      "@ai-protect/core": ["./packages/ai-protect-core/src/index.ts"],
+      "@ai-protect/core/*": ["./packages/ai-protect-core/src/*"],
+      "@ai-protect/nano": ["./packages/ai-protect-nano/src/index.ts"],
+      "@ai-protect/nano/*": ["./packages/ai-protect-nano/src/*"],
+      "@ai-protect/policy": ["./packages/ai-protect-policy/src/index.ts"],
+      "@ai-protect/policy/*": ["./packages/ai-protect-policy/src/*"]
     }
   }
 }

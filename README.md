@@ -30,6 +30,14 @@
 - ⚡ **Live SSE Streaming** — Real-time agent output with tool call rendering
 - 🧠 **Memory & Skills** — Browse, search, and edit agent memory; explore 2,000+ skills
 
+> **Nightly agent fleet**: this workspace also runs 6 scheduled intel agents
+> (competitor/customer/partner/product-intel, chief-of-staff, fleet-health) plus
+> CRM backup and board↔Buzz sync via launchd. Start at
+> [`docs/ops/agents/README.md`](docs/ops/agents/README.md) (agent index +
+> runbooks), [`docs/ops/test-suite.md`](docs/ops/test-suite.md) (test catalog),
+> [`docs/EVOLVING-TESTING-DOCUMENTATION.md`](docs/EVOLVING-TESTING-DOCUMENTATION.md) (comprehensive testing documentation & reference),
+> [`docs/tailscale-optional.md`](docs/tailscale-optional.md) (multi-device).
+
 ---
 
 ## 📸 Screenshots
@@ -67,7 +75,7 @@ hermes gateway run                  # terminal 1
 cd ~/hermes-workspace && pnpm dev   # terminal 2
 ```
 
-Open http://localhost:3000. That's it.
+Open http://localhost:3001. That's it.
 
 ---
 
@@ -89,7 +97,7 @@ echo 'HERMES_DASHBOARD_URL=http://127.0.0.1:9119' >> .env
 # If your gateway was started with API_SERVER_KEY (auth enabled), set the same value:
 # echo 'HERMES_API_TOKEN=***' >> .env
 
-pnpm dev                            # http://localhost:3000 (override with PORT=4000 pnpm dev)
+pnpm dev                            # http://localhost:3001 (override with PORT=4000 pnpm dev)
 ```
 
 Requirements on the agent side:
@@ -165,10 +173,10 @@ cd hermes-workspace
 pnpm install
 cp .env.example .env
 printf '\nHERMES_API_URL=http://127.0.0.1:8642\n' >> .env
-pnpm dev                   # Starts on http://localhost:3000
+pnpm dev                   # Starts on http://localhost:3001
 ```
 
-> **Verify:** Open `http://localhost:3000` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes APIs, advanced features appear automatically.
+> **Verify:** Open `http://localhost:3001` and complete the onboarding flow. First connect the backend, then verify chat works. If your gateway exposes Hermes APIs, advanced features appear automatically.
 
 ### Agent W Managed Companion
 
@@ -356,7 +364,7 @@ Agent state (config, sessions, skills, memory, credentials) persists in the
 
 ### Step 3: Access the Workspace
 
-Open `http://localhost:3000` and complete the onboarding.
+Open `http://localhost:3001` and complete the onboarding.
 
 > **Verify:** Check the Docker logs for `[gateway] Connected to Hermes` — this confirms the workspace successfully connected to the agent.
 
@@ -411,7 +419,7 @@ Hermes Workspace is a **Progressive Web App (PWA)** — install it for the full 
 
 ### 🖥️ Desktop (macOS / Windows / Linux)
 
-1. Open Hermes Workspace in **Chrome** or **Edge** at `http://localhost:3000`
+1. Open Hermes Workspace in **Chrome** or **Edge** at `http://localhost:3001`
 2. Click the **install icon** (⊕) in the address bar
 3. Click **Install** — Hermes Workspace opens as a standalone desktop app
 4. Pin to Dock / Taskbar for quick access

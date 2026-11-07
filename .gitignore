@@ -142,11 +142,15 @@ __pycache__/
 # generated artifacts & one-off data
 sbom*.json
 failed_*.csv
-run/
+/run/
 twenty/
 *.dump
 ops/backups/
-temp_*.py
-
+# ops runtime dir: logs/live state stay local; only the pre/post-change
+# backup snapshots (b*/r7 rollback record referenced by docs/ops) are tracked
+ops/run/*
+!ops/run/b*/
+!ops/run/r7*/
 # ops secrets — never commit
 ops/secrets/
+temp_*.py

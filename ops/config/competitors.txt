@@ -1,0 +1,9 @@
+# competitor-scout — short web watchlist (keep 3-5 entries; deep product-intel handles full 5+2 matrix).
+# These are smoke + early-signal entries. Add/remove via hand-edit (no approval gate).
+Protecto
+Nightfall AI
+Harmonic Security
+# Uncomment to broaden during active cycles:
+# Straiker
+# OpenAI
+# Anthropic

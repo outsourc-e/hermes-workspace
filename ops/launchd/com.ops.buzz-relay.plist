@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ops.buzz-relay</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$PATH"; cd ~/srv/buzz &amp;&amp; . ./bin/activate-hermit >/dev/null 2>&amp;1; exec just relay</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/buzz-relay.log</string>
+  <key>StandardErrorPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/buzz-relay.log</string>
+</dict>
+</plist>

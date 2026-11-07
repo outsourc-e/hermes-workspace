@@ -2,6 +2,11 @@
 
 Common setup issues and how to fix them.
 
+> **Systematic health checks:** run `bash ops/tests/test-hermes-health.sh -v`
+> and follow the interpretation guide in
+> [`EVOLVING-TESTING-DOCUMENTATION.md`](EVOLVING-TESTING-DOCUMENTATION.md)
+> (covers the gateway, local-model fleet, cron scheduler and supervisors).
+
 ---
 
 ## 1. Gateway starts but API server never binds (port 8642 not listening)

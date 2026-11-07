@@ -1,0 +1,7 @@
+# Modelfile — Ternary-Bonsai-2-27B GGUF (Q2_0 ternary) imported for Ollama
+# Source: prism-ml/Ternary-Bonsai-2-27B-gguf (base: Qwen/Qwen3.8-27B)
+# HF cache blob: ~/.cache/huggingface/hub/blobs/96/96406754df9960544fb0f540d7c5c304ed09d95724537ab9808cbbd041155181
+FROM /Users/andreasnahrgang/.cache/huggingface/hub/blobs/96/96406754df9960544fb0f540d7c5c304ed09d95724537ab9808cbbd041155181
+PARAMETER num_ctx 65536
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9

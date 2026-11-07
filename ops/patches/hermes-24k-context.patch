@@ -1,0 +1,16 @@
+diff --git a/agent/model_metadata.py b/agent/model_metadata.py
+index cfaf7ed0c8..a8d257d47d 100644
+--- a/agent/model_metadata.py
++++ b/agent/model_metadata.py
+@@ -269,7 +269,10 @@ def _warn_context_length_fallback(model: str, base_url: str) -> None:
+ 
+ 
+ # Sessions, model switches and cron jobs reject models below this (too little working memory).
+-MINIMUM_CONTEXT_LENGTH = 64_000
++# PATCHED: Lowered from 64000 to 24576 to support Metal acceleration with large models
++# Metal backend on Apple Silicon struggles with generation at 32K+ context for 27B models
++# 24576 provides good balance of performance and context capacity on Apple M2 Max
++MINIMUM_CONTEXT_LENGTH = 24_576
+ # In-process (model, base_url) -> (result, monotonic_ts) memo for local probes: one
+ # startup resolves the same model several times (banner, /model, compressor). Never persisted.
+ _LOCAL_CTX_PROBE_TTL_SECONDS = 30.0

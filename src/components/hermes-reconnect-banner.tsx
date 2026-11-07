@@ -117,7 +117,7 @@ export function HermesReconnectBanner({
               Date.now() - autoRestartTriedAtRef.current
             if (sinceLastTry > AUTO_RESTART_COOLDOWN_MS) {
               autoRestartTriedAtRef.current = Date.now()
-              void fetch('/api/start-hermes', {
+              void fetch('/api/start-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
               })
@@ -197,7 +197,7 @@ export function HermesReconnectBanner({
     setMessage(null)
 
     try {
-      const response = await fetch('/api/start-agent', {
+      const response = await fetch('/api/start-all', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

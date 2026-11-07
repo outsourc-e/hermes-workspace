@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ops.ollama-env</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/andreasnahrgang/hermes-workspace/ops/bin/ollama-env-apply.sh</string>
+    <string>3</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>1805</integer>
+  <key>Comment</key><string>R7: keeps OLLAMA_NUM_PARALLEL=3 in the Aqua launchd env (R6 lesson — the last unsupervised process now also has supervision). Restarts Ollama.app once if the live serve lacks the var.</string>
+  <key>StandardOutPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/ollama-env.log</string>
+  <key>StandardErrorPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/ollama-env.log</string>
+</dict>
+</plist>

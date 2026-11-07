@@ -22,7 +22,7 @@ Thanks for your interest in contributing! Here's how to get started.
 # Install dependencies
 pnpm install
 
-# Dev server (default: localhost:3000)
+# Dev server (default: localhost:3001)
 pnpm dev
 
 # Type check

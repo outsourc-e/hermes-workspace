@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAuditReceipt } from "../../packages/ai-protect-core/src/audit.js";
+import { buildAuditReceipt } from "@ai-protect/core/audit";
 
 describe("audit receipt — NIS2 revisionssicher p10, no raw", () => {
   it("contains only ids, no raw secret", () => {

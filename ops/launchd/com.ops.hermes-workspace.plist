@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  com.ops.hermes-workspace
+  Owner of the production workspace server on 127.0.0.1:3001.
+  Rules:
+  - This is the ONLY supervisor. The cron watchdog observes, never starts.
+  - start-stable.sh does not rebuild on every restart: SKIP_BUILD=1.
+  - Bind is loopback-only (network-mode marker: ops/run/network-mode).
+  Changed 2026-11-02: dev server replaced by production server (single listener).
+-->
+<dict>
+  <key>Label</key><string>com.ops.hermes-workspace</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>export PATH="/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$HOME/.local/bin:$PATH"; cd ~/hermes-workspace &amp;&amp; exec bash scripts/start-stable.sh</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>20</integer>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOST</key><string>127.0.0.1</string>
+    <key>PORT</key><string>3001</string>
+    <key>SKIP_BUILD</key><string>1</string>
+    <key>FOREGROUND</key><string>1</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/Users/andreasnahrgang/hermes-workspace</string>
+  <key>StandardOutPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/workspace.log</string>
+  <key>StandardErrorPath</key><string>/Users/andreasnahrgang/hermes-workspace/ops/run/workspace.log</string>
+</dict>
+</plist>

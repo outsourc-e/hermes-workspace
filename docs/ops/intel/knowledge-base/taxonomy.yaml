@@ -1,0 +1,84 @@
+# Unified Feature & Technology Taxonomy — product-intel knowledge base
+# Every vendor profile and the comparison matrix use EXACTLY these dimension keys.
+# The agent extends this file ONLY via a proposal in #approvals (owner-signed reaction).
+version: 1
+updated: 2026-08-26
+value_scale: {none: "not offered", partial: "limited/beta/narrow scope", full: "generally available, core capability", unverified: "claimed by vendor, not independently confirmed"}
+
+groups:
+  discovery_inventory:
+    label: Discovery & Inventory
+    dims:
+      shadow_ai_tool_discovery: "Discover unapproved AI tools/apps in use (Shadow AI)"
+      ai_agent_inventory: "Catalog AI agents incl. builder platforms (Bedrock AgentCore, Copilot Studio) and coding agents"
+      mcp_server_discovery: "Find MCP servers connected to agents/clients; local stdio servers included"
+      browser_extension_coverage: "Ship or support a browser extension for AI interaction control"
+      endpoint_agent_coverage: "Endpoint agent (macOS/Windows) for on-device inspection"
+      saas_api_integrations: "API-based integrations into SaaS (Slack, Drive, Gmail, Salesforce...)"
+
+  data_protection:
+    label: Data Protection
+    dims:
+      pii_detection_breadth: "# of sensitive entity/data types detected (PII/PHI/PCI/secrets)"
+      deterministic_regex_engine: "Deterministic pattern engine (no ML hallucination, reproducible)"
+      ml_llm_detection: "ML/NLP/LLM-based detectors and classifiers"
+      context_preserving_tokenization: "Masking that preserves semantic structure so model accuracy survives"
+      reversible_reveal: "1-click re-identification/detokenization of AI responses locally"
+      file_document_sanitization: "PDF/DOCX/XLSX/CSV scrubbing incl. offline OCR"
+      custom_rules_regex: "Customer-defined detection rules / regex / token labels"
+      inline_realtime_redaction: "Redact before submission at typing/upload time (inline, not after-the-fact)"
+
+  access_governance:
+    label: Access Control & Governance
+    dims:
+      runtime_access_control: "Context/task-aware access decisions at inference time (CBAC-style)"
+      policy_engine: "Central policy definition + automatic enforcement across surfaces"
+      admin_lock_mdm: "CISO/admin enforced lock via MDM or central config (tamper-resistant client)"
+      audit_trail_receipts: "Audit logging / signed receipts proving handling (who/what/when)"
+      multi_tenancy: "Multi-tenant isolation for platforms/MSPs"
+
+  agent_security:
+    label: AI Agent Security
+    dims:
+      agent_runtime_guardrails: "Runtime blocking of prompt injection / leakage / tool manipulation"
+      hooks_level_interception: "Interception inside coding-agent execution (hooks, e.g. Claude Code)"
+      tool_call_governance: "Classify/govern tool call inputs and outputs"
+      mcp_gateway_security: "Secure MCP gateway: authN/Z, discovery, audit for MCP traffic"
+      agent_red_teaming: "Continuous automated red-teaming of agents"
+      agent_observability: "Tracing/observability of agent behavior end-to-end"
+      autonomous_analyst: "Autonomous AI analyst agent inside the product (e.g. triage)"
+
+  deployment_architecture:
+    label: Deployment & Architecture
+    dims:
+      client_side_zero_server: "Processing happens client-side in RAM/browser; zero server egress"
+      local_on_device_ml: "On-device models (SLM/WASM/WebGPU) with no data leaving endpoint"
+      saas_multitenant_cloud: "Hosted SaaS offering"
+      vpc_self_hosted: "Deployable into customer VPC / self-hosted"
+      air_gapped_onprem: "Fully air-gapped / on-prem deployment option"
+      open_source_components: "Meaningful open-source components/repos"
+
+  compliance:
+    label: Compliance Mapping
+    dims:
+      hipaa_mapping: "HIPAA (Safe Harbor/BAA) mapping"
+      gdpr_mapping: "GDPR Art. 25/32 etc."
+      soc2_iso_certifications: "SOC 2 Type II / ISO 27001 certifications"
+      eu_ai_act_mapping: "EU AI Act risk-tier/transparency mapping"
+      nist_owasp_frameworks: "NIST AI RMF / OWASP Agentic Top 10 / MITRE ATLAS mappings"
+
+  commercial:
+    label: Commercial Signals
+    dims:
+      transparent_pricing: "Public pricing page"
+      free_tier_or_trial: "Free tier/trial/self-serve start"
+      named_enterprise_customers: "Named reference customers/case studies"
+      partner_program: "Channel/partner program (reseller/integrator)"
+
+# Clusters group vendors by category — used by gap analysis.
+clusters:
+  client-anonymization: "Client-side PII redaction / prompt anonymization (zero-server bias)"
+  data-control-plane: "Enterprise AI data security platform (DLP/tokenization/CBAC)"
+  agent-security: "Agent inventory, posture management, runtime agent defense"
+  gateway-infra: "LLM/MCP/agent gateways & serving infrastructure"
+  enterprise-browser: "Enterprise browsers / browser-layer security"

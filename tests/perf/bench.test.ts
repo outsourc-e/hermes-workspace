@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { substituteExact } from "../../packages/ai-protect-core/src/substitute.js";
+import { substituteExact } from "@ai-protect/core/substitute";
 
 describe("perf: tinybench style", () => {
   it("benchmark 14.5TB replay shape (2000 iterations)", () => {

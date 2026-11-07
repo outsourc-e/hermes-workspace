@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "updated": "2026-08-26",
+  "own_products": [
+    {
+      "name": "AI-Protect",
+      "url": "https://ai-protect.store/",
+      "profile": "own-products.md#ai-protect",
+      "note": "JS-rendered site; profile seeded from Obsidian strategy docs"
+    },
+    {
+      "name": "PrivacyScrubber",
+      "url": "https://privacyscrubber.com/",
+      "profile": "own-products.md#privacyscrubber",
+      "note": "fully fetchable, rich technical marketing site"
+    }
+  ],
+  "targets": [
+    {
+      "name": "Protecto",
+      "url": "https://www.protecto.ai/",
+      "type": "competitor",
+      "cluster": "data-control-plane",
+      "status": "active",
+      "profile": "vendors/protecto.md"
+    },
+    {
+      "name": "Straiker",
+      "url": "https://www.straiker.ai/products/discover-ai",
+      "type": "competitor",
+      "cluster": "agent-security",
+      "status": "active",
+      "profile": "vendors/straiker.md"
+    },
+    {
+      "name": "Harmonic Security",
+      "url": "https://www.harmonic.security/solutions/shadow-ai-detection",
+      "type": "competitor",
+      "cluster": "agent-security",
+      "status": "active",
+      "profile": "vendors/harmonic.md"
+    },
+    {
+      "name": "Nightfall AI",
+      "url": "https://www.nightfall.ai/",
+      "type": "competitor",
+      "cluster": "data-control-plane",
+      "status": "active",
+      "profile": "vendors/nightfall.md"
+    },
+    {
+      "name": "TrueFoundry",
+      "url": "https://www.truefoundry.com/",
+      "type": "partner-candidate",
+      "cluster": "gateway-infra",
+      "status": "active",
+      "profile": "vendors/truefoundry.md",
+      "note": "gateway infra; potential embed/integration partner for PrivacyScrubber SDK"
+    }
+  ],
+  "candidates_policy": "New targets are PROPOSALS in candidates/ until the owner reacts with approval in Buzz #approvals AND the target is added via ops/bin/intel-add-target.sh. The agent must never edit this file's targets array directly."
+}

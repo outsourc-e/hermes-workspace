@@ -1,0 +1,36 @@
+{
+  "summary": {
+    "generated_at": "2026-11-05T22:41:29",
+    "window_hours": 24,
+    "ok": 1,
+    "warn": 0,
+    "fail": 1,
+    "jobs_tracked": 2
+  },
+  "jobs": [
+    {
+      "id": "base0000",
+      "name": "base-ok",
+      "active": true,
+      "verdict": "ok"
+    },
+    {
+      "id": "y1",
+      "name": "Shadow AI Distiller",
+      "active": true,
+      "cadence_minutes": 10080,
+      "runs_24h": 1,
+      "failed_24h": 1,
+      "artifact": {
+        "exists": true,
+        "fresh": false,
+        "age_hours": 900,
+        "threshold_hours": 170
+      },
+      "verdict": "fail",
+      "reasons": [
+        "artifact stale"
+      ]
+    }
+  ]
+}

@@ -10,7 +10,7 @@
 #   1. cp .env.example .env
 #   2. Add at least one provider key (whichever you use)
 #   3. docker compose up
-#   4. Open http://localhost:3000
+#   4. Open http://localhost:3001
 #
 # Images:
 #   This file pulls pre-built images by default — no local build required.

@@ -230,7 +230,7 @@ Next steps (two terminals):
   2) Start the workspace UI:
        cd $INSTALL_DIR && pnpm dev
 
-  3) Open http://localhost:3000
+  3) Open http://localhost:3001
 
 If the gateway was already running before this install,
 restart it so API_SERVER_ENABLED=true takes effect.

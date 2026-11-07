@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { substituteExact, rehydrateFull } from "../../packages/ai-protect-core/src/substitute.js";
-import { StreamingRehydrator } from "../../packages/ai-protect-core/src/rehydrator.js";
+import { substituteExact, rehydrateFull } from "@ai-protect/core/substitute";
+import { StreamingRehydrator } from "@ai-protect/core/rehydrator";
 
 const LEX = [
   { id: "CS_021", secret: "Project Titan", decoy: "Project Atlas", type: "codename" as const },

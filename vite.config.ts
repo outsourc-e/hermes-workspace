@@ -5,6 +5,7 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
 import { resolve, dirname } from 'node:path'
 import os from 'node:os'
+import { startLocalAI } from './src/server/local-ai-launcher'
 
 // devtools removed
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -92,6 +93,12 @@ const config = defineConfig(({ mode, command }) => {
 
   const startHermesAgent = async () => {
     if (hermesAgentStarted) return
+    // Skip auto-start if explicitly disabled via env var
+    if (env.HERMES_AGENT_SKIP_AUTO_START === 'true') {
+      console.log('[hermes-agent] Auto-start disabled via HERMES_AGENT_SKIP_AUTO_START')
+      hermesAgentStarted = true
+      return
+    }
     // Skip auto-start when HERMES_API_URL is explicitly set to a non-local endpoint
     const explicitUrl =
       env.HERMES_API_URL || process.env.HERMES_API_URL || hermesApiUrl || ''
@@ -445,8 +452,8 @@ const config = defineConfig(({ mode, command }) => {
       // Port precedence:
       //   1. --port CLI flag (wins, but we no longer hardcode it in package.json)
       //   2. $PORT env var (for containers, reverse proxies, WhatsApp bridge collisions, etc. — see #96)
-      //   3. default 3000 (matches README/docs/docker-compose expectations)
-      port: process.env.PORT ? Number(process.env.PORT) : 3000,
+      //   3. default 3001 (matches README/docs/docker-compose expectations)
+      port: process.env.PORT ? Number(process.env.PORT) : 3001,
       strictPort: false, // allow fallback if port is taken, but log clearly
       allowedHosts: true,
       watch: {
@@ -464,13 +471,7 @@ const config = defineConfig(({ mode, command }) => {
           ws: true,
           rewrite: (path) => path.replace(/^\/ws-hermes/, ''),
         },
-// REST API proxy: API proxy for Hermes backend
-        '/api/hermes-proxy': {
-          target: proxyTarget,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/hermes-proxy/, ''),
-        },
-        '/hermes-ui': {
+'/hermes-ui': {
           target: proxyTarget,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/hermes-ui/, ''),
@@ -620,6 +621,11 @@ const config = defineConfig(({ mode, command }) => {
           // Auto-start hermes-agent when dev server launches
           if (command === 'serve') {
             void startHermesAgent()
+            void startLocalAI().then((result) => {
+              for (const [id, r] of Object.entries(result.results)) {
+                console.log(`[local-ai] ${id}: ${r.ok ? r.message : r.error}`)
+              }
+            })
           }
 
           // Shutdown hermes-agent when dev server stops

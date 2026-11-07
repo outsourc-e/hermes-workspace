@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { substituteExact, rehydrateFull } from "../../packages/ai-protect-core/src/substitute.js";
+import { substituteExact, rehydrateFull } from "@ai-protect/core/substitute";
 import fc from "fast-check";
 
 // fast-check optional: if not installed, property test is skipped
