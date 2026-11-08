@@ -4,7 +4,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.expanduser("~/hermes-agent"))
+sys.path.insert(0, os.environ.get("HERMES_AGENT_PATH") or os.path.expanduser("~/.hermes/hermes-agent"))
 
 from tools.skills_hub import GitHubAuth, create_source_router, unified_search
 
