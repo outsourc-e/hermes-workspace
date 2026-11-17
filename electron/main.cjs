@@ -4,6 +4,25 @@ const fs = require('fs')
 const { existsSync } = fs
 const { spawn, execSync } = require('child_process')
 const http = require('http')
+
+// Packaged macOS/Linux apps launched from Finder/Dock get a minimal PATH, so the
+// hermes CLI (venv, ~/.local/bin, Homebrew) isn't found. Extend it up front.
+if (process.platform !== 'win32') {
+  const { delimiter } = require('path')
+  const homeDir = require('os').homedir()
+  const extraPaths = [
+    join(homeDir, 'hermes-agent/.venv/bin'),
+    join(homeDir, '.local/bin'),
+    join(homeDir, 'bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+  ]
+  const current = (process.env.PATH || '').split(delimiter)
+  const missing = extraPaths.filter((p) => !current.includes(p))
+  if (missing.length) {
+    process.env.PATH = [...missing, ...current].filter(Boolean).join(delimiter)
+  }
+}
 let autoUpdater = null
 try {
   ;({ autoUpdater } = require('electron-updater'))
@@ -409,7 +428,11 @@ function startLocalServer() {
       process.execPath,
       [join(__dirname, 'prod-server.cjs'), '--port', String(APP_PORT)],
       {
-        cwd: join(__dirname, '..'),
+        // With asar packaging, join(__dirname, '..') is the app.asar *file* and
+        // spawn fails with ENOTDIR. Fall back to Resources only in that case.
+        cwd: join(__dirname, '..').endsWith('.asar')
+          ? process.resourcesPath
+          : join(__dirname, '..'),
         env: {
           ...process.env,
           ELECTRON_RUN_AS_NODE: '1',
